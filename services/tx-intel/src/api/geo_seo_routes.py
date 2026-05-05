@@ -85,17 +85,20 @@ async def list_profiles(
         offset = (page - 1) * size
 
         count_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(DISTINCT store_id) AS total
                 FROM geo_brand_profiles
                 WHERE tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         total = count_row.scalar() or 0
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id, store_name, platform, seo_score,
                        address, phone, cuisine_type, citation_found,
                        updated_at
@@ -103,7 +106,8 @@ async def list_profiles(
                 WHERE tenant_id = :tid AND is_deleted = FALSE
                 ORDER BY seo_score DESC, updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "limit": size, "offset": offset},
         )
         items = [
@@ -187,7 +191,8 @@ async def list_citations(
         total = count_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, query, platform, mention_found, mention_text,
                        mention_position, competitor_mentions, sentiment,
                        checked_at, check_round
@@ -195,7 +200,8 @@ async def list_citations(
                 WHERE {where_sql}
                 ORDER BY checked_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [

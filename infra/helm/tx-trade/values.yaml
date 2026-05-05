@@ -71,11 +71,29 @@ podAntiAffinity:
   enabled: true
 
 serviceAccount:
-  create: false
+  create: true
   name: ""
-
+  annotations: {}
 podAnnotations: {}
 
 nodeSelector: {}
 
 tolerations: []
+
+# P0.6 工件 3 — PodDisruptionBudget（Tier 1：minAvailable=1，强保护）
+pdb:
+  enabled: true
+  minAvailable: 1
+  maxUnavailable: ""
+
+# P0.6 工件 4 — NetworkPolicy（默认禁用，启用前需画清楚服务依赖图）
+# docs/infra/service-dependency-graph.md（待补）
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# P0.6 工件 5 — 额外 ConfigMap（默认禁用，启用后通过 envFrom 注入 deployment）
+configMap:
+  enabled: false
+  data: {}

@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -101,7 +102,7 @@ async def recommend_at_order_time(
         uuid.UUID(req.customer_id)
         uuid.UUID(req.store_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     meal_period = req.meal_period or _current_meal_period()
 
@@ -113,7 +114,8 @@ async def recommend_at_order_time(
 
             # ── 1. 客户历史偏好（常点菜 Top 10）──────────────────────────
             history_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT oi.dish_id, d.name AS dish_name,
                            d.price_fen, COUNT(*) AS order_count
                     FROM order_items oi
@@ -127,7 +129,8 @@ async def recommend_at_order_time(
                     GROUP BY oi.dish_id, d.name, d.price_fen
                     ORDER BY order_count DESC
                     LIMIT 10
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "customer_id": req.customer_id},
             )
             for r in history_result.fetchall():
@@ -145,7 +148,8 @@ async def recommend_at_order_time(
 
             # ── 2. 时段热销菜品 Top 10 ───────────────────────────────────
             hot_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT oi.dish_id, d.name AS dish_name,
                            d.price_fen, COUNT(*) AS sale_count
                     FROM order_items oi
@@ -159,7 +163,8 @@ async def recommend_at_order_time(
                     GROUP BY oi.dish_id, d.name, d.price_fen
                     ORDER BY sale_count DESC
                     LIMIT 10
-                """),
+                """
+                ),
                 {
                     "tenant_id": x_tenant_id,
                     "store_id": req.store_id,
@@ -190,7 +195,8 @@ async def recommend_at_order_time(
                 # 使用参数化查询（最多取前3个购物车商品做关联）
                 for cart_item_id in cart_ids[:3]:
                     assoc_result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT oi2.dish_id, d.name AS dish_name,
                                    d.price_fen, COUNT(*) AS co_count
                             FROM order_items oi1
@@ -205,7 +211,8 @@ async def recommend_at_order_time(
                             GROUP BY oi2.dish_id, d.name, d.price_fen
                             ORDER BY co_count DESC
                             LIMIT 5
-                        """),
+                        """
+                        ),
                         {"tenant_id": x_tenant_id, "cart_dish_id": cart_item_id},
                     )
                     for r in assoc_result.fetchall():
@@ -227,7 +234,8 @@ async def recommend_at_order_time(
 
             # ── 4. 高毛利菜品加分 ──────────────────────────────────────────
             margin_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id AS dish_id, name AS dish_name,
                            price_fen,
                            CASE WHEN cost_fen > 0
@@ -240,7 +248,8 @@ async def recommend_at_order_time(
                       AND status = 'on_sale'
                     ORDER BY margin_rate DESC
                     LIMIT 20
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id},
             )
             for r in margin_result.fetchall():
@@ -270,7 +279,8 @@ async def recommend_at_order_time(
             # 写入推荐日志
             for item in sorted_candidates:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO recommendation_logs
                             (id, tenant_id, customer_id, store_id, scene,
                              recommended_dish_id, recommended_dish_name,
@@ -279,7 +289,8 @@ async def recommend_at_order_time(
                             (:id, :tenant_id, :customer_id, :store_id, 'order_time',
                              :dish_id, :dish_name,
                              :score, :reason, :reason_type, FALSE, NOW())
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": x_tenant_id,
@@ -341,7 +352,7 @@ async def recommend_upsell(
         uuid.UUID(x_tenant_id)
         uuid.UUID(order_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     async for db in get_db():
         try:
@@ -349,7 +360,8 @@ async def recommend_upsell(
 
             # 获取当前订单信息
             order_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT o.customer_id, o.store_id, o.total_fen,
                            c.display_name AS customer_name
                     FROM orders o
@@ -357,7 +369,8 @@ async def recommend_upsell(
                         ON c.id = o.customer_id AND c.tenant_id = o.tenant_id
                     WHERE o.id = :order_id
                       AND o.tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"order_id": order_id, "tenant_id": x_tenant_id},
             )
             order_row = order_result.fetchone()
@@ -370,24 +383,28 @@ async def recommend_upsell(
 
             # 获取当前订单菜品
             current_items_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT dish_id FROM order_items
                     WHERE order_id = :order_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"order_id": order_id, "tenant_id": x_tenant_id},
             )
             current_dish_ids = {str(r.dish_id) for r in current_items_result.fetchall()}
 
             # 获取当前订单菜品的品类
             current_categories_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT DISTINCT d.category
                     FROM order_items oi
                     JOIN dishes d ON d.id = oi.dish_id AND d.tenant_id = oi.tenant_id
                     WHERE oi.order_id = :order_id
                       AND oi.tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"order_id": order_id, "tenant_id": x_tenant_id},
             )
             current_categories = {r.category for r in current_categories_result.fetchall() if r.category}
@@ -397,7 +414,8 @@ async def recommend_upsell(
             # 策略1：客户曾点但本次未点的高频菜品
             if customer_id:
                 history_fav = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT oi.dish_id, d.name AS dish_name,
                                d.price_fen, d.category, COUNT(*) AS freq
                         FROM order_items oi
@@ -410,7 +428,8 @@ async def recommend_upsell(
                         GROUP BY oi.dish_id, d.name, d.price_fen, d.category
                         ORDER BY freq DESC
                         LIMIT 20
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "customer_id": customer_id},
                 )
                 for r in history_fav.fetchall():
@@ -434,7 +453,8 @@ async def recommend_upsell(
             if complement_categories and len(upsell_items) < limit:
                 for cat in complement_categories:
                     cat_result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT id AS dish_id, name AS dish_name, price_fen, category
                             FROM dishes
                             WHERE tenant_id = :tenant_id
@@ -443,7 +463,8 @@ async def recommend_upsell(
                               AND is_deleted = FALSE
                             ORDER BY RANDOM()
                             LIMIT 2
-                        """),
+                        """
+                        ),
                         {"tenant_id": x_tenant_id, "category": cat},
                     )
                     for r in cat_result.fetchall():
@@ -464,7 +485,8 @@ async def recommend_upsell(
             # 写推荐日志
             for item in upsell_items:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO recommendation_logs
                             (id, tenant_id, customer_id, store_id, scene,
                              recommended_dish_id, recommended_dish_name,
@@ -475,7 +497,8 @@ async def recommend_upsell(
                              :dish_id, :dish_name,
                              :score, :reason, :reason_type, FALSE,
                              :order_id, NOW())
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": x_tenant_id,
@@ -534,7 +557,7 @@ async def recommend_return_visit(
         uuid.UUID(x_tenant_id)
         uuid.UUID(customer_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"UUID 格式错误: {e}") from e
+        raise safe_http_exception(400, "请求参数格式错误", e) from e
 
     async for db in get_db():
         try:
@@ -544,7 +567,8 @@ async def recommend_return_visit(
 
             # 获取客户基本信息
             customer_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT display_name,
                            COALESCE(
                                (SELECT rfm_level FROM member_rfm
@@ -555,7 +579,8 @@ async def recommend_return_visit(
                     FROM customers
                     WHERE id = :customer_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "customer_id": customer_id},
             )
             cust_row = customer_result.fetchone()
@@ -564,7 +589,8 @@ async def recommend_return_visit(
 
             # 策略1：最近偏好的品类中的新菜品（探索推荐）
             recent_cats = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT d.category, COUNT(*) AS cat_count
                     FROM order_items oi
                     JOIN dishes d ON d.id = oi.dish_id AND d.tenant_id = oi.tenant_id
@@ -576,21 +602,24 @@ async def recommend_return_visit(
                     GROUP BY d.category
                     ORDER BY cat_count DESC
                     LIMIT 3
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "customer_id": customer_id},
             )
             fav_categories = [r.category for r in recent_cats.fetchall() if r.category]
 
             # 查该客户未吃过但同品类热门的菜
             already_tried = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT DISTINCT oi.dish_id
                     FROM order_items oi
                     JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
                     WHERE oi.tenant_id = :tenant_id
                       AND o.customer_id = :customer_id
                       AND o.status = 'paid'
-                """),
+                """
+                ),
                 {"tenant_id": x_tenant_id, "customer_id": customer_id},
             )
             tried_ids = {str(r.dish_id) for r in already_tried.fetchall()}
@@ -599,7 +628,8 @@ async def recommend_return_visit(
                 if len(recommendations) >= limit:
                     break
                 explore_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT d.id AS dish_id, d.name AS dish_name, d.price_fen,
                                d.category, COUNT(oi.id) AS popularity
                         FROM dishes d
@@ -612,7 +642,8 @@ async def recommend_return_visit(
                         GROUP BY d.id, d.name, d.price_fen, d.category
                         ORDER BY popularity DESC
                         LIMIT 5
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "category": cat},
                 )
                 for r in explore_result.fetchall():
@@ -633,7 +664,8 @@ async def recommend_return_visit(
             # 策略2：经典回购菜品（上次点过且复购率高）
             if len(recommendations) < limit:
                 repurchase_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT oi.dish_id, d.name AS dish_name, d.price_fen,
                                d.category, COUNT(*) AS buy_count,
                                MAX(o.created_at) AS last_ordered
@@ -648,7 +680,8 @@ async def recommend_return_visit(
                         HAVING COUNT(*) >= 2
                         ORDER BY buy_count DESC, last_ordered DESC
                         LIMIT 5
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id, "customer_id": customer_id},
                 )
                 for r in repurchase_result.fetchall():
@@ -670,7 +703,8 @@ async def recommend_return_visit(
             # RFM 高价值客户(S1/S2) 推荐更高客单价菜品
             if rfm_level in ("S1", "S2") and len(recommendations) < limit:
                 premium_result = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id AS dish_id, name AS dish_name, price_fen, category
                         FROM dishes
                         WHERE tenant_id = :tenant_id
@@ -679,7 +713,8 @@ async def recommend_return_visit(
                           AND price_fen >= 5000
                         ORDER BY price_fen DESC
                         LIMIT 3
-                    """),
+                    """
+                    ),
                     {"tenant_id": x_tenant_id},
                 )
                 for r in premium_result.fetchall():
@@ -701,7 +736,8 @@ async def recommend_return_visit(
             # 写推荐日志
             for item in recommendations:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO recommendation_logs
                             (id, tenant_id, customer_id, store_id, scene,
                              recommended_dish_id, recommended_dish_name,
@@ -710,7 +746,8 @@ async def recommend_return_visit(
                             (:id, :tenant_id, :customer_id, NULL, 'return_visit',
                              :dish_id, :dish_name,
                              :score, :reason, :reason_type, FALSE, NOW())
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": x_tenant_id,
@@ -760,7 +797,7 @@ async def get_recommendation_metrics(
     try:
         uuid.UUID(x_tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {e}") from e
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", e) from e
 
     async for db in get_db():
         try:
@@ -774,7 +811,8 @@ async def get_recommendation_metrics(
 
             # 总体指标
             overview_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         COUNT(*) AS total_recommendations,
                         COUNT(*) FILTER (WHERE is_accepted = TRUE) AS accepted_count,
@@ -789,14 +827,16 @@ async def get_recommendation_metrics(
                     WHERE tenant_id = :tenant_id
                       AND created_at >= NOW() - (:days || ' days')::INTERVAL
                       {scene_filter}
-                """),
+                """
+                ),
                 params,
             )
             overview = overview_result.fetchone()
 
             # 按场景分组统计
             by_scene_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         scene,
                         COUNT(*) AS total,
@@ -812,7 +852,8 @@ async def get_recommendation_metrics(
                       {scene_filter}
                     GROUP BY scene
                     ORDER BY total DESC
-                """),
+                """
+                ),
                 params,
             )
             by_scene = [
@@ -827,7 +868,8 @@ async def get_recommendation_metrics(
 
             # 按推荐理由类型统计
             by_reason_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         reason_type,
                         COUNT(*) AS total,
@@ -839,7 +881,8 @@ async def get_recommendation_metrics(
                       {scene_filter}
                     GROUP BY reason_type
                     ORDER BY accepted DESC
-                """),
+                """
+                ),
                 params,
             )
             by_reason = [
@@ -854,7 +897,8 @@ async def get_recommendation_metrics(
 
             # 篮子提升额估算（采纳推荐的订单 vs 未采纳的平均客单价差异）
             basket_lift_result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         COALESCE(AVG(o.total_fen) FILTER (
                             WHERE rl.is_accepted = TRUE
@@ -869,7 +913,8 @@ async def get_recommendation_metrics(
                       AND rl.created_at >= NOW() - (:days || ' days')::INTERVAL
                       AND rl.order_id IS NOT NULL
                       {scene_filter}
-                """),
+                """
+                ),
                 params,
             )
             basket_row = basket_lift_result.fetchone()

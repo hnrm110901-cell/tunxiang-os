@@ -330,7 +330,8 @@ async def _generate_voucher_internal(
     from sqlalchemy import text
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO financial_vouchers (
                 tenant_id, store_id, voucher_no, voucher_date,
                 voucher_type, total_amount, entries,
@@ -341,7 +342,8 @@ async def _generate_voucher_internal(
                 :source_type, :source_id::UUID, 'draft'
             )
             ON CONFLICT (voucher_no) DO NOTHING
-        """),
+        """
+        ),
         {
             "tenant_id": str(tenant_id),
             "store_id": str(store_id),

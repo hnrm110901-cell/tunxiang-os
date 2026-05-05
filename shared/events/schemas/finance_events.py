@@ -5,6 +5,7 @@
 
 演进规则: 只加不改
 """
+
 from __future__ import annotations
 
 from typing import Optional
@@ -31,6 +32,4 @@ class CashFlowSnapshotPayload(OntologyEvent):
         default=None,
         description="预计断流天数, None 表示 >30 天或无断流风险",
     )
-    confidence: float = Field(
-        ge=0.0, le=1.0, description="预测置信度 0.0–1.0"
-    )
+    confidence: float = Field(ge=0.0, le=1.0, description="预测置信度 0.0–1.0")

@@ -99,7 +99,8 @@ class BrandStrategyDbService:
     async def get_active_profile(self, tenant_id: uuid.UUID, db: AsyncSession) -> Optional[dict[str, Any]]:
         """获取当前激活的品牌档案"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, brand_name, brand_slogan, brand_story,
                        cuisine_type, price_tier, core_value_proposition,
                        target_segments, key_scenarios, brand_voice, color_palette,
@@ -108,7 +109,8 @@ class BrandStrategyDbService:
                 WHERE tenant_id = :tid AND is_active = TRUE
                 ORDER BY version DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -128,7 +130,8 @@ class BrandStrategyDbService:
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brand_profiles (
                     tenant_id, brand_name, brand_slogan, brand_story,
                     cuisine_type, price_tier, core_value_proposition,
@@ -145,7 +148,8 @@ class BrandStrategyDbService:
                           cuisine_type, price_tier, core_value_proposition,
                           target_segments, key_scenarios, brand_voice, color_palette,
                           is_active, version, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "brand_name": data.brand_name,
@@ -259,7 +263,8 @@ class BrandStrategyDbService:
     ) -> dict[str, Any]:
         """添加营销日历节点"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brand_seasonal_calendar (
                     tenant_id, brand_profile_id, period_type, period_name,
                     start_date, end_date, campaign_theme, recommended_dishes,
@@ -272,7 +277,8 @@ class BrandStrategyDbService:
                 RETURNING id, tenant_id, brand_profile_id, period_type, period_name,
                           start_date, end_date, campaign_theme, recommended_dishes,
                           marketing_focus, target_segments, created_at
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "bpid": str(data.brand_profile_id),
@@ -298,7 +304,8 @@ class BrandStrategyDbService:
         """
         today = date.today()
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, period_type, period_name, start_date, end_date,
                        campaign_theme, recommended_dishes, marketing_focus, target_segments
                 FROM brand_seasonal_calendar
@@ -307,7 +314,8 @@ class BrandStrategyDbService:
                   AND end_date >= :today
                 ORDER BY start_date DESC
                 LIMIT 3
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "today": today},
         )
         rows = [dict(r) for r in result.mappings()]
@@ -377,7 +385,8 @@ class BrandStrategyDbService:
     ) -> dict[str, Any]:
         """添加内容约束规则"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brand_content_constraints (
                     tenant_id, brand_profile_id, constraint_type, channel,
                     max_length, required_elements, forbidden_elements, template_hints
@@ -388,7 +397,8 @@ class BrandStrategyDbService:
                 )
                 RETURNING id, tenant_id, brand_profile_id, constraint_type, channel,
                           max_length, required_elements, forbidden_elements, template_hints, created_at
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "bpid": str(data.brand_profile_id),

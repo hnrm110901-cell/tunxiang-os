@@ -128,12 +128,14 @@ class PosterGenerator:
 
         # 获取品牌logo
         brand_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT brand_name, logo_url
                 FROM brand_strategies
                 WHERE tenant_id = :tid AND is_deleted = false
                 ORDER BY updated_at DESC LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         brand = brand_row.mappings().first()
@@ -147,11 +149,13 @@ class PosterGenerator:
 
         if dish_id:
             dish_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT name, description, price_fen, image_url
                     FROM dishes
                     WHERE id = :did AND tenant_id = :tid AND is_deleted = false
-                """),
+                """
+                ),
                 {"did": dish_id, "tid": tenant_id},
             )
             dish = dish_row.mappings().first()

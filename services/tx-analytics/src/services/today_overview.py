@@ -49,7 +49,8 @@ async def calculate_health_score(
     try:
         # ── 1. 营业额达成率 ×30分 ──
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(o.final_amount_fen), 0) AS actual_fen,
                     COALESCE(s.revenue_target_fen, 0)    AS target_fen
@@ -60,7 +61,8 @@ async def calculate_health_score(
                   AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
                   AND o.status     = 'paid'
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         rev_row = row.mappings().first()
@@ -72,7 +74,8 @@ async def calculate_health_score(
 
         # ── 2. 翻台率 ×20分 ──
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(DISTINCT ts.table_id)                     AS used_tables,
                     COUNT(ts.id)                                     AS session_count,
@@ -83,7 +86,8 @@ async def calculate_health_score(
                   AND ts.tenant_id  = :tenant_id
                   AND DATE(ts.started_at) = :target_date
                   AND ts.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         table_row = row.mappings().first()
@@ -96,7 +100,8 @@ async def calculate_health_score(
 
         # ── 3. 顾客满意度（投诉率反向）×20分 ──
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE o.status IN ('refunded', 'cancelled')) AS complaint_count,
                     COUNT(*) AS total_count
@@ -105,7 +110,8 @@ async def calculate_health_score(
                   AND o.tenant_id  = :tenant_id
                   AND COALESCE(o.biz_date, DATE(o.created_at)) = :target_date
                   AND o.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         sat_row = row.mappings().first()
@@ -118,7 +124,8 @@ async def calculate_health_score(
 
         # ── 4. 食材损耗率（反向）×15分 ──
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(w.waste_cost_fen), 0) AS waste_fen,
                     COALESCE(SUM(p.amount_fen), 0)     AS purchase_fen
@@ -142,7 +149,8 @@ async def calculate_health_score(
                       AND pi.is_deleted = FALSE
                     GROUP BY pi.store_id, pi.tenant_id
                 ) p
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         waste_row = row.mappings().first()
@@ -155,7 +163,8 @@ async def calculate_health_score(
 
         # ── 5. 员工出勤率 ×15分 ──
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE a.status = 'present') AS present_count,
                     COUNT(*)                                       AS scheduled_count
@@ -164,7 +173,8 @@ async def calculate_health_score(
                   AND a.tenant_id  = :tenant_id
                   AND DATE(a.scheduled_date) = :target_date
                   AND a.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         att_row = row.mappings().first()
@@ -338,14 +348,16 @@ async def _query_hourly_revenue(db: AsyncSession, store_id: str, tenant_id: str,
 async def _query_current_occupancy(db: AsyncSession, store_id: str, tenant_id: str) -> float:
     """查询当前上座率百分比"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FILTER (WHERE status = 'occupied') AS occupied,
                    COUNT(*) AS total
             FROM tables
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     result = row.mappings().first()
@@ -357,11 +369,13 @@ async def _query_current_occupancy(db: AsyncSession, store_id: str, tenant_id: s
 async def _query_tenant_stores(db: AsyncSession, tenant_id: str) -> list[dict]:
     """查询租户下所有门店"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, store_name
             FROM stores
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     return [dict(r) for r in row.mappings().all()]

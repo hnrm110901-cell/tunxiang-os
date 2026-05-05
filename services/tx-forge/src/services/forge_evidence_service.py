@@ -71,7 +71,8 @@ class ForgeEvidenceService:
         card_id = f"ec_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_evidence_cards
                     (card_id, app_id, card_type, title, summary,
                      evidence_data, score, verified_by,
@@ -84,7 +85,8 @@ class ForgeEvidenceService:
                           evidence_data, score, verified_by,
                           verification_method, is_active,
                           expires_at, created_at
-            """),
+            """
+            ),
             {
                 "card_id": card_id,
                 "app_id": app_id,
@@ -149,7 +151,8 @@ class ForgeEvidenceService:
 
         # 数据
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT card_id, app_id, card_type, title, summary,
                        evidence_data, score, verified_by,
                        verification_method, is_active,
@@ -158,7 +161,8 @@ class ForgeEvidenceService:
                 {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -173,7 +177,8 @@ class ForgeEvidenceService:
     ) -> dict:
         """获取应用所有活跃证据卡片，计算加权信任分。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT card_id, card_type, title, summary,
                        evidence_data, score, verified_by,
                        verification_method, is_active,
@@ -183,7 +188,8 @@ class ForgeEvidenceService:
                   AND is_active = true
                   AND (expires_at IS NULL OR expires_at > NOW())
                 ORDER BY card_type, created_at DESC
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         cards = [dict(r) for r in result.mappings().all()]
@@ -213,13 +219,15 @@ class ForgeEvidenceService:
 
         # 统计过期卡片
         expired_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM forge_evidence_cards
                 WHERE app_id = :app_id
                   AND is_active = true
                   AND expires_at IS NOT NULL
                   AND expires_at <= NOW()
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         expired_count = expired_result.scalar_one()
@@ -269,13 +277,15 @@ class ForgeEvidenceService:
         set_clause = ", ".join(set_parts)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_evidence_cards
                 SET {set_clause}
                 WHERE card_id = :card_id
                 RETURNING card_id, app_id, card_type, title, summary,
                           evidence_data, score, is_active, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -298,14 +308,16 @@ class ForgeEvidenceService:
     ) -> dict:
         """停用所有已过期但仍标记为活跃的卡片。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_evidence_cards
                 SET is_active = false,
                     updated_at = NOW()
                 WHERE expires_at < NOW()
                   AND is_active = true
                 RETURNING card_id
-            """),
+            """
+            ),
         )
         deactivated = result.mappings().all()
         count = len(deactivated)

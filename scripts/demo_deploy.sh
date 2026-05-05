@@ -34,13 +34,13 @@ fi
 
 # Step 2: Start containers
 echo "[2/5] 启动 Docker 容器..."
-docker compose -f infra/docker/docker-compose.demo.yml up -d --build 2>&1 | tail -5
+docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.yml up -d --build 2>&1 | tail -5
 echo "  ✓ 容器已启动"
 
 # Step 3: Wait for DB
 echo "[3/5] 等待 PostgreSQL 就绪..."
 for i in $(seq 1 30); do
-    if docker compose -f infra/docker/docker-compose.demo.yml exec -T postgres pg_isready -U tunxiang -d tunxiang_os > /dev/null 2>&1; then
+    if docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.yml exec -T postgres pg_isready -U tunxiang -d tunxiang_os > /dev/null 2>&1; then
         echo "  ✓ 数据库已就绪 (${i}s)"; break
     fi
     [ "$i" -eq 30 ] && echo "  ✗ 超时" && exit 1
@@ -49,12 +49,12 @@ done
 
 # Step 4: Init DB
 echo "[4/5] 初始化数据库..."
-docker compose -f infra/docker/docker-compose.demo.yml exec -T gateway \
+docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.yml exec -T gateway \
     python -c "import asyncio; from shared.ontology.src.database import init_db; asyncio.run(init_db()); print('  ✓ 完成')"
 
 # Step 5: Seed data
 echo "[5/5] 导入三商户演示数据..."
-docker compose -f infra/docker/docker-compose.demo.yml exec -T gateway python scripts/demo_seed.py
+docker compose -f infra/compose/base.yml -f infra/compose/envs/demo.yml exec -T gateway python scripts/demo_seed.py
 
 echo ""
 echo "╔══════════════════════════════════════════════╗"

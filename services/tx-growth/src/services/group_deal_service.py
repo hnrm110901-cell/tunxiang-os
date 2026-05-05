@@ -15,7 +15,6 @@
 金额单位：分(fen)
 """
 
-import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
@@ -101,7 +100,8 @@ class GroupDealService:
         share_link_code = uuid.uuid4().hex[:8]
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO group_deals (
                     id, tenant_id, store_id, name, description, dish_id,
                     min_participants, max_participants, current_participants,
@@ -113,7 +113,8 @@ class GroupDealService:
                     :original_price_fen, :deal_price_fen, 'open',
                     :expires_at, :initiator_customer_id, :share_link_code
                 )
-            """),
+            """
+            ),
             {
                 "id": str(deal_id),
                 "tenant_id": str(tenant_id),
@@ -134,11 +135,13 @@ class GroupDealService:
         # 发起者自动成为首位参与者
         participant_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO group_deal_participants (
                     id, tenant_id, deal_id, customer_id
                 ) VALUES (:id, :tenant_id, :deal_id, :customer_id)
-            """),
+            """
+            ),
             {
                 "id": str(participant_id),
                 "tenant_id": str(tenant_id),
@@ -191,11 +194,13 @@ class GroupDealService:
         """
         # 检查重复参团（UNIQUE约束兜底，这里提前报友好错误）
         dup_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM group_deal_participants
                 WHERE deal_id = :deal_id AND customer_id = :customer_id
                   AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "deal_id": str(deal_id),
                 "customer_id": str(customer_id),
@@ -209,7 +214,8 @@ class GroupDealService:
         # WHERE 条件保证：open + 未满 + 未过期 + 未删除，防止并发超卖
         now = datetime.now(timezone.utc)
         update_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deals
                 SET current_participants = current_participants + 1,
                     status = CASE
@@ -229,7 +235,8 @@ class GroupDealService:
                   AND (expires_at IS NULL OR expires_at > :now)
                   AND is_deleted = false
                 RETURNING id, current_participants, status, min_participants, max_participants
-            """),
+            """
+            ),
             {
                 "deal_id": str(deal_id),
                 "tenant_id": str(tenant_id),
@@ -240,11 +247,13 @@ class GroupDealService:
         if not deal:
             # 原子更新失败 — 查原因给用户友好错误
             check = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT status, current_participants, max_participants, expires_at
                     FROM group_deals
                     WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
-                """),
+                """
+                ),
                 {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
             )
             info = check.mappings().first()
@@ -261,11 +270,13 @@ class GroupDealService:
         # 插入参与者记录
         participant_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO group_deal_participants (
                     id, tenant_id, deal_id, customer_id
                 ) VALUES (:id, :tenant_id, :deal_id, :customer_id)
-            """),
+            """
+            ),
             {
                 "id": str(participant_id),
                 "tenant_id": str(tenant_id),
@@ -314,11 +325,13 @@ class GroupDealService:
         """
         # 查参与记录
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, paid FROM group_deal_participants
                 WHERE deal_id = :deal_id AND customer_id = :customer_id
                   AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "deal_id": str(deal_id),
                 "customer_id": str(customer_id),
@@ -334,11 +347,13 @@ class GroupDealService:
 
         # 检查是否为发起者
         deal_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT initiator_customer_id, status
                 FROM group_deals
                 WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         deal = deal_result.mappings().first()
@@ -350,17 +365,20 @@ class GroupDealService:
 
         # 软删除参与者记录
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deal_participants
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :pid AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"pid": str(participant["id"]), "tenant_id": str(tenant_id)},
         )
 
         # 更新拼团人数和状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deals
                 SET current_participants = current_participants - 1,
                     status = CASE
@@ -373,17 +391,20 @@ class GroupDealService:
                     END,
                     updated_at = NOW()
                 WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
 
         # 查更新后人数
         cnt_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT current_participants FROM group_deals
                 WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         row = cnt_result.first()
@@ -423,11 +444,13 @@ class GroupDealService:
             GroupDealError: 未参团/已支付
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, paid FROM group_deal_participants
                 WHERE deal_id = :deal_id AND customer_id = :customer_id
                   AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "deal_id": str(deal_id),
                 "customer_id": str(customer_id),
@@ -443,12 +466,14 @@ class GroupDealService:
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deal_participants
                 SET paid = true, paid_at = :paid_at, order_id = :order_id,
                     updated_at = NOW()
                 WHERE id = :pid AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "paid_at": now,
                 "order_id": str(order_id),
@@ -459,22 +484,26 @@ class GroupDealService:
 
         # 查拼团价并更新收入
         deal_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT deal_price_fen FROM group_deals
                 WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         deal_row = deal_result.first()
         price_fen = deal_row[0] if deal_row else 0
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deals
                 SET total_revenue_fen = total_revenue_fen + :price_fen,
                     updated_at = NOW()
                 WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "price_fen": price_fen,
                 "deal_id": str(deal_id),
@@ -516,11 +545,13 @@ class GroupDealService:
             GroupDealError: 拼团不存在/状态不对/仍有未支付
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, current_participants, total_revenue_fen
                 FROM group_deals
                 WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         deal = result.mappings().first()
@@ -528,32 +559,32 @@ class GroupDealService:
             raise GroupDealError("DEAL_NOT_FOUND", "拼团活动不存在")
 
         if deal["status"] not in ("filled", "open"):
-            raise GroupDealError(
-                "INVALID_STATUS", f"拼团状态为 {deal['status']}，无法完成"
-            )
+            raise GroupDealError("INVALID_STATUS", f"拼团状态为 {deal['status']}，无法完成")
 
         # 检查是否全部支付
         unpaid_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM group_deal_participants
                 WHERE deal_id = :deal_id AND tenant_id = :tenant_id
                   AND is_deleted = false AND paid = false
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         unpaid_count = unpaid_result.scalar_one()
         if unpaid_count > 0:
-            raise GroupDealError(
-                "UNPAID_PARTICIPANTS", f"仍有 {unpaid_count} 位参与者未支付"
-            )
+            raise GroupDealError("UNPAID_PARTICIPANTS", f"仍有 {unpaid_count} 位参与者未支付")
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deals
                 SET status = 'completed', completed_at = :now, updated_at = NOW()
                 WHERE id = :deal_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"now": now, "deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -587,7 +618,8 @@ class GroupDealService:
         """
         now = datetime.now(timezone.utc)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE group_deals
                 SET status = 'expired', updated_at = NOW()
                 WHERE tenant_id = :tenant_id
@@ -595,7 +627,8 @@ class GroupDealService:
                   AND expires_at <= :now
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "now": now},
         )
         expired_ids = result.fetchall()
@@ -629,7 +662,8 @@ class GroupDealService:
             GroupDealError: 拼团不存在
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, name, description, dish_id,
                        min_participants, max_participants, current_participants,
                        original_price_fen, deal_price_fen, discount_fen,
@@ -638,7 +672,8 @@ class GroupDealService:
                        total_revenue_fen, created_at
                 FROM group_deals
                 WHERE id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         deal = result.mappings().first()
@@ -647,12 +682,14 @@ class GroupDealService:
 
         # 查参与者
         p_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, joined_at, order_id, paid, paid_at
                 FROM group_deal_participants
                 WHERE deal_id = :deal_id AND tenant_id = :tenant_id AND is_deleted = false
                 ORDER BY joined_at ASC
-            """),
+            """
+            ),
             {"deal_id": str(deal_id), "tenant_id": str(tenant_id)},
         )
         participants = [
@@ -734,7 +771,8 @@ class GroupDealService:
         params["offset"] = offset
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, name, min_participants, max_participants,
                        current_participants, original_price_fen, deal_price_fen,
                        discount_fen, status, expires_at, share_link_code,
@@ -743,7 +781,8 @@ class GroupDealService:
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -788,7 +827,8 @@ class GroupDealService:
         cutoff = datetime.now(timezone.utc) - timedelta(days=days)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_deals,
                     COUNT(*) FILTER (WHERE status IN ('filled', 'completed')) AS filled_count,
@@ -799,7 +839,8 @@ class GroupDealService:
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = false
                   AND created_at >= :cutoff
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "cutoff": cutoff},
         )
         row = result.mappings().first()

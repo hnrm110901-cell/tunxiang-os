@@ -3,11 +3,12 @@
 7 个端点：个性化首页、等级菜单、排队调度、个性化优惠、预订调度、应用等级权益、升级机会
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.smart_dispatcher import (
     apply_level_benefits,
@@ -53,7 +54,7 @@ async def get_personalized_home_route(
         data = await get_personalized_home(customer_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 2. 等级菜单 ──────────────────────────────────────────────
@@ -71,7 +72,7 @@ async def get_level_menu(
         data = await dispatch_menu(customer_id, store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 3. 排队调度 ──────────────────────────────────────────────
@@ -89,7 +90,7 @@ async def get_queue_dispatch(
         data = await dispatch_queue(customer_id, store_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 4. 个性化优惠 ────────────────────────────────────────────
@@ -106,7 +107,7 @@ async def get_personalized_offers(
         data = await dispatch_offer(customer_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 5. 预订调度 ──────────────────────────────────────────────
@@ -128,7 +129,7 @@ async def create_reservation_dispatch(
         )
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 6. 应用等级权益 ──────────────────────────────────────────
@@ -145,7 +146,7 @@ async def apply_benefits(
         data = await apply_level_benefits(body.customer_id, body.order_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ── 7. 升级机会 ──────────────────────────────────────────────
@@ -162,4 +163,4 @@ async def get_upgrade_opportunity_route(
         data = await check_upgrade_opportunity(customer_id, x_tenant_id, db)
         return {"ok": True, "data": data}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc

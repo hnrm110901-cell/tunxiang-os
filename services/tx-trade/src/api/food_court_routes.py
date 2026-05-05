@@ -712,14 +712,16 @@ async def pay_food_court_order(
 
     # ── 1. FOR UPDATE 锁定订单，防并发重复支付 ──────────────────────────────
     order_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, food_court_id, order_no, total_amount_fen, status
             FROM food_court_orders
             WHERE id = :order_id
               AND food_court_id = :fc_id
               AND tenant_id = :tenant_id
             FOR UPDATE
-        """),
+        """
+        ),
         {"order_id": order_id, "fc_id": fc_id, "tenant_id": tenant_id},
     )
     row = order_result.fetchone()
@@ -735,12 +737,14 @@ async def pay_food_court_order(
     # ── 2. 幂等键检查 ─────────────────────────────────────────────────────────
     if req.idempotency_key:
         dup = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM food_court_orders
                 WHERE idempotency_key = :key
                   AND tenant_id = :tenant_id
                   AND id != :order_id
-            """),
+            """
+            ),
             {"key": req.idempotency_key, "tenant_id": tenant_id, "order_id": order_id},
         )
         if dup.fetchone():
@@ -753,7 +757,8 @@ async def pay_food_court_order(
     # ── 4. 标记订单已支付 ─────────────────────────────────────────────────────
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE food_court_orders
             SET status = 'paid',
                 payment_method = :method,
@@ -761,7 +766,8 @@ async def pay_food_court_order(
                 idempotency_key = :idem_key,
                 updated_at = :now
             WHERE id = :order_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {
             "method": req.payment_method,
             "paid_at": now,
@@ -774,11 +780,13 @@ async def pay_food_court_order(
 
     # ── 5. 更新所有订单行为 preparing ─────────────────────────────────────────
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE food_court_order_items
             SET status = 'preparing', updated_at = :now
             WHERE order_id = :order_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"order_id": order_id, "now": now, "tenant_id": tenant_id},
     )
 
@@ -930,11 +938,13 @@ async def cancel_food_court_order(
     now = datetime.now(timezone.utc)
     order.status = "cancelled"
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE food_court_order_items
             SET status = 'cancelled', updated_at = :now
             WHERE order_id = :order_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"order_id": order_id, "now": now, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -1072,27 +1082,31 @@ async def get_vendor_stats(
     settlement = settlement_result.scalar_one_or_none()
 
     ready_count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM food_court_order_items fci
             JOIN food_court_orders fco ON fci.order_id = fco.id
             WHERE fci.vendor_id = :v_id
               AND fci.tenant_id = :tenant_id
               AND fci.status = 'ready'
               AND fco.paid_at::date = :query_date
-        """),
+        """
+        ),
         {"v_id": v_id, "tenant_id": tenant_id, "query_date": query_date},
     )
     ready_count = ready_count_result.scalar_one()
 
     pending_count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM food_court_order_items fci
             JOIN food_court_orders fco ON fci.order_id = fco.id
             WHERE fci.vendor_id = :v_id
               AND fci.tenant_id = :tenant_id
               AND fci.status IN ('pending', 'preparing')
               AND fco.status = 'paid'
-        """),
+        """
+        ),
         {"v_id": v_id, "tenant_id": tenant_id},
     )
     pending_in_queue = pending_count_result.scalar_one()
@@ -1190,7 +1204,8 @@ async def generate_settlements(
     generated = []
     for vendor in vendors:
         agg_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(DISTINCT fco.id) AS order_count,
                     COALESCE(SUM(fci.quantity), 0) AS item_count,
@@ -1201,7 +1216,8 @@ async def generate_settlements(
                   AND fci.tenant_id = :tenant_id
                   AND fco.status IN ('paid', 'completed')
                   AND fco.paid_at::date = :settlement_date
-            """),
+            """
+            ),
             {
                 "vendor_id": str(vendor.id),
                 "tenant_id": tenant_id,
@@ -1358,7 +1374,8 @@ async def get_settlement_summary(
         params["end_date"] = date.fromisoformat(end_date)
 
     summary_result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 fcv.id               AS vendor_id,
                 fcv.vendor_code,
@@ -1382,7 +1399,8 @@ async def get_settlement_summary(
               AND fcv.is_deleted = FALSE
             GROUP BY fcv.id, fcv.vendor_code, fcv.vendor_name, fcv.category, fcv.display_order
             ORDER BY fcv.display_order
-        """),
+        """
+        ),
         params,
     )
     rows = summary_result.fetchall()

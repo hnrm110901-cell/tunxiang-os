@@ -113,12 +113,14 @@ async def get_my_invite_code(
 
         # 查询已有邀请码
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT code, invited_count, total_points_earned
                 FROM invite_codes
                 WHERE tenant_id = :tid AND member_id = :mid AND is_active = true
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "mid": member_id},
         )
         existing = row.first()
@@ -131,12 +133,14 @@ async def get_my_invite_code(
             # 首次：生成并写入邀请码
             code = _generate_code(member_id)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO invite_codes
                         (tenant_id, member_id, code, invited_count, total_points_earned)
                     VALUES (:tid, :mid, :code, 0, 0)
                     ON CONFLICT (tenant_id, member_id) DO NOTHING
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "mid": member_id, "code": code},
             )
             await db.commit()
@@ -198,14 +202,16 @@ async def get_invite_records(
 
         # 汇总统计
         summary_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                              AS invited_count,
                     COALESCE(SUM(inviter_points) FILTER (WHERE status = 'credited'), 0)  AS earned_points,
                     COALESCE(SUM(inviter_points) FILTER (WHERE status = 'pending'), 0)   AS pending_points
                 FROM invite_records
                 WHERE tenant_id = :tid AND inviter_member_id = :mid
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "mid": member_id},
         )
         s = summary_row.first()
@@ -217,10 +223,12 @@ async def get_invite_records(
 
         # 总数
         cnt_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM invite_records
                 WHERE tenant_id = :tid AND inviter_member_id = :mid
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "mid": member_id},
         )
         total: int = cnt_row.scalar() or 0
@@ -228,7 +236,8 @@ async def get_invite_records(
         # 明细（left join customers 取 nickname）
         offset = (page - 1) * size
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ir.id,
                     COALESCE(c.nickname, '用户' || LEFT(ir.invitee_member_id::text, 6)) AS nickname,
@@ -241,7 +250,8 @@ async def get_invite_records(
                 WHERE ir.tenant_id = :tid AND ir.inviter_member_id = :mid
                 ORDER BY ir.created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "mid": member_id, "lim": size, "off": offset},
         )
 
@@ -297,12 +307,14 @@ async def claim_invite(
 
         # 1. 根据邀请码查找邀请码记录
         code_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, member_id
                 FROM invite_codes
                 WHERE code = :code AND tenant_id = :tid AND is_active = true
                 LIMIT 1
-            """),
+            """
+            ),
             {"code": payload.invite_code, "tid": x_tenant_id},
         )
         code_rec = code_row.first()
@@ -318,14 +330,16 @@ async def claim_invite(
 
         # 3. 创建邀请记录（唯一约束防重复）
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO invite_records
                     (tenant_id, invite_code_id, inviter_member_id, invitee_member_id,
                      invite_code, status, inviter_points, invitee_points)
                 VALUES
                     (:tid, :code_id, :inviter, :invitee,
                      :code, 'pending', :ipts, :epts)
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "code_id": invite_code_id,
@@ -339,12 +353,14 @@ async def claim_invite(
 
         # 4. 更新邀请码使用计数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invite_codes
                 SET invited_count = invited_count + 1,
                     updated_at    = NOW()
                 WHERE id = :code_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"code_id": invite_code_id, "tid": x_tenant_id},
         )
 

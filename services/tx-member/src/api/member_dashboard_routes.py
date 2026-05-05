@@ -86,7 +86,8 @@ async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
     """从 customers + orders 查询驾驶舱聚合指标。"""
     # 会员总数 & 近 30 天新增
     members_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*)                                                  AS total_members,
                 COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS new_members_30d,
@@ -95,7 +96,8 @@ async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
                 COALESCE(SUM(total_spent_fen), 0)::bigint                 AS total_stored_value_fen
             FROM customers
             WHERE is_deleted = FALSE
-        """)
+        """
+        )
     )
     m = members_row.mappings().one()
 
@@ -129,7 +131,8 @@ async def _query_dashboard(tenant_id: uuid.UUID, db: AsyncSession) -> dict:
 async def _query_rfm(tenant_id: uuid.UUID, db: AsyncSession) -> list[dict]:
     """按 rfm_level 统计分布，返回列表。"""
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 rfm_level,
                 COUNT(*)                              AS cnt,
@@ -138,7 +141,8 @@ async def _query_rfm(tenant_id: uuid.UUID, db: AsyncSession) -> list[dict]:
             FROM customers
             WHERE is_deleted = FALSE
             GROUP BY rfm_level
-        """)
+        """
+        )
     )
     data = rows.mappings().all()
 
@@ -175,17 +179,20 @@ async def _query_members_by_level(
     offset = (page - 1) * size
 
     count_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS cnt
             FROM customers
             WHERE rfm_level = :level AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"level": rfm_code},
     )
     total = int(count_row.scalar_one())
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id::text           AS member_id,
                 full_name          AS name,
@@ -199,7 +206,8 @@ async def _query_members_by_level(
             WHERE rfm_level = :level AND is_deleted = FALSE
             ORDER BY total_spent_fen DESC NULLS LAST
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"level": rfm_code, "lim": size, "off": offset},
     )
     items = []
@@ -232,7 +240,8 @@ async def _query_tags(
 ) -> tuple[list[dict], int]:
     """从 customers.tags 数组中统计 top-20 标签，应用筛选后分页返回。"""
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 unnest(tags)  AS name,
                 COUNT(*)::int AS member_count
@@ -242,7 +251,8 @@ async def _query_tags(
             GROUP BY 1
             ORDER BY member_count DESC
             LIMIT 20
-        """)
+        """
+        )
     )
     all_tags = rows.mappings().all()
 

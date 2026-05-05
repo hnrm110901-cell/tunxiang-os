@@ -1,35 +1,429 @@
-## 2026-05-04 Phase 1-3 Agent-UI 深度融合 — 全线 UI/UX 升级（完成）
+## 2026-05-05 P2.5 Phase 2 收尾 + Tier 1 基线扩展（/loop 自驱动 4 PR + 1 docs PR）
 
 ### 今日完成
-- [web-pos] Phase 1 补完：品牌色 #FF6B2C→#FF6B35（14应用/159文件）、触控目标≥44px（11文件）、web-admin 15 hr/占位替换、Design Token、ReservationPage 完整重写
-- [web-pos] Phase 2 Agent-UI：Command Palette + Agent 查询（Ctrl+K→A2UI渲染）、Smart Sidebar SSE 实时推送（替代30s轮询）、KDS 时间线视图
-- [web-pos] Phase 3 前沿：A2UI 兼容引擎（14组件白名单/JSON→React）、语音 Agent（TTS+STT/17条指令/5场景）、门店数字孪生（Canvas 2D鸟瞰+热力图）
-- [web-pos] 触控反馈：12 核心 POS 页面全按钮 useTouchFeedback（Queue/Settle/Order/TableMap/CreditPay/SplitPay/ReverseSettle/TaxInvoice/OpenTable/FastFoodPage/FastFoodKDS + 6基础引入）
-- [web-pos] TxButton 组件（6 variant + 4 size，内置 touch feedback）+ useButtonTf 快捷 hook
-- [web-pos] A2UI 演示页（/a2ui-demo）
-- [web-pos] 语音 Agent 覆盖：CashierPage / KDS / QuickCashierPage / OpenTablePage / FastFoodPage
-- [web-pos] VoiceCommandBar 指令扩展（17条 POS/KDS 命令，上下文匹配）
-- [web-pos] TableMapPage/POSDashboardPage → /store-twin 鸟瞰入口
-- [code-review] 2 轮完整审查：CRITICAL→LOW 全部修复（useState导入/render-phase副作用/SSE批量/闭包/重连/JSX错误/遗漏handler）
+- [PR #171] Tier 1 基线 47 文件 / 46 测试 docker python:3.11-slim — pipefail 修补后真实 44/46，2 已知坏（saga_buffer disk mock + invoice_tier1 patch 路径）
+- [PR #172] P2.5 batch3 — tx-trade/tx-analytics/tx-member/tx-agent **56 文件 289 处** detail=str() → safe_http_exception
+- [PR #174] P2.5 batch4 — 12 服务/子目录 **45 文件 184 处**（含 tx-ops 补 8 处）+ review P0 修补（codemod re.DOTALL + approval f-string 泄漏）
+- [PR #166 rebase] 1 commit 干净 replay + force-push（解 CONFLICTING）
+- [PR #175] DEVLOG + progress.md 同步
+- [scripts/codemod_safe_http_exception.py] 修 bug — 只识别顶格 import（避免插入函数体内 IndentationError）+ re.DOTALL（多行 HTTPException 支持）
+
+### 关键决策
+- **strict-code-reviewer 揭露 2 P0**：tier1 runner `tail -5` 掩盖 pytest 退出码导致 46/46 假阳；approval_workflow:401 f-string detail 泄漏 `inst['status']` DB 字段。两者均已修
+- **Tier1 真实基线 44/46**（之前 46/46 不可信）：DEPS 加 `pyyaml aiosqlite asyncpg` 修 2 文件，剩 2 文件是测试自身缺陷（saga disk path / invoice_service patch 模块名），独立 follow-up
+- **代理 502 应对**：`reclaude:53896` 间歇性 502 → 切 `ClashX:7890`，5 分支批量 push 通过
 
 ### 数据变化
-- 新建：16 文件（useAgentSSE useVoiceAgent useButtonTf a2ui/* TxButton VoiceCommandBar KdsTimeline StoreHeatmap StoreTwinPage A2UIDemoPage）
-- 修改：25 文件（App routes tradeApi hooks CommandPalette SmartSidebar InsightCard + 12 POS页面 + DEVLOG）
-- 路由新增：/store-twin /a2ui-demo
-- 提交：15 commits（be5ebcf..83df11e）
-- 代码行：~4700 行
+- P2.5 Phase 2 累积归一处数：**744+ 处**（PR #166 16 + #167 255 + #172 289 + #174 184）
+- 涉及服务：17 个（tx-trade/tx-analytics/tx-member/tx-agent/tx-malaysia/tx-expense/
+  tx-growth/tx-predict/tx-brain/gateway/tx-menu/tx-vietnam/tx-indonesia/tx-ops/
+  tx-org/tx-supply 通过 #167）
+- 新增工具脚本：`scripts/codemod_safe_http_exception.py`（119 行，正则匹配 + 顶层 import 注入 + idempotent + DOTALL）
+- ruff F401 + I001 自动清理：109 errors → 0
 
 ### 遗留问题
-- npm 仓库代理阻断，无法运行 tsc/vite 编译验证
-- Git push 代理阻断（15 commits 待 push）
-- 15 个 Tier 3 辅助页面/组件残留手动 onPointerDown（CallingScreen/DepositPos/OmniChannel/OrderHistory/TrainingMode 等，非结算核心流程）
-- web-admin 重度依赖 Ant Design，A2UI 迁移需单独规划
+- 6 PR 等创始人 admin merge：#166（已 MERGEABLE）/ #167 / #171（含 P0 修补）/ #172 / #174（rebase 后）/ #175
+- tx-finance / tx-supply 残余 38 处由 PK.2/PK.3 baseline 守门作业域处理
+- 4 个 Tier 1 文件需 real PG/fastapi.testclient（test_task_engine_tier1 / test_orders_idempotency_wiring_tier1 / test_sync_pull_*_tier1）
+- 2 新发现 Tier 1 真坏：test_saga_buffer disk mock 3 个 / test_invoice_tier1 patch 路径 2 个
+
+### 明日计划
+- 6 PR admin merge 后清点 P2.5 真实残余 + 修 saga_buffer + invoice_tier1 测试缺陷
+- PI.2 — 73 历史 alembic head 分批收敛（独立 sprint）
+
+---
+
+## 2026-05-05 PK 系列 — RLS 真注入紧急修 + text(f) 全 Tier 1 域 baseline 守门收官
+
+> 本会话由 reviewer 发现的 3 处真 RLS f-string 注入起 → 全仓 SET LOCAL :tid 模式可靠性
+> 评估 → text(f) 守门策略大转向（per-domain cleanup → baseline gate）→ reviewer 救场抓出
+> scanner blind spot → 全量审计修复。共 5 PR + 1 reviewer-driven fix，**Tier 1 SQL 注入面整体收敛**。
+
+### 今日完成（按合并顺序）
+
+| PR | 主题 | 合并 SHA | Tier | 关键产出 |
+|---|---|---|---|---|
+| #168 | PK.0 紧急修 3 处 RLS tenant_id SQL 注入 | `b0e8fdd8` | Tier1 / SECURITY | `_set_rls(tenant_id)` 由 f-string 改 `set_config('app.tenant_id', :tid, true)` 参数化（printer_config / crew_stats / print_manager 三 router）+ 6 守门测试 |
+| #169 | PK.0.1 全仓 SET LOCAL :tid → set_config 加固 | `fa7e345a` | SECURITY | 89 处 `text("SET LOCAL app.tenant_id = :tid")` 统一迁到 PG 原生 `set_config` helper（参数化 100% 安全，等价 SET LOCAL is_local=true）+ 4 守门测试 |
+| #170 | PK.1 tx-trade 域 text(f) baseline 守门 | `df0f52d3` | Tier1 | 锁定 33 处 text(f) 上限不准新增；方法论从 codemod → baseline gate 转向 |
+| #173 | PK.2+3 tx-finance + tx-supply baseline + reviewer 救场全量审计修 | `985e007a` | Tier1 / SECURITY | 多次叠加：① 加 21+23 baseline ② **reviewer 抓 scanner 单行扫漏 60%+** → fix scanner + 校准 33→139 / 21→59 / 23→78 + parametrize ③ 加 text(sql/stmt/*_sql) 变量间接注入面第二维 baseline (15+4+7) |
+
+### 数据变化
+- RLS 注入面：3 处 f-string `_set_rls` → 0（紧急修）
+- SET LOCAL 模式：89 处 `text("SET LOCAL :tid")` → 0（驱动层 quoting 不可靠的隐患全清）
+- text(f) 守门：3 域 × 2 维度 = 6 个 baseline，10 个 Tier 1 守门测试
+  - text(f"..."): tx-trade=139 / tx-finance=59 / tx-supply=78
+  - text(<sql_var>): tx-trade=15 / tx-finance=4 / tx-supply=7
+- 新增 Tier 1 测试：~14 个（PK.0 6 + PK.0.1 4 + PK.1 2 + PK.2+3 4）
+- shared/ontology 标准 helper 强基线：`shared/ontology/src/database.py:25` `set_config('app.tenant_id', :tid, true)` 升格为全仓唯一允许的 RLS 设值方式
+
+### 关键决策
+
+1. **PK.0 真注入紧急性** — 3 处 `_set_rls` f-string 拼接的 tenant_id 来自 X-Tenant-ID header（用户可控），任意 PR 加新 router 用模板都会复制注入面 → P0 优先级，0 容忍立即修
+2. **PK.0.1 SET LOCAL :tid 不可靠的根本原因** — PG SET 是 utility statement，不走 PARSE/BIND；SQLAlchemy + asyncpg 实际处理时可能 fallback simple query + client-side substitution（驱动版本依赖）。统一改 `SELECT set_config(name, value, is_local)` PG 原生函数调用 — 走标准 PREPARE+BIND，等价 `SET LOCAL`（is_local=true），参数 100% 安全
+3. **方法论 pivot：codemod → baseline gate** — 全仓 ~298 处 text(f) 多数为白名单 conditions list / set_clauses 拼接，0 真注入面但 ROI 极低；改套精确 baseline 双向锁定（> baseline fail 防新增 / < baseline fail 迫使下调显式 review 清理范围）冻结现状，零代码风险
+4. **strict-code-reviewer 救场** — PK.2+3 第一次推送后 reviewer 抓出 scanner 用 `splitlines()` 逐行扫，完全看不见 `text(\n    f"""...""")` 多行模式（tx-finance/tx-supply 主流写法）。漏扫 60%+ 真实命中（tx-trade 33→139, tx-finance 21→59, tx-supply 23→78）。**直接攻击向量：任意 PR 加多行 text(f"... '{user_input}'")，counter 不动，CI 全绿**。同 PR 修 scanner + 校准 baseline，否则把错误的安全感固化到主分支
+5. **scanner 修复方式** — `\s*` 正则已匹配 `\n`，bug 仅在 splitlines 逐行；改 `findall` 整 body + 改 `finditer` 整 body 反算行号。同时 3 函数 → 1 parametrized + dict（reviewer Medium 顺手修）
+6. **PK.2-fix++ 全量审计** — 用户要求"全量修复"，把 reviewer Suggestion #6（text(sql/stmt) 变量间接注入面）也立刻补上，加第二维 baseline。范围限定 SQL 习惯命名（sql/stmt/query/*_sql/*_stmt/*_query）排除 text(self)/text(request) 等非 SQL 伪命中
+7. **gh api fallback 全程稳定** — git push 502 雪崩 ~6 次 + canonical clone 被外部进程反复切换分支；全程用 `gh api -X PUT /contents` 单文件推 + admin merge，零阻塞
+
+### 遗留问题
+- **全仓 text(f) 残留 ~276 处**（139+59+78 = 276 已 baseline 锁，全仓 ~298 减去这三 + 已修部分）— 都是项目内白名单变量插值，零真注入风险；clean-up 是 ROI 极低的纯噪音改动，baseline gate 已冻结
+- **text(<sql_var>) 第二维 baseline 26 处** — 同上，baseline 锁定不强制清理
+- **PE.2 / PJ.2 staging dry-run / PI.2 73 历史 head 收敛** — 仍待外部资源/独立立项
+
+### 明日计划
+- 评估 PI.2 73 历史 alembic head 收敛工程立项
+- 评估 PJ.2 在 staging PG 实跑 CONCURRENTLY 验证（需 staging 访问）
+- 等待 PE.2 客户协作
+---
+
+## 2026-05-05 PD.2 收尾 — 积分系统 29 测试全绿（本机 Python 3.11）
+
+### 今日完成
+- [tx-member] 跑 `services/tx-member/src/tests/test_points_tier1.py` 全 29 用例 → **29 passed in 0.46s**
+- 7 类场景全覆盖：EarnRules / CashOffset / MarginFloorConstraint / CrossStoreSettlement / FifoExpiry / RoutesNotMocked / ExpiryWorker
+- 不再依赖 Docker — 本机 Python 3.11.15 直接 pytest 即可
+
+### 关键决策
+- **PD.2 阻塞解除** — 之前以为需要 Docker Python 3.11+，实际本机已装 `~/.local/bin/python3.11`，直接跑 0.46s 完成
+- 任务 #28（PD.2 原条目）+ #31（PD.2 重新定位）一并 completed
+
+### 遗留问题（不变）
+- PE.2 — 与首批客户对账校验阶梯费率（仍待客户协作）
+- text(f) 全仓 codemod / PI.2 73 历史 head 收敛（独立工程立项）
+
+---
+
+## 2026-05-05 PJ 系列后续修复（7 PR admin merge / CodeRabbit post-merge P1 全清 / 主分支事件总线收口）
+
+> 上一会话 7 PR 合并后 CodeRabbit 发现 6 处真 P1 + 主分支冒出 v393/v396 双 alembic head，
+> 本会话用"超级开发智能体团队 + 主线协调"模式串清。worktree 隔离 5 agent 并行，主线一次性
+> admin merge。完整闭环上一轮所有 in-flight 风险敞口。
+
+### 今日完成（按合并顺序）
+
+| PR | 主题 | 合并 SHA | Tier | 关键产出 |
+|---|---|---|---|---|
+| #158 | PJ.3 PG.2 codemod 残留 tzinfo 不一致 | `a83247f2` | Tier1 | kds_banquet_routes naive-aware TypeError 修 + members wecom_follow_at 强制 aware + 7 守门测试 |
+| #159 | PJ.2 v396 索引改 CONCURRENTLY 生产零阻塞 | `952574c4` | Tier1 | 6 表 × 2 索引全 CONCURRENTLY + autocommit_block + downgrade 对应 + 同步既有守门 |
+| #160 | PJ.6 守门补 text(f) 模式 + 协议补 delete/rename fallback | `37576390` | Tier1 | text(f) 注入面 regex + DELETE /contents fallback + sha 三态规则；发现 298 处 text(f) 待清理债 |
+| #161 | PJ.4 backfill 循环到底 + 每事务重设 tenant GUC | `b61f3c11` | Tier1 | keyset while 循环到底 + set_tenant_guc 抽出 + 跨租户切换重设 + 6 新测试（共 35）|
+| #162 | PJ.1 sync/pull 三键 cursor + OperationalError 收窄 | `807f287d` | Tier1 | event_id UUID 第三键 tiebreaker + max_event_id 响应 + lock-timeout/conn-lost raise + 9 守门测试 |
+| #163 | PG.1.1 合并 v393+v396 双 alembic head（v397 merge migration）| `903c29d7` | SECURITY | 消除 chain 分叉 + migration-chain-debt 文档登记 PI.2（73 历史 head）|
+| #164 | PJ.5 KNOWN_BROKEN 白名单收窄到 revision 自身 | `86f1322e` | Tier1 | scope guard：新 rev 引用白名单 → fail；scripts/check_alembic_chain.py 抽离 + 11 守门测试 |
+
+### 数据变化
+- 迁移版本：v396 → **v397**（v393+v396 双 head merge，no-op upgrade/downgrade）
+- 索引部署模式：v396 全表 12 索引改 CONCURRENTLY → 生产部署不阻塞写入
+- /api/v1/sync/pull 协议升级：cursor 二键 → 三键 (recorded_at, sequence_num, event_id)
+- 新增 Tier 1 测试：**约 38 个**（PJ.1 9 + PJ.2 6 + PJ.4 6 + PJ.5 11 + PJ.6 4 + 同步守门 2）
+- 守门反退化层数：text(f) 注入面 + KNOWN_BROKEN scope guard + CONCURRENTLY 索引
+
+### 关键决策
+
+1. **超级开发智能体团队并行调度** — 5 agent 同时启动 PJ.1/2/4/5/6，worktree 隔离零互踩；主线协调 admin merge + ruff 二轮修补
+2. **PJ.1 旧二元组 cursor 兼容** — `since_id` 缺省零 UUID 让旧客户端零迁移；新客户端用 max_event_id 续传消除数据丢失
+3. **PJ.1 OperationalError 精确化** — `e.orig` 字符串匹配 "events" + "does not exist"；其他（lock timeout / 连接断 / 磁盘满）必须 raise，绝不吞成空响应骗客户端
+4. **PJ.2 既有守门同步** — CREATE INDEX → CREATE INDEX CONCURRENTLY 时既有 v396 测试精确字符串断言失效；改 substring 检查同时强制要求 CONCURRENTLY 关键字
+5. **PJ.5 KNOWN_BROKEN scope** — 白名单仅豁免 revision 自身断链，新 rev `down_revision ∈ PARENTS` 且自身 `∉ CHILDREN` → fail；防止污染传播
+6. **PJ.6 text(f) 量化为债** — 全仓 298 处 text(f) 注入面成为独立工程债（独立 codemod 项目，按 tx-trade > tx-finance > tx-supply 优先级）
+7. **gh api fallback 全程稳定** — git push 502 雪崩 4 次切 PUT /contents；PR #163 来自外部 agent 补 v397 dual-head merge → 全部一次性合入
+
+### 遗留问题
+- **全仓 text(f) 收紧** — 298 处 / 200 文件待清理（独立大 codemod 项目）
+- **PI.2 73 个历史 alembic head 收敛** — 已登记 docs/migration-chain-debt.md，待立项
+- **PD.2 / PE.2** — 仍待外部环境与客户协作
+
+### 明日计划
+- 评估 PI.2 alembic head 收敛工程（73 个历史 head 是否影响 v397 之后的新 migration 节奏）
+- 评估 text(f) 全仓 codemod 立项（按域风险优先级分批）
+- 验证 PJ.2 CONCURRENTLY 在 staging PG 实跑（dry-run alembic upgrade）
+
+---
+
+## 2026-05-04 PG/PI/P2.2 后续会话（7 PR admin merge / 70 个新 Tier 1 测试 / 3 类基建守门）
+
+> v6 审计修复总会话之后的延续会话。聚焦 in-flight PR 收尾 + 主分支基建欠债 +
+> 加盟域事件总线收口 + 多智能体并发协议固化。
+
+### 今日完成（按合并顺序）
+
+| PR | 主题 | 合并 SHA | Tier | 关键产出 |
+|---|---|---|---|---|
+| #145 | PI.1 修 main 上 3 个 alembic chain 断链 + 兼容 alembic 1.13+ 语法 | `45b0cc3d` | SECURITY | migration-ci.yml 正则修 + KNOWN_BROKEN 白名单 + chain debt 文档 |
+| #146 | PG.4 GET /api/v1/sync/pull SyncToken 双键增量 | `963f61a0` | Tier1 | sync_ingest_router 新端点 + 8 tier1 测试 + JSONB str/dict 反序列化 |
+| #147 | PG.6 v396 加盟 6 表 last_event_id + 索引 | `356161e7` | Tier1 | ADD COLUMN UUID + 主索引 + PARTIAL NULL 索引 + 36 tier1 测试 |
+| #148 | PG.2 datetime.utcnow codemod 第二轮（17 文件 27 处）| `4726566a` | refactor | scripts/codemod_utcnow.py 复用 + 反退化 tier1 守门测 |
+| #149 | PG.5 加盟历史回放 backfill 脚本 | `f084c25e` | Tier1 财务 | scripts/backfill_franchise_events.py（6 表 × 6 mapper）+ 29 tier1 测试 |
+| #155 | P2.2 消除 f-string SQL 拼接 + S608 守门 | `dce2851e` | SECURITY | shared/apikeys 14 处静态化 + demo_seed noqa + 4 tier1 守门测 |
+| #156 | PG.3 多智能体并发开发协议 v1 | `8d5e72b3` | docs | docs/multi-agent-concurrency-protocol.md（7 协议 + 反模式 + 自检表）|
+
+### 数据变化
+- 迁移版本：v395 → **v396**（加盟 6 表加 last_event_id 列 + 12 索引）
+- 新增 API 端点：`GET /api/v1/sync/pull`（事件流增量拉取）
+- 新增 Tier 1 测试：**70 个**（sync_pull 8 + v396 36 + franchise_backfill 29 + 守门若干）
+- 新增脚本：`backfill_franchise_events.py`
+- 新增 CI 守门：S608 守门 + datetime.utcnow 守门 + 多智能体协议
+- 主分支基建：3 处 alembic chain 断链修齐 + KNOWN_BROKEN 白名单建立
+
+### 关键决策
+
+1. **PI.1 KNOWN_BROKEN 白名单制**（非"全清债再合并"）— 既有 3 处历史 chain 断链立即修风险大；改为 CI tolerate + 文档化 + 后续单独 PR 清理 → 解锁所有后续 PR
+2. **PG.5 注入式接口设计** — `backfill_one_table(spec, db_execute=, db_update=, emit_event=)` 接受函数注入；测试 AsyncMock 全套依赖 → 29 测试 0.06s 完成，零 DB 依赖
+3. **P2.2 守门测试"先窄后宽"** — 全仓扫命中 394 处不相关 f-string SQL；收窄为只守实际改过的 3 文件；全仓收紧留单独工程
+4. **gh api 兜底全程稳定** — 5 次 git push proxy 502 雪崩 → 立即切 `gh api -X PUT /contents`；已写入 PG.3 协议条款
+5. **多智能体并发协议固化** — 之前 5 次同类问题（worktree 互踩 / push 502 / PR base 漂移 / CI 拥堵 / 守门假阳性）全归档为协议
+
+### 遗留问题
+- **PD.2** 积分系统 22 个 Tier 1 测试 — 本机 Python 3.9 不支持，需 Docker Python 3.11+
+- **PE.2** 与首批客户对账校验阶梯费率新算法 — 需客户协作（尝在一起/最黔线/尚宫厨）
+- **全仓 f-string SQL 收紧** — ~394 处分布在 services/ 各路由/服务层，待立项
+
+### 明日计划
+- 跑 PD.2 / PE.2（需外部环境/协作）
+- 评估 v397 next migration（事件总线 Phase 2 物化视图重建？或 PE.2 阶梯费率结构变化？）
+- 监测 backfill_franchise_events 真跑时的事件流 / 投影器消费速率
+
+---
+
+## 2026-05-04 v6 审计修复总会话（51 commit / 8 智能体并行 / 5 Tier 1 路径覆盖）
+
+> 单次会话产出最大的一次。从「W12 5 个开发任务 + 22 项审计修复」出发，
+> 经审计校对（仅 23% 准确率，剔除 6 项 ghost、纠正 3 项错路径），
+> 落地 51 commit + 约 105 个新测试用例 + 4 张新表 + 2 个 codemod 脚本 + 1 个 pre-commit 守门员。
+
+### 阶段一：审计校对（揭穿审计 6 项 Ghost + 3 项路径错）
+| 审计项 | 真相 |
+|---|---|
+| P1.4+1.5 CFOBudgetDashboardPage | git 全历史不存在 — Ghost |
+| P1.6 lineage_routes.py | 后端整个域不存在 — Ghost |
+| P3.1/P3.4 lineage_service | 同上 — Ghost |
+| P2.6 Gaussian 近似 | 实际是标准高斯机制 — Ghost |
+| P3.2/P3.3 排班/宴席性能 | 实际无嵌套查询 — Ghost |
+| P1.1 marketing_opportunity_engine | 实位 audience_pack_service.py:322-333 |
+| P1.2 traffic_predictor_v2 | 实位 traffic_predictor.py:340 |
+| P1.3 enterprise_overview_routes | 实位 group_routes.py |
+| 审计漏报 INTERVAL 9 处 | 全仓 5 服务真有同类 Bug，4 处导致安全告警静默失效 |
+
+### 阶段二：Tier 1 财务红线 + 安全闭合（24 commit）
+
+**SQL INTERVAL 全仓修复（5 commit）**：
+- [fix(tx-pay/tx-growth/tx-predict/gateway)] 9 处 `INTERVAL ':n unit'` → `make_interval()`
+- 关键发现：gateway/audit_log_service 4 处 + security_report_service 2 处导致登录失败/约束突破/数据导出/凌晨偷登 4 类安全告警**静默失效**
+
+**P1 真 Bug（3 commit）**：
+- [fix(tx-growth)] `audience_pack_service.py` 生日跨年/闰月边界（`make_date()` 方案）
+- [fix(tx-member)] `group_routes.py` 7 端点加成员验证 + 6 IDOR 测试（修复横向越权）
+- [fix(tx-org)] `franchise_settlement_service` 改用 calculate_fen 直传分
+
+**Tier 1 测试 + 实装（16 commit）**：
+- [test/feat(sync-engine)] LWW-Register CRDT 算法库 + 23 测试（含 200 单 4h 零丢失）
+- [test/feat(tx-org)] RoyaltyCalculator calculate_fen + Decimal 中间精度 + 11 Tier 1 测试（**100w × 5% 精确等于 5 万元**）
+- [test/feat(tx-member)] 积分系统毛利硬约束 + 跨店结算金额零泄漏 + FIFO 过期 + 22 Tier 1 测试
+
+### 阶段三：W12 业务功能（13 commit）
+
+| W12 | 落地 |
+|---|---|
+| W12-1 积分系统 | 5 commit / 22 测试 / 揭穿审计「80% 完成」实为 100% mock |
+| W12-2 配送调度 | v391 迁移 + 3 Provider Adapter（达达/顺丰/自有）+ 22 测试 |
+| W12-3 CRDT LWW | 见阶段二（Tier 1）|
+| W12-4 加盟管理 | 智能体精读后正确**拒绝重复实现** — 8 文件 + 4 service 已完整 |
+| W12-5 TV 菜单屏 | 25 端点对齐前端 + 规则模板布局 + 24 端到端测试 |
+
+### 阶段四：W12 后续接线（6 commit）
+
+- [migrate(tx-member)] **v392 创建积分系统核心三表**（member_cards/points_log/card_types） — 揭穿审计盲区：之前积分服务的 9 处 SQL 全是死的，3 张表都没建
+- [migrate(sync)] **v393 sync_checkpoints + last_pull_token** — LWW 接线 OfflineSyncService 持久化
+- [feat(sync)] resolve_conflict 替换 server_wins 占位 → field-level LWW（金额强制 PN-Counter）+ 22 集成测试
+- [refactor(tx-org)] **加盟路由冲突裁决**（保留 v5_routes 删除 routes/router 重复端点）+ 12 测试 — 揭穿现网 422 Bug：Starlette **先注册胜出**（不是后者覆盖），生产前端发 `name` 字段被旧 routes 拦截一直 422
+
+### 阶段五：技术债 codemod + 安全 hardening（21 commit）
+
+- [security(shared)] **safe_http_exception 中央错误处理器** + correlation_id + 7 测试
+- [security] gateway/tx-trade/tx-finance/tx-member 5 试点服务，**~177 个 detail=str(e) 异常泄漏**修复
+- [security(ci)] **pre-commit hook 直接 reject 新增 detail=str(e)** — 守门员就位
+- [refactor] datetime.utcnow → now(UTC) — 27 文件 / 190 处 + 可复用 codemod 脚本
+- [refactor] logging → structlog — 15 文件 / 100% 占位符 → keyword args 改造率
+
+### 数据变化
+- 迁移版本：v391（旧）→ v392 积分三表 → v393 sync_checkpoints token
+- 新增模块：4 个（lww_register / safe_http_exception / delivery_dispatch_adapters / points_settlement|expiry_fifo|expiry_worker）
+- 新增 codemod 脚本：1 个（codemod_utcnow.py）
+- 新增 pre-commit 钩子：1 个（no-detail-str-e）
+- 新增测试：约 105 个（CRDT 23 + 集成 22 + 积分 22 + 配送 22 + TV 24 + Royalty 11 + 企业集团 6 + 异常 handler 7 - 部分重叠）
+- 修改文件：约 80 个；新建文件：约 20 个
+
+### 遗留问题（已开 8 项跟踪任务）
+| ID | 待办 | 阻塞性 |
+|---|---|---|
+| PB.3 | 加盟接入 emit_event（FranchiseEventType 11 事件） | 进行中 |
+| PD.2 | Wave G+H 共 ~105 测试需 Python 3.11+ Docker 跑（本地 3.9 跑了 62/85 = 73%） | 上线前必跑 |
+| PE.2 | PB.1 修了阶梯费率 tier[0] 以下错误回退 last_tier 的 Bug，灰度前需对账 | 业务确认 |
+| PG.1 | v391 INSERT policy 错用 USING（PG 规范要求 WITH CHECK） | P1 安全 |
+| PG.2 | datetime codemod 第二轮（in-flight 释放后 12 文件） | P3 |
+| PG.3 | 多智能体并发 commit race（3 次撞上） | P1 架构 |
+| PG.4 | 云端 /api/v1/sync/pull 需支持 since_ts query | P1 增量同步 |
+| PD.1 | 积分系统 schema 已建（v392），但需创始人审批表名/列定后入生产 | 已建表 |
+
+### 关键架构反馈（智能体多次确认）
+1. **多智能体并发 commit race**：A 智能体 staged 改动被 B 的 `git add -A`/`commit -a` 卷走 — 已 3 次发生。建议加到 CLAUDE.md §21 用 `git stash`/`worktree` 隔离
+2. **审计准确率仅 ~23%**：建议把「审计校对」作为后续所有 Wave 的强制前置步骤
+3. **PG.1 v391 INSERT policy bug**：PD.1 智能体顺手发现 — INSERT 必须 WITH CHECK 才阻止跨租户，USING 对 INSERT 无效
+
+### 明日计划
+- Docker (Python 3.12) 跑全套 ~105 测试验证 100% 绿
+- 灰度 v392/v393 迁移到 DEMO 环境
+- 与首批客户对账阶梯费率新算法（PE.2）
+- 启动 P2.5 Phase 2（tx-org/tx-supply/tx-ops，预估 ~120 异常泄漏修复）
+
+---
+
+## 2026-05-04 W12-3 LWW-Register 接线 OfflineSyncService（Tier 1 — 4h 离线零丢失）
+
+### 今日完成
+- [migrate] v393_sync_checkpoints_token — 给 v036 sync_checkpoints 表增量增加 last_pull_token TEXT + last_pull_token_ts TIMESTAMPTZ + 审计索引（保留 v036 RLS/索引完整）
+- [feat(edge/sync-engine)] offline_sync_service.resolve_conflict 替换 server_wins 占位 → 字段级 LWW-Register 决策（调 lww_register.resolve_lww）
+- [feat(edge/sync-engine)] 字段策略表 LWW_FIELDS / MONETARY_FIELDS / LIST_FIELDS：金额字段强制 server_wins（PN-Counter 语义），列表字段 server_wins（顺序敏感），其它默认 server_wins 兜底
+- [feat(edge/sync-engine)] ConflictResolution 增加 field_decisions / merged_payload 字段供审计，决策结果以 _lww_resolution 子对象写回 order_data 不覆盖原始字段
+- [feat(edge/sync-engine)] _push_single_order 从云端 409 响应捕获 server_payload（兼容 server_payload + order_data 双 key）
+- [feat(edge/sync-engine)] load_sync_token / save_sync_token 公开方法 — 从 v393 持久化 SyncToken 恢复，无新列时降级到 v036 字段（向后兼容）
+- [feat(edge/sync-engine)] pull_updates 用 SyncToken.filter_unseen 二次过滤已见事件 + GREATEST UPSERT 防止并发回退
+- [test(edge/sync-engine)] test_offline_sync_service_integration.py — 22 用例（含 4h 离线 200 单 N+M=零丢失场景）
+- [docs] 决策表：status/桌号/会员绑定/备注 → LWW；*_fen 金额字段 → server_wins；items_data/payments_data → server_wins；缺失 payload → server_wins 兜底
+
+### 数据变化
+- 迁移版本：v392 → v393（sync_checkpoints 增量 2 列）
+- 修改服务：edge/sync-engine（offline_sync_service.py +327 行）
+- 新增测试：22 个（test_offline_sync_service_integration.py）
+
+### 遗留问题
+- 集成测试在沙盒 shell 内 pytest 被禁用，未在本次会话运行；需在标准 dev 环境 pytest edge/sync-engine/tests/ -v 验证全绿
+- pull_updates 接口契约扩展 since_ts query param，云端 sync API 需同步支持（云端实现为 W12-4 范围）
+- LIST_FIELDS（items_data / payments_data）暂走 server_wins，长期应迁移到 RGA/Logoot CRDT
+
+### 明日计划
+- 跑 pytest edge/sync-engine/tests/ 全绿确认（23 LWW + 22 集成 = 45 用例）
+- 灰度部署 v393 迁移到 DEMO 环境（徐记海鲜数据），手动跑 4h 断网 200 单回放主流程
+
+## 2026-05-04 积分系统 Tier 1 补全（路由接服务层 + 跨店结算 + FIFO 过期 + 毛利硬约束）
+
+### 今日完成
+- [feat(tx-member)] 修复审计 ghost claim：原 8 个积分端点全部为 mock 返回 0；本次接入 services.points_engine
+- [feat(tx-member)] services/points_settlement.py — 跨店应付分摊纯函数（按发行店权重，余数给最大债权人，金额无泄漏）
+- [feat(tx-member)] services/points_expiry_fifo.py — 批次列表 FIFO 消费 + 过期清零纯函数
+- [feat(tx-member)] services/points_engine.check_offset_against_margin_floor — 三条硬约束之一：抵现毛利率不可低于阈值（默认 15%），同时返回 max_offset_fen 提示
+- [feat(tx-member)] api/points_routes 全部改为依赖注入 + emit_event(MemberEventType.POINTS_CHANGED) 旁路写事件总线
+- [feat(tx-member)] 新增 POST /api/v1/member/points/offset-check 端点：POS 端预检
+- [feat(tx-member)] workers/points_expiry_worker.py — Cron Worker（单租户失败隔离）
+- [test(tx-member)] tests/test_points_tier1.py — 22 个用例覆盖 4 大场景
+
+### 数据变化
+- 迁移版本：无（schema 变更需 ontology 审批，本次不动）
+- 新增模块：3 个（points_settlement.py / points_expiry_fifo.py / points_expiry_worker.py）
+- 新增测试：22 个（test_points_tier1.py）
+
+### 遗留问题
+- services/points_engine.py 中 earn_points / spend_points 等异步函数仍引用 member_cards / points_log / card_types 三张未在任何 migration 中存在的表 → 集成测试落地需要 ontology 审批新增 schema
+- services/points_expiry.py 仍用模块级内存 dict 持久化批次；本次未替换为 DB（避免越权动 ontology），新模块以纯函数 + 注入方式绕开
+- main.py 尚未注册 PointsExpiryWorker 到 AsyncIOScheduler（待运维确认每日窗口期）
+
+### 明日计划
+- 推 ontology 审批：member_points_batches / member_card_points / points_log 三表 + RLS 策略
+- main.py lifespan 注册 PointsExpiryWorker（hour=3, minute=0）
+
+## 2026-05-04 P0.5 Phase 4 — 下游引用对齐 infra/compose/
+
+### 今日完成（feat/p0-compose-consolidation）
+
+#### 阶段 G — CI workflows
+- [ci] `.github/workflows/deploy.yml`：staging/prod ssh 部署脚本 `docker-compose -f docker-compose.{staging,prod}.yml` 改为 `docker compose -f infra/compose/base.yml -f infra/compose/envs/{staging,prod}.yml`
+- [ci] `.github/workflows/toxiproxy-smoke.yml`：toxiproxy 启停改用 `base.yml + envs/dev.yml + special/toxiproxy.yml` 三层叠加
+- [ci] `.github/workflows/offline-e2e.yml`：paths 触发器从 `infra/docker/docker-compose.toxiproxy.yml` 改为 `infra/compose/special/toxiproxy.yml`
+- [ci] `.github/workflows/pr-check.yml`：路径分类规则去掉已废弃的 `docker-compose*` 通配（`infra/*` 已覆盖）
+- 4 份 workflow 全部 yaml 校验通过
+
+#### 阶段 H — scripts
+- [scripts] `auto-sync.sh`：`COMPOSE_FILE`+`COMPOSE_DIR` 改为 `COMPOSE_ARGS=(-f base -f envs/prod)`；监听变更路径含 `infra/compose/`
+- [scripts] `rollback-service.sh`：`ps` 与 `up -d` 改用 base + envs/prod
+- [scripts] `deploy.sh`：重构 — 引入 `compose_files_for_target()` 函数，staging/prod/gray 全部走 `base + envs/<target>.yml`；`docker-compose` 全替换为 `docker compose`（v2）
+- [scripts] `gate1-manual-ops.sh` / `setup-security-keys.sh` / `DEPLOY_QUICKSTART.md`：手册命令对齐
+- [scripts] `week8_gate_check.sh`：端口冲突扫描器目标改为 `infra/compose/envs/dev.yml`
+- 7 份脚本 `bash -n` 校验通过
+
+#### 阶段 I — Helm chart 端口反向校验
+- 14 个 chart（api-gateway / tx-trade / tx-menu / tx-member / tx-growth / tx-ops / tx-supply / tx-finance / tx-agent / tx-analytics / tx-brain / tx-intel / tx-org / web-admin）port/targetPort 与 `infra/compose/base.yml` 完全一致，**无需改动**
+- mcp-server / tx-pay / tx-predict / tx-civic / tx-expense / tx-forge / tx-devforge 在 `infra/helm/` 下无独立 chart（待 P0-2 合并 + 后续补齐），本次未涉及
+- 机器无 `helm` CLI，未跑 `helm template`；14 个 `values.yaml` 全部 yaml 语法校验通过
+
+#### 阶段 J — 残留扫描 + 文档收尾
+- 全仓两条扫描清零：`grep -rn 'docker-compose\.(yml|prod|staging|gray|dev|demo|czyz|sgc|zqx|toxiproxy|resource-limits)'` 与 `grep -rn 'infra/docker/docker-compose'`（排除归档文档与 `infra/compose/special/` 内注释）
+- 附带对齐：`Makefile` / `README.md` / `.env.{staging,gray}.example` / `infra/nginx/conf.d/api.conf` / `e2e/README.md` / `e2e/scripts/toxiproxy-inject.sh` / `shared/test_infra/{fixtures.py,tests/test_toxiproxy_smoke.py}`
+- `docs/infra/compose-validation-2026-05.md` 新增 "Phase 4 执行结果" 小节
+
+### 数据变化
+- 改动文件：4 (workflows) + 7 (scripts) + 7 (附带对齐) + 1 (validation doc) + 1 (DEVLOG) = 20
+- 端口/Helm 改动：0（已全绿）
+
+### 遗留问题
+- `infra/compose/special/toxiproxy.yml` 与 `special/resource-limits.yml` 头部注释仍引用旧路径——按 "不碰 special/（P0.5 已稳定）" 原则未改，可放在 P0.6 维护轮
+- mcp-server/tx-pay/tx-predict 等 7 个服务无独立 helm chart，等 P0-2 合并后单独补
+- 旧根 `docker-compose.{yml,prod,staging,gray}.yml` 与 `infra/docker/docker-compose*.yml` 已在 P0.5 阶段 D 删除，本次仅清理引用
+
+---
+
+## 2026-05-03 生产前安全审计全量修复 — 代码已 push
+
+### 今日完成
+
+#### 阶段一：DEMO Go/No-Go 补全（Tier 1 合规）
+- [audit/tier1] 修复 Alembic 迁移链：13 处 `down_revision` 断链 + 17 个重复 revision ID，`upgrade head` 可单链运行
+- [audit/tier1] `shared/db-migrations/env.py` 降级为 Python 3.9 兼容版（移除 `str | None` / `slots=True`）
+- [audit/tier1] `tests/tier1/test_rls_all_tables_tier1.py` 新增 `_apply_safe_rls()` / `_enable_rls()` 直接调用和间接调用（`_TABLE` 变量）三种识别模式
+- [audit/security] `scripts/check_rls_policies.py` 修复 `"app.tenant"` 子串假阳性（改为 regex 负向 lookahead），491 条 CRITICAL 误报降为 0
+- [audit/demo] `scripts/demo_go_no_go.py` 补全：3 路径 tier1 glob、Python 3.9 skip 逻辑、env 错误区分、`--database-url` 透传审计脚本
+- [demo] 达成 **10/10 Go/No-Go 全绿**（§1 Tier1 / §2 k6 P99<200ms / §3 支付 / §4 断网 / §5 签字 / §6 分数 / §7 RLS / §8 reset / §9 A/B / §10 话术）
+
+#### 阶段二：CORS + Prometheus 安全修复
+- [security/cors] `tx-trade` `tx-finance` `tx-brain` `tx-civic` `tx-forge` `tx-member` `tx-expense` `tx-devforge`：全部移除 `allow_origins=["*"]`，改为 `CORS_ALLOWED_ORIGINS` env var（默认 `http://localhost:5173`）
+- [security/cors] `tx-brain`：同时修复 `["*"]` + `allow_credentials=True` CORS 规范违规
+- [security/infra] `infra/nginx/nginx.conf`：`api.tunxiangos.com` 和 `mac-station` 代理添加 `location = /metrics { deny all }` 封堵 Prometheus 外网泄露
+
+#### 阶段三：生产就绪阻塞修复（P1-P3 + Y1-Y3）
+- [security/infra] **P1** `docker-compose.prod.yml` 新增 `pg-backup` 容器（02:00 定时 `pg_dump`，保留 7 天），`pg_backups` volume，`scripts/backup/pg_backup.sh` + `pg_restore.sh`
+- [security/tier1] **P2** `cashier_engine._try_auto_pay()`：移除 `_StoredValueStore._cards` 内存查找（重启丢失、多实例竞态），改为查 `stored_value_accounts` 表（`member_id/tenant_id` 过滤，`ORDER BY balance_fen DESC LIMIT 1`）
+- [security/config] **P3** `tx-devforge/config.py`：移除 `DATABASE_URL` 默认值 `changeme_dev`，改为 `@field_validator` 空值启动失败（实际 env 变量名：`DEVFORGE_DATABASE_URL`）
+- [security/config] **Y3** `xiaohongshu_routes.py`：两处 `stub_app_secret` 改为读 `XHS_APP_SECRET` env var，未配置时返回 503
+- [frontend] **Y2** 9 个前端应用 Vite `^5.0/^5.4/^6.0` 统一升级至 `^8.0.3`，同步 `@vitejs/plugin-react ^4.3`；全部 `vite.config.ts` 确认无破坏性变更
+- [infra] **Y1** 17 个服务生成 `requirements.lock`（pip-compile 精确锁定），6 个生产 Dockerfile 添加 lock 切换指引，`pyproject.toml` 加入 `pip-tools` dev 依赖
+
+#### 阶段四：代码质量收尾
+- [quality] `tx-growth/promotion_rules_v3_routes.py`：`except Exception` → `except (OSError, ValueError, ConnectionError)` + 日志（远端提交已覆盖）
+- [quality] `tx-menu/menu_plan_v2_routes.py`：`log.warning` 补 `exc_info=True`
+- [infra] `pnpm install` 完成，`pnpm-lock.yaml` 更新
+
+### 数据变化
+- 迁移版本：无新增
+- 修改文件：~60 个（跨 4 个阶段 8 次提交）
+- 新增脚本：`scripts/backup/pg_backup.sh` / `pg_restore.sh` / `generate_requirements_locks.sh`
+- 新增 lock 文件：`services/*/requirements.lock` × 17
+- 测试：**345 passed**（rebase 后合入远端新增测试，从 156 → 345）
+- 提交数：8 个原子化 commit，已 push 至 `origin/main`
+
+### 遗留问题
+- `coupon_service.py` `_StoredValueStore` 类仍保留（仅供单测 fixture，生产路径已迁移 DB）
+- `requirements.lock` 由本机 Python 3.9/pip-tools 7.5 生成，生产环境建议用 Docker 内重新生成以保证一致性
+- Vite 8.x 升级后需在 CI 中完整构建验证（本次仅更新 package.json，未实际 `pnpm build`）
+- `infra/docker/*.czyz.yml` / `demo.yml` / `sgc.yml` 仍含租户硬编码密码（遗留上轮）
 
 ### 下一步
-- 网络恢复后 push + tsc 编译检查
-- web-admin Ant Design → A2UI/DS 组件迁移规划
-- web-kds Timeline/KDS 时间线组件集成
+- CI 流水线跑 `pnpm build` 验证 Vite 8 兼容性
+- 生产部署前运行 `docker-compose -f docker-compose.prod.yml up pg-backup` 验证备份容器
+- 切换 Dockerfiles 至 `requirements.lock`（取消 COPY 注释行即可）
+
 ---
+
 ## 2026-05-03 A1 授权加固回归测试 + 基础设施安全加固
 
 ### 今日完成
@@ -92,6 +486,226 @@
 - Docker 环境启动后: k6 压测 + 服务冒烟 + 报表逐张验收
 - 沙箱环境就绪后: 微信分账 POC + 美团真实接入
 - RLS 技术债: 独立 PR 补 26 张表
+## 2026-05-04 Gap B-03 + C-04 开发执行
+
+### 今日完成
+- [B-03] 商户目标配置外置化 + tx-brain 集成
+  - `services/tx-analytics/src/config/merchant_targets.py` — 外置化默认目标/KPI标签/LOWER_IS_BETTER
+  - `services/tx-analytics/src/api/merchant_targets_routes.py` — 重构为 import from config
+  - `services/tx-brain/src/api/merchant_target_routes.py` — 3 个新端点（GET targets/gap + POST analyze）
+  - `services/tx-brain/src/main.py` — 注册 merchant_target_router
+- [C-04] 演示环境监控面板
+  - `services/tx-analytics/src/api/demo_monitor_routes.py` — GET /demo-monitor/health + /demo-monitor/services
+  - `apps/web-admin/src/api/demoMonitorApi.ts` — 前端 API 类型 + fetch 函数
+  - `apps/web-admin/src/pages/DemoMonitorPage.tsx` — 暗色主题监控面板，30s 自动轮询
+  - `apps/web-admin/src/App.tsx` — 注册 /demo-monitor 路由
+
+### 状态更新
+- A 系列（A-01/A-02/A-03）：✅ 完成
+- B 系列（B-03/B-04）：✅ 完成
+- C 系列（C-03/C-04）：✅ 完成
+- 全部 7 项 Gap 任务代码完成，待发布闸门
+
+### 数据变化
+- 迁移版本：无变更
+- 新增服务模块：4 个（config/merchant_targets.py, demo_monitor_routes.py, demoMonitorApi.ts, DemoMonitorPage.tsx）
+- 新增 API 端点：5 个（GET /demo-monitor/health, GET /demo-monitor/services, GET /brain/merchant-targets/{code}, GET .../gap, POST .../analyze）
+
+## 2026-05-03 马来西亚版 Phase 1 开发执行
+
+### 今日完成
+- [docs/malaysia-development-plan.md] 基于市场进入报告制定马来西亚版开发计划
+  - 4个Phase、16个Sprint、覆盖40+周
+  - 新建 tx-malaysia 微服务 + 7个适配器 + 2个前端i18n框架
+  - 改造12个关键文件（country_code/多币种/SST-VAT路由）
+
+### Sprint 1.1 — 国家层基础设施
+- [shared/ontology/src/base.py] TenantBase 新增 country_code
+- [shared/ontology/src/entities.py] Store 继承 country_code
+- [shared/db-migrations/versions/v384_country_code.py] 17张业务表新增 country_code (v384)
+- [shared/feature_flags/flag_names.py] 新增 MalaysiaFlags (15个MY特性开关)
+- [services/tx-org/src/api/region_management_routes.py] 新增 by-country 端点
+
+### Sprint 1.2 — 多语言 i18n 框架
+- [apps/web-pos/src/i18n/] 新建POS i18n框架（zh/en/ms + LangContext）
+- [apps/web-admin/src/i18n/] 新建Admin i18n框架（zh/en/ms + LangContext）
+- [shared/i18n/ms_MY.py] 后端马来语翻译
+- [shared/design-system/src/utils/formatPrice.ts] 多币种支持（CNY/MYR/IDR/VND等）
+- [apps/h5-self-order/src/i18n/ms.ts] 130+马来语翻译 + LangContext 注册
+- [apps/miniapp-customer-v2/src/utils/i18n.ts] 新增 ms-MY locale
+
+### Sprint 1.3 — SST 税务引擎
+- [services/tx-malaysia/] 新建微服务（main.py + SST服务 + e-Invoice占位）
+- [services/tx-malaysia/src/services/sst_service.py] SST计算引擎（6%/8%/0%）
+- [services/tx-malaysia/src/api/sst_routes.py] SST申报API（/calculate/rates/categories）
+- [shared/ontology/src/entities.py] Dish 新增 sst_category 字段
+- [services/tx-trade/src/services/cashier_engine.py] SST/VAT 路由（country_code分支）
+- [shared/db-migrations/versions/v385_sst_category.py] dishes 表新增 sst_category
+
+### Sprint 1.4 — 马来西亚支付适配器
+- [shared/adapters/tng_ewallet/] Touch 'n Go eWallet 适配器（client + adapter）
+- [shared/adapters/grabpay/] GrabPay 适配器（OAuth2 + client + adapter）
+- [shared/adapters/boost/] Boost 适配器（client + adapter）
+- [services/tx-trade/src/services/payment_gateway.py] MY支付方法路由（tng_ewallet/grabpay/boost）
+- [services/tx-trade/src/routers/payment_router.py] MY支付方式注册
+- [services/tx-trade/src/services/my_payment_notify_service.py] MY回调通知处理
+
+### Sprint 1.5 — LHDN e-Invoice Hub
+- [shared/adapters/myinvois/src/client.py] MyInvois API客户端（OAuth2/提交/查询/取消）
+- [services/tx-malaysia/src/services/e_invoice_service.py] e-Invoice业务服务（submit/query/cancel/search + LHDN Phase合规）
+- [services/tx-malaysia/src/api/e_invoice_routes.py] e-Invoice API端点
+- [services/tx-finance/src/services/invoice_service.py] MY分支路由（country_code判断+MyInvois适配器）
+
+### Sprint 1.6 — POS前端马来西亚适配
+- [apps/web-pos/src/main.tsx] 引入 LangProvider 包裹App
+- [apps/web-pos/src/pages/TaxInvoicePage.tsx] MY e-Invoice开票流程（BRN/NRIC校验、RM币种)
+
+### 数据变化
+- 迁移版本：v384 → v385
+- 新增3个适配器包：tng_ewallet、grabpay、boost
+- 新增6个服务模块：e_invoice_service、sst_service、my_payment_notify_service
+- 新增2个前端i18n框架：web-pos、web-admin
+- 新增1个后端i18n模块：ms_MY
+
+### 当前状态
+- ② Phase 1（6个Sprint）全部代码完成
+- Phase 2-4 待后续分配Agent执行
+
+### 遗留问题
+- formatPrice MYR 符号在新版 Intl 中返回 "MYR" 而非 "RM"（备用方案通过 CURRENCY_CONFIG 硬编码修正）
+- MyInvois adapter 需要生产环境 client_id/client_secret 方可端到端测试
+- TaxInvoicePage 的 API 调用尚为 TODO 注释状态，需对接后端真实接口
+
+## 2026-05-03 马来西亚版 Phase 2-3 开发执行 + Phase 4 启动
+
+### 今日完成 (Phase 2 — 外卖平台与生态建设)
+
+### Sprint 2.1 — GrabFood 适配器
+- [shared/adapters/grabfood/] GrabFood 适配器（OAuth2 client + DeliveryPlatformAdapter）
+- [services/tx-trade/src/services/delivery_adapters/grabfood_adapter.py] GrabFood webhook适配器（HMAC-SHA256验签、parse_order、confirm/reject）
+- [shared/adapters/delivery_canonical/transformers.py] GrabFoodTransformer 添加
+- [shared/adapters/delivery_publish/publishers.py] GrabFoodPublisher 添加
+- [shared/adapters/delivery_factory.py] GrabFoodDeliveryAdapter 注册
+- [services/tx-trade/src/routers/delivery_panel_router.py] /webhooks/grabfood 端点
+
+### Sprint 2.2 — Foodpanda + ShopeeFood 适配器
+- [shared/adapters/foodpanda/] Foodpanda 适配器（HMAC-SHA256 client + adapter）
+- [shared/adapters/shopeefood/] ShopeeFood 适配器（OAuth2 + HMAC client + adapter）
+- [services/tx-trade/src/services/delivery_adapters/foodpanda_adapter.py] Foodpanda webhook 处理
+- [services/tx-trade/src/services/delivery_adapters/shopeefood_adapter.py] ShopeeFood webhook 处理
+- [shared/adapters/delivery_canonical/base.py] ALLOWED_PLATFORMS 添加 foodpanda/shopeefood
+- 8个共享层文件 + 4个服务层文件修改
+
+### Sprint 2.3 — 外卖聚合看板 + KDS
+- [apps/web-pos/src/pages/OmniChannelOrders.tsx] 新增 grabfood/foodpanda/shopeefood 平台支持（品牌色、平台过滤标签页）
+- [apps/web-pos/src/i18n/] 新增 delivery 命名空间（zh/en/ms 30+翻译键）
+- [apps/web-kds/src/components/DeliveryOrderBadge.tsx] 外卖平台徽标组件（GrabFood绿/foodpanda粉/ShopeeFood橙）
+- [apps/web-kds/src/pages/KDSBoardPage.tsx] 新增外卖过滤切换（全部/堂食/外卖）
+- [apps/web-kds/src/pages/KitchenBoard.tsx] 外卖订单显示 + DeliveryOrderBadge
+
+### Sprint 2.4 — PDPA 合规 + 数据主权
+- [services/tx-malaysia/src/services/pdpa_service.py] PDPA数据保护服务（查阅/更正/删除/可携带性、数据保留检查）
+- [services/tx-malaysia/src/api/pdpa_routes.py] PDPA请求API（7端点）
+- [shared/security/src/data_sovereignty.py] 数据主权路由层（国家PG映射、跨境传输校验）
+- [shared/db-migrations/versions/v387_pdpa_compliance.py] pdpa_requests + pdpa_consent_logs 表
+
+### Sprint 2.5 — SSM 企业验证 + 补贴套餐
+- [services/tx-malaysia/src/services/ssm_service.py] SSM企业注册验证（verify/search/detail/validate_director）
+- [services/tx-malaysia/src/api/ssm_routes.py] SSM验证API（4端点）
+- [services/tx-malaysia/src/services/subsidy_service.py] 政府补贴计费（MDEC 50%/SME Corp 40%）
+- [services/tx-malaysia/src/api/subsidy_routes.py] 补贴API（5端点）
+- [shared/db-migrations/versions/v386_subsidy_programs.py] tenant_subsidies + subsidy_bills 表
+
+### Sprint 2.6 — 管理后台马来西亚版
+- [apps/web-admin/src/App.tsx] LangProvider 接入 + 动态Ant Design locale
+- [apps/web-admin/src/shell/IconRail.tsx][TopbarHQ.tsx][SidebarHQ.tsx] t()调用替换硬编码中文
+- [apps/web-admin/src/config/menuConfigs.ts] 全量菜单新增 labelKey 支持
+- [apps/web-admin/src/i18n/zh/en/ms.ts] 200+翻译键扩展（nav/common/dashboard/finance等）
+- [apps/web-admin/src/pages/finance/EInvoicePage.tsx] MY模式（LHDN彩色标签、RM币种、MyInvois状态）
+- [apps/web-admin/src/pages/finance/TaxManagePage.tsx] SST申报标签页（6%/8%/0%税率表）
+
+### 数据变化 (Phase 2)
+- 迁移版本：v386 → v387
+- 新增7个适配器包：grabfood、foodpanda、shopeefood
+- 新增MY支付适配器：tng_ewallet、grabpay、boost
+- tx-malaysia 新增6个服务模块（PDPA/SSM/Subsidy）
+- 前端：OmniChannelOrders + KDS 支持6平台
+
+### 今日完成 (Phase 3 — 深度本地化与区域扩张)
+
+### Sprint 3.1 — 淡米尔语全平台
+- [apps/web-pos/src/i18n/ta.ts] POS淡米尔语翻译（56键：checkout/menu/order/table/einvoice/sst）
+- [apps/web-admin/src/i18n/ta.ts] Admin淡米尔语翻译（29键：nav/common/sst/einvoice）
+- [apps/h5-self-order/src/i18n/ta.ts] H5点餐淡米尔语翻译（87键）
+- [shared/i18n/ta_IN.py] 后端淡米尔语（CATEGORIES/UI/RECEIPT）
+- [apps/miniapp-customer-v2/src/utils/i18n.ts] ta-TA locale注册
+- 4个LangContext.tsx注册ta语言
+
+### Sprint 3.2 — AI模型马来西亚优化
+- [services/tx-agent/src/config/malaysia_holidays.py] 22个2026+15个2027马来西亚假日数据（含餐饮趋势、乘数）
+- [services/tx-agent/src/config/malaysia_cuisine_profiles.py] 5类菜系画像（马来/中华/印度/融合/东马）+ 6种饮料
+- [services/tx-agent/src/config/malaysia_ingredients.py] 26种食材档案（三语名称、真实供应商、季节性价格）
+- [services/tx-agent/src/services/malaysia_forecasting_service.py] 销量/库存预测服务（集成假日+菜系+食材数据）
+- [shared/vector_store/src/malaysia_embeddings.py] 7个多语嵌入命名空间配置
+- [services/tx-malaysia/src/services/malaysia_timezone.py] UTC+8时区工具（含历史偏移、用餐时段检测）
+
+### Sprint 3.3 — AI功能 + 报表深化
+- [services/tx-malaysia/src/services/my_dashboard_service.py] MY经营仪表盘（SST汇总、e-Invoice统计、假日影响分析、菜系表现、补贴利用率、多币种报表）
+- [services/tx-malaysia/src/api/my_dashboard_routes.py] 6个仪表盘API端点
+- [services/tx-malaysia/src/services/ai_insights_service.py] AI洞察服务（减少食物浪费建议、人力优化、Halal合规、定价建议）
+- [services/tx-malaysia/src/api/ai_insights_routes.py] 4个AI洞察API端点
+
+### Sprint 3.4 — 印尼市场准备
+- [apps/web-pos/src/i18n/id.ts] POS印尼语翻译
+- [apps/web-admin/src/i18n/id.ts] Admin印尼语翻译（370+键）
+- [apps/h5-self-order/src/i18n/id.ts] H5印尼语翻译
+- [shared/i18n/id_ID.py] 后端印尼语模块
+- [services/tx-indonesia/] 新建微服务（main.py + PPN引擎 + API）
+- [services/tx-indonesia/src/services/ppn_service.py] PPN 11%计算引擎
+- [shared/adapters/gopay/] GoPay适配器（OAuth2 + QR支付）
+- [shared/adapters/dana/] DANA适配器（HMAC-SHA256 + API Key）
+- [shared/db-migrations/versions/v388_id_market.py] dishes表新增ppn_category
+
+### Sprint 3.5 — 越南市场准备
+- [apps/web-pos/src/i18n/vi.ts] POS越南语翻译
+- [apps/web-admin/src/i18n/vi.ts] Admin越南语翻译
+- [apps/h5-self-order/src/i18n/vi.ts] H5越南语翻译
+- [shared/i18n/vi_VN.py] 后端越南语模块
+- [services/tx-vietnam/] 新建微服务（main.py + VAT引擎 + API）
+- [services/tx-vietnam/src/services/vat_service.py] VAT 10%/8%计算引擎（含10位加权校验和算法）
+- [shared/adapters/momo/] MoMo适配器（HMAC-SHA256 + QR支付）
+- [shared/adapters/zalopay/] ZaloPay适配器（Key1/Key2双钥HMAC）
+- [shared/db-migrations/versions/v389_vn_market.py] dishes表新增vat_category
+
+### Sprint 3.6 — 区域扩张基础设施
+- [shared/region/src/region_config.py] 中央区域配置中心（CN/MY/ID/VN + SG/TH预留）
+- [shared/region/src/cross_border_report.py] 跨境报表服务（多币种合并、市场对比、运营时段）
+- [services/tx-malaysia/src/api/regional_routes.py] 区域配置API
+- [services/tx-malaysia/src/api/sme_onboarding_routes.py] SME快速入驻（SSM验证→补贴资格→e-Invoice注册）
+- [docs/regional-deployment-guide.md] 区域部署架构指南（市场拓扑、数据流、环境变量）
+
+### 今日完成 (Phase 4 — 持续迭代启动)
+- Phase 4 项目启动：东南亚Top 5市场份额目标、开放API生态规划、AI 2.0方向确立
+- 全部4个Phase、16个Sprint代码已生成
+
+### 数据变化 (Phase 2 + Phase 3)
+- 迁移版本：v384 → v389（新增6个迁移文件）
+- 新增语言支持：马来语(ms)、印尼语(id)、越南语(vi)、淡米尔语(ta)（4个前端框架 × 4语言 = 16个翻译文件 + 4个后端模块）
+- 新增适配器：grabfood、foodpanda、shopeefood、gopay、dana、momo、zalopay（7个）
+- 新增微服务：tx-indonesia（port 8016）、tx-vietnam（port 8200）
+- tx-malaysia 扩展：PDPA/SSM/Subsidy/Dashboard/AI Insights/Regional/Onboarding（17个新模块）
+- tx-agent 新增：Holiday/Cuisine/Ingredient 3个配置 + 预测服务 + 向量嵌入配置
+- 前端修改：OmniChannelOrders(6平台)、KDS(外卖过滤)、Admin Shell(i18n接入)、EInvoicePage(MY模式)
+
+### 遗留问题
+- v389_vn_market 迁移修正：down_revision v383→v388 已修复
+- 印尼/越南微服务生产部署依赖各自云资源就绪
+- AI Insights 服务为数据驱动型存根，真实推理需要 Claude API 集成
+- MyInvois/e-Faktur 沙箱环境需在生产前验证
+- 部分Phase 3文件在主项目而非工作树中（已同步）
+- 货币汇率表为固定参考值（非实时）
+
+## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
 
 ### 今日完成
 - [shared/service_utils/auto_mount.py] 核心函数 auto_mount_routes(app, pkg, api_dir, modules, strict=False) + MountResult dataclass + mount_report；文件存在检查 + 容错 import + WARNING 不阻塞

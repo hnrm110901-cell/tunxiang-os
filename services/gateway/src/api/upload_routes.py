@@ -22,6 +22,7 @@ from shared.integrations.cos_upload import (
     COSUploadError,
     get_cos_upload_service,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..response import ok
 
@@ -75,7 +76,7 @@ async def upload_image(
         )
     except COSUploadError as exc:
         logger.warning("upload_image_failed", error=str(exc), folder=folder)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     logger.info(
         "upload_image_success",
@@ -117,7 +118,7 @@ async def upload_file(
         )
     except COSUploadError as exc:
         logger.warning("upload_file_failed", error=str(exc), folder=folder)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     logger.info(
         "upload_file_success",
@@ -149,7 +150,7 @@ async def upload_base64(
         )
     except COSUploadError as exc:
         logger.warning("upload_base64_failed", error=str(exc), folder=body.folder)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     logger.info(
         "upload_base64_success",

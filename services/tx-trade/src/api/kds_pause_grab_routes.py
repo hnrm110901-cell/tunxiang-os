@@ -2,11 +2,13 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_db
+from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.kds_pause_grab import grab_task, pause_task, resume_task
 
 router = APIRouter(prefix="/api/v1/kds/tickets", tags=["kds-pause-grab"])
@@ -38,7 +40,7 @@ async def api_pause_task(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/{ticket_id}/resume")
@@ -56,7 +58,7 @@ async def api_resume_task(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/{ticket_id}/grab")
@@ -78,4 +80,4 @@ async def api_grab_task(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

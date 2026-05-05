@@ -69,7 +69,8 @@ async def create_device(
     device_id = str(uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_kitchen_devices (
                     id, tenant_id, store_id, device_name, device_type,
                     device_brand, device_model, serial_no, stream_url,
@@ -81,7 +82,8 @@ async def create_device(
                     :stream_protocol, :ai_enabled, :ai_capabilities, :location_desc,
                     'online', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": device_id,
                 "tenant_id": x_tenant_id,
@@ -286,14 +288,16 @@ async def register_stream(
 
         registration_id = str(uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_stream_registrations (
                     id, tenant_id, store_id, device_id, stream_url,
                     stream_protocol, platform_status, created_at
                 ) VALUES (
                     :id, :tid, :sid, :did, :url, :proto, 'pending', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": registration_id,
                 "tid": x_tenant_id,

@@ -51,21 +51,24 @@ async def _get_store_data(
 
         # 薪资汇总（取最近一期）
         payroll_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT total_salary_fen, headcount
                 FROM payroll_summaries
                 WHERE store_id = :sid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                 ORDER BY period_year DESC, period_month DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"sid": store_id},
         )
         payroll = payroll_row.mappings().first()
 
         # 营收汇总（最近30天已支付订单）
         revenue_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_fen), 0) AS total_revenue_fen,
                        COUNT(*) AS order_count
                 FROM orders
@@ -73,20 +76,23 @@ async def _get_store_data(
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND status = 'paid'
                   AND created_at >= :cutoff
-            """),
+            """
+            ),
             {"sid": store_id, "cutoff": cutoff},
         )
         revenue = revenue_row.mappings().first()
 
         # 出勤工时汇总（最近30天）
         attendance_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(work_hours), 0.0) AS total_work_hours
                 FROM daily_attendance
                 WHERE store_id = :sid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND work_date >= :cutoff
-            """),
+            """
+            ),
             {"sid": store_id, "cutoff": cutoff},
         )
         attendance = attendance_row.mappings().first()
@@ -145,12 +151,14 @@ async def _get_brand_data(
 
         # 获取租户下所有门店 ID（通过 payroll_summaries 或 employees 推断）
         store_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT store_id::text
                 FROM employees
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND status = 'active'
-            """),
+            """
+            ),
         )
         store_ids = [r[0] for r in store_rows.fetchall()]
 
@@ -158,7 +166,8 @@ async def _get_brand_data(
 
         # 近3个月薪资/营收趋势（按月聚合）
         trend_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT period_year, period_month,
                        SUM(total_salary_fen) AS monthly_labor_fen
                 FROM payroll_summaries
@@ -166,13 +175,15 @@ async def _get_brand_data(
                 GROUP BY period_year, period_month
                 ORDER BY period_year DESC, period_month DESC
                 LIMIT 3
-            """),
+            """
+            ),
         )
         trend = trend_rows.mappings().all()
         monthly_labor_fen = [int(r["monthly_labor_fen"]) for r in reversed(trend)]
 
         revenue_trend_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DATE_TRUNC('month', created_at) AS mo,
                        SUM(total_fen) AS monthly_revenue_fen
                 FROM orders
@@ -182,7 +193,8 @@ async def _get_brand_data(
                 GROUP BY mo
                 ORDER BY mo DESC
                 LIMIT 3
-            """),
+            """
+            ),
             {"cutoff": cutoff},
         )
         rev_trend = revenue_trend_rows.mappings().all()
@@ -190,18 +202,21 @@ async def _get_brand_data(
 
         # 员工汇总统计
         headcount_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS total_headcount
                 FROM employees
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND status = 'active'
-            """),
+            """
+            ),
         )
         total_headcount = int((headcount_row.scalar()) or 0)
 
         # 平均薪资（最近一期 payroll_summaries）
         avg_salary_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT AVG(total_salary_fen::float / NULLIF(headcount, 0)) AS avg_salary_fen
                 FROM payroll_summaries
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
@@ -209,7 +224,8 @@ async def _get_brand_data(
                       SELECT MAX(period_year) FROM payroll_summaries
                       WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   )
-            """),
+            """
+            ),
         )
         avg_salary_fen = int((avg_salary_row.scalar()) or 0)
 
@@ -256,13 +272,15 @@ async def _get_employee_data(
 
         # 员工基本信息 + 门店
         emp_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT employee_id::text, store_id::text
                 FROM employees
                 WHERE employee_id = :eid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                 LIMIT 1
-            """),
+            """
+            ),
             {"eid": employee_id},
         )
         emp = emp_row.mappings().first()
@@ -270,7 +288,8 @@ async def _get_employee_data(
 
         # 出勤工时
         attendance_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(work_hours), 0.0) AS hours_worked,
                        COUNT(*) FILTER (WHERE status = 'present') AS present_days,
                        COUNT(*) FILTER (WHERE status = 'absent')  AS absent_days,
@@ -280,21 +299,24 @@ async def _get_employee_data(
                 WHERE employee_id = :eid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND work_date >= :cutoff
-            """),
+            """
+            ),
             {"eid": employee_id, "cutoff": cutoff},
         )
         att = attendance_row.mappings().first()
 
         # 薪资（最近一期）
         payroll_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT total_salary_fen
                 FROM payroll_summaries
                 WHERE store_id = :sid
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                 ORDER BY period_year DESC, period_month DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"sid": store_id or ""},
         )
         payroll = payroll_row.mappings().first()
@@ -302,7 +324,8 @@ async def _get_employee_data(
 
         # 所在门店营收（近30天，用于计算人均产值）
         revenue_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(total_fen), 0) AS revenue_fen,
                        COUNT(*) AS order_count
                 FROM orders
@@ -310,7 +333,8 @@ async def _get_employee_data(
                   AND tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND status = 'paid'
                   AND created_at >= :cutoff
-            """),
+            """
+            ),
             {"sid": store_id or "", "cutoff": cutoff},
         )
         rev = revenue_row.mappings().first()

@@ -28,6 +28,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import date
 from typing import Any, Optional
@@ -39,6 +40,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import FranchiseEventType
 from shared.ontology.src.database import get_db
 
 log = structlog.get_logger(__name__)
@@ -81,14 +84,16 @@ async def _set_rls(db: AsyncSession, tenant_id: str) -> uuid.UUID:
 async def _fetch_bill(db: AsyncSession, bill_id: uuid.UUID, tid: uuid.UUID) -> dict:
     """查询账单，不存在则 404。"""
     res = await db.execute(
-        text("""
+        text(
+            """
             SELECT b.id, b.franchise_id, f.name AS franchise_name,
                    b.bill_type, b.amount_fen, b.paid_fen, b.status,
                    b.due_date, b.billing_period, b.created_at, b.updated_at
             FROM franchise_fee_bills b
             LEFT JOIN franchisees f ON f.id = b.franchise_id AND f.tenant_id = b.tenant_id
             WHERE b.id = :bid AND b.tenant_id = :tid AND b.is_deleted IS NOT TRUE
-        """),
+        """
+        ),
         {"bid": bill_id, "tid": tid},
     )
     row = res.fetchone()
@@ -186,13 +191,15 @@ async def create_fee_bill(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_fee_bills
                   (id, tenant_id, franchise_id, bill_type, amount_fen, paid_fen,
                    status, due_date, billing_period, notes, created_by)
                 VALUES (:id, :tid, :fid, :btype, :amount, 0,
                         :status, :due_date, :period, :notes, :operator)
-            """),
+            """
+            ),
             {
                 "id": bill_id,
                 "tid": tid,
@@ -219,6 +226,47 @@ async def create_fee_bill(
         amount_fen=req.amount_fen,
         tenant_id=x_tenant_id,
     )
+
+    # ── v147+ 事件总线旁路写入：账单生成 + 已逾期标记 ──
+    # stream_id = bill_id（账单聚合根），金额单位分（int）
+    asyncio.create_task(
+        emit_event(
+            event_type=FranchiseEventType.FEE_BILLED,
+            tenant_id=x_tenant_id,
+            stream_id=str(bill_id),
+            payload={
+                "bill_id": str(bill_id),
+                "franchise_id": req.franchise_id,
+                "bill_type": req.bill_type,
+                "amount_fen": req.amount_fen,
+                "due_date": req.due_date,
+                "billing_period": req.billing_period,
+                "initial_status": initial_status,
+            },
+            source_service="tx-org",
+            metadata={"operator_id": x_operator},
+        )
+    )
+    if initial_status == "overdue":
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.FEE_OVERDUE,
+                tenant_id=x_tenant_id,
+                stream_id=str(bill_id),
+                payload={
+                    "bill_id": str(bill_id),
+                    "franchise_id": req.franchise_id,
+                    "bill_type": req.bill_type,
+                    "amount_fen": req.amount_fen,
+                    "unpaid_fen": req.amount_fen,
+                    "due_date": req.due_date,
+                    "reason": "due_date_in_past_at_creation",
+                },
+                source_service="tx-org",
+                metadata={"operator_id": x_operator},
+            )
+        )
+
     return {
         "ok": True,
         "data": {
@@ -289,7 +337,8 @@ async def list_fee_bills(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT b.id, b.franchise_id, f.name AS franchise_name,
                    b.bill_type, b.amount_fen, b.paid_fen, b.status,
                    b.due_date, b.billing_period, b.created_at,
@@ -299,7 +348,8 @@ async def list_fee_bills(
             {where}
             ORDER BY b.due_date ASC, b.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -336,21 +386,50 @@ async def list_overdue_bills(
     tid = await _set_rls(db, x_tenant_id)
 
     # 自动将到期未付账单标记为逾期
+    newly_overdue: list[dict] = []
     try:
-        await db.execute(
-            text("""
+        marked_res = await db.execute(
+            text(
+                """
                 UPDATE franchise_fee_bills
                 SET status = 'overdue', updated_at = now()
                 WHERE tenant_id = :tid
                   AND status = 'pending'
                   AND due_date < CURRENT_DATE
                   AND is_deleted IS NOT TRUE
-            """),
+                RETURNING id, franchise_id, bill_type, amount_fen,
+                          COALESCE(paid_fen, 0) AS paid_fen, due_date
+            """
+            ),
             {"tid": tid},
         )
+        newly_overdue = [dict(r._mapping) for r in marked_res.fetchall()]
         await db.commit()
     except SQLAlchemyError as exc:
         log.warning("overdue_bills.auto_mark_failed", error=str(exc))
+
+    # ── v147+ 事件总线旁路写入：每条新标记 overdue 的账单单独发射事件 ──
+    # stream_id = bill_id；金额单位 fen（int）
+    for nb in newly_overdue:
+        unpaid_fen = int(nb["amount_fen"]) - int(nb["paid_fen"])
+        asyncio.create_task(
+            emit_event(
+                event_type=FranchiseEventType.FEE_OVERDUE,
+                tenant_id=x_tenant_id,
+                stream_id=str(nb["id"]),
+                payload={
+                    "bill_id": str(nb["id"]),
+                    "franchise_id": str(nb["franchise_id"]),
+                    "bill_type": nb["bill_type"],
+                    "amount_fen": int(nb["amount_fen"]),
+                    "paid_fen": int(nb["paid_fen"]),
+                    "unpaid_fen": unpaid_fen,
+                    "due_date": nb["due_date"].isoformat() if nb["due_date"] else None,
+                    "reason": "auto_mark_pending_past_due",
+                },
+                source_service="tx-org",
+            )
+        )
 
     where = "WHERE b.tenant_id = :tid AND b.status = 'overdue' AND b.is_deleted IS NOT TRUE"
     params: dict = {"tid": tid}
@@ -374,7 +453,8 @@ async def list_overdue_bills(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT b.id, b.franchise_id, f.name AS franchise_name,
                    b.bill_type, b.amount_fen, b.paid_fen, b.due_date, b.billing_period,
                    CURRENT_DATE - b.due_date AS overdue_days,
@@ -384,7 +464,8 @@ async def list_overdue_bills(
             {where}
             ORDER BY overdue_days DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -423,12 +504,14 @@ async def get_fee_bill_detail(
 
     # 查询收款记录
     payments_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, paid_amount_fen, payment_method, payment_date, receipt_no, notes, created_at
             FROM franchise_fee_payments
             WHERE bill_id = :bid AND tenant_id = :tid
             ORDER BY created_at DESC
-        """),
+        """
+        ),
         {"bid": bid, "tid": tid},
     )
     payments = [
@@ -486,13 +569,15 @@ async def record_payment(
     try:
         # 插入收款记录
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_fee_payments
                   (id, tenant_id, bill_id, franchise_id, paid_amount_fen,
                    payment_method, payment_date, receipt_no, notes, created_by)
                 VALUES (:id, :tid, :bid, :fid, :amount,
                         :method, :pdate, :receipt, :notes, :operator)
-            """),
+            """
+            ),
             {
                 "id": payment_id,
                 "tid": tid,
@@ -509,11 +594,13 @@ async def record_payment(
 
         # 更新账单已付金额和状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE franchise_fee_bills
                 SET paid_fen = :new_paid, status = :new_status, updated_at = now()
                 WHERE id = :bid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"new_paid": new_paid_fen, "new_status": new_status, "bid": bid, "tid": tid},
         )
         await db.commit()
@@ -529,6 +616,36 @@ async def record_payment(
         new_status=new_status,
         tenant_id=x_tenant_id,
     )
+
+    # ── v147+ 事件总线旁路写入：收款完成 ──
+    # stream_id = bill_id；新状态可能为 partial（部分收款）或 paid（结清）
+    asyncio.create_task(
+        emit_event(
+            event_type=FranchiseEventType.FEE_PAID,
+            tenant_id=x_tenant_id,
+            stream_id=bill_id,
+            payload={
+                "bill_id": bill_id,
+                "payment_id": str(payment_id),
+                "franchise_id": bill["franchise_id"],
+                "bill_type": bill["bill_type"],
+                "amount_fen": bill["amount_fen"],
+                "paid_amount_fen": req.paid_amount_fen,
+                "total_paid_fen": new_paid_fen,
+                "remaining_fen": new_remaining,
+                "bill_status": new_status,
+                "fully_paid": new_status == "paid",
+                "payment_method": req.payment_method,
+                "payment_date": payment_date.isoformat(),
+            },
+            source_service="tx-org",
+            metadata={
+                "operator_id": x_operator,
+                "receipt_no": req.receipt_no,
+            },
+        )
+    )
+
     return {
         "ok": True,
         "data": {
@@ -563,11 +680,13 @@ async def send_payment_reminder(
 
     # 查询联系人信息
     contact_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT contact_phone, contact_email, name
             FROM franchisees
             WHERE id = :fid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"fid": uuid.UUID(bill["franchise_id"]), "tid": tid},
     )
     contact_row = contact_res.fetchone()
@@ -575,11 +694,13 @@ async def send_payment_reminder(
     # 记录催款日志
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_reminder_logs
                   (tenant_id, bill_id, franchise_id, reminder_type, sent_by, bill_status, unpaid_fen)
                 VALUES (:tid, :bid, :fid, 'wecom_sms', :operator, :status, :unpaid)
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "bid": bid,
@@ -658,13 +779,15 @@ async def create_billing_rule(
     rule_id = uuid.uuid4()
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_billing_rules
                   (id, tenant_id, franchise_id, fee_type, amount_fen, rate,
                    billing_cycle, billing_day, start_date, status, notes, created_by)
                 VALUES (:id, :tid, :fid, :fee_type, :amount, :rate,
                         :cycle, :bday, :start_date, 'active', :notes, :operator)
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tid": tid,
@@ -746,7 +869,8 @@ async def list_billing_rules(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT r.id, r.franchise_id, f.name AS franchise_name,
                    r.fee_type, r.amount_fen, r.rate, r.billing_cycle,
                    r.billing_day, r.start_date, r.status, r.last_triggered_at
@@ -755,7 +879,8 @@ async def list_billing_rules(
             {where}
             ORDER BY r.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -795,11 +920,13 @@ async def trigger_billing_rule(
 
     # 查询规则
     rule_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, franchise_id, fee_type, amount_fen, rate, billing_cycle, billing_day
             FROM franchise_billing_rules
             WHERE id = :rid AND tenant_id = :tid AND status = 'active'
-        """),
+        """
+        ),
         {"rid": rid, "tid": tid},
     )
     rule_row = rule_res.fetchone()
@@ -844,13 +971,15 @@ async def trigger_billing_rule(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO franchise_fee_bills
                   (id, tenant_id, franchise_id, bill_type, amount_fen, paid_fen,
                    status, due_date, billing_period, notes, created_by)
                 VALUES (:id, :tid, :fid, :btype, :amount, 0,
                         :status, :due_date, :period, :notes, :operator)
-            """),
+            """
+            ),
             {
                 "id": bill_id,
                 "tid": tid,
@@ -936,7 +1065,8 @@ async def get_fee_report_summary(
 
     # 汇总统计
     summary_res = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 SUM(b.amount_fen)                                           AS total_billed_fen,
                 SUM(COALESCE(b.paid_fen, 0))                                AS total_paid_fen,
@@ -947,7 +1077,8 @@ async def get_fee_report_summary(
                 COUNT(CASE WHEN b.status = 'overdue' THEN 1 END)            AS overdue_count
             FROM franchise_fee_bills b
             {where}
-        """),
+        """
+        ),
         params,
     )
     row = summary_res.fetchone()
@@ -958,7 +1089,8 @@ async def get_fee_report_summary(
 
     # 分类统计
     by_type_res = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 b.bill_type,
                 SUM(b.amount_fen)            AS billed_fen,
@@ -968,7 +1100,8 @@ async def get_fee_report_summary(
             {where}
             GROUP BY b.bill_type
             ORDER BY billed_fen DESC
-        """),
+        """
+        ),
         params,
     )
     by_type = [
@@ -1038,10 +1171,12 @@ async def get_fee_report_by_franchise(
         params["bill_type"] = bill_type
 
     count_res = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(DISTINCT b.franchise_id)
             FROM franchise_fee_bills b {where}
-        """),
+        """
+        ),
         params,
     )
     total = count_res.scalar() or 0
@@ -1049,7 +1184,8 @@ async def get_fee_report_by_franchise(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 b.franchise_id,
                 f.name AS franchise_name,
@@ -1067,7 +1203,8 @@ async def get_fee_report_by_franchise(
             GROUP BY b.franchise_id, f.name, f.contact_phone
             ORDER BY overdue_amount_fen DESC, total_billed_fen DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [

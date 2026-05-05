@@ -6,6 +6,7 @@
   - 字段类型不可变更
   - 破坏性变更必须改 schema_version 主版本并启用新 topic
 """
+
 from __future__ import annotations
 
 from typing import ClassVar

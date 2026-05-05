@@ -229,7 +229,8 @@ async def get_personalized_menu(
     dishes: list[PersonalizedDish] = []
     try:
         dish_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     d.id::text AS dish_id,
                     d.dish_name AS name,
@@ -247,7 +248,8 @@ async def get_personalized_menu(
                   AND d.is_deleted = false
                 ORDER BY COALESCE(c.sort_order, 999), d.dish_name
                 LIMIT 200
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         for row in dish_rows.mappings():
@@ -274,7 +276,8 @@ async def get_personalized_menu(
     if customer_id:
         try:
             history_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT oi.dish_name, COUNT(*) AS cnt
                     FROM order_items oi
                     JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
@@ -285,7 +288,8 @@ async def get_personalized_menu(
                     GROUP BY oi.dish_name
                     ORDER BY cnt DESC
                     LIMIT 10
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "cid": customer_id},
             )
             history_top = [row["dish_name"] for row in history_rows.mappings()]
@@ -297,7 +301,8 @@ async def get_personalized_menu(
     hot_dishes: list[str] = []
     try:
         hot_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT oi.dish_name, COUNT(*) AS cnt
                 FROM order_items oi
                 JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
@@ -308,7 +313,8 @@ async def get_personalized_menu(
                 GROUP BY oi.dish_name
                 ORDER BY cnt DESC
                 LIMIT 10
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "sid": store_id},
         )
         hot_dishes = [row["dish_name"] for row in hot_rows.mappings()]

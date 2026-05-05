@@ -6,4 +6,5 @@ RUN pip install --no-cache-dir --retries 5 --timeout 120 -i https://mirrors.aliy
 COPY shared/ ./shared/
 COPY services/tx-pay/src/ ./services/tx_pay/src/
 ENV PYTHONPATH=/app
-CMD ["uvicorn", "services.tx_pay.src.main:app", "--host", "0.0.0.0", "--port", "8013"]
+EXPOSE 8016
+CMD ["uvicorn", "services.tx_pay.src.main:app", "--host", "0.0.0.0", "--port", "8016"]

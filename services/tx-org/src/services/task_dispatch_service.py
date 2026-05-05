@@ -47,8 +47,7 @@ from uuid import UUID, uuid4
 import structlog
 from repositories.task_repo import InMemoryTaskRepository, TaskQuery, TaskRepository
 
-from shared.events.src.emitter import emit_event
-from shared.events.src.event_types import TaskEventType
+from shared.events.src import TaskEventType, emit_event
 from shared.ontology.src.extensions.tasks import Task, TaskStatus, TaskType
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -227,9 +226,7 @@ class TaskDispatchService:
         """
         task = await self._require_task(task_id, tenant_id)
         if task.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
-            raise TaskTerminalStateError(
-                f"task {task_id} already in terminal state {task.status.value}"
-            )
+            raise TaskTerminalStateError(f"task {task_id} already in terminal state {task.status.value}")
 
         now = self._utcnow()
         updated_payload = {
@@ -284,9 +281,7 @@ class TaskDispatchService:
         """手动升级：Agent 或人工调用。"""
         task = await self._require_task(task_id, tenant_id)
         if task.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
-            raise TaskTerminalStateError(
-                f"task {task_id} already in terminal state {task.status.value}"
-            )
+            raise TaskTerminalStateError(f"task {task_id} already in terminal state {task.status.value}")
 
         now = self._utcnow()
         updated = task.model_copy(
@@ -344,12 +339,8 @@ class TaskDispatchService:
         candidates = await self.repo.query_overdue_pending(now=ref_now, tenant_id=tenant_id)
         # 补充 "已升店长、尚未升区经" 的场景：扩展查询
         if tenant_id is not None:
-            also_escalated = await self.repo.query(
-                TaskQuery(tenant_id=tenant_id, status=TaskStatus.ESCALATED)
-            )
-            candidates.extend(
-                t for t in also_escalated if t.due_at <= ref_now
-            )
+            also_escalated = await self.repo.query(TaskQuery(tenant_id=tenant_id, status=TaskStatus.ESCALATED))
+            candidates.extend(t for t in also_escalated if t.due_at <= ref_now)
 
         escalated_out: list[Task] = []
         for task in candidates:
@@ -392,9 +383,7 @@ class TaskDispatchService:
         else:
             # 仍未达到任何阈值（可能 store_mgr 缺失但尚未 72h）
             if age >= timedelta(hours=ESCALATION_HOURS_STORE_MANAGER) and not store_mgr and not district_mgr:
-                raise EscalationChainMissing(
-                    "escalation_chain missing both store_manager and district_manager"
-                )
+                raise EscalationChainMissing("escalation_chain missing both store_manager and district_manager")
             return None
 
         # 幂等：已升级到该对象则跳过
@@ -426,9 +415,7 @@ class TaskDispatchService:
 
         task = await self._require_task(task_id, tenant_id)
         if task.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
-            raise TaskTerminalStateError(
-                f"task {task_id} already in terminal state {task.status.value}"
-            )
+            raise TaskTerminalStateError(f"task {task_id} already in terminal state {task.status.value}")
 
         now = self._utcnow()
         updated = task.model_copy(

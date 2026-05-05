@@ -99,7 +99,7 @@ backup_current_state() {
             kubectl get svc "${svc}" -o json >> "$backup_file" 2>/dev/null || true
             ;;
         compose)
-            docker compose -f "${PROJECT_ROOT}/infra/docker/docker-compose.yml" ps "${svc}" > "$backup_file" 2>/dev/null || true
+            docker compose -f "${PROJECT_ROOT}/infra/compose/base.yml" -f "${PROJECT_ROOT}/infra/compose/envs/prod.yml" ps "${svc}" > "$backup_file" 2>/dev/null || true
             ;;
     esac
     log_info "当前状态已备份到 $backup_file"
@@ -127,14 +127,18 @@ rollback_compose() {
     local svc=$1
     local target=${2:-}
 
-    local compose_file="${PROJECT_ROOT}/infra/docker/docker-compose.yml"
+    # P0.5 后 compose 收敛到 infra/compose/，prod 用 base + envs/prod.yml
+    local -a compose_args=(
+        -f "${PROJECT_ROOT}/infra/compose/base.yml"
+        -f "${PROJECT_ROOT}/infra/compose/envs/prod.yml"
+    )
     local image_tag="${target:-latest}"
 
     log_info "Compose 回滚 $svc → 镜像标签 $image_tag"
 
     # 检查是否有带版本标签的镜像
     if docker images "tunxiang/${svc}:${image_tag}" --format '{{.Repository}}:{{.Tag}}' | grep -q .; then
-        TAG="${image_tag}" docker compose -f "$compose_file" up -d --no-deps "${svc}"
+        TAG="${image_tag}" docker compose "${compose_args[@]}" up -d --no-deps "${svc}"
     else
         log_error "镜像 tunxiang/${svc}:${image_tag} 不存在"
         log_info "可用镜像："

@@ -226,13 +226,15 @@ async def get_digital_menu_dishes(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, category_id, price_fen, description, image_url, is_available
                 FROM dishes
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true),'')::UUID
                   AND store_id = :store_id AND is_deleted = false AND is_available = true
                 ORDER BY category_id, sort_order
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         rows = result.mappings().all()
@@ -272,13 +274,15 @@ async def get_digital_menu_config(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, logo_url, announcement_text, theme_color
                 FROM stores
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true),'')::UUID
                   AND id = :store_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         row = result.mappings().one_or_none()
@@ -347,11 +351,13 @@ async def update_board_announcement(
         {"tid": x_tenant_id},
     )
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE stores
                SET config = COALESCE(config, '{}') || jsonb_build_object('board_announcement', :msg)
              WHERE id = :sid::uuid AND tenant_id = :tid::uuid
-        """),
+        """
+        ),
         {"tid": x_tenant_id, "sid": body.store_id, "msg": body.announcement},
     )
     await db.commit()

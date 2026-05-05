@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.takeaway_manager import (
     accept_order,
@@ -138,7 +139,7 @@ async def api_accept_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 端点 4: 拒单 ───
@@ -162,7 +163,7 @@ async def api_reject_order(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 端点 5: 沽清同步 ───
@@ -205,7 +206,7 @@ async def api_update_delivery_status(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 端点 7: 外卖仪表盘 ───
@@ -250,7 +251,7 @@ async def api_get_reconciliation(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 端点 9: 外卖菜品上下架 ───
@@ -274,7 +275,7 @@ async def api_manage_menu(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ─── 端点 10: 自动接单规则 ───
@@ -297,4 +298,4 @@ async def api_set_auto_accept_rules(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e

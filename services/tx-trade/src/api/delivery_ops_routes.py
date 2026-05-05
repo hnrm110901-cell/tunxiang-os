@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.delivery_order import DeliveryOrder as DeliveryOrderModel
 from ..repositories.delivery_order_repo import DeliveryOrderRepository
@@ -138,7 +139,7 @@ async def get_all_configs(
             "error": None,
         }
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get(
@@ -160,7 +161,7 @@ async def get_config(
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.put(
@@ -192,7 +193,7 @@ async def update_config(
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── Busy Mode ─────────────────────────────────────────────────────────────────
@@ -227,7 +228,7 @@ async def enable_busy_mode(
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.delete(
@@ -249,9 +250,9 @@ async def disable_busy_mode(
         await db.commit()
         return {"ok": True, "data": config.model_dump(mode="json"), "error": None}
     except ConfigNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get(
@@ -280,7 +281,7 @@ async def get_busy_mode_status(
         ]
         return {"ok": True, "data": status_list, "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 差评管理 ──────────────────────────────────────────────────────────────────
@@ -327,7 +328,7 @@ async def get_negative_reviews(
             "error": None,
         }
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post(
@@ -353,9 +354,9 @@ async def reply_review(
         await db.commit()
         return {"ok": True, "data": review.model_dump(mode="json"), "error": None}
     except ReviewNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get(
@@ -374,7 +375,7 @@ async def get_alert_count(
         count = await svc.get_unhandled_alert_count(store_id=store_id, tenant_id=tenant_id, db=db)
         return {"ok": True, "data": {"count": count}, "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 健康度看板 ────────────────────────────────────────────────────────────────
@@ -402,7 +403,7 @@ async def get_health_dashboard(
         dashboard = await svc.get_health_dashboard(store_id=store_id, tenant_id=tenant_id, db=db)
         return {"ok": True, "data": dashboard.model_dump(mode="json"), "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get(
@@ -452,7 +453,7 @@ async def get_health_trend(
             )
         return {"ok": True, "data": {"trend": serialized, "days": days}, "error": None}
     except DeliveryOpsError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─── 外卖对账候选（Y-A5 骨架：查询 + 汇总，供定时任务 / HQ 使用）──────────────────

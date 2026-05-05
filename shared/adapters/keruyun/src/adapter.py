@@ -4,7 +4,7 @@
 """
 
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -284,7 +284,7 @@ class KeruyunAdapter:
             else:
                 created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         return OrderSchema(
             order_id=str(raw.get("order_id", "")),
@@ -330,7 +330,7 @@ class KeruyunAdapter:
             else:
                 created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
         except (ValueError, TypeError, OSError):
-            created_at = datetime.utcnow()
+            created_at = datetime.now(timezone.utc)
 
         amount_raw = raw.get("amount")
         amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None

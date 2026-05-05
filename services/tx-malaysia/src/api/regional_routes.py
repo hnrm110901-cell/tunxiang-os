@@ -11,7 +11,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
@@ -20,12 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 from shared.region.src.cross_border_report import CrossBorderReportService
 from shared.region.src.region_config import (
-    MarketRegion,
-    get_config,
     get_config_by_code,
     get_supported_markets,
-    is_market_supported,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/regional", tags=["regional"])
 
@@ -92,8 +90,7 @@ async def get_region_config(
     if region is None:
         raise HTTPException(
             status_code=404,
-            detail=f"Unsupported market: {market}. "
-                   f"Supported: CN, MY, ID, VN",
+            detail=f"Unsupported market: {market}. Supported: CN, MY, ID, VN",
         )
 
     return {
@@ -121,9 +118,7 @@ async def get_region_config(
 async def get_consolidated_revenue(
     date_from: str = Query(..., description="统计起始日（YYYY-MM-DD）"),
     date_to: str = Query(..., description="统计结束日（YYYY-MM-DD）"),
-    target_currency: str = Query(
-        "CNY", description="目标汇总币种（CNY/MYR/IDR/VND/USD）"
-    ),
+    target_currency: str = Query("CNY", description="目标汇总币种（CNY/MYR/IDR/VND/USD）"),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
     service: CrossBorderReportService = Depends(get_cross_border_service),
@@ -145,7 +140,7 @@ async def get_consolidated_revenue(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/market-comparison")
@@ -170,4 +165,4 @@ async def get_market_comparison(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

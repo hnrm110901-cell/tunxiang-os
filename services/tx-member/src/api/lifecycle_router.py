@@ -72,14 +72,16 @@ async def get_lifecycle_distribution(
     await _set_rls(db, tenant_id)
 
     where_store = "AND store_id = :store_id" if store_id else ""
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT lifecycle_stage, count(*) AS cnt
         FROM customers
         WHERE tenant_id = :tid
           AND is_deleted = FALSE
           {where_store}
         GROUP BY lifecycle_stage
-    """)
+    """
+    )
     params: dict[str, Any] = {"tid": str(tenant_id)}
     if store_id:
         params["store_id"] = store_id
@@ -147,7 +149,8 @@ async def get_at_risk_members(
     await _set_rls(db, tenant_id)
 
     where_store = "AND store_id = :store_id" if store_id else ""
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             id,
             display_name,
@@ -163,7 +166,8 @@ async def get_at_risk_members(
           {where_store}
         ORDER BY last_order_at ASC NULLS LAST
         LIMIT :limit
-    """)
+    """
+    )
     params: dict[str, Any] = {"tid": str(tenant_id), "limit": limit}
     if store_id:
         params["store_id"] = store_id
@@ -290,14 +294,16 @@ async def get_member_lifecycle(
     await _set_rls(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id, display_name, primary_phone,
                 lifecycle_stage, first_order_at, last_order_at,
                 total_order_count, rfm_level, created_at
             FROM customers
             WHERE id = :mid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"mid": member_id, "tid": str(tenant_id)},
     )
     row = result.fetchone()

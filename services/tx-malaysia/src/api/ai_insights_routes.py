@@ -7,13 +7,11 @@
   - GET  /api/v1/my/insights/pricing              定价优化建议
 """
 
-from typing import Any, Optional
-
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.ai_insights_service import AIInsightsService
 
@@ -52,7 +50,7 @@ async def get_waste_reduction(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/labour-optimization")
@@ -77,7 +75,7 @@ async def get_labour_optimization(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/halal-compliance")
@@ -99,7 +97,7 @@ async def get_halal_compliance(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/pricing")
@@ -122,4 +120,4 @@ async def get_pricing_recommendations(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

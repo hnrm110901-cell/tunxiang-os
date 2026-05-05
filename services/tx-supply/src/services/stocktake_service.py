@@ -124,13 +124,15 @@ async def create_stocktake(
         # 注意：v064 迁移中 stocktakes.id 为 UUID，status 枚举为 draft/in_progress/completed/cancelled
         # 盘点开始即为 in_progress（对应原 open 语义）
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stocktakes
                     (id, tenant_id, store_id, status, started_at, created_at, updated_at)
                 VALUES
                     (:id::uuid, :tenant_id::uuid, :store_id::uuid,
                      'in_progress', :now, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": stocktake_id,
                 "tenant_id": tenant_id,
@@ -141,7 +143,8 @@ async def create_stocktake(
 
         for item in items.values():
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO stocktake_items
                         (id, stocktake_id, tenant_id, ingredient_id,
                          ingredient_name, unit,
@@ -154,7 +157,8 @@ async def create_stocktake(
                          :system_qty, NULL,
                          :cost_price,
                          :now, :now)
-                """),
+                """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "stocktake_id": stocktake_id,
@@ -223,11 +227,13 @@ async def record_count(
 
         # 查 stocktake 头（校验租户 + 状态）
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, status
                 FROM stocktakes
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {"id": stocktake_id, "tenant_id": tenant_id},
         )
         stocktake_row = row.mappings().one_or_none()
@@ -238,13 +244,15 @@ async def record_count(
 
         # 查 item 行（v064 列名：expected_qty, cost_price）
         item_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, ingredient_name, expected_qty, cost_price
                 FROM stocktake_items
                 WHERE stocktake_id = :stocktake_id::uuid
                   AND ingredient_id = :ingredient_id::uuid
                   AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {
                 "stocktake_id": stocktake_id,
                 "ingredient_id": ingredient_id,
@@ -260,13 +268,15 @@ async def record_count(
 
         # 更新 actual_qty
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stocktake_items
                 SET actual_qty = :actual_qty, updated_at = :now
                 WHERE stocktake_id = :stocktake_id::uuid
                   AND ingredient_id = :ingredient_id::uuid
                   AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {
                 "actual_qty": actual_qty,
                 "now": datetime.now(timezone.utc),
@@ -356,11 +366,13 @@ async def finalize_stocktake(
     if use_db:
         # 查盘点头（v064 status 枚举: draft/in_progress/completed/cancelled）
         header_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, status
                 FROM stocktakes
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {"id": stocktake_id, "tenant_id": tenant_id},
         )
         header = header_row.mappings().one_or_none()
@@ -371,13 +383,15 @@ async def finalize_stocktake(
 
         # 查所有明细行（v064 列名：expected_qty, cost_price）
         items_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_id, ingredient_name, unit,
                        expected_qty, actual_qty, cost_price
                 FROM stocktake_items
                 WHERE stocktake_id = :stocktake_id::uuid
                   AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {"stocktake_id": stocktake_id, "tenant_id": tenant_id},
         )
         items_rows = items_result.mappings().all()
@@ -489,13 +503,15 @@ async def finalize_stocktake(
     if use_db:
         # v064 schema: status 枚举为 completed，无 matched_count 等聚合列
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stocktakes
                 SET status = 'completed',
                     completed_at = :now,
                     updated_at = :now
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {
                 "id": stocktake_id,
                 "tenant_id": tenant_id,
@@ -557,7 +573,8 @@ async def get_stocktake_history(
 
         # v064 stocktakes 用 completed_at（无 finalized_at 列）
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     s.id AS stocktake_id,
                     s.store_id,
@@ -572,7 +589,8 @@ async def get_stocktake_history(
                   AND s.is_deleted = FALSE
                 GROUP BY s.id, s.store_id, s.status, s.created_at, s.completed_at
                 ORDER BY s.created_at DESC
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id},
         )
         rows = result.mappings().all()

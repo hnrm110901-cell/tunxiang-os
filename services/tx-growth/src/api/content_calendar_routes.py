@@ -155,7 +155,8 @@ async def list_content(
     params["limit"] = size
     params["offset"] = offset
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, store_id, title, content_type, content_body,
                    media_urls, target_channels, tags, ai_generated, ai_model,
                    status, scheduled_at, published_at, created_by,
@@ -166,7 +167,8 @@ async def list_content(
             WHERE {where}
             ORDER BY COALESCE(scheduled_at, created_at) DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = []
@@ -215,7 +217,8 @@ async def create_content(
     ctx_json = json.dumps(req.ai_prompt_context, ensure_ascii=False)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO content_calendar
                 (tenant_id, store_id, title, content_type, content_body,
                  media_urls, target_channels, tags, ai_generated, ai_model,
@@ -226,7 +229,8 @@ async def create_content(
                  :ctx::jsonb, :sched, :created_by,
                  CASE WHEN :sched IS NOT NULL THEN 'scheduled' ELSE 'draft' END)
             RETURNING id, status, created_at
-        """),
+        """
+        ),
         {
             "tid": x_tenant_id,
             "store_id": req.store_id,
@@ -295,12 +299,14 @@ async def update_content(
 
     set_clause = ", ".join(sets)
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE content_calendar
             SET {set_clause}
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
             RETURNING id, title, status, updated_at
-        """),
+        """
+        ),
         params,
     )
     r = row.mappings().first()
@@ -328,12 +334,14 @@ async def delete_content(
     await _set_tenant(db, x_tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             UPDATE content_calendar
             SET is_deleted = true, updated_at = NOW()
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
             RETURNING id
-        """),
+        """
+        ),
         {"cid": content_id, "tid": x_tenant_id},
     )
     r = row.mappings().first()
@@ -449,14 +457,16 @@ async def calendar_view(
 
     where = " AND ".join(conditions)
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, title, content_type, status,
                    COALESCE(scheduled_at, created_at) AS display_date,
                    ai_generated, store_id
             FROM content_calendar
             WHERE {where}
             ORDER BY display_date ASC
-        """),
+        """
+        ),
         params,
     )
 

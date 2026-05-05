@@ -44,6 +44,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import MemberEventType, SettlementEventType
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.stored_value_service import (
     CardNotActiveError,
@@ -71,7 +72,7 @@ def _parse_tenant_id(x_tenant_id: str = Header(..., alias="X-Tenant-ID")) -> uui
     try:
         return uuid.UUID(x_tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"X-Tenant-ID 格式错误: {x_tenant_id}") from e
+        raise safe_http_exception(400, "X-Tenant-ID 格式错误", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -238,7 +239,7 @@ async def account_recharge(
         )
         return {"ok": True, "data": result}
     except (CardNotActiveError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/accounts/{card_id}/consume", summary="消费核销（按 card_id）")
@@ -296,11 +297,11 @@ async def account_consume(
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/accounts/{card_id}/refund", summary="退款（按 card_id）")
@@ -323,7 +324,7 @@ async def account_refund(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/accounts/{card_id}/transfer", summary="余额转赠（按 card_id）")
@@ -346,11 +347,11 @@ async def account_transfer(
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except (CardNotActiveError, TransferNotAllowedError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.get("/accounts/{card_id}/balance", summary="余额查询（按 card_id）")
@@ -364,7 +365,7 @@ async def account_balance(
         result = await svc.get_balance(db=db, card_id=card_id, tenant_id=tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "储值卡或记录不存在", e) from e
 
 
 @router.get("/accounts/{card_id}/transactions", summary="流水记录（按 card_id）")
@@ -429,7 +430,7 @@ async def get_card_by_id(
     """按 card_id 查询储值卡详情"""
     card = await svc.get_card_by_id(db=db, card_id=card_id, tenant_id=tenant_id)
     if not card:
-        raise HTTPException(status_code=404, detail=f"储值卡不存在: {card_id}")
+        raise HTTPException(status_code=404, detail="储值卡不存在")
     return {"ok": True, "data": card}
 
 
@@ -451,11 +452,11 @@ async def recharge_by_plan(
         )
         return {"ok": True, "data": result}
     except PlanNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "储值卡或记录不存在", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/consume", summary="消费扣款")
@@ -472,11 +473,11 @@ async def consume(req: ConsumeReq, db: AsyncSession = Depends(_get_tenant_db)):
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/refund-by-transaction", summary="按原始流水退款")
@@ -496,7 +497,7 @@ async def refund_by_transaction(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.get("/balance/{card_id}", summary="余额查询（按 card_id）")
@@ -510,7 +511,7 @@ async def get_balance(
         result = await svc.get_balance(db=db, card_id=card_id, tenant_id=tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "储值卡或记录不存在", e) from e
 
 
 @router.get("/transactions/{card_id}", summary="流水分页查询（按 card_id）")
@@ -564,7 +565,7 @@ async def create_recharge_plan(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -577,7 +578,7 @@ async def get_balance_by_card_no(card_no: str, db: AsyncSession = Depends(_get_t
     """查询储值卡余额（按卡号）"""
     card = await svc.get_card(db, card_no)
     if not card:
-        raise HTTPException(status_code=404, detail=f"储值卡不存在: {card_no}")
+        raise HTTPException(status_code=404, detail="储值卡不存在")
     return {"ok": True, "data": card}
 
 
@@ -588,9 +589,9 @@ async def recharge(req: RechargeReq, db: AsyncSession = Depends(_get_tenant_db))
         result = await svc.recharge(db, req.card_no, req.amount_fen, req.operator_id, req.store_id)
         return {"ok": True, "data": result}
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/refund", summary="退款（v1 兼容）")
@@ -600,7 +601,7 @@ async def refund(req: RefundReq, db: AsyncSession = Depends(_get_tenant_db)):
         result = await svc.refund(db, req.card_no, req.amount_fen, req.order_id, req.operator_id)
         return {"ok": True, "data": result}
     except (CardNotActiveError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/freeze", summary="冻结储值卡")
@@ -610,7 +611,7 @@ async def freeze(req: FreezeReq, db: AsyncSession = Depends(_get_tenant_db)):
         result = await svc.freeze(db, req.card_no, req.operator_id)
         return {"ok": True, "data": result}
     except (CardNotActiveError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.post("/unfreeze", summary="解冻储值卡")
@@ -620,7 +621,7 @@ async def unfreeze(req: FreezeReq, db: AsyncSession = Depends(_get_tenant_db)):
         result = await svc.unfreeze(db, req.card_no, req.operator_id)
         return {"ok": True, "data": result}
     except (CardNotActiveError, ValueError) as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "储值操作失败", e) from e
 
 
 @router.get("/{card_no}/transactions", summary="流水查询（v1 兼容：按卡号）")
@@ -635,4 +636,4 @@ async def get_transactions(
         result = await svc.get_transactions(db, card_no, limit=size, offset=(page - 1) * size)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "储值卡或记录不存在", e) from e

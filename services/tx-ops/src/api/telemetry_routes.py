@@ -159,19 +159,19 @@ class PosCrashReport(BaseModel):
     store_id: Optional[str] = Field(None, max_length=64, description="门店 UUID（登录前可空）")
     # ── Sprint A1 扩字段（v268），全部 Optional，向前兼容 ───────────────────
     timeout_reason: Optional[str] = Field(
-        None, max_length=32,
+        None,
+        max_length=32,
         description="超时原因：fetch_timeout/saga_timeout/gateway_timeout/rls_deny/disk_io_error/unknown",
     )
     recovery_action: Optional[str] = Field(
-        None, max_length=32,
+        None,
+        max_length=32,
         description="恢复动作：reset/redirect_tables/retry/abort",
     )
     saga_id: Optional[str] = Field(None, max_length=64, description="关联 payment_sagas.saga_id")
     order_no: Optional[str] = Field(None, max_length=64, description="订单号（软关联）")
     severity: Optional[str] = Field(None, max_length=16, description="严重级：fatal/warn/info")
-    boundary_level: Optional[str] = Field(
-        None, max_length=16, description="ErrorBoundary 层级：root/cashier/unknown"
-    )
+    boundary_level: Optional[str] = Field(None, max_length=16, description="ErrorBoundary 层级：root/cashier/unknown")
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -362,22 +362,31 @@ async def report_pos_crash(
             detail={"code": "INVALID_PAYLOAD", "message": "severity 必须是 fatal/warn/info"},
         )
     if body.boundary_level is not None and body.boundary_level not in {
-        "root", "cashier", "unknown",
+        "root",
+        "cashier",
+        "unknown",
     }:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_PAYLOAD", "message": "boundary_level 必须是 root/cashier/unknown"},
         )
     if body.timeout_reason is not None and body.timeout_reason not in {
-        "fetch_timeout", "saga_timeout", "gateway_timeout",
-        "rls_deny", "disk_io_error", "unknown",
+        "fetch_timeout",
+        "saga_timeout",
+        "gateway_timeout",
+        "rls_deny",
+        "disk_io_error",
+        "unknown",
     }:
         raise HTTPException(
             status_code=400,
             detail={"code": "INVALID_PAYLOAD", "message": "timeout_reason 枚举不合法"},
         )
     if body.recovery_action is not None and body.recovery_action not in {
-        "reset", "redirect_tables", "retry", "abort",
+        "reset",
+        "redirect_tables",
+        "retry",
+        "abort",
     }:
         raise HTTPException(
             status_code=400,
@@ -447,6 +456,7 @@ async def report_pos_crash(
     # 审计钩子失败绝不影响 POS 主业务：create_task 即发即忘 + 内层 try/except
     hook = _audit_hook
     if hook is not None:
+
         async def _run_audit_hook() -> None:
             try:
                 await hook(
@@ -471,6 +481,7 @@ async def report_pos_crash(
                     report_id=report_id,
                     tenant_id=user_tenant_id,
                 )
+
         try:
             asyncio.create_task(_run_audit_hook())
         except RuntimeError as exc:

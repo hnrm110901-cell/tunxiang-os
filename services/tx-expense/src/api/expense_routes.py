@@ -14,7 +14,6 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -156,7 +155,7 @@ async def create_application(
         log.info("expense_application_created", tenant_id=str(tenant_id), applicant_id=str(current_user_id))
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("expense_application_create_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
         raise HTTPException(status_code=500, detail="创建费用申请失败，请稍后重试")
@@ -259,7 +258,7 @@ async def update_application(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error(
             "expense_application_update_failed", error=str(exc), application_id=str(application_id), exc_info=True
@@ -328,7 +327,7 @@ async def submit_application(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error(
             "expense_application_submit_failed", error=str(exc), application_id=str(application_id), exc_info=True
@@ -562,7 +561,7 @@ async def delete_application(
     except HTTPException:
         raise
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error(
             "expense_application_delete_failed", error=str(exc), application_id=str(application_id), exc_info=True
@@ -584,6 +583,7 @@ async def route_health() -> Dict[str, Any]:
 # ─── 差标相关端点（P0-S2新增）───────────────────────────────────────────────
 
 import src.services.expense_standard_service as _std_svc  # noqa: E402
+from shared.security.src.error_handler import safe_http_exception
 
 
 class ExpenseStandardCreate(BaseModel):
@@ -672,7 +672,7 @@ async def create_standard(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         log.error("standard_create_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
         raise HTTPException(status_code=500, detail="创建差标规则失败，请稍后重试")

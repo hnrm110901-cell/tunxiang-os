@@ -150,7 +150,8 @@ async def get_roi_summary(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 agent_id,
                 metric_type,
@@ -160,7 +161,8 @@ async def get_roi_summary(
             WHERE tenant_id = :tenant_id AND {period_filter}
             GROUP BY agent_id, metric_type
             ORDER BY agent_id, metric_type
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id},
         )
         rows = result.mappings().all()
@@ -247,7 +249,8 @@ async def get_agent_roi_detail(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 date_trunc(:trunc, period_start) AS period,
                 metric_type,
@@ -257,7 +260,8 @@ async def get_agent_roi_detail(
             GROUP BY period, metric_type
             ORDER BY period DESC, metric_type
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             {**params, "trunc": trunc},
         )
         rows = result.mappings().all()
@@ -291,7 +295,8 @@ async def get_agent_leaderboard(
 
     try:
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 agent_id,
                 SUM(value)::float AS total_value,
@@ -303,7 +308,8 @@ async def get_agent_leaderboard(
               AND metric_type LIKE '%%_fen'
             GROUP BY agent_id
             ORDER BY total_value DESC
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id},
         )
         rows = result.mappings().all()
@@ -364,10 +370,12 @@ async def collect_roi_metrics(
     # ── 幂等检查：若当日已有记录则跳过 ──────────────────────────────────────
     try:
         existing = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*)::int FROM agent_roi_metrics
             WHERE tenant_id = :tid AND period_start::date = :d
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date_str},
         )
         if (existing.scalar() or 0) > 0:
@@ -388,7 +396,8 @@ async def collect_roi_metrics(
     # 1. discount_guardian — 来源: orders 表
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(discount_amount_fen), 0)::bigint AS total_discount_fen,
                 COUNT(*) FILTER (WHERE discount_amount_fen > 0)::int AS discount_order_count
@@ -396,7 +405,8 @@ async def collect_roi_metrics(
             WHERE tenant_id = :tid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND status = 'completed'
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date_str},
         )
         row = r.mappings().one()
@@ -420,7 +430,8 @@ async def collect_roi_metrics(
     # 2. 所有 Agent — 来源: agent_auto_executions（执行计数 + 结果聚合）
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 agent_id,
                 COUNT(*)::int AS exec_count,
@@ -431,7 +442,8 @@ async def collect_roi_metrics(
               AND DATE(executed_at AT TIME ZONE 'Asia/Shanghai') = :d
               AND is_deleted = FALSE
             GROUP BY agent_id
-        """),
+        """
+            ),
             {"tid": x_tenant_id, "d": target_date_str},
         )
         exec_rows = r.mappings().all()
@@ -472,12 +484,14 @@ async def collect_roi_metrics(
     try:
         for m in metrics:
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO agent_roi_metrics
                     (tenant_id, agent_id, metric_type, value, period_start, period_end, metadata)
                 VALUES
                     (:tid, :agent_id, :metric_type, :value, :period_start, :period_end, :metadata::jsonb)
-            """),
+            """
+                ),
                 {
                     "tid": x_tenant_id,
                     "agent_id": m["agent_id"],
@@ -543,13 +557,13 @@ async def get_decision_roi_monthly(
         params["store_id"] = store_id
 
     # 只取回溯窗口内
-    filters.append(
-        "period_month >= DATE_TRUNC('month', CURRENT_DATE - :months_back * INTERVAL '1 month')::date"
-    )
+    filters.append("period_month >= DATE_TRUNC('month', CURRENT_DATE - :months_back * INTERVAL '1 month')::date")
     where = " AND ".join(filters)
 
     try:
-        result = await db.execute(text(f"""
+        result = await db.execute(
+            text(
+                f"""
             SELECT
                 period_month,
                 store_id::text AS store_id,
@@ -563,7 +577,10 @@ async def get_decision_roi_monthly(
             FROM mv_agent_roi_monthly
             WHERE {where}
             ORDER BY period_month DESC, agent_id
-        """), params)
+        """
+            ),
+            params,
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.error("d2_roi_monthly_query_failed", error=str(exc), exc_info=True)
@@ -578,10 +595,13 @@ async def get_decision_roi_monthly(
             if r.get(k) is not None:
                 r[k] = float(r[k])
 
-    return {"ok": True, "data": {
-        "rows": rows,
-        "filters": {"agent_id": agent_id, "store_id": store_id, "months_back": months_back},
-    }}
+    return {
+        "ok": True,
+        "data": {
+            "rows": rows,
+            "filters": {"agent_id": agent_id, "store_id": store_id, "months_back": months_back},
+        },
+    }
 
 
 @router.post("/decision-roi/refresh", summary="D2: 手工刷新 mv_agent_roi_monthly（运维用）")
@@ -612,7 +632,9 @@ async def get_decision_roi_summary(
 ) -> dict:
     """租户当月各 Agent 累计 ROI 一屏汇总，首页"三条硬约束 ROI"展示卡用。"""
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT
                 agent_id,
                 SUM(decision_count)            AS decisions,
@@ -630,7 +652,10 @@ async def get_decision_roi_summary(
                 + SUM(saved_labor_hours_sum) * 10000
             ) DESC
             LIMIT 20
-        """), {"tenant_id": x_tenant_id})
+        """
+            ),
+            {"tenant_id": x_tenant_id},
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.error("d2_roi_summary_failed", error=str(exc), exc_info=True)
@@ -646,14 +671,17 @@ async def get_decision_roi_summary(
             if r.get(k) is not None:
                 r[k] = float(r[k])
 
-    return {"ok": True, "data": {
-        "by_agent": rows,
-        "aggregate": {
-            "saved_labor_hours": round(total_saved_hours, 2),
-            "prevented_loss_fen": total_prevented_fen,
-            "prevented_loss_yuan": round(total_prevented_fen / 100, 2),
-            "revenue_uplift_fen": total_revenue_up_fen,
-            "revenue_uplift_yuan": round(total_revenue_up_fen / 100, 2),
+    return {
+        "ok": True,
+        "data": {
+            "by_agent": rows,
+            "aggregate": {
+                "saved_labor_hours": round(total_saved_hours, 2),
+                "prevented_loss_fen": total_prevented_fen,
+                "prevented_loss_yuan": round(total_prevented_fen / 100, 2),
+                "revenue_uplift_fen": total_revenue_up_fen,
+                "revenue_uplift_yuan": round(total_revenue_up_fen / 100, 2),
+            },
+            "period": "current_month",
         },
-        "period": "current_month",
-    }}
+    }

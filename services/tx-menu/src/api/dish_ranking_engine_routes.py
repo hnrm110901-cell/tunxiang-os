@@ -425,7 +425,8 @@ async def get_dish_trends(
         d_from = d_to - timedelta(days=days)
 
         daily_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     o.created_at::date                       AS sale_date,
                     SUM(oi.quantity)                         AS qty
@@ -438,7 +439,8 @@ async def get_dish_trends(
                   AND o.created_at::date BETWEEN :d_from AND :d_to
                 GROUP BY sale_date
                 ORDER BY sale_date
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "store_id": store_id, "dish_id": dish_id, "d_from": str(d_from), "d_to": str(d_to)},
         )
         daily_rows = {str(r.sale_date): int(r.qty) for r in daily_result.fetchall()}

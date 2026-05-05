@@ -105,7 +105,8 @@ async def get_admin_payroll_view(
     tid = _tid(tenant_id)
 
     count_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*)::bigint AS n
             FROM payroll_records_v2 p
             INNER JOIN employees e
@@ -116,7 +117,8 @@ async def get_admin_payroll_view(
               AND p.period_month = :month
               AND p.is_deleted = FALSE
               AND e.is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -127,7 +129,8 @@ async def get_admin_payroll_view(
     total = int(count_r.scalar_one() or 0)
 
     sum_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(p.gross_salary_fen), 0)::bigint AS total_gross_fen,
                 COALESCE(SUM(p.net_salary_fen), 0)::bigint AS total_net_fen,
@@ -149,7 +152,8 @@ async def get_admin_payroll_view(
               AND p.period_month = :month
               AND p.is_deleted = FALSE
               AND e.is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -160,7 +164,8 @@ async def get_admin_payroll_view(
     agg = sum_r.mappings().one()
 
     rows_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 p.employee_id,
                 p.base_salary_fen,
@@ -186,7 +191,8 @@ async def get_admin_payroll_view(
               AND e.is_deleted = FALSE
             ORDER BY e.emp_name ASC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -235,7 +241,8 @@ async def get_employee_payslip(
     tid = _tid(tenant_id)
 
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 p.period_year,
                 p.period_month,
@@ -260,7 +267,8 @@ async def get_employee_payslip(
               AND p.period_month = :month
               AND p.is_deleted = FALSE
               AND e.is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "employee_id": eid,
@@ -346,7 +354,8 @@ async def get_employee_payslip_history(
     tid = _tid(tenant_id)
 
     hist_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 p.period_year,
                 p.period_month,
@@ -359,7 +368,8 @@ async def get_employee_payslip_history(
               AND p.is_deleted = FALSE
             ORDER BY p.period_year DESC, p.period_month DESC
             LIMIT :limit
-        """),
+        """
+        ),
         {"tenant_id": tid, "employee_id": eid, "limit": months},
     )
     out: list[dict[str, Any]] = []
@@ -396,7 +406,8 @@ async def confirm_payroll_batch(
     tid = _tid(tenant_id)
     sid = str(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE payroll_records_v2
             SET status = 'confirmed',
                 confirmed_at = NOW(),
@@ -407,7 +418,8 @@ async def confirm_payroll_batch(
               AND period_month = :month
               AND status = 'draft'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -438,7 +450,8 @@ async def mark_paid_batch(
     tid = _tid(tenant_id)
     sid = str(store_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE payroll_records_v2
             SET status = 'paid',
                 paid_at = NOW(),
@@ -449,7 +462,8 @@ async def mark_paid_batch(
               AND period_month = :month
               AND status = 'confirmed'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,
@@ -481,7 +495,8 @@ async def export_payroll_summary(
     sid = str(store_id)
 
     rows_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 e.emp_name,
                 e.role AS position,
@@ -505,7 +520,8 @@ async def export_payroll_summary(
               AND p.is_deleted = FALSE
               AND e.is_deleted = FALSE
             ORDER BY e.emp_name ASC
-        """),
+        """
+        ),
         {
             "tenant_id": tid,
             "store_id": sid,

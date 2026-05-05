@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-pay
+description: 屯象OS 支付中枢微服务 — 资金链路（Tier 1）
+type: application
+version: 1.0.0
+appVersion: "latest"

@@ -41,6 +41,7 @@ from shared.ontology.src.extensions.banquet_contracts import (
     EODepartment,
 )
 from shared.ontology.src.extensions.banquet_leads import BanquetType
+from shared.security.src.error_handler import safe_http_exception
 
 from ..repositories.banquet_contract_repo import (
     BanquetContractRepositoryBase,
@@ -74,17 +75,13 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
 
 
 def _require_tenant(request: Request) -> uuid.UUID:
-    raw = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    raw = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not raw:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     try:
         return uuid.UUID(str(raw))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid X-Tenant-ID: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid X-Tenant-ID: {exc}") from exc
 
 
 def _optional_store_id(request: Request) -> Optional[uuid.UUID]:
@@ -214,7 +211,7 @@ async def get_contract(
     try:
         contract = await service.get_contract(contract_id, tenant_id)
     except BanquetContractNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(contract.model_dump(mode="json"))
 
 
@@ -235,7 +232,7 @@ async def sign_contract(
             pdf_url=payload.pdf_url,
         )
     except BanquetContractNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (InvalidContractTransitionError, SignatureRequiredError) as exc:
         return _err(str(exc), code=exc.code)
     except BanquetContractError as exc:
@@ -259,7 +256,7 @@ async def cancel_contract(
             operator_id=payload.operator_id,
         )
     except BanquetContractNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (CancellationReasonMissingError, InvalidContractTransitionError) as exc:
         return _err(str(exc), code=exc.code)
     except BanquetContractError as exc:
@@ -316,7 +313,7 @@ async def split_eo_tickets(
     try:
         contract = await contract_service.get_contract(contract_id, tenant_id)
     except BanquetContractNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     ctx = {
         "tables": contract.tables,
@@ -352,9 +349,7 @@ async def list_eo_tickets(
     eo_service: BanquetEOTicketService = Depends(get_eo_service),
 ) -> dict[str, Any]:
     tenant_id = _require_tenant(request)
-    tickets = await eo_service.list_by_contract(
-        tenant_id=tenant_id, contract_id=contract_id
-    )
+    tickets = await eo_service.list_by_contract(tenant_id=tenant_id, contract_id=contract_id)
     return _ok({"items": [t.model_dump(mode="json") for t in tickets]})
 
 
@@ -376,7 +371,7 @@ async def record_approval(
     try:
         await service.get_contract(contract_id, tenant_id)
     except BanquetContractNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     if payload.action == ApprovalAction.REJECT and not payload.notes:
         return _err("notes required when action=reject", code="VALIDATION_ERROR")

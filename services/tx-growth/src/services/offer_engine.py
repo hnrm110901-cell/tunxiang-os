@@ -186,7 +186,8 @@ class OfferEngine:
         new_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO offers
                     (id, tenant_id, name, offer_type, description, goal,
                      discount_rules, validity_days, target_segments,
@@ -199,7 +200,8 @@ class OfferEngine:
                      :stores::jsonb, :time_slots::jsonb, :margin_floor, :max_per_user,
                      'active', 0, 0, 0,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -257,7 +259,8 @@ class OfferEngine:
         oid = uuid.UUID(offer_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, description, goal,
                        discount_rules, validity_days, target_segments,
                        applicable_stores, time_slots, margin_floor, max_per_user,
@@ -266,7 +269,8 @@ class OfferEngine:
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         row = result.fetchone()
@@ -298,7 +302,8 @@ class OfferEngine:
 
         where_clause = " AND ".join(where_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, offer_type, description, goal,
                        discount_rules, validity_days, target_segments,
                        applicable_stores, time_slots, margin_floor, max_per_user,
@@ -307,7 +312,8 @@ class OfferEngine:
                 FROM offers
                 WHERE {where_clause}
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -338,11 +344,13 @@ class OfferEngine:
 
         # 检查优惠是否存在
         offer_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, max_per_user FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         offer_row = offer_result.fetchone()
@@ -353,11 +361,13 @@ class OfferEngine:
 
         # 检查用户使用次数
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM offer_redemptions
                 WHERE tenant_id = :tid AND offer_id = :oid
                   AND customer_id = :mid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tid, "oid": oid, "mid": mid},
         )
         used_count = count_result.scalar() or 0
@@ -368,14 +378,16 @@ class OfferEngine:
         redemption_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO offer_redemptions
                     (id, tenant_id, offer_id, customer_id, order_id,
                      order_total_fen, discount_fen, redeemed_at, created_at)
                 VALUES
                     (:id, :tid, :oid, :mid, :order_id,
                      :order_total_fen, :discount_fen, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": redemption_id,
                 "tid": tid,
@@ -390,13 +402,15 @@ class OfferEngine:
 
         # 更新 offers 聚合统计
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE offers
                 SET redeemed_count = redeemed_count + 1,
                     total_discount_fen = total_discount_fen + :discount_fen,
                     updated_at = :now
                 WHERE id = :oid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"discount_fen": discount_fen, "now": now, "oid": oid, "tid": tid},
         )
         await db.commit()
@@ -432,12 +446,14 @@ class OfferEngine:
         oid = uuid.UUID(offer_id)
 
         offer_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, offer_type, issued_count, redeemed_count, total_discount_fen
                 FROM offers
                 WHERE id = :oid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"oid": oid, "tid": tid},
         )
         offer_row = offer_result.fetchone()
@@ -445,13 +461,15 @@ class OfferEngine:
             return {"error": f"优惠不存在: {offer_id}"}
 
         redemption_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt,
                        COALESCE(SUM(order_total_fen), 0) AS total_revenue,
                        COALESCE(SUM(discount_fen), 0) AS total_discount
                 FROM offer_redemptions
                 WHERE tenant_id = :tid AND offer_id = :oid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tid, "oid": oid},
         )
         r = redemption_result.fetchone()

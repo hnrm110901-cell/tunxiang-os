@@ -25,6 +25,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -161,7 +162,7 @@ async def trigger_supplier_score(
 
     except ValueError as exc:
         log.warning("supplier_score_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except (ProgrammingError, OperationalError) as exc:
         log.error("supplier_score_db_error", error=str(exc), exc_info=True)
         raise HTTPException(
@@ -195,14 +196,17 @@ async def get_supplier_score_history(
 
     offset = (page - 1) * size
 
-    count_sql = text("""
+    count_sql = text(
+        """
         SELECT COUNT(*) AS total
         FROM supplier_score_history
         WHERE tenant_id = :tenant_id
           AND supplier_id = :supplier_id::UUID
           AND is_deleted = FALSE
-    """)
-    list_sql = text("""
+    """
+    )
+    list_sql = text(
+        """
         SELECT
             id::TEXT,
             period_start, period_end,
@@ -217,7 +221,8 @@ async def get_supplier_score_history(
           AND is_deleted = FALSE
         ORDER BY period_start DESC
         LIMIT :size OFFSET :offset
-    """)
+    """
+    )
 
     params = {
         "tenant_id": x_tenant_id,
@@ -280,7 +285,8 @@ async def get_supplier_ranking(
     )
 
     # 按每个供应商取最新一期评分
-    ranking_sql = text("""
+    ranking_sql = text(
+        """
         WITH latest_scores AS (
             SELECT DISTINCT ON (sh.supplier_id)
                 sh.supplier_id::TEXT,
@@ -308,7 +314,8 @@ async def get_supplier_ranking(
         WHERE (:tier IS NULL OR tier = :tier)
         ORDER BY composite_score DESC
         LIMIT :limit
-    """)
+    """
+    )
 
     try:
         rows = (

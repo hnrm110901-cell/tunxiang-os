@@ -59,7 +59,8 @@ class TransferCostEngine:
         now = datetime.now(tz=timezone.utc)
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_transfer_orders
                     (id, tenant_id, employee_id, employee_name,
                      from_store_id, from_store_name, to_store_id, to_store_name,
@@ -70,7 +71,8 @@ class TransferCostEngine:
                      :fsid, :fsname, :tsid, :tsname,
                      :ttype, :sd, :ed, 'pending', :reason,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": order_id,
                 "tid": self.tenant_id,
@@ -110,7 +112,8 @@ class TransferCostEngine:
     async def get_transfer(self, order_id: str) -> Optional[dict]:
         """获取单个借调单详情。"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, employee_name,
                        from_store_id, from_store_name,
                        to_store_id, to_store_name,
@@ -119,7 +122,8 @@ class TransferCostEngine:
                        created_at, updated_at
                 FROM store_transfer_orders
                 WHERE id = :oid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"oid": order_id},
         )
         row = result.mappings().first()
@@ -137,11 +141,13 @@ class TransferCostEngine:
 
         now = datetime.now(tz=timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE store_transfer_orders
                 SET status = 'approved', approved_by = :aid, approved_at = :now, updated_at = :now
                 WHERE id = :oid
-            """),
+            """
+            ),
             {"oid": order_id, "aid": approver_id, "now": now},
         )
         await self.db.commit()
@@ -236,7 +242,8 @@ class TransferCostEngine:
         params["limit"] = size
         params["offset"] = offset
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, employee_id, employee_name,
                        from_store_id, from_store_name,
                        to_store_id, to_store_name,
@@ -247,7 +254,8 @@ class TransferCostEngine:
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_row_to_dict(r) for r in result.mappings().all()]
@@ -282,7 +290,8 @@ class TransferCostEngine:
             next_month_start = f"{year}-{mon + 1:02d}-01"
 
         transfers_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, from_store_id, to_store_id, start_date, end_date
                 FROM store_transfer_orders
                 WHERE employee_id = :eid
@@ -290,7 +299,8 @@ class TransferCostEngine:
                   AND start_date < :month_end
                   AND (end_date IS NULL OR end_date >= :month_start)
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"eid": employee_id, "month_start": month_start, "month_end": next_month_start},
         )
         transfer_rows = transfers_result.mappings().all()
@@ -308,14 +318,16 @@ class TransferCostEngine:
 
         # 2. 查询该员工该月考勤记录
         attendance_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT employee_id, clock_date::TEXT AS date,
                        COALESCE(worked_hours, 0) AS hours, store_id
                 FROM attendance_records
                 WHERE employee_id = :eid
                   AND clock_date >= :month_start
                   AND clock_date < :month_end
-            """),
+            """
+            ),
             {"eid": employee_id, "month_start": month_start, "month_end": next_month_start},
         )
         attendance_rows = attendance_result.mappings().all()
@@ -336,10 +348,12 @@ class TransferCostEngine:
         # 4. 写入 transfer_cost_allocations
         # 先清除该员工该月旧记录
         await self.db.execute(
-            text("""
+            text(
+                """
                 DELETE FROM transfer_cost_allocations
                 WHERE tenant_id = :tid AND employee_id = :eid AND month = :month
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": employee_id, "month": month},
         )
 
@@ -353,7 +367,8 @@ class TransferCostEngine:
         for store_id, costs in emp_cost.items():
             alloc_id = str(uuid4())
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO transfer_cost_allocations
                         (id, tenant_id, transfer_order_id, employee_id, store_id, month,
                          worked_hours, wage_fen, social_insurance_fen, bonus_fen,
@@ -362,7 +377,8 @@ class TransferCostEngine:
                         (:id, :tid, :toid, :eid, :sid, :month,
                          :hours, :wage, :social, :bonus,
                          :total, :ratio, NOW(), NOW())
-                """),
+                """
+                ),
                 {
                     "id": alloc_id,
                     "tid": self.tenant_id,
@@ -405,7 +421,8 @@ class TransferCostEngine:
         """门店维度的借调成本报表（三表合一）。"""
         # 查询该门店该月的所有成本分摊记录
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT ca.employee_id, ca.store_id, ca.worked_hours,
                        ca.wage_fen, ca.social_insurance_fen, ca.bonus_fen,
                        ca.total_fen, ca.ratio,
@@ -417,7 +434,8 @@ class TransferCostEngine:
                   AND (t.from_store_id = :sid OR t.to_store_id = :sid)
                   AND ca.is_deleted = FALSE
                   AND t.is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "month": month},
         )
         rows = result.mappings().all()

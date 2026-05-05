@@ -80,19 +80,13 @@ class SalesCoachJobService:
 
     # ── 幂等 ─────────────────────────────────────────────────────────
 
-    def _ledger_key(
-        self, tenant_id: str, job_name: str, run_date: date
-    ) -> tuple[str, str, str]:
+    def _ledger_key(self, tenant_id: str, job_name: str, run_date: date) -> tuple[str, str, str]:
         return (str(tenant_id), job_name, run_date.isoformat())
 
-    def _already_ran(
-        self, tenant_id: str, job_name: str, run_date: date
-    ) -> bool:
+    def _already_ran(self, tenant_id: str, job_name: str, run_date: date) -> bool:
         return self._ledger_key(tenant_id, job_name, run_date) in self._run_ledger
 
-    def _mark_ran(
-        self, tenant_id: str, job_name: str, run_date: date, at: datetime
-    ) -> None:
+    def _mark_ran(self, tenant_id: str, job_name: str, run_date: date, at: datetime) -> None:
         self._run_ledger[self._ledger_key(tenant_id, job_name, run_date)] = at
 
     # ── 每日教练作业 ─────────────────────────────────────────────────
@@ -176,13 +170,9 @@ class SalesCoachJobService:
             if customers_map:
                 dispatch_params["customers_by_type"] = customers_map
             try:
-                disp_result = await agent.run(
-                    "dispatch_daily_tasks", dispatch_params
-                )
+                disp_result = await agent.run("dispatch_daily_tasks", dispatch_params)
                 if getattr(disp_result, "success", False):
-                    dispatched_total += int(
-                        (disp_result.data or {}).get("dispatched_count", 0)
-                    )
+                    dispatched_total += int((disp_result.data or {}).get("dispatched_count", 0))
             except (httpx.HTTPError, RuntimeError, ValueError) as exc:
                 log.warning(
                     "daily_dispatch_failed",
@@ -206,9 +196,7 @@ class SalesCoachJobService:
                     if not t_id:
                         continue
                     try:
-                        gap = await agent.run(
-                            "diagnose_gap", {"target_id": str(t_id)}
-                        )
+                        gap = await agent.run("diagnose_gap", {"target_id": str(t_id)})
                         if getattr(gap, "success", False):
                             if (gap.data or {}).get("has_gap"):
                                 gap_alerts += 1

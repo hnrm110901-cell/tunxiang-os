@@ -12,7 +12,7 @@
 """
 
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -27,12 +27,21 @@ AUTO_ACCEPT_THRESHOLD_FEN: int = 5000  # ¥50
 
 _VALID_CHANNELS = ("meituan", "eleme", "douyin")
 _VALID_DISPUTE_TYPES = (
-    "refund", "deduction", "penalty",
-    "missing_item", "quality", "late_delivery", "other",
+    "refund",
+    "deduction",
+    "penalty",
+    "missing_item",
+    "quality",
+    "late_delivery",
+    "other",
 )
 _VALID_STATUSES = (
-    "pending", "auto_accepted", "manual_review",
-    "accepted", "rejected", "escalated",
+    "pending",
+    "auto_accepted",
+    "manual_review",
+    "accepted",
+    "rejected",
+    "escalated",
 )
 _VALID_REVIEW_ACTIONS = ("accept", "reject", "escalate")
 
@@ -111,13 +120,14 @@ class DeliveryDisputeService:
             resolution_amount_fen = None
 
         dispute_id = str(_uuid.uuid4())
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         await _set_tenant(self.db, self.tenant_id)
 
         try:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO delivery_disputes (
                         id, tenant_id, store_id, order_id,
                         channel, dispute_type, platform_dispute_id,
@@ -135,7 +145,8 @@ class DeliveryDisputeService:
                         :platform_evidence::JSONB,
                         :now, :now
                     )
-                """),
+                """
+                ),
                 {
                     "id": _uuid.UUID(dispute_id),
                     "tenant_id": _uuid.UUID(self.tenant_id),
@@ -229,9 +240,7 @@ class DeliveryDisputeService:
 
         current_status = dispute["status"]
         if current_status not in ("pending", "manual_review"):
-            raise ValueError(
-                f"异议状态为 {current_status!r}，只有 pending/manual_review 状态可以复核"
-            )
+            raise ValueError(f"异议状态为 {current_status!r}，只有 pending/manual_review 状态可以复核")
 
         # 确定新状态
         status_map = {
@@ -248,7 +257,7 @@ class DeliveryDisputeService:
         elif action == "reject":
             resolution_amount_fen = 0
 
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         update_params: dict = {
             "dispute_id": _uuid.UUID(dispute_id),
@@ -351,7 +360,8 @@ class DeliveryDisputeService:
         params["offset"] = (page - 1) * size
 
         rows_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, order_id,
                        channel, dispute_type, platform_dispute_id,
                        disputed_amount_fen,
@@ -364,7 +374,8 @@ class DeliveryDisputeService:
                 {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
 
@@ -424,7 +435,8 @@ class DeliveryDisputeService:
 
         # 总览
         overview_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) AS total_count,
                     COALESCE(SUM(disputed_amount_fen), 0) AS total_disputed_fen,
@@ -436,27 +448,23 @@ class DeliveryDisputeService:
                         FILTER (WHERE reviewed_at IS NOT NULL) AS avg_review_seconds
                 FROM delivery_disputes
                 {base_where}
-            """),
+            """
+            ),
             params,
         )
         overview_row = overview_result.fetchone()
 
         total_count: int = overview_row[0] if overview_row else 0
         auto_accepted_count: int = overview_row[3] if overview_row else 0
-        auto_accept_rate: float = (
-            round(auto_accepted_count / total_count, 4)
-            if total_count > 0
-            else 0.0
-        )
+        auto_accept_rate: float = round(auto_accepted_count / total_count, 4) if total_count > 0 else 0.0
         avg_review_seconds: Optional[float] = (
-            round(float(overview_row[6]), 1)
-            if overview_row and overview_row[6] is not None
-            else None
+            round(float(overview_row[6]), 1) if overview_row and overview_row[6] is not None else None
         )
 
         # 按渠道汇总
         channel_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT channel,
                        COUNT(*) AS count,
                        COALESCE(SUM(disputed_amount_fen), 0) AS total_fen
@@ -464,17 +472,16 @@ class DeliveryDisputeService:
                 {base_where}
                 GROUP BY channel
                 ORDER BY count DESC
-            """),
+            """
+            ),
             params,
         )
-        by_channel = [
-            {"channel": r[0], "count": r[1], "total_disputed_fen": r[2]}
-            for r in channel_result.fetchall()
-        ]
+        by_channel = [{"channel": r[0], "count": r[1], "total_disputed_fen": r[2]} for r in channel_result.fetchall()]
 
         # 按类型汇总
         type_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT dispute_type,
                        COUNT(*) AS count,
                        COALESCE(SUM(disputed_amount_fen), 0) AS total_fen
@@ -482,30 +489,27 @@ class DeliveryDisputeService:
                 {base_where}
                 GROUP BY dispute_type
                 ORDER BY count DESC
-            """),
+            """
+            ),
             params,
         )
-        by_type = [
-            {"dispute_type": r[0], "count": r[1], "total_disputed_fen": r[2]}
-            for r in type_result.fetchall()
-        ]
+        by_type = [{"dispute_type": r[0], "count": r[1], "total_disputed_fen": r[2]} for r in type_result.fetchall()]
 
         # 按状态汇总
         status_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT status,
                        COUNT(*) AS count
                 FROM delivery_disputes
                 {base_where}
                 GROUP BY status
                 ORDER BY count DESC
-            """),
+            """
+            ),
             params,
         )
-        by_status = [
-            {"status": r[0], "count": r[1]}
-            for r in status_result.fetchall()
-        ]
+        by_status = [{"status": r[0], "count": r[1]} for r in status_result.fetchall()]
 
         return {
             "store_id": store_id,
@@ -564,7 +568,8 @@ class DeliveryDisputeService:
     async def _get_dispute_by_id(self, dispute_id: str) -> Optional[dict]:
         """按ID查询单条异议。"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, order_id,
                        channel, dispute_type, platform_dispute_id,
                        disputed_amount_fen,
@@ -575,7 +580,8 @@ class DeliveryDisputeService:
                        created_at, updated_at
                 FROM delivery_disputes
                 WHERE id = :dispute_id AND is_deleted = false
-            """),
+            """
+            ),
             {"dispute_id": _uuid.UUID(dispute_id)},
         )
         row = result.fetchone()

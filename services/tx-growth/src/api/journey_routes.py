@@ -127,7 +127,7 @@ async def list_journey_definitions(
     where = " AND ".join(conditions)
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         count_result = await db.execute(
             text(f"SELECT COUNT(*) FROM journey_definitions WHERE {where}"),
@@ -136,14 +136,16 @@ async def list_journey_definitions(
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, description, trigger_event, trigger_conditions,
                        steps, target_segment, is_active, version, created_at, updated_at
                 FROM journey_definitions
                 WHERE {where}
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = rows_result.fetchall()
@@ -186,16 +188,18 @@ async def create_journey_definition(
 
     def_id = uuid.uuid4()
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journey_definitions
                     (id, tenant_id, name, description, trigger_event,
                      trigger_conditions, steps, target_segment, is_active, version)
                 VALUES
                     (:id, :tenant_id, :name, :description, :trigger_event,
                      :conditions::jsonb, :steps::jsonb, :segment, FALSE, 1)
-            """),
+            """
+            ),
             {
                 "id": str(def_id),
                 "tenant_id": str(tenant_id),
@@ -231,14 +235,16 @@ async def get_journey_definition(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, description, trigger_event, trigger_conditions,
                        steps, target_segment, is_active, version, created_at, updated_at
                 FROM journey_definitions
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(def_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -299,14 +305,16 @@ async def update_journey_definition(
         params["segment"] = body.target_segment
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE journey_definitions
                 SET {", ".join(set_clauses)}
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
                 RETURNING id, name, is_active, version
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()
@@ -330,14 +338,16 @@ async def delete_journey_definition(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_definitions
                 SET is_deleted = TRUE, is_active = FALSE, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": str(def_id), "tenant_id": str(tenant_id)},
         )
         if not result.fetchone():
@@ -360,13 +370,15 @@ async def activate_journey(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT steps FROM journey_definitions
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": str(def_id), "tenant_id": str(tenant_id)},
         )
         row = check.fetchone()
@@ -378,11 +390,13 @@ async def activate_journey(
             raise HTTPException(status_code=422, detail="旅程无步骤，不可激活")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_definitions
                 SET is_active = TRUE, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": str(def_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -403,14 +417,16 @@ async def deactivate_journey(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journey_definitions
                 SET is_active = FALSE, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": str(def_id), "tenant_id": str(tenant_id)},
         )
         if not result.fetchone():
@@ -446,16 +462,18 @@ async def import_journey_template(
 
     def_id = uuid.uuid4()
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journey_definitions
                     (id, tenant_id, name, description, trigger_event,
                      trigger_conditions, steps, target_segment, is_active, version)
                 VALUES
                     (:id, :tenant_id, :name, :description, :trigger_event,
                      :conditions::jsonb, :steps::jsonb, :segment, FALSE, 1)
-            """),
+            """
+            ),
             {
                 "id": str(def_id),
                 "tenant_id": str(tenant_id),
@@ -523,7 +541,7 @@ async def list_enrollments(
     where = " AND ".join(conditions)
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
 
         count_result = await db.execute(
             text(f"SELECT COUNT(*) FROM journey_enrollments e WHERE {where}"),
@@ -532,7 +550,8 @@ async def list_enrollments(
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT e.id, e.journey_definition_id, e.customer_id, e.phone,
                        e.current_step_id, e.status, e.enrolled_at, e.completed_at,
                        e.exited_at, e.next_step_at, d.name AS journey_name
@@ -541,7 +560,8 @@ async def list_enrollments(
                 WHERE {where}
                 ORDER BY e.enrolled_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = rows_result.fetchall()
@@ -578,16 +598,18 @@ async def get_enrollment(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT e.id, e.journey_definition_id, e.customer_id, e.phone,
                        e.current_step_id, e.status, e.enrolled_at, e.completed_at,
                        e.exited_at, e.context_data, e.next_step_at, d.name AS journey_name
                 FROM journey_enrollments e
                 LEFT JOIN journey_definitions d ON d.id = e.journey_definition_id
                 WHERE e.id = :id AND e.tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": str(enrollment_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -625,15 +647,17 @@ async def get_enrollment_steps(
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, step_id, action_type, action_config, status,
                        scheduled_at, executed_at, result, error_message, created_at
                 FROM journey_step_executions
                 WHERE enrollment_id = :enrollment_id AND tenant_id = :tenant_id
                 ORDER BY scheduled_at ASC
-            """),
+            """
+            ),
             {"enrollment_id": str(enrollment_id), "tenant_id": str(tenant_id)},
         )
         rows = result.fetchall()

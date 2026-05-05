@@ -96,7 +96,8 @@ class PermissionRepository:
         若两个都有，取 store_id 精确匹配的。
         """
         # 先精确匹配门店，再回退到全品牌
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 rc.id                   AS role_config_id,
                 rc.role_name,
@@ -123,7 +124,8 @@ class PermissionRepository:
             ORDER BY
                 CASE WHEN era.store_id = :store_id THEN 0 ELSE 1 END ASC
             LIMIT 1
-        """)
+        """
+        )
         result = await session.execute(
             sql,
             {
@@ -164,7 +166,8 @@ class PermissionRepository:
         session: AsyncSession,
     ) -> None:
         """写入权限检查日志（不阻断主流程，失败仅警告）"""
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO permission_check_logs
                 (id, tenant_id, employee_id, store_id, operation, amount_fen,
                  role_level, allowed, require_approval, approver_min_level,
@@ -173,7 +176,8 @@ class PermissionRepository:
                 (:id, :tenant_id, :employee_id, :store_id, :operation, :amount_fen,
                  :role_level, :allowed, :require_approval, :approver_min_level,
                  :deny_reason, :order_id, :request_ip)
-        """)
+        """
+        )
         await session.execute(
             sql,
             {

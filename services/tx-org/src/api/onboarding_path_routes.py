@@ -234,13 +234,15 @@ async def list_onboarding_paths(
     params["limit"] = size
     params["offset"] = offset
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT {_SELECT_COLS}
             FROM onboarding_paths
             WHERE {where_sql}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     rows = [_row_to_dict(r._mapping) for r in result.fetchall()]
@@ -278,7 +280,8 @@ async def create_onboarding_path(
     tasks_json = json.dumps(tasks, ensure_ascii=False)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO onboarding_paths (
                 id, tenant_id, employee_id, store_id,
                 template_name, start_date, target_days, current_day,
@@ -290,7 +293,8 @@ async def create_onboarding_path(
                 :tasks::jsonb, 0, :mentor_id, 0,
                 'in_progress', FALSE, NOW(), NOW()
             )
-        """),
+        """
+        ),
         {
             "id": path_id,
             "tenant_id": tenant_id,
@@ -328,7 +332,8 @@ async def onboarding_dashboard(
 
     # 总览统计
     summary_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*) AS total,
                 COUNT(*) FILTER (WHERE status = 'in_progress') AS in_progress,
@@ -343,14 +348,16 @@ async def onboarding_dashboard(
                 ) AS avg_completion_days
             FROM onboarding_paths
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     summary_row = summary_result.fetchone()._mapping
 
     # 按门店分组
     by_store_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 store_id::text,
                 COUNT(*) AS total,
@@ -361,14 +368,16 @@ async def onboarding_dashboard(
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
             GROUP BY store_id
             ORDER BY total DESC
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     by_store = [dict(r._mapping) for r in by_store_result.fetchall()]
 
     # 按路径类型分组
     by_target_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 target_days,
                 COUNT(*) AS total,
@@ -379,7 +388,8 @@ async def onboarding_dashboard(
             WHERE tenant_id = :tenant_id AND is_deleted = FALSE
             GROUP BY target_days
             ORDER BY target_days
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     by_target_days = [dict(r._mapping) for r in by_target_result.fetchall()]
@@ -429,11 +439,13 @@ async def get_onboarding_path(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT {_SELECT_COLS}
             FROM onboarding_paths
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -476,12 +488,14 @@ async def update_onboarding_path(
         raise HTTPException(status_code=400, detail="至少提供一个更新字段")
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE onboarding_paths
             SET {", ".join(set_parts)}
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
             RETURNING id
-        """),
+        """
+        ),
         params,
     )
     if not result.fetchone():
@@ -507,11 +521,13 @@ async def complete_task(
 
     # 读取当前 tasks
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT tasks, status
             FROM onboarding_paths
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -533,7 +549,8 @@ async def complete_task(
 
     # 用 jsonb_set 更新单个任务的 completed 和 completed_at
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET tasks = jsonb_set(
                     jsonb_set(
@@ -546,7 +563,8 @@ async def complete_task(
                 ),
                 updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "idx_str": str(task_idx),
             "now_str": now_str,
@@ -563,11 +581,13 @@ async def complete_task(
     progress = round(completed_required / total_required * 100, 2) if total_required > 0 else 0
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET progress_pct = :progress, updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"progress": progress, "path_id": path_id, "tenant_id": tenant_id},
     )
 
@@ -598,11 +618,13 @@ async def advance_day(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT current_day, target_days, status
             FROM onboarding_paths
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -621,11 +643,13 @@ async def advance_day(
         new_status = "overdue"
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET current_day = :new_day, status = :new_status, updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "new_day": new_day,
             "new_status": new_status,
@@ -652,11 +676,13 @@ async def complete_onboarding(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT tasks, status, progress_pct
             FROM onboarding_paths
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -681,7 +707,8 @@ async def complete_onboarding(
     readiness = round(progress / 10, 1)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET status = 'completed',
                 completed_at = NOW(),
@@ -689,7 +716,8 @@ async def complete_onboarding(
                 progress_pct = 100,
                 updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"readiness": readiness, "path_id": path_id, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -712,11 +740,13 @@ async def terminate_onboarding(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT status
             FROM onboarding_paths
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     row = result.fetchone()
@@ -730,11 +760,13 @@ async def terminate_onboarding(
         )
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET status = 'terminated', updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -756,12 +788,14 @@ async def delete_onboarding_path(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE onboarding_paths
             SET is_deleted = TRUE, updated_at = NOW()
             WHERE id = :path_id AND tenant_id = :tenant_id AND is_deleted = FALSE
             RETURNING id
-        """),
+        """
+        ),
         {"path_id": path_id, "tenant_id": tenant_id},
     )
     if not result.fetchone():

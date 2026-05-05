@@ -91,9 +91,7 @@ async def ingest_canonical_order(
     request: Request,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("cashier", "store_manager", "admin", "integration")
-    ),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin", "integration")),
 ) -> StandardResponse:
     """落库 canonical 订单。
 
@@ -137,9 +135,7 @@ async def list_canonical_orders(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("cashier", "store_manager", "admin", "integration", "viewer")
-    ),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin", "integration", "viewer")),
 ) -> StandardResponse:
     """分页列出本租户 canonical 订单。"""
     if user.tenant_id and user.tenant_id != x_tenant_id:
@@ -147,9 +143,7 @@ async def list_canonical_orders(
 
     svc = ChannelCanonicalService(db, tenant_id=x_tenant_id)
     try:
-        records, total = await svc.list_recent(
-            store_id=store_id, page=page, size=size
-        )
+        records, total = await svc.list_recent(store_id=store_id, page=page, size=size)
     except SQLAlchemyError:
         logger.exception("channel_canonical_list_db_error", tenant_id=x_tenant_id)
         raise HTTPException(
@@ -157,9 +151,7 @@ async def list_canonical_orders(
             detail={"code": "DB_ERROR", "message": "canonical list failed"},
         )
 
-    resp = CanonicalOrderListResponse(
-        items=records, total=total, page=page, size=size
-    )
+    resp = CanonicalOrderListResponse(items=records, total=total, page=page, size=size)
     return _ok(resp)
 
 
@@ -168,9 +160,7 @@ async def get_canonical_order(
     record_id: str = Path(..., min_length=1, max_length=64),
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
-    user: UserContext = Depends(
-        require_role("cashier", "store_manager", "admin", "integration", "viewer")
-    ),
+    user: UserContext = Depends(require_role("cashier", "store_manager", "admin", "integration", "viewer")),
 ) -> StandardResponse:
     if user.tenant_id and user.tenant_id != x_tenant_id:
         raise HTTPException(status_code=403, detail="USER_TENANT_MISMATCH")

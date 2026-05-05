@@ -19,6 +19,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_accounting_periods_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -44,12 +45,12 @@ from services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )
 
-
 # ─── 工具 ────────────────────────────────────────────────────────────
 
 
 def _period(
-    year: int = 2026, month: int = 4,
+    year: int = 2026,
+    month: int = 4,
     status: str = STATUS_OPEN,
     tenant_id: uuid.UUID | None = None,
 ) -> AccountingPeriod:
@@ -212,6 +213,7 @@ class _FakeSavepoint:
     真 SQLAlchemy 的 begin_nested() 返回 SAVEPOINT transaction.
     异常时自动 ROLLBACK TO SAVEPOINT, 异常继续向外传播.
     """
+
     async def __aenter__(self):
         return self
 
@@ -235,7 +237,10 @@ class TestEnsurePeriod:
         session.begin_nested = MagicMock(return_value=_FakeSavepoint())
 
         p = await svc.ensure_period(
-            tenant_id=uuid.uuid4(), year=2026, month=4, session=session,
+            tenant_id=uuid.uuid4(),
+            year=2026,
+            month=4,
+            session=session,
         )
         assert p.status == STATUS_OPEN
         assert p.period_start == date(2026, 4, 1)
@@ -256,7 +261,10 @@ class TestEnsurePeriod:
         session.execute = AsyncMock(return_value=mock_hit)
 
         p = await svc.ensure_period(
-            tenant_id=existing.tenant_id, year=2026, month=4, session=session,
+            tenant_id=existing.tenant_id,
+            year=2026,
+            month=4,
+            session=session,
         )
         assert p is existing
         session.add.assert_not_called()  # 不重复 INSERT
@@ -283,17 +291,23 @@ class TestEnsurePeriod:
         hit.scalar_one_or_none = MagicMock(return_value=winner)
         session.execute = AsyncMock(side_effect=[miss, hit])
 
-        session.flush = AsyncMock(side_effect=IntegrityError(
-            "INSERT ...", {},
-            Exception('duplicate key value violates unique constraint "uq_ap_tenant_year_month"'),
-        ))
+        session.flush = AsyncMock(
+            side_effect=IntegrityError(
+                "INSERT ...",
+                {},
+                Exception('duplicate key value violates unique constraint "uq_ap_tenant_year_month"'),
+            )
+        )
         session.begin_nested = MagicMock(return_value=_FakeSavepoint())
         session.rollback = AsyncMock()
         # 模拟外层事务内已有前置写入 (e.g. create_voucher 已 add 凭证)
         session.add = MagicMock()
 
         await svc.ensure_period(
-            tenant_id=winner.tenant_id, year=2026, month=4, session=session,
+            tenant_id=winner.tenant_id,
+            year=2026,
+            month=4,
+            session=session,
         )
 
         # 业务价值: session.rollback 从不调 (外层事务完整保留)
@@ -323,18 +337,17 @@ class TestEnsurePeriod:
         hit.scalar_one_or_none = MagicMock(return_value=winner)
         session.execute = AsyncMock(side_effect=[miss, hit])
 
-        fake_orig = Exception(
-            'duplicate key value violates unique constraint "uq_ap_tenant_year_month"'
-        )
-        session.flush = AsyncMock(
-            side_effect=IntegrityError("INSERT ...", {}, fake_orig)
-        )
+        fake_orig = Exception('duplicate key value violates unique constraint "uq_ap_tenant_year_month"')
+        session.flush = AsyncMock(side_effect=IntegrityError("INSERT ...", {}, fake_orig))
         # [W2.C] SAVEPOINT 正常退出 (异常穿透), session.rollback 不应被调
         session.begin_nested = MagicMock(return_value=_FakeSavepoint())
         session.rollback = AsyncMock()
 
         p = await svc.ensure_period(
-            tenant_id=winner.tenant_id, year=2026, month=4, session=session,
+            tenant_id=winner.tenant_id,
+            year=2026,
+            month=4,
+            session=session,
         )
         assert p is winner
         # [W2.C 核心断言] 不调 session.rollback() — 外层事务保持完整
@@ -359,8 +372,11 @@ class TestCloseReopenLockViaService:
         session.flush = AsyncMock()
 
         await svc.close_period(
-            tenant_id=p.tenant_id, year=2026, month=4,
-            operator_id=uuid.uuid4(), reason="2026-04 月结",
+            tenant_id=p.tenant_id,
+            year=2026,
+            month=4,
+            operator_id=uuid.uuid4(),
+            reason="2026-04 月结",
             session=session,
         )
         assert p.status == STATUS_CLOSED
@@ -377,8 +393,11 @@ class TestCloseReopenLockViaService:
 
         with pytest.raises(ValueError, match="账期 2026-04 不存在"):
             await svc.close_period(
-                tenant_id=uuid.uuid4(), year=2026, month=4,
-                operator_id=uuid.uuid4(), reason="关账",
+                tenant_id=uuid.uuid4(),
+                year=2026,
+                month=4,
+                operator_id=uuid.uuid4(),
+                reason="关账",
                 session=session,
             )
 
@@ -397,8 +416,10 @@ class TestCloseReopenLockViaService:
 
         with pytest.raises(ValueError, match="只找到 11 个 period"):
             await svc.lock_year(
-                tenant_id=uuid.uuid4(), year=2026,
-                operator_id=uuid.uuid4(), reason="2026 年度结账",
+                tenant_id=uuid.uuid4(),
+                year=2026,
+                operator_id=uuid.uuid4(),
+                reason="2026 年度结账",
                 session=session,
             )
 
@@ -419,8 +440,10 @@ class TestCloseReopenLockViaService:
 
         with pytest.raises(ValueError, match="非 closed.*2026-03"):
             await svc.lock_year(
-                tenant_id=uuid.uuid4(), year=2026,
-                operator_id=uuid.uuid4(), reason="年结",
+                tenant_id=uuid.uuid4(),
+                year=2026,
+                operator_id=uuid.uuid4(),
+                reason="年结",
                 session=session,
             )
 
@@ -438,8 +461,10 @@ class TestCloseReopenLockViaService:
         session.execute = AsyncMock(return_value=mock_list)
 
         result = await svc.lock_year(
-            tenant_id=uuid.uuid4(), year=2026,
-            operator_id=uuid.uuid4(), reason="2026 年度结账",
+            tenant_id=uuid.uuid4(),
+            year=2026,
+            operator_id=uuid.uuid4(),
+            reason="2026 年度结账",
             session=session,
         )
         assert all(p.status == STATUS_LOCKED for p in result)
@@ -460,7 +485,8 @@ class TestPeriodLookup:
         session.execute = AsyncMock(return_value=mock_hit)
 
         result = await svc.find_period_for_date(
-            tenant_id=p.tenant_id, biz_date=date(2026, 4, 15),
+            tenant_id=p.tenant_id,
+            biz_date=date(2026, 4, 15),
             session=session,
         )
         assert result is p
@@ -474,7 +500,8 @@ class TestPeriodLookup:
         session.execute = AsyncMock(return_value=mock_miss)
 
         result = await svc.find_period_for_date(
-            tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),
+            tenant_id=uuid.uuid4(),
+            biz_date=date(2026, 4, 15),
             session=session,
         )
         assert result is None
@@ -488,7 +515,8 @@ class TestPeriodLookup:
         session.execute = AsyncMock(return_value=mock_hit)
 
         result = await svc.is_date_writable(
-            tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),
+            tenant_id=uuid.uuid4(),
+            biz_date=date(2026, 4, 15),
             session=session,
         )
         assert result is True
@@ -502,7 +530,8 @@ class TestPeriodLookup:
         session.execute = AsyncMock(return_value=mock_hit)
 
         result = await svc.is_date_writable(
-            tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),
+            tenant_id=uuid.uuid4(),
+            biz_date=date(2026, 4, 15),
             session=session,
         )
         assert result is False
@@ -517,7 +546,8 @@ class TestPeriodLookup:
         session.execute = AsyncMock(return_value=mock_miss)
 
         result = await svc.is_date_writable(
-            tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),
+            tenant_id=uuid.uuid4(),
+            biz_date=date(2026, 4, 15),
             session=session,
         )
         assert result is True
@@ -536,8 +566,10 @@ class TestPeriodLookup:
         session.begin_nested = MagicMock(return_value=_FakeSavepoint())
 
         result = await svc.is_date_writable(
-            tenant_id=uuid.uuid4(), biz_date=date(2026, 4, 15),
-            session=session, auto_ensure=True,
+            tenant_id=uuid.uuid4(),
+            biz_date=date(2026, 4, 15),
+            session=session,
+            auto_ensure=True,
         )
         assert result is True
         session.add.assert_called_once()
@@ -552,9 +584,7 @@ class TestV270MigrationFileStructure:
     @pytest.fixture(autouse=True)
     def _load_migration(self):
         path = (
-            Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
-            / "v270_accounting_periods.py"
+            Path(__file__).resolve().parents[4] / "shared" / "db-migrations" / "versions" / "v270_accounting_periods.py"
         )
         assert path.exists(), f"v270 迁移文件不存在: {path}"
         self.migration_src = path.read_text(encoding="utf-8")
@@ -566,7 +596,7 @@ class TestV270MigrationFileStructure:
         assert re.search(r'^down_revision\s*=\s*"v268"', self.migration_src, re.M)
 
     def test_seven_check_constraints(self):
-        """7 CHECK: status / month / year / date_range / closed_audit / locked_audit / ... """
+        """7 CHECK: status / month / year / date_range / closed_audit / locked_audit / ..."""
         required_checks = [
             "chk_ap_status_valid",
             "chk_ap_month_range",
@@ -582,20 +612,23 @@ class TestV270MigrationFileStructure:
         """status='closed' → closed_at + closed_by 必填."""
         assert re.search(
             r"status\s*!=\s*'closed'\s*OR\s*\(\s*closed_at\s+IS\s+NOT\s+NULL\s+AND\s+closed_by\s+IS\s+NOT\s+NULL\s*\)",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_locked_audit_enforces_at_and_by(self):
         assert re.search(
             r"status\s*!=\s*'locked'\s*OR\s*\(\s*locked_at\s+IS\s+NOT\s+NULL\s+AND\s+locked_by\s+IS\s+NOT\s+NULL\s*\)",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
 
     def test_unique_tenant_year_month(self):
         assert "uq_ap_tenant_year_month" in self.migration_src
         uq_block = re.search(
             r"UniqueConstraint\(\s*(.*?)\s*name=.uq_ap_tenant_year_month.",
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         )
         assert uq_block is not None
         cols = uq_block.group(1)
@@ -607,21 +640,24 @@ class TestV270MigrationFileStructure:
         """ix_ap_tenant_open 必须是 partial index WHERE status='open'."""
         assert "ix_ap_tenant_open" in self.migration_src
         assert re.search(
-            r'ix_ap_tenant_open.*?postgresql_where.*?status\s*=\s*.open.',
-            self.migration_src, re.S,
+            r"ix_ap_tenant_open.*?postgresql_where.*?status\s*=\s*.open.",
+            self.migration_src,
+            re.S,
         ), "ix_ap_tenant_open 必须是 partial index WHERE status='open'"
 
     def test_date_range_index(self):
         assert "ix_ap_tenant_date_range" in self.migration_src
         assert re.search(
             r'ix_ap_tenant_date_range.*?\[\s*"tenant_id"\s*,\s*"period_start"\s*,\s*"period_end"\s*\]',
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         )
 
     def test_rls_enabled_with_app_tenant_id(self):
         assert re.search(
             r"ALTER TABLE\s+accounting_periods\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
         assert "CREATE POLICY accounting_periods_tenant" in self.migration_src
         assert "current_setting('app.tenant_id', true)" in self.migration_src
@@ -632,13 +668,15 @@ class TestV270MigrationFileStructure:
             r"CREATE POLICY.*accounting_periods_tenant.*"
             r"USING\s*\(.*app\.tenant_id.*\).*"
             r"WITH\s+CHECK\s*\(.*app\.tenant_id.*\)",
-            self.migration_src, re.S | re.I,
+            self.migration_src,
+            re.S | re.I,
         ), "POLICY 必须同时声明 USING 和 WITH CHECK"
 
     def test_tenant_id_not_nullable(self):
         tenant_col = re.search(
             r'Column\(\s*"tenant_id"\s*,\s*UUID\(as_uuid=True\)\s*,\s*(.+?)\)',
-            self.migration_src, re.S,
+            self.migration_src,
+            re.S,
         )
         assert tenant_col is not None
         assert "nullable=False" in tenant_col.group(1)
@@ -648,8 +686,7 @@ class TestV270MigrationFileStructure:
         assert len(notices) >= 3
 
     def test_downgrade_not_empty(self):
-        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )",
-                      self.migration_src, re.S | re.M)
+        m = re.search(r"def downgrade\(\) -> None:(.*?)(?=\Z|^def )", self.migration_src, re.S | re.M)
         assert m is not None
         body = m.group(1)
         assert "drop_table" in body.lower()

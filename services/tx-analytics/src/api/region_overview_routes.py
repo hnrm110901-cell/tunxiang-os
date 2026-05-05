@@ -74,7 +74,8 @@ async def region_overview(
         if dimension == "brand":
             # 按品牌聚合：group stores by brand_id, join orders for revenue
             rows = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     s.brand_id,
                     COUNT(DISTINCT s.id)                        AS store_count,
@@ -88,7 +89,8 @@ async def region_overview(
                 WHERE s.is_deleted = false
                   AND s.status     = 'active'
                 GROUP BY s.brand_id, s.region
-            """)
+            """
+                )
             )
             raw = rows.fetchall()
 
@@ -119,7 +121,8 @@ async def region_overview(
         # ── 按区域汇总 ───────────────────────────────────────────────
         # Group stores by the `region` varchar field; join orders for revenue/metrics
         region_rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(s.region, '未分区')                    AS region_name,
                 COUNT(DISTINCT s.id)                            AS store_count,
@@ -138,13 +141,15 @@ async def region_overview(
               AND s.status     = 'active'
             GROUP BY COALESCE(s.region, '未分区')
             ORDER BY revenue_fen DESC
-        """)
+        """
+            )
         )
         region_raw = region_rows.fetchall()
 
         # Per-region brand breakdown
         brand_rows = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(s.region, '未分区')                    AS region_name,
                 COALESCE(s.brand_id, 'unknown')                 AS brand,
@@ -158,7 +163,8 @@ async def region_overview(
             WHERE s.is_deleted = false
               AND s.status     = 'active'
             GROUP BY COALESCE(s.region, '未分区'), COALESCE(s.brand_id, 'unknown')
-        """)
+        """
+            )
         )
         brand_raw = brand_rows.fetchall()
 
@@ -243,13 +249,15 @@ async def region_stores(
 
         # Verify the region exists (region_id is the region string value)
         check = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*)
             FROM stores
             WHERE is_deleted = false
               AND status     = 'active'
               AND COALESCE(region, '未分区') = :region_id
-        """),
+        """
+            ),
             {"region_id": region_id},
         )
         total = check.scalar() or 0
@@ -264,7 +272,8 @@ async def region_stores(
         offset = (page - 1) * size
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 s.id::text                                      AS store_id,
                 s.store_name,
@@ -283,7 +292,8 @@ async def region_stores(
             GROUP BY s.id, s.store_name, s.city, s.brand_id
             ORDER BY {sort_by} {direction}
             LIMIT :size OFFSET :offset
-        """),
+        """
+            ),
             {"region_id": region_id, "size": size, "offset": offset},
         )
         store_rows = rows.fetchall()

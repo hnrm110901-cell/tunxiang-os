@@ -38,6 +38,8 @@ router = APIRouter(prefix="/api/v1/ops/approvals", tags=["ops-approvals"])
 
 from fastapi import Depends
 
+from shared.security.src.error_handler import safe_http_exception
+
 
 async def get_db():  # noqa: ANN201
     """生产环境替换为真实 asyncpg / SQLAlchemy async session。"""
@@ -111,7 +113,8 @@ async def list_templates(
     """查询审批模板列表（仅返回未删除的）。"""
     if business_type is not None:
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, template_name, business_type,
                        steps, is_active, created_at, updated_at
                 FROM approval_templates
@@ -119,19 +122,22 @@ async def list_templates(
                   AND business_type = :business_type
                   AND is_deleted = false
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "business_type": business_type},
         )
     else:
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, template_name, business_type,
                        steps, is_active, created_at, updated_at
                 FROM approval_templates
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = false
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id},
         )
     return {"ok": True, "data": {"items": [dict(r) for r in rows], "total": len(rows)}}
@@ -152,14 +158,16 @@ async def upsert_template(
 
     # 尝试查找同名同 business_type 模板
     existing = await db.fetch_one(
-        text("""
+        text(
+            """
             SELECT id FROM approval_templates
             WHERE tenant_id = :tenant_id
               AND business_type = :business_type
               AND template_name = :template_name
               AND is_deleted = false
             LIMIT 1
-        """),
+        """
+        ),
         {
             "tenant_id": x_tenant_id,
             "business_type": body.business_type,
@@ -170,11 +178,13 @@ async def upsert_template(
     if existing:
         template_id = str(existing["id"])
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE approval_templates
                 SET steps = :steps, is_active = :is_active, updated_at = :now
                 WHERE id = :id
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "steps": steps_json,
@@ -186,14 +196,16 @@ async def upsert_template(
     else:
         template_id = str(uuid.uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO approval_templates
                     (id, tenant_id, template_name, business_type, steps, is_active,
                      created_at, updated_at)
                 VALUES
                     (:id, :tenant_id, :template_name, :business_type, :steps, :is_active,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": template_id,
                 "tenant_id": x_tenant_id,
@@ -236,7 +248,7 @@ async def create_instance(
             amount_fen=body.amount_fen,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     # 若指定了 deadline_hours，补充写入 deadline_at
     if body.deadline_hours is not None:
@@ -292,7 +304,8 @@ async def get_instance_detail(
 ) -> Dict[str, Any]:
     """查询审批实例详情，包含所有步骤操作记录。"""
     inst = await db.fetch_one(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, template_id, business_type, business_id,
                    title, description, amount_fen,
                    initiator_id, initiator_name,
@@ -302,21 +315,24 @@ async def get_instance_detail(
             WHERE id = :id
               AND tenant_id = :tenant_id
               AND is_deleted = false
-        """),
+        """
+        ),
         {"id": instance_id, "tenant_id": x_tenant_id},
     )
     if inst is None:
         raise HTTPException(status_code=404, detail="审批实例不存在")
 
     step_records = await db.fetch_all(
-        text("""
+        text(
+            """
             SELECT id, step_no, approver_id, approver_name, approver_role,
                    action, comment, delegated_to, acted_at
             FROM approval_step_records
             WHERE instance_id = :instance_id
               AND tenant_id = :tenant_id
             ORDER BY acted_at ASC
-        """),
+        """
+        ),
         {"instance_id": instance_id, "tenant_id": x_tenant_id},
     )
 
@@ -350,9 +366,9 @@ async def act_on_instance(
             comment=body.comment,
         )
     except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": result}
 
@@ -368,21 +384,24 @@ async def cancel_instance(
     仅允许 status=pending 且 current_step=1 时操作。
     """
     inst = await db.fetch_one(
-        text("""
+        text(
+            """
             SELECT id, status, current_step
             FROM approval_instances
             WHERE id = :id
               AND tenant_id = :tenant_id
               AND is_deleted = false
-        """),
+        """
+        ),
         {"id": instance_id, "tenant_id": x_tenant_id},
     )
     if inst is None:
         raise HTTPException(status_code=404, detail="审批实例不存在")
     if inst["status"] != "pending":
-        raise HTTPException(
-            status_code=422,
-            detail=f"当前状态 {inst['status']!r} 不允许撤回，仅 pending 可撤回",
+        raise safe_http_exception(
+            422,
+            "请求格式错误",
+            ValueError(f"approval_status={inst['status']!r}"),
         )
     if inst["current_step"] != 1:
         raise HTTPException(
@@ -392,11 +411,13 @@ async def cancel_instance(
 
     now = datetime.now(tz=timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE approval_instances
             SET status = 'cancelled', updated_at = :now
             WHERE id = :id
-        """),
+        """
+        ),
         {"id": instance_id, "now": now},
     )
     log.info("approval_instance_cancelled", instance_id=instance_id, tenant_id=x_tenant_id)
@@ -422,7 +443,8 @@ async def list_notifications(
 
     if is_read is not None:
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT id, instance_id, recipient_id, recipient_name,
                        notification_type, message, is_read, sent_at, read_at
                 FROM approval_notifications
@@ -431,7 +453,8 @@ async def list_notifications(
                   AND is_read = :is_read
                 ORDER BY sent_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "recipient_id": recipient_id,
@@ -441,17 +464,20 @@ async def list_notifications(
             },
         )
         total_row = await db.fetch_one(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt FROM approval_notifications
                 WHERE tenant_id = :tenant_id
                   AND recipient_id = :recipient_id
                   AND is_read = :is_read
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "recipient_id": recipient_id, "is_read": is_read},
         )
     else:
         rows = await db.fetch_all(
-            text("""
+            text(
+                """
                 SELECT id, instance_id, recipient_id, recipient_name,
                        notification_type, message, is_read, sent_at, read_at
                 FROM approval_notifications
@@ -459,7 +485,8 @@ async def list_notifications(
                   AND recipient_id = :recipient_id
                 ORDER BY sent_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "recipient_id": recipient_id,
@@ -468,11 +495,13 @@ async def list_notifications(
             },
         )
         total_row = await db.fetch_one(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt FROM approval_notifications
                 WHERE tenant_id = :tenant_id
                   AND recipient_id = :recipient_id
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "recipient_id": recipient_id},
         )
 
@@ -497,21 +526,25 @@ async def mark_notification_read(
     """标记通知为已读。"""
     now = datetime.now(tz=timezone.utc)
     result = await db.fetch_one(
-        text("""
+        text(
+            """
             SELECT id FROM approval_notifications
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"id": notification_id, "tenant_id": x_tenant_id},
     )
     if result is None:
         raise HTTPException(status_code=404, detail="通知不存在")
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE approval_notifications
             SET is_read = true, read_at = :now
             WHERE id = :id
-        """),
+        """
+        ),
         {"id": notification_id, "now": now},
     )
     return {"ok": True, "data": {"notification_id": notification_id, "read_at": now.isoformat()}}

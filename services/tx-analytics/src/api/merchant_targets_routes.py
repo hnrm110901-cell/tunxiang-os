@@ -26,49 +26,12 @@ logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["merchant-targets"])
 
-# ── 内置默认目标（可通过 PUT 接口在内存中覆盖） ───────────────────────────────────
-_DEFAULT_TARGETS: dict[str, dict] = {
-    "czyz": {
-        "merchant_name": "尝在一起",
-        "focus": "翻台率优先",
-        "targets": {
-            "table_turnover_rate": 4.5,  # 次/天
-            "avg_dish_time_minutes": 18,  # 分钟
-            "seat_utilization_pct": 75,  # %
-            "avg_ticket_fen": 8500,  # 分
-            "member_repurchase_rate_pct": 35,  # %
-            "monthly_revenue_growth_pct": 8,  # %
-            "gross_margin_pct": 62,  # %
-        },
-    },
-    "zqx": {
-        "merchant_name": "最黔线",
-        "focus": "客单+复购优先",
-        "targets": {
-            "table_turnover_rate": 2.8,
-            "avg_dish_time_minutes": 25,
-            "seat_utilization_pct": 65,
-            "avg_ticket_fen": 18000,
-            "member_repurchase_rate_pct": 55,
-            "monthly_revenue_growth_pct": 12,
-            "gross_margin_pct": 58,
-        },
-    },
-    "sgc": {
-        "merchant_name": "尚宫厨",
-        "focus": "宴席+客单优先",
-        "targets": {
-            "table_turnover_rate": 1.5,
-            "avg_dish_time_minutes": 35,
-            "seat_utilization_pct": 60,
-            "avg_ticket_fen": 45000,
-            "member_repurchase_rate_pct": 30,
-            "monthly_revenue_growth_pct": 15,
-            "gross_margin_pct": 65,
-            "banquet_deposit_rate_pct": 80,
-        },
-    },
-}
+# ── 外置化配置（来自 config/merchant_targets.py） ───────────────────────────────
+from ..config.merchant_targets import (  # noqa: E402
+    DEFAULT_TARGETS,
+    KPI_LABELS,
+    LOWER_IS_BETTER,
+)
 
 # 运行时覆盖存储（PUT 接口写入这里，同时持久化到 DB）
 _overrides: dict[str, dict] = {}
@@ -84,7 +47,7 @@ async def _load_overrides_from_db() -> None:
     """从 merchant_target_overrides 表加载持久化覆盖值到内存缓存。
     可在应用启动后手动调用，不在模块导入时自动执行。
     """
-    for merchant_code in _DEFAULT_TARGETS:
+    for merchant_code in DEFAULT_TARGETS:
         tenant_uuid = _tenant_uuid_for_merchant(merchant_code)
         try:
             async with async_session_factory() as session:
@@ -93,16 +56,18 @@ async def _load_overrides_from_db() -> None:
                     {"tid": str(tenant_uuid)},
                 )
                 result = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT target_key, target_value
                         FROM merchant_target_overrides
                         WHERE tenant_id = :tid AND merchant_code = :mc
-                    """),
+                    """
+                    ),
                     {"tid": str(tenant_uuid), "mc": merchant_code},
                 )
                 rows = result.fetchall()
                 if rows:
-                    base = copy.deepcopy(_DEFAULT_TARGETS[merchant_code])
+                    base = copy.deepcopy(DEFAULT_TARGETS[merchant_code])
                     for row in rows:
                         # _fen 字段保持整数，其余比率/指标用 float
                         val = row.target_value
@@ -121,11 +86,11 @@ async def _load_overrides_from_db() -> None:
             )
 
 
-# 演示商户 → 租户 ID 映射
+# 演示商户 → 租户 ID 映射（与 _tenant_uuid_for_merchant 保持一致）
 _DEMO_TENANTS: dict[str, str] = {
-    "czyz": "czyz-demo-tenant",
-    "zqx": "zqx-demo-tenant",
-    "sgc": "sgc-demo-tenant",
+    "czyz": str(uuid.uuid5(uuid.NAMESPACE_DNS, "czyz-demo-tenant")),
+    "zqx": str(uuid.uuid5(uuid.NAMESPACE_DNS, "zqx-demo-tenant")),
+    "sgc": str(uuid.uuid5(uuid.NAMESPACE_DNS, "sgc-demo-tenant")),
 }
 
 
@@ -133,8 +98,8 @@ def _get_targets(merchant_code: str) -> dict:
     """返回商户目标，优先使用覆盖值，否则返回内置默认值的深拷贝。"""
     if merchant_code in _overrides:
         return _overrides[merchant_code]
-    if merchant_code in _DEFAULT_TARGETS:
-        return copy.deepcopy(_DEFAULT_TARGETS[merchant_code])
+    if merchant_code in DEFAULT_TARGETS:
+        return copy.deepcopy(DEFAULT_TARGETS[merchant_code])
     raise HTTPException(
         status_code=404,
         detail=f"未找到商户 {merchant_code!r} 的目标配置，支持: czyz / zqx / sgc",
@@ -153,20 +118,7 @@ def _require_tenant(merchant_code: str, x_tenant_id: Optional[str]) -> str:
     return x_tenant_id.strip()
 
 
-# ── KPI 中文标签 ─────────────────────────────────────────────────────────────────
-_KPI_LABELS: dict[str, str] = {
-    "table_turnover_rate": "翻台率（次/天）",
-    "avg_dish_time_minutes": "平均出餐时间（分钟）",
-    "seat_utilization_pct": "座位利用率（%）",
-    "avg_ticket_fen": "客单价（分）",
-    "member_repurchase_rate_pct": "会员复购率（%）",
-    "monthly_revenue_growth_pct": "月营收增长率（%）",
-    "gross_margin_pct": "毛利率（%）",
-    "banquet_deposit_rate_pct": "宴席定金率（%）",
-}
-
-# 出餐时间越短越好（反向 KPI）
-_LOWER_IS_BETTER = {"avg_dish_time_minutes"}
+# KPI 标签和反向 KPI 来自 config/merchant_targets.py
 
 
 async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optional[float]]:
@@ -183,7 +135,8 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
         if "avg_ticket_fen" in kpi_keys or "table_turnover_rate" in kpi_keys:
             try:
                 row = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT
                             AVG(total_fen)      AS avg_ticket,
                             COUNT(*)            AS order_count
@@ -191,8 +144,12 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
                           AND created_at >= NOW() - INTERVAL '30 days'
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
+                          AND created_at >= NOW() - (:days * INTERVAL '1 day')
+                    """),
+                    {"tid": tenant_id, "days": 30},
                 )
                 r = row.fetchone()
                 if r and r.order_count and r.order_count > 0:
@@ -207,22 +164,29 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
         if "table_turnover_rate" in kpi_keys:
             try:
                 row_orders = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS cnt
                         FROM orders
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
                           AND created_at >= NOW() - INTERVAL '30 days'
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
+                          AND created_at >= NOW() - (:days * INTERVAL '1 day')
+                    """),
+                    {"tid": tenant_id, "days": 30},
                 )
                 row_tables = await session.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(*) AS cnt
                         FROM tables
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"tid": tenant_id},
                 )
                 order_cnt = row_orders.scalar() or 0
@@ -249,7 +213,7 @@ def _build_gap_item(kpi: str, target: float, actual: Optional[float]) -> dict:
     else:
         data_note = ""
 
-    is_lower_better = kpi in _LOWER_IS_BETTER
+    is_lower_better = kpi in LOWER_IS_BETTER
     gap_pct = round((actual - target) / target * 100, 1) if target != 0 else 0.0
 
     # 对于越低越好的 KPI，gap_pct 符号含义相反
@@ -265,7 +229,7 @@ def _build_gap_item(kpi: str, target: float, actual: Optional[float]) -> dict:
     else:
         status = "⚠️ 低于目标"
 
-    label = _KPI_LABELS.get(kpi, kpi)
+    label = KPI_LABELS.get(kpi, kpi)
     ai_recommendation = _generate_recommendation(kpi, target, actual, effective_gap, data_note)
 
     return {
@@ -322,7 +286,7 @@ def _generate_recommendation(kpi: str, target: float, actual: float, effective_g
     kpi_recs = recommendations.get(kpi)
     if not kpi_recs:
         direction = "良好" if effective_gap >= 0 else f"低于目标{pct_str}"
-        return f"{_KPI_LABELS.get(kpi, kpi)} {direction}{suffix}"
+        return f"{KPI_LABELS.get(kpi, kpi)} {direction}{suffix}"
 
     return kpi_recs["good"] if effective_gap >= 0 else kpi_recs["bad"]
 
@@ -358,14 +322,14 @@ async def update_merchant_targets(
 ) -> dict:
     """覆盖指定商户的 KPI 目标配置（运行时内存存储，重启后恢复默认值）。"""
     # 验证商户代码
-    if merchant_code not in _DEFAULT_TARGETS:
+    if merchant_code not in DEFAULT_TARGETS:
         raise HTTPException(
             status_code=404,
             detail=f"未知商户代码 {merchant_code!r}，支持: czyz / zqx / sgc",
         )
 
     # 合并更新：保留默认值，覆盖传入字段
-    base = copy.deepcopy(_DEFAULT_TARGETS[merchant_code])
+    base = copy.deepcopy(DEFAULT_TARGETS[merchant_code])
     if "targets" in payload and isinstance(payload["targets"], dict):
         base["targets"].update(payload["targets"])
     if "focus" in payload:
@@ -388,7 +352,8 @@ async def update_merchant_targets(
                 )
                 for key, value in updated_targets.items():
                     await session.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO merchant_target_overrides
                               (tenant_id, merchant_code, target_key, target_value, updated_by)
                             VALUES (:tid, :mc, :key, :val, :by)
@@ -397,7 +362,8 @@ async def update_merchant_targets(
                               target_value = EXCLUDED.target_value,
                               updated_at   = NOW(),
                               updated_by   = EXCLUDED.updated_by
-                        """),
+                        """
+                        ),
                         {
                             "tid": str(tenant_uuid),
                             "mc": merchant_code,
@@ -463,7 +429,7 @@ async def get_merchant_target_gap(
     # 计算综合差距分（0-100，越高越好）
     gap_scores: list[float] = []
     for g in gaps:
-        effective_gap = -g["gap_pct"] if g["kpi"] in _LOWER_IS_BETTER else g["gap_pct"]
+        effective_gap = -g["gap_pct"] if g["kpi"] in LOWER_IS_BETTER else g["gap_pct"]
         # 归一化到 0-100：目标完成率，最高 120 分截断到 100
         completion = min((100 + effective_gap) / 100, 1.2) * 100
         gap_scores.append(min(max(completion, 0), 100))
@@ -473,11 +439,11 @@ async def get_merchant_target_gap(
     # 找出差距最大的 KPI（effective_gap 最负的）
     worst = min(
         gaps,
-        key=lambda g: -(g["gap_pct"]) if g["kpi"] in _LOWER_IS_BETTER else g["gap_pct"],
+        key=lambda g: -(g["gap_pct"]) if g["kpi"] in LOWER_IS_BETTER else g["gap_pct"],
         default=None,
     )
     priority_action = (
-        f"重点提升{_KPI_LABELS.get(worst['kpi'], worst['kpi'])}（差距最大）"
+        f"重点提升{KPI_LABELS.get(worst['kpi'], worst['kpi'])}（差距最大）"
         if worst and worst["status"] == "⚠️ 低于目标"
         else "各项 KPI 运营正常，保持现有策略"
     )

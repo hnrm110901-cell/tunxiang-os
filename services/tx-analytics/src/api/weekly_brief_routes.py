@@ -61,7 +61,8 @@ async def _week_metrics(db: AsyncSession, tenant_id: str, week_start: date) -> d
     start, end = _week_range(week_start)
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint    AS revenue_fen,
                 COUNT(*)                                       AS order_count,
@@ -74,7 +75,8 @@ async def _week_metrics(db: AsyncSession, tenant_id: str, week_start: date) -> d
               AND status    = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         row = dict(r.mappings().fetchone() or {})
@@ -101,7 +103,8 @@ async def _week_dish_analysis(db: AsyncSession, tenant_id: str, week_start: date
     start, end = _week_range(week_start)
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 oi.dish_name,
                 SUM(oi.quantity)            AS qty,
@@ -115,7 +118,8 @@ async def _week_dish_analysis(db: AsyncSession, tenant_id: str, week_start: date
             GROUP BY oi.dish_name
             ORDER BY qty DESC
             LIMIT 20
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         rows = r.mappings().all()
@@ -136,7 +140,8 @@ async def _week_member_analysis(db: AsyncSession, tenant_id: str, week_start: da
     start, end = _week_range(week_start)
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) FILTER (WHERE member_id IS NOT NULL)  AS member_orders,
                 COUNT(*) FILTER (WHERE member_id IS NULL)      AS guest_orders,
@@ -146,7 +151,8 @@ async def _week_member_analysis(db: AsyncSession, tenant_id: str, week_start: da
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         row = dict(r.mappings().fetchone() or {})
@@ -382,7 +388,8 @@ async def get_group_weekly_brief(
     # 集团汇总 + 按门店分组
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(store_id::text, 'unknown')            AS store_id,
                 COALESCE(SUM(total_amount_fen), 0)::bigint     AS revenue_fen,
@@ -396,13 +403,15 @@ async def get_group_weekly_brief(
               AND created_at <  :end
             GROUP BY store_id
             ORDER BY revenue_fen DESC
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": start, "end": end},
         )
         store_rows = r.mappings().all()
 
         lw_r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(total_amount_fen), 0)::bigint AS revenue_fen,
                 COUNT(*)::int                               AS order_count
@@ -411,7 +420,8 @@ async def get_group_weekly_brief(
               AND status      = 'completed'
               AND created_at >= :start
               AND created_at <  :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "start": lstart, "end": lend},
         )
         lw = dict(lw_r.mappings().fetchone() or {})

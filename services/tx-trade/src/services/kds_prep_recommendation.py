@@ -113,7 +113,8 @@ async def _query_historical_sales(
 ) -> list[dict]:
     """查询历史同星期销量数据（SQL 聚合，避免 N+1）。"""
     dept_filter = "AND dd.dept_id = :dept_id" if dept_id else ""
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             oi.dish_id::TEXT                    AS dish_id,
             d.name                              AS dish_name,
@@ -145,7 +146,8 @@ async def _query_historical_sales(
         GROUP BY oi.dish_id, d.name, dd.dept_id, pd.name
         ORDER BY avg_qty DESC
         LIMIT 100
-    """)
+    """
+    )
 
     params: dict = {
         "tenant_id": tenant_id,
@@ -170,7 +172,8 @@ async def _query_booking_boost(
 
     有预订包厢的菜品 boost 系数适当提升。
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             bpi.dish_id::TEXT  AS dish_id,
             SUM(bpi.quantity)  AS booking_qty
@@ -181,7 +184,8 @@ async def _query_booking_boost(
           AND bpt.prep_date = :target_date
           AND bpt.is_deleted = FALSE
         GROUP BY bpi.dish_id
-    """)
+    """
+    )
     try:
         result = await db.execute(
             sql,

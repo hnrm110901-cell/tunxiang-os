@@ -18,6 +18,8 @@ from typing import Optional
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.store_analysis import (
     peak_hour_analysis,
     revenue_analysis,
@@ -191,5 +193,5 @@ async def api_store_comparison(
     try:
         data = await store_comparison(store_uuids, body.metrics, dr, tenant_id, db=None)
     except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise safe_http_exception(422, "请求格式错误", e) from e
     return {"ok": True, "data": data}

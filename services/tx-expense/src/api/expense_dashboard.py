@@ -112,7 +112,8 @@ async def get_overview(
     try:
         # 1) 本月费用汇总（已审批+已付款）
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COALESCE(SUM(total_amount), 0)                          AS month_total_fen,
                 COUNT(*)                                                AS month_count,
@@ -123,7 +124,8 @@ async def get_overview(
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end},
         )
         row = r.mappings().one()
@@ -133,28 +135,32 @@ async def get_overview(
 
         # 2) 本季度费用汇总
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(total_amount), 0) AS quarter_total_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": q_start, "e": q_end},
         )
         quarter_total_fen = int(r.scalar() or 0)
 
         # 3) 上月费用（环比）
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(SUM(total_amount), 0) AS prev_total_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status IN ('approved', 'paid')
               AND created_at::date BETWEEN :s AND :e
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": pm_start, "e": pm_end},
         )
         prev_total_fen = int(r.scalar() or 0)
@@ -165,13 +171,15 @@ async def get_overview(
 
         # 4) 待审批单据
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) AS cnt, COALESCE(SUM(total_amount), 0) AS pending_fen
             FROM expense_applications
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND status = 'pending_review'
-        """),
+        """
+            ),
             {"tid": str(tenant_id)},
         )
         row = r.mappings().one()
@@ -180,7 +188,8 @@ async def get_overview(
 
         # 5) 本月预算执行率（取月度预算，不存在时取年度）
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT total_amount, used_amount
             FROM budgets
             WHERE tenant_id = :tid
@@ -190,14 +199,16 @@ async def get_overview(
               AND budget_month = :mo
             ORDER BY created_at DESC
             LIMIT 1
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "yr": year, "mo": month},
         )
         budget_row = r.mappings().first()
         if not budget_row:
             # fallback: 年度预算
             r = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT total_amount, used_amount
                 FROM budgets
                 WHERE tenant_id = :tid
@@ -207,7 +218,8 @@ async def get_overview(
                   AND budget_month IS NULL
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+                ),
                 {"tid": str(tenant_id), "yr": year},
             )
             budget_row = r.mappings().first()
@@ -220,7 +232,8 @@ async def get_overview(
 
         # 6) 发票状态（本月）
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 COUNT(*) AS total_invoices,
                 COUNT(*) FILTER (WHERE verification_status = 'pending_verification') AS pending_verify,
@@ -230,7 +243,8 @@ async def get_overview(
             WHERE tenant_id = :tid
               AND is_deleted = false
               AND created_at::date BETWEEN :s AND :e
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end},
         )
         inv_row = r.mappings().first()
@@ -296,7 +310,8 @@ async def get_by_store(
     try:
         # 费控申请按门店汇总
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 store_id::text,
                 COUNT(*) AS application_count,
@@ -310,14 +325,16 @@ async def get_by_store(
               AND created_at::date BETWEEN :s AND :e
             GROUP BY store_id
             ORDER BY total_fen DESC
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end},
         )
         expense_rows = r.mappings().all()
 
         # 成本日报（本月均值）按门店
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 store_id::text,
                 ROUND(AVG(food_cost_rate)::numeric, 4)     AS avg_food_cost_rate,
@@ -330,7 +347,8 @@ async def get_by_store(
               AND report_date BETWEEN :s AND :e
               AND data_status != 'pending'
             GROUP BY store_id
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end},
         )
         cost_rows = {str(r["store_id"]): r for r in r.mappings().all()}
@@ -401,7 +419,8 @@ async def get_by_category(
 
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 ea.category_id::text,
                 ec.name            AS category_name,
@@ -417,7 +436,8 @@ async def get_by_category(
               AND ea.created_at::date BETWEEN :s AND :e
             GROUP BY ea.category_id, ec.name, ec.parent_id
             ORDER BY total_fen DESC
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end},
         )
         rows = r.mappings().all()
@@ -484,7 +504,8 @@ async def get_trend(
 
         # 批量查询所有月份
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 DATE_TRUNC('month', created_at)::date AS month_start,
                 COALESCE(SUM(total_amount), 0)        AS total_fen,
@@ -496,7 +517,8 @@ async def get_trend(
               AND created_at::date BETWEEN :start AND :end
             GROUP BY DATE_TRUNC('month', created_at)
             ORDER BY month_start
-        """),
+        """
+            ),
             {
                 "tid": str(tenant_id),
                 "start": month_starts[0],
@@ -556,7 +578,8 @@ async def get_top_applicants(
 
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 applicant_id::text,
                 COUNT(*)                          AS application_count,
@@ -574,7 +597,8 @@ async def get_top_applicants(
             GROUP BY applicant_id
             ORDER BY total_fen DESC
             LIMIT :lim
-        """),
+        """
+            ),
             {"tid": str(tenant_id), "s": m_start, "e": m_end, "lim": limit},
         )
         rows = r.mappings().all()

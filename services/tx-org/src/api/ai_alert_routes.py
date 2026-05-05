@@ -118,7 +118,8 @@ async def _check_duplicate(
     where_clause = " AND ".join(conditions)
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 a.id::text AS alert_id,
                 a.alert_type,
@@ -131,7 +132,8 @@ async def _check_duplicate(
             WHERE {where_clause}
             ORDER BY a.created_at DESC
             LIMIT 1
-        """),
+        """
+        ),
         params,
     )
     row = result.fetchone()
@@ -150,12 +152,14 @@ async def _generate_order_no(db: AsyncSession) -> str:
     prefix = f"DRI-{today_str}-"
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT MAX(order_no) AS max_no
             FROM dri_work_orders
             WHERE order_no LIKE :prefix || '%'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"prefix": prefix},
     )
     row = result.fetchone()
@@ -342,7 +346,8 @@ async def create_ai_alert(
     alert_id = str(uuid4())
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO ai_alerts (
                 id, tenant_id, alert_type, store_id, employee_id, severity,
                 title, detail, suggestion, resolved, expires_at,
@@ -353,7 +358,8 @@ async def create_ai_alert(
                 FALSE, :now, :now
             )
             RETURNING id::text AS alert_id
-        """),
+        """
+        ),
         {
             "id": alert_id,
             "tid": tenant_id,
@@ -404,7 +410,8 @@ async def get_ai_alert_dashboard(
         params["store_id"] = store_id
 
     # 未解决总数 + 按类型 + 按严重度
-    overview_sql = text(f"""
+    overview_sql = text(
+        f"""
         SELECT
             COUNT(*) FILTER (WHERE a.resolved = FALSE) AS total_unresolved,
             COUNT(*) FILTER (WHERE a.resolved = FALSE AND a.alert_type = 'turnover') AS t_turnover,
@@ -417,14 +424,16 @@ async def get_ai_alert_dashboard(
             COUNT(*) FILTER (WHERE a.resolved = FALSE AND a.severity = 'critical') AS s_critical
         FROM ai_alerts a
         WHERE a.is_deleted = FALSE {store_filter}
-    """)
+    """
+    )
     overview_result = await db.execute(overview_sql, params)
     ov = dict(overview_result.fetchone()._mapping)
     for key in ov:
         ov[key] = int(ov[key] or 0)
 
     # 最近5条critical未解决预警
-    critical_sql = text(f"""
+    critical_sql = text(
+        f"""
         SELECT
             a.id::text AS alert_id,
             a.alert_type,
@@ -441,7 +450,8 @@ async def get_ai_alert_dashboard(
           {store_filter}
         ORDER BY a.created_at DESC
         LIMIT 5
-    """)
+    """
+    )
     critical_result = await db.execute(critical_sql, params)
     recent_critical = []
     for r in critical_result.fetchall():
@@ -451,7 +461,8 @@ async def get_ai_alert_dashboard(
         recent_critical.append(d)
 
     # 近7天新增趋势
-    trend_sql = text(f"""
+    trend_sql = text(
+        f"""
         SELECT
             a.created_at::date AS date,
             COUNT(*) AS count
@@ -461,7 +472,8 @@ async def get_ai_alert_dashboard(
           {store_filter}
         GROUP BY a.created_at::date
         ORDER BY date
-    """)
+    """
+    )
     trend_result = await db.execute(trend_sql, params)
     trend_7d = []
     for r in trend_result.fetchall():
@@ -471,7 +483,8 @@ async def get_ai_alert_dashboard(
         trend_7d.append(d)
 
     # 近30天解决率
-    rate_sql = text(f"""
+    rate_sql = text(
+        f"""
         SELECT
             COUNT(*) AS total_30d,
             COUNT(*) FILTER (WHERE a.resolved = TRUE) AS resolved_30d
@@ -479,7 +492,8 @@ async def get_ai_alert_dashboard(
         WHERE a.is_deleted = FALSE
           AND a.created_at >= CURRENT_DATE - INTERVAL '30 days'
           {store_filter}
-    """)
+    """
+    )
     rate_result = await db.execute(rate_sql, params)
     rate_row = dict(rate_result.fetchone()._mapping)
     total_30d = int(rate_row["total_30d"] or 0)
@@ -543,7 +557,8 @@ async def batch_create_ai_alerts(
 
         alert_id = str(uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ai_alerts (
                     id, tenant_id, alert_type, store_id, employee_id, severity,
                     title, detail, suggestion, resolved, expires_at,
@@ -553,7 +568,8 @@ async def batch_create_ai_alerts(
                     :title, :detail, :suggestion, FALSE, :expires_at,
                     FALSE, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": alert_id,
                 "tid": tenant_id,
@@ -596,7 +612,8 @@ async def get_store_alert_summary(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         WITH ranked AS (
             SELECT
                 a.id::text AS alert_id,
@@ -647,7 +664,8 @@ async def get_store_alert_summary(
                 WHEN 'info' THEN 1
             END DESC,
             tc.count DESC
-    """)
+    """
+    )
 
     result = await db.execute(sql, {"store_id": store_id})
     groups = []
@@ -692,7 +710,8 @@ async def get_ai_alert_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             a.id::text AS alert_id,
             a.alert_type,
@@ -716,7 +735,8 @@ async def get_ai_alert_detail(
         LEFT JOIN stores s ON s.id = a.store_id AND s.is_deleted = FALSE
         LEFT JOIN employees e ON e.id = a.employee_id AND e.is_deleted = FALSE
         WHERE a.id = :alert_id AND a.is_deleted = FALSE
-    """)
+    """
+    )
 
     result = await db.execute(sql, {"alert_id": alert_id})
     row = result.fetchone()
@@ -732,13 +752,15 @@ async def get_ai_alert_detail(
 
     # 如果有关联工单，查询工单摘要
     if data.get("linked_order_id"):
-        order_sql = text("""
+        order_sql = text(
+            """
             SELECT
                 wo.order_no,
                 wo.status
             FROM dri_work_orders wo
             WHERE wo.id = :order_id AND wo.is_deleted = FALSE
-        """)
+        """
+        )
         order_result = await db.execute(order_sql, {"order_id": data["linked_order_id"]})
         order_row = order_result.fetchone()
         if order_row:
@@ -782,7 +804,8 @@ async def resolve_ai_alert(
         params["linked_order_id"] = req.linked_order_id
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE ai_alerts
             SET resolved = TRUE,
                 resolved_at = :now,
@@ -792,7 +815,8 @@ async def resolve_ai_alert(
                 {extra_sets}
             WHERE id = :alert_id AND is_deleted = FALSE AND resolved = FALSE
             RETURNING id::text AS alert_id
-        """),
+        """
+        ),
         params,
     )
     row = result.fetchone()
@@ -831,7 +855,8 @@ async def dismiss_ai_alert(
     now = datetime.now(timezone.utc)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE ai_alerts
             SET resolved = TRUE,
                 resolved_at = :now,
@@ -839,7 +864,8 @@ async def dismiss_ai_alert(
                 updated_at = :now
             WHERE id = :alert_id AND is_deleted = FALSE AND resolved = FALSE
             RETURNING id::text AS alert_id
-        """),
+        """
+        ),
         {"alert_id": alert_id, "now": now},
     )
     row = result.fetchone()
@@ -879,7 +905,8 @@ async def create_order_from_alert(
 
     # 查询预警信息
     alert_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 a.id::text AS alert_id,
                 a.store_id::text,
@@ -887,7 +914,8 @@ async def create_order_from_alert(
                 a.resolved
             FROM ai_alerts a
             WHERE a.id = :alert_id AND a.is_deleted = FALSE
-        """),
+        """
+        ),
         {"alert_id": alert_id},
     )
     alert_row = alert_result.fetchone()
@@ -904,7 +932,8 @@ async def create_order_from_alert(
 
     # 创建DRI工单
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO dri_work_orders (
                 id, tenant_id, order_no, order_type, store_id, title,
                 description, severity, status, dri_user_id,
@@ -916,7 +945,8 @@ async def create_order_from_alert(
                 :due_date, 'ai_alert', :source_ref_id,
                 FALSE, :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": order_id,
             "tid": tenant_id,
@@ -935,11 +965,13 @@ async def create_order_from_alert(
 
     # 更新预警关联工单ID
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE ai_alerts
             SET linked_order_id = :order_id, updated_at = :now
             WHERE id = :alert_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"order_id": order_id, "alert_id": alert_id, "now": now},
     )
 

@@ -63,16 +63,19 @@ async def hr_dashboard(
     await _set_tenant(db, tenant_id)
 
     # 1. 在职总人数
-    headcount_q = text("""
+    headcount_q = text(
+        """
         SELECT COUNT(*) AS total
         FROM employees e
         WHERE e.tenant_id = CAST(:tenant_id AS uuid)
           AND e.is_deleted = false
           AND COALESCE(e.is_active, true) = true
-    """)
+    """
+    )
 
     # 2. 今日应到/实到/缺岗
-    today_q = text("""
+    today_q = text(
+        """
         SELECT
             COUNT(*) AS expected,
             COUNT(CASE WHEN da.status IN ('normal', 'late', 'early_leave') THEN 1 END) AS present,
@@ -81,45 +84,55 @@ async def hr_dashboard(
         WHERE da.tenant_id = CAST(:tenant_id AS uuid)
           AND da.date = CURRENT_DATE
           AND COALESCE(da.is_deleted, false) = false
-    """)
+    """
+    )
 
     # 3. 待处理请假数
-    leave_q = text("""
+    leave_q = text(
+        """
         SELECT COUNT(*) AS pending_leave
         FROM leave_requests lr
         WHERE lr.tenant_id = CAST(:tenant_id AS uuid)
           AND lr.status = 'pending'
           AND COALESCE(lr.is_deleted, false) = false
-    """)
+    """
+    )
 
     # 4. 排班冲突数
-    conflict_q = text("""
+    conflict_q = text(
+        """
         SELECT COUNT(*) AS conflicts
         FROM schedule_conflicts sc
         WHERE sc.tenant_id = CAST(:tenant_id AS uuid)
           AND sc.status = 'open'
           AND COALESCE(sc.is_deleted, false) = false
-    """)
+    """
+    )
 
     # 5. 合规预警数（open）
-    alert_q = text("""
+    alert_q = text(
+        """
         SELECT COUNT(*) AS open_alerts
         FROM compliance_alerts ca
         WHERE ca.tenant_id = CAST(:tenant_id AS uuid)
           AND ca.status = 'open'
-    """)
+    """
+    )
 
     # 6. 待审核薪资单数
-    payroll_q = text("""
+    payroll_q = text(
+        """
         SELECT COUNT(*) AS pending_payroll
         FROM payroll_records pr
         WHERE pr.tenant_id = CAST(:tenant_id AS uuid)
           AND pr.status = 'pending_review'
           AND COALESCE(pr.is_deleted, false) = false
-    """)
+    """
+    )
 
     # 7. 近7天出勤率趋势
-    trend_q = text("""
+    trend_q = text(
+        """
         SELECT
             da.date,
             COUNT(CASE WHEN da.status = 'normal' THEN 1 END)::float
@@ -130,16 +143,19 @@ async def hr_dashboard(
           AND COALESCE(da.is_deleted, false) = false
         GROUP BY da.date
         ORDER BY da.date
-    """)
+    """
+    )
 
     # 8. Agent最新建议摘要
-    agent_q = text("""
+    agent_q = text(
+        """
         SELECT agent_id, decision_type, reasoning, confidence, created_at
         FROM agent_decision_logs
         WHERE tenant_id = CAST(:tenant_id AS uuid)
         ORDER BY created_at DESC
         LIMIT 5
-    """)
+    """
+    )
 
     params = {"tenant_id": tenant_id}
 

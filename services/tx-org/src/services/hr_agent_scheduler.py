@@ -205,12 +205,14 @@ class HRAgentScheduler:
         try:
             async for db in get_db_no_rls():
                 result = await db.execute(
-                    _text("""
+                    _text(
+                        """
                         SELECT DISTINCT tenant_id::text
                         FROM stores
                         WHERE is_deleted = FALSE
                         ORDER BY 1
-                    """)
+                    """
+                    )
                 )
                 tenant_ids = [row[0] for row in result.fetchall()]
                 if tenant_ids:

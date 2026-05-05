@@ -151,7 +151,8 @@ async def _ensure_builtin_templates(db: AsyncSession, tid: uuid.UUID) -> None:
     now = datetime.now(timezone.utc)
     for key, tpl in _BUILTIN_TEMPLATES.items():
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO content_templates
                     (id, tenant_id, template_key, name, content_type,
                      body_template, variables, is_builtin, is_active,
@@ -161,7 +162,8 @@ async def _ensure_builtin_templates(db: AsyncSession, tid: uuid.UUID) -> None:
                      :body, :variables::jsonb, true, true,
                      0, :now, :now)
                 ON CONFLICT ON CONSTRAINT uq_content_templates_tenant_key DO NOTHING
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "key": key,
@@ -233,7 +235,8 @@ async def create_template(
         new_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO content_templates
                     (id, tenant_id, template_key, name, content_type,
                      body_template, variables, is_builtin, is_active,
@@ -242,7 +245,8 @@ async def create_template(
                     (:id, :tid, null, :name, :content_type,
                      :body, :variables::jsonb, false, true,
                      0, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -326,14 +330,16 @@ async def list_templates(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_key, name, content_type, body_template,
                        variables, is_builtin, usage_count, created_at, updated_at
                 FROM content_templates
                 WHERE {where_clause}
                 ORDER BY is_builtin DESC, usage_count DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -385,12 +391,14 @@ async def generate_content(
         if req.template_id:
             tpl_id = uuid.UUID(req.template_id)
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name, content_type, body_template, variables
                     FROM content_templates
                     WHERE id = :tid_tpl AND tenant_id = :tid AND is_active = true AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid_tpl": tpl_id, "tid": tid},
             )
         else:
@@ -398,14 +406,16 @@ async def generate_content(
             if req.content_type not in _VALID_CONTENT_TYPES:
                 return error_response("INVALID_TYPE", f"content_type 须为 {_VALID_CONTENT_TYPES} 之一")
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name, content_type, body_template, variables
                     FROM content_templates
                     WHERE tenant_id = :tid AND content_type = :ctype
                       AND is_active = true AND is_deleted = false
                     ORDER BY usage_count DESC, is_builtin DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid, "ctype": req.content_type},
             )
 
@@ -441,11 +451,13 @@ async def generate_content(
         # 递增使用次数
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE content_templates
                     SET usage_count = usage_count + 1, updated_at = NOW()
                     WHERE id = :tpl_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"tpl_id": row.id, "tid": tid},
             )
             await db.commit()
@@ -487,12 +499,14 @@ async def get_template_performance(
         tpl_id = uuid.UUID(template_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, content_type, is_builtin, usage_count, created_at, updated_at
                 FROM content_templates
                 WHERE id = :tpl_id AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tpl_id": tpl_id, "tid": tid},
         )
         row = result.fetchone()

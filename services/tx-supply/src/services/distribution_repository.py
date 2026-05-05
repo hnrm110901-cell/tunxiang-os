@@ -106,7 +106,8 @@ class DistributionRepository:
         """注入/更新仓库信息（UPSERT）"""
         await self._set_tenant()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO distribution_warehouses
                     (id, tenant_id, warehouse_id, warehouse_name, lat, lng, address, capacity_kg, updated_at)
                 VALUES
@@ -118,7 +119,8 @@ class DistributionRepository:
                         address        = EXCLUDED.address,
                         capacity_kg    = EXCLUDED.capacity_kg,
                         updated_at     = NOW()
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -136,7 +138,8 @@ class DistributionRepository:
         """注入/更新门店地理信息（UPSERT）"""
         await self._set_tenant()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO distribution_store_geos
                     (id, tenant_id, store_id, store_name, lat, lng, address, updated_at)
                 VALUES
@@ -147,7 +150,8 @@ class DistributionRepository:
                         lng        = EXCLUDED.lng,
                         address    = EXCLUDED.address,
                         updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -164,7 +168,8 @@ class DistributionRepository:
         """注入/更新司机信息（UPSERT）"""
         await self._set_tenant()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO distribution_drivers
                     (id, tenant_id, driver_id, driver_name, phone, vehicle_no,
                      vehicle_type, capacity_kg, updated_at)
@@ -178,7 +183,8 @@ class DistributionRepository:
                         vehicle_type = EXCLUDED.vehicle_type,
                         capacity_kg  = EXCLUDED.capacity_kg,
                         updated_at   = NOW()
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "tid": self._tid,
@@ -219,14 +225,16 @@ class DistributionRepository:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO distribution_plans
                     (id, tenant_id, warehouse_id, status, store_count, total_items,
                      store_deliveries, created_at, updated_at)
                 VALUES
                     (:id, :tid, :wh_id, 'planned', :store_count, :total_items,
                      :deliveries::jsonb, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": plan_id,
                 "tid": self._tid,
@@ -252,13 +260,15 @@ class DistributionRepository:
         """查询配送计划"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, warehouse_id, status, store_count, total_items,
                        driver_id, route, store_deliveries,
                        created_at, updated_at, dispatched_at, completed_at
                 FROM distribution_plans
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -283,10 +293,12 @@ class DistributionRepository:
 
         warehouse_id = plan["warehouse_id"]
         wh_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT lat, lng FROM distribution_warehouses
                 WHERE warehouse_id = :wh_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"wh_id": uuid.UUID(warehouse_id), "tid": self._tid},
         )
         wh_row = wh_result.fetchone()
@@ -314,11 +326,13 @@ class DistributionRepository:
             }
 
         geo_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id, store_name, lat, lng
                 FROM distribution_store_geos
                 WHERE tenant_id = :tid AND store_id = ANY(:sids)
-            """),
+            """
+            ),
             {"tid": self._tid, "sids": [uuid.UUID(s) for s in store_ids]},
         )
         geo_map = {str(r.store_id): r for r in geo_result.fetchall()}
@@ -339,11 +353,13 @@ class DistributionRepository:
 
         # 写入 DB
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE distribution_plans
                 SET route = :route::jsonb, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"route": json.dumps(route), "id": uuid.UUID(plan_id), "tid": self._tid},
         )
         await self.db.flush()
@@ -384,7 +400,8 @@ class DistributionRepository:
 
         now = datetime.now(timezone.utc)
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE distribution_plans
                 SET status           = 'dispatched',
                     driver_id        = :driver_id,
@@ -392,7 +409,8 @@ class DistributionRepository:
                     dispatched_at    = :now,
                     updated_at       = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "driver_id": uuid.UUID(driver_id),
                 "deliveries": json.dumps(store_deliveries),
@@ -405,11 +423,13 @@ class DistributionRepository:
 
         # 查司机信息
         driver_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT driver_name, phone, vehicle_no, vehicle_type, capacity_kg
                 FROM distribution_drivers
                 WHERE driver_id = :did AND tenant_id = :tid
-            """),
+            """
+            ),
             {"did": uuid.UUID(driver_id), "tid": self._tid},
         )
         driver_row = driver_result.fetchone()
@@ -488,14 +508,16 @@ class DistributionRepository:
         completed_at = now if new_status == "delivered" else None
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE distribution_plans
                 SET status           = :status,
                     store_deliveries = :deliveries::jsonb,
                     completed_at     = :completed_at,
                     updated_at       = :now
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {
                 "status": new_status,
                 "deliveries": json.dumps(store_deliveries),
@@ -536,13 +558,15 @@ class DistributionRepository:
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, store_count, total_items, driver_id, created_at
                 FROM distribution_plans
                 WHERE tenant_id = :tid AND warehouse_id = :wh_id
                 ORDER BY created_at DESC
                 LIMIT 200
-            """),
+            """
+            ),
             {"tid": self._tid, "wh_id": wh_uuid},
         )
         rows = result.fetchall()

@@ -131,7 +131,8 @@ class ScheduledSubmissionWorker:
         Returns:
             submissions 列表
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT id, tenant_id, store_id, city_code, domain,
                    submission_type, payload, retry_count
             FROM civic_submissions
@@ -139,7 +140,8 @@ class ScheduledSubmissionWorker:
               AND status = 'pending'
             ORDER BY created_at ASC
             LIMIT :limit
-        """)
+        """
+        )
 
         try:
             result = await db.execute(sql, {"limit": BATCH_SIZE})
@@ -173,7 +175,8 @@ class ScheduledSubmissionWorker:
         """
         now = datetime.now(timezone.utc)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT id, tenant_id, store_id, city_code, domain,
                    submission_type, payload, retry_count
             FROM civic_submissions
@@ -183,7 +186,8 @@ class ScheduledSubmissionWorker:
               AND retry_count < :max_retry
             ORDER BY next_retry_at ASC
             LIMIT :limit
-        """)
+        """
+        )
 
         try:
             result = await db.execute(sql, {"now": now, "max_retry": MAX_RETRY_COUNT, "limit": BATCH_SIZE})
@@ -368,7 +372,8 @@ class ScheduledSubmissionWorker:
             error_message: 错误信息
             response_data: 平台响应数据
         """
-        sql = text("""
+        sql = text(
+            """
             UPDATE civic_submissions
             SET status = :status,
                 retry_count = :retry_count,
@@ -378,7 +383,8 @@ class ScheduledSubmissionWorker:
                 submitted_at = CASE WHEN :status IN ('accepted', 'rejected') THEN NOW() ELSE submitted_at END,
                 updated_at = NOW()
             WHERE id = :id
-        """)
+        """
+        )
 
         import json
 

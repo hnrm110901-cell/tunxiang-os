@@ -95,6 +95,7 @@ def _make_db_override(db: AsyncMock):
     """返回一个 async generator，直接 yield mock db，覆盖 _get_tenant_db 依赖。
     必须使用 Request 类型注解，否则 FastAPI 会将参数解析为 query param。
     """
+
     async def _dep(request: Request):
         yield db
 
@@ -117,9 +118,7 @@ async def test_apply_service_fee() -> None:
 
     _app.dependency_overrides[billing_module._get_tenant_db] = _make_db_override(db)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/orders/{ORDER_UUID}/apply-billing-rules",
             json={
@@ -154,9 +153,7 @@ async def test_apply_min_spend_shortfall() -> None:
 
     _app.dependency_overrides[billing_module._get_tenant_db] = _make_db_override(db)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/orders/{ORDER_UUID}/apply-billing-rules",
             json={
@@ -191,9 +188,7 @@ async def test_apply_min_spend_satisfied() -> None:
 
     _app.dependency_overrides[billing_module._get_tenant_db] = _make_db_override(db)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/orders/{ORDER_UUID}/apply-billing-rules",
             json={
@@ -229,9 +224,7 @@ async def test_exempt_member_tier() -> None:
 
     _app.dependency_overrides[billing_module._get_tenant_db] = _make_db_override(db)
 
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as client:
         resp = await client.post(
             f"/api/v1/orders/{ORDER_UUID}/apply-billing-rules",
             json={

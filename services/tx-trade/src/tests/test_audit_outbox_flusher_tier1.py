@@ -59,11 +59,14 @@ def fake_session_factory():
 
 @pytest.mark.asyncio
 async def test_flusher_loop_calls_flush_periodically(fake_session_factory):
-    """两次 0.05s 间隔后，flush_outbox_to_pg 应该被至少调用 2 次。"""
+    """两次迭代后 flush_outbox_to_pg 应被至少调用 2 次（确定性等待）。"""
     call_count = {"n": 0}
+    reached_two = asyncio.Event()
 
     async def _fake_flush(session):
         call_count["n"] += 1
+        if call_count["n"] >= 2:
+            reached_two.set()
         return 0  # 没有 outbox 内容
 
     with patch("src.services.audit_outbox.flush_outbox_to_pg", _fake_flush):
@@ -71,7 +74,8 @@ async def test_flusher_loop_calls_flush_periodically(fake_session_factory):
         loop_task = asyncio.create_task(
             _flusher_loop(fake_session_factory, stop_event, interval_seconds=0.05),
         )
-        await asyncio.sleep(0.18)  # 应该够 3-4 次迭代
+        # 等到第 2 次迭代被实际触发，再发停止信号 — 不依赖 wallclock
+        await asyncio.wait_for(reached_two.wait(), timeout=2.0)
         stop_event.set()
         await asyncio.wait_for(loop_task, timeout=1.0)
 
@@ -109,13 +113,15 @@ async def test_stop_event_terminates_loop_promptly(fake_session_factory):
 
 @pytest.mark.asyncio
 async def test_iteration_exception_does_not_kill_loop(fake_session_factory):
-    """flush_outbox_to_pg 抛 RuntimeError 时，loop 应该 log + 继续下一轮。"""
+    """flush_outbox_to_pg 抛 RuntimeError 时，loop 应该 log + 继续下一轮（确定性等待）。"""
     call_count = {"n": 0}
+    second_call = asyncio.Event()
 
     async def _failing_flush(session):
         call_count["n"] += 1
         if call_count["n"] == 1:
             raise RuntimeError("simulated PG outage")
+        second_call.set()
         return 0
 
     with patch("src.services.audit_outbox.flush_outbox_to_pg", _failing_flush):
@@ -123,7 +129,8 @@ async def test_iteration_exception_does_not_kill_loop(fake_session_factory):
         loop_task = asyncio.create_task(
             _flusher_loop(fake_session_factory, stop_event, interval_seconds=0.05),
         )
-        await asyncio.sleep(0.15)  # 第 1 次抛错，第 2 次应正常
+        # 等到第 2 次（异常后存活）被实际触发
+        await asyncio.wait_for(second_call.wait(), timeout=2.0)
         stop_event.set()
         await asyncio.wait_for(loop_task, timeout=1.0)
 
@@ -138,15 +145,17 @@ async def test_iteration_exception_does_not_kill_loop(fake_session_factory):
 
 @pytest.mark.asyncio
 async def test_session_factory_failure_does_not_kill_loop():
-    """session_factory() 进入 async with 时抛错 → loop 仍继续。"""
+    """session_factory() 进入 async with 时抛错 → loop 仍继续（确定性等待）。"""
     factory_call_count = {"n": 0}
+    second_factory_call = asyncio.Event()
 
     @asynccontextmanager
     async def _failing_factory():
         factory_call_count["n"] += 1
         if factory_call_count["n"] == 1:
             raise RuntimeError("connection pool exhausted")
-        # 第二次正常
+        # 第二次正常 — 通知主测试 loop 已存活
+        second_factory_call.set()
         session = AsyncMock()
         yield session
 
@@ -158,7 +167,8 @@ async def test_session_factory_failure_does_not_kill_loop():
         loop_task = asyncio.create_task(
             _flusher_loop(_failing_factory, stop_event, interval_seconds=0.05),
         )
-        await asyncio.sleep(0.15)
+        # 等到第 2 次 factory 调用被触发，证明 loop 在 __aenter__ 异常后未死
+        await asyncio.wait_for(second_factory_call.wait(), timeout=2.0)
         stop_event.set()
         await asyncio.wait_for(loop_task, timeout=1.0)
 

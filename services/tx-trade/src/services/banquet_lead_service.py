@@ -214,23 +214,17 @@ class BanquetLeadService:
         """
         lead = await self._repo.get_by_id(lead_id, tenant_id)
         if lead is None:
-            raise BanquetLeadNotFoundError(
-                f"lead_id={lead_id} not found for tenant={tenant_id}"
-            )
+            raise BanquetLeadNotFoundError(f"lead_id={lead_id} not found for tenant={tenant_id}")
 
         # 幂等：已经在目标 stage，直接返回
         if lead.stage == next_stage:
             return lead
 
         if not _is_valid_transition(lead.stage, next_stage):
-            raise InvalidStageTransitionError(
-                f"invalid stage transition {lead.stage.value} -> {next_stage.value}"
-            )
+            raise InvalidStageTransitionError(f"invalid stage transition {lead.stage.value} -> {next_stage.value}")
 
         if next_stage == LeadStage.INVALID and not invalidation_reason:
-            raise InvalidationReasonMissingError(
-                "invalidation_reason is required when transitioning to 'invalid'"
-            )
+            raise InvalidationReasonMissingError("invalidation_reason is required when transitioning to 'invalid'")
 
         previous_stage = lead.stage
         now = datetime.now(timezone.utc)
@@ -293,9 +287,7 @@ class BanquetLeadService:
 
         lead = await self._repo.get_by_id(lead_id, tenant_id)
         if lead is None:
-            raise BanquetLeadNotFoundError(
-                f"lead_id={lead_id} not found for tenant={tenant_id}"
-            )
+            raise BanquetLeadNotFoundError(f"lead_id={lead_id} not found for tenant={tenant_id}")
 
         # 自动推进到 order（如仍在 all/opportunity）
         if lead.stage != LeadStage.ORDER:
@@ -315,9 +307,7 @@ class BanquetLeadService:
                     tenant_id=tenant_id,
                 )
             else:
-                raise InvalidStageTransitionError(
-                    f"cannot convert lead in stage {lead.stage.value} to reservation"
-                )
+                raise InvalidStageTransitionError(f"cannot convert lead in stage {lead.stage.value} to reservation")
 
         now = datetime.now(timezone.utc)
         updated = lead.model_copy(
@@ -395,9 +385,7 @@ class BanquetLeadService:
         # 幂等：若 lead 已 invalid 就直接返回（transition_stage 内部已保证）
         lead = await self._repo.get_by_id(lead_id, tenant_id)
         if lead is None:
-            raise BanquetLeadNotFoundError(
-                f"lead_id={lead_id} not found for tenant={tenant_id}"
-            )
+            raise BanquetLeadNotFoundError(f"lead_id={lead_id} not found for tenant={tenant_id}")
         if lead.stage == LeadStage.INVALID:
             logger.info(
                 "banquet_lead_already_invalid_on_deposit_refund",
@@ -459,9 +447,7 @@ class BanquetLeadService:
                 "order": order_cnt,
                 "invalid": int(row["invalid"]),
                 "total": total,
-                "estimated_amount_fen_total": int(
-                    row.get("estimated_amount_fen_total", 0)
-                ),
+                "estimated_amount_fen_total": int(row.get("estimated_amount_fen_total", 0)),
                 "conversion_rate": conv,
             }
         return result
@@ -493,9 +479,7 @@ class BanquetLeadService:
                     "total": total,
                     "converted": converted,
                     "invalid": int(row["invalid"]),
-                    "estimated_amount_fen_total": int(
-                        row["estimated_amount_fen_total"]
-                    ),
+                    "estimated_amount_fen_total": int(row["estimated_amount_fen_total"]),
                     "conversion_rate": conv,
                 }
             )

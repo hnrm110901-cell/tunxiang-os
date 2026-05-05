@@ -28,13 +28,13 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from models.cost_snapshot import Base
 from models.invoice import Invoice
+
 from services.invoice_service import (
     InvoiceAmountMismatchError,
     InvoiceNotFoundError,
     InvoiceService,
     InvoiceStatusError,
 )
-
 from shared.adapters.nuonuo.src.invoice_client import NuonuoInvoiceClient, NuonuoResponse
 
 # ── 夹具：内存 SQLite DB（仅测试用，生产使用 PostgreSQL）────────────────────────
@@ -80,9 +80,7 @@ def _make_nuonuo_client(
             )
         )
     else:
-        client.apply_invoice = AsyncMock(
-            return_value=NuonuoResponse(success=False, error_msg=apply_error)
-        )
+        client.apply_invoice = AsyncMock(return_value=NuonuoResponse(success=False, error_msg=apply_error))
 
     # query_invoice 返回模拟状态
     client.query_invoice = AsyncMock(
@@ -110,18 +108,12 @@ def _make_nuonuo_client(
             )
         )
     else:
-        client.get_pdf_url = AsyncMock(
-            return_value=NuonuoResponse(success=False, error_msg="PDF 获取失败")
-        )
+        client.get_pdf_url = AsyncMock(return_value=NuonuoResponse(success=False, error_msg="PDF 获取失败"))
 
     if red_flush_success:
-        client.red_flush_invoice = AsyncMock(
-            return_value=NuonuoResponse(success=True, data={"serialNo": "SN-RED-001"})
-        )
+        client.red_flush_invoice = AsyncMock(return_value=NuonuoResponse(success=True, data={"serialNo": "SN-RED-001"}))
     else:
-        client.red_flush_invoice = AsyncMock(
-            return_value=NuonuoResponse(success=False, error_msg="红冲失败")
-        )
+        client.red_flush_invoice = AsyncMock(return_value=NuonuoResponse(success=False, error_msg="红冲失败"))
 
     return client
 
@@ -145,6 +137,7 @@ def _base_invoice_info(**overrides) -> dict[str, Any]:
 
 
 # ── 测试用例 ──────────────────────────────────────────────────────────────────
+
 
 class TestRequestInvoice:
     """场景1：订单完成触发发票申请 → 写入 invoices 表"""
@@ -248,9 +241,7 @@ class TestNuonuoApiFailure:
         assert invoice.status == "failed"
 
         # 第二次：成功
-        client.apply_invoice = AsyncMock(
-            return_value=NuonuoResponse(success=True, data={"serialNo": "SN-RETRY-001"})
-        )
+        client.apply_invoice = AsyncMock(return_value=NuonuoResponse(success=True, data={"serialNo": "SN-RETRY-001"}))
         retried = await service.retry_failed(invoice.id, TENANT_A, db_session)
 
         assert retried.status == "pending"

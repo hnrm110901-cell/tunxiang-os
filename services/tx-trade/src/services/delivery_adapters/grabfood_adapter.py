@@ -13,9 +13,8 @@ Signature algorithm: HMAC-SHA256 with app_secret as the shared key.
 
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 
@@ -109,9 +108,7 @@ class GrabFoodAdapter(BaseDeliveryAdapter):
             estimated_delivery_at: Optional[datetime] = None
             if isinstance(create_time, str):
                 try:
-                    placed_at = datetime.fromisoformat(
-                        create_time.replace("Z", "+00:00")
-                    )
+                    placed_at = datetime.fromisoformat(create_time.replace("Z", "+00:00"))
                 except ValueError:
                     log.warning(
                         "grabfood.invalid_createTime",
@@ -124,9 +121,7 @@ class GrabFoodAdapter(BaseDeliveryAdapter):
             pickup_time = raw.get("estimatedPickupTime")
             if isinstance(pickup_time, str):
                 try:
-                    estimated_delivery_at = datetime.fromisoformat(
-                        pickup_time.replace("Z", "+00:00")
-                    )
+                    estimated_delivery_at = datetime.fromisoformat(pickup_time.replace("Z", "+00:00"))
                 except ValueError:
                     pass
 
@@ -141,9 +136,7 @@ class GrabFoodAdapter(BaseDeliveryAdapter):
             order = DeliveryOrder(
                 platform=self.platform,
                 platform_order_id=order_id,
-                status=self.STATUS_MAP.get(
-                    raw.get("orderState", ""), "pending"
-                ),
+                status=self.STATUS_MAP.get(raw.get("orderState", ""), "pending"),
                 items=items,
                 total_fen=total_fen or total_calculated_fen,
                 delivery_fee_fen=0,  # GrabFood does not separate delivery fee here

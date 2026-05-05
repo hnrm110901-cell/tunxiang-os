@@ -187,7 +187,8 @@ async def list_peak_guard(
     rows = (
         (
             await db.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT id::text, tenant_id::text, store_id::text, guard_date,
                    peak_type, expected_traffic, coverage_score,
                    risk_positions, actions_taken, result_score,
@@ -196,7 +197,8 @@ async def list_peak_guard(
             WHERE {where}
             ORDER BY guard_date DESC, created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -232,7 +234,8 @@ async def create_peak_guard(
     coverage_score = _calc_coverage_score(risk_positions)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO peak_guard_records
                 (id, tenant_id, store_id, guard_date, peak_type, expected_traffic,
                  coverage_score, risk_positions, actions_taken, notes,
@@ -241,7 +244,8 @@ async def create_peak_guard(
                 (:id, :tid, :store_id, :guard_date, :peak_type, :expected_traffic,
                  :coverage_score, :risk_positions::jsonb, '[]'::jsonb, :notes,
                  FALSE, :now, :now)
-        """),
+        """
+        ),
         {
             "id": record_id,
             "tid": tenant_id,
@@ -289,7 +293,8 @@ async def peak_guard_dashboard(
     row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT
                 COUNT(*) FILTER (WHERE guard_date = CURRENT_DATE) AS today_count,
                 COUNT(*) FILTER (WHERE guard_date BETWEEN date_trunc('week', CURRENT_DATE) AND date_trunc('week', CURRENT_DATE) + INTERVAL '6 days') AS week_count,
@@ -297,7 +302,8 @@ async def peak_guard_dashboard(
                 COALESCE(AVG(result_score) FILTER (WHERE result_score IS NOT NULL), 0) AS avg_result_score
             FROM peak_guard_records
             WHERE tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+                ),
                 {"tid": tenant_id},
             )
         )
@@ -309,7 +315,8 @@ async def peak_guard_dashboard(
     low_stores = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT DISTINCT store_id::text, MIN(coverage_score) AS min_coverage
             FROM peak_guard_records
             WHERE tenant_id = :tid AND is_deleted = FALSE
@@ -318,7 +325,8 @@ async def peak_guard_dashboard(
             GROUP BY store_id
             ORDER BY min_coverage ASC
             LIMIT 20
-        """),
+        """
+                ),
                 {"tid": tenant_id},
             )
         )
@@ -330,7 +338,8 @@ async def peak_guard_dashboard(
     by_type = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT peak_type, COUNT(*) AS cnt,
                    COALESCE(AVG(coverage_score), 0) AS avg_coverage
             FROM peak_guard_records
@@ -338,7 +347,8 @@ async def peak_guard_dashboard(
               AND guard_date >= CURRENT_DATE - INTERVAL '30 days'
             GROUP BY peak_type
             ORDER BY cnt DESC
-        """),
+        """
+                ),
                 {"tid": tenant_id},
             )
         )
@@ -383,13 +393,15 @@ async def upcoming_peaks(
     rows = (
         (
             await db.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT id::text, store_id::text, guard_date, peak_type,
                    expected_traffic, coverage_score, risk_positions, notes
             FROM peak_guard_records
             WHERE {where}
             ORDER BY guard_date ASC, peak_type ASC
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -449,14 +461,16 @@ async def peak_guard_alerts(
     rows = (
         (
             await db.execute(
-                text(f"""
+                text(
+                    f"""
             SELECT id::text, store_id::text, guard_date, peak_type,
                    expected_traffic, coverage_score, risk_positions, notes
             FROM peak_guard_records
             WHERE {where}
             ORDER BY coverage_score ASC, guard_date ASC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+                ),
                 params,
             )
         )
@@ -484,14 +498,16 @@ async def get_peak_guard(
     row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT id::text, tenant_id::text, store_id::text, guard_date,
                    peak_type, expected_traffic, coverage_score,
                    risk_positions, actions_taken, result_score,
                    notes, created_at, updated_at
             FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+                ),
                 {"rid": record_id, "tid": tenant_id},
             )
         )
@@ -527,10 +543,12 @@ async def update_peak_guard(
     existing = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT id FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+                ),
                 {"rid": record_id, "tid": tenant_id},
             )
         )
@@ -566,11 +584,13 @@ async def update_peak_guard(
         params["coverage_score"] = body.coverage_score
 
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE peak_guard_records
             SET {", ".join(sets)}
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -595,10 +615,12 @@ async def add_action(
     existing = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT id FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+                ),
                 {"rid": record_id, "tid": tenant_id},
             )
         )
@@ -617,12 +639,14 @@ async def add_action(
     }
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE peak_guard_records
             SET actions_taken = actions_taken || :new_action::jsonb,
                 updated_at = :now
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "rid": record_id,
             "tid": tenant_id,
@@ -652,11 +676,13 @@ async def evaluate_peak_guard(
     row = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT coverage_score
             FROM peak_guard_records
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+                ),
                 {"rid": record_id, "tid": tenant_id},
             )
         )
@@ -671,12 +697,14 @@ async def evaluate_peak_guard(
     effectiveness = round(body.result_score - coverage, 2)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE peak_guard_records
             SET result_score = :result_score,
                 updated_at = :now
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "rid": record_id,
             "tid": tenant_id,
@@ -711,11 +739,13 @@ async def delete_peak_guard(
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE peak_guard_records
             SET is_deleted = TRUE, updated_at = :now
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id, "now": datetime.now(timezone.utc)},
     )
 

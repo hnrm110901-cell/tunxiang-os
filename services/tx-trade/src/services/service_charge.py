@@ -33,13 +33,15 @@ async def get_charge_config(
         return None
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, store_id, mode, config, enabled, source_template_id,
                    created_at, updated_at
             FROM service_charge_configs
             WHERE tenant_id = :tenant_id AND store_id = :store_id::UUID
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id},
     )
     row = result.mappings().first()
@@ -74,7 +76,8 @@ async def set_charge_config(
     source_template_id = config.get("source_template_id")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO service_charge_configs
                 (tenant_id, store_id, mode, config, enabled, source_template_id, updated_at)
             VALUES
@@ -88,7 +91,8 @@ async def set_charge_config(
                 source_template_id = EXCLUDED.source_template_id,
                 updated_at = EXCLUDED.updated_at
             RETURNING id, created_at, updated_at
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -213,11 +217,13 @@ async def create_charge_template(
         raise ValueError("DB session required")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO service_charge_templates (tenant_id, name, rules, status)
             VALUES (:tenant_id::UUID, :name, :rules::JSONB, 'active')
             RETURNING id, created_at
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "name": name, "rules": rules},
     )
     row = result.mappings().first()
@@ -247,11 +253,13 @@ async def publish_template(
 
     # 查模板
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, rules, tenant_id
             FROM service_charge_templates
             WHERE id = :template_id::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"template_id": template_id},
     )
     template = result.mappings().first()

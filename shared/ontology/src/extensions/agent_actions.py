@@ -63,12 +63,8 @@ class CallerIdentifyParams(BaseModel):
 class CallerProfile(BaseModel):
     """客户画像卡。"""
 
-    customer_id: UUID | None = Field(
-        default=None, description="Golden Customer ID（未命中为 None）"
-    )
-    display_name: str | None = Field(
-        default=None, max_length=64, description="客户展示名"
-    )
+    customer_id: UUID | None = Field(default=None, description="Golden Customer ID（未命中为 None）")
+    display_name: str | None = Field(default=None, max_length=64, description="客户展示名")
     vip_level: str | None = Field(
         default=None,
         max_length=32,
@@ -78,18 +74,10 @@ class CallerProfile(BaseModel):
         default=None,
         description="四象限状态（消费 R1 customer_lifecycle_state 表）",
     )
-    last_visit_at: datetime | None = Field(
-        default=None, description="上次消费时间"
-    )
-    favorite_dishes: list[str] = Field(
-        default_factory=list, description="偏好菜品（Top5）"
-    )
-    taboo_ingredients: list[str] = Field(
-        default_factory=list, description="忌口（过敏/宗教/健康）"
-    )
-    lifetime_value_fen: int = Field(
-        default=0, ge=0, description="累计消费（分）"
-    )
+    last_visit_at: datetime | None = Field(default=None, description="上次消费时间")
+    favorite_dishes: list[str] = Field(default_factory=list, description="偏好菜品（Top5）")
+    taboo_ingredients: list[str] = Field(default_factory=list, description="忌口（过敏/宗教/健康）")
+    lifetime_value_fen: int = Field(default=0, ge=0, description="累计消费（分）")
 
 
 class CallerIdentifyResult(BaseModel):
@@ -104,17 +92,13 @@ class CallerIdentifyResult(BaseModel):
         default=None,
         description="命中依据：phone / member_card / wechat_openid / none",
     )
-    confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="识别置信度"
-    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="识别置信度")
     reasoning: str = Field(default="", description="决策理由摘要")
     inference_layer: str = Field(
         default="edge",
         description="推理层：edge（Whisper/Core ML）或 cloud",
     )
-    decision_id: UUID | None = Field(
-        default=None, description="AgentDecisionLog 记录ID"
-    )
+    decision_id: UUID | None = Field(default=None, description="AgentDecisionLog 记录ID")
 
 
 class SuggestSlotParams(BaseModel):
@@ -129,9 +113,7 @@ class SuggestSlotParams(BaseModel):
         max_length=64,
         description="偏好房型（vip_room / big_hall / outdoor 等）",
     )
-    customer_id: UUID | None = Field(
-        default=None, description="客户ID（用于个性化菜单推荐）"
-    )
+    customer_id: UUID | None = Field(default=None, description="客户ID（用于个性化菜单推荐）")
 
 
 class SlotOption(BaseModel):
@@ -141,21 +123,15 @@ class SlotOption(BaseModel):
     slot_end: datetime = Field(..., description="档期结束时间")
     table_type: str = Field(..., description="桌型")
     room_type: str | None = Field(default=None, description="房间类型")
-    recommended_package_id: UUID | None = Field(
-        default=None, description="推荐套餐ID"
-    )
-    estimated_amount_fen: int = Field(
-        default=0, ge=0, description="预估消费金额（分）"
-    )
+    recommended_package_id: UUID | None = Field(default=None, description="推荐套餐ID")
+    estimated_amount_fen: int = Field(default=0, ge=0, description="预估消费金额（分）")
 
 
 class SuggestSlotResult(BaseModel):
     """suggest_slot 返回体。"""
 
     ok: bool = Field(..., description="是否有可用档期")
-    options: list[SlotOption] = Field(
-        default_factory=list, description="可用档期列表（Top N）"
-    )
+    options: list[SlotOption] = Field(default_factory=list, description="可用档期列表（Top N）")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -167,9 +143,7 @@ class DetectCollisionParams(BaseModel):
     tenant_id: UUID = Field(..., description="租户ID")
     customer_id: UUID = Field(..., description="客户ID")
     target_date: date = Field(..., description="目标日期")
-    incoming_reservation_id: UUID = Field(
-        ..., description="本次新进入的预订ID"
-    )
+    incoming_reservation_id: UUID = Field(..., description="本次新进入的预订ID")
 
 
 class CollisionDecision(BaseModel):
@@ -180,12 +154,8 @@ class CollisionDecision(BaseModel):
         default=None,
         description="保留的预订ID（依优先级裁决）",
     )
-    merged_reservation_ids: list[UUID] = Field(
-        default_factory=list, description="被合并的预订ID列表"
-    )
-    priority_channel: SourceChannel | None = Field(
-        default=None, description="裁决优先渠道"
-    )
+    merged_reservation_ids: list[UUID] = Field(default_factory=list, description="被合并的预订ID列表")
+    priority_channel: SourceChannel | None = Field(default=None, description="裁决优先渠道")
 
 
 class DetectCollisionResult(BaseModel):
@@ -210,27 +180,17 @@ class SendInvitationParams(BaseModel):
         max_length=3,
         description="同时触达的通道（通常 sms + wechat）",
     )
-    coupon_code: str | None = Field(
-        default=None, max_length=64, description="附带券码"
-    )
-    coupon_value_fen: int = Field(
-        default=0, ge=0, description="券面值（分）"
-    )
-    template_id: str | None = Field(
-        default=None, max_length=64, description="模板ID"
-    )
+    coupon_code: str | None = Field(default=None, max_length=64, description="附带券码")
+    coupon_value_fen: int = Field(default=0, ge=0, description="券面值（分）")
+    template_id: str | None = Field(default=None, max_length=64, description="模板ID")
 
 
 class SendInvitationResult(BaseModel):
     """send_invitation 返回体。"""
 
     ok: bool = Field(..., description="全部通道是否成功")
-    invitations: list[InvitationRecord] = Field(
-        default_factory=list, description="每通道一条 InvitationRecord"
-    )
-    failed_channels: list[InvitationChannel] = Field(
-        default_factory=list, description="失败通道"
-    )
+    invitations: list[InvitationRecord] = Field(default_factory=list, description="每通道一条 InvitationRecord")
+    failed_channels: list[InvitationChannel] = Field(default_factory=list, description="失败通道")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -242,12 +202,8 @@ class ConfirmArrivalParams(BaseModel):
     tenant_id: UUID = Field(..., description="租户ID")
     reservation_id: UUID = Field(..., description="预订ID")
     customer_id: UUID | None = Field(default=None, description="客户ID")
-    scheduled_at: datetime = Field(
-        ..., description="原定到店时间"
-    )
-    call_script_id: str | None = Field(
-        default=None, max_length=64, description="外呼话术脚本ID"
-    )
+    scheduled_at: datetime = Field(..., description="原定到店时间")
+    call_script_id: str | None = Field(default=None, max_length=64, description="外呼话术脚本ID")
 
 
 class ConfirmArrivalOutcome(str, Enum):
@@ -263,9 +219,7 @@ class ConfirmArrivalResult(BaseModel):
     """confirm_arrival 返回体。"""
 
     ok: bool = Field(..., description="是否外呼完成（不等同于客户确认）")
-    outcome: ConfirmArrivalOutcome = Field(
-        ..., description="核餐结果"
-    )
+    outcome: ConfirmArrivalOutcome = Field(..., description="核餐结果")
     new_scheduled_at: datetime | None = Field(
         default=None,
         description="改期后的新时间（outcome=rescheduled 时必填）",
@@ -285,10 +239,7 @@ class ConfirmArrivalResult(BaseModel):
 
     @model_validator(mode="after")
     def _validate_reschedule(self) -> "ConfirmArrivalResult":
-        if (
-            self.outcome == ConfirmArrivalOutcome.RESCHEDULED
-            and not self.new_scheduled_at
-        ):
+        if self.outcome == ConfirmArrivalOutcome.RESCHEDULED and not self.new_scheduled_at:
             raise ValueError("outcome=rescheduled 时 new_scheduled_at 必填")
         return self
 
@@ -302,9 +253,7 @@ class DecomposeTargetParams(BaseModel):
     """decompose_target 参数：年目标 → 月/周/日分解。"""
 
     tenant_id: UUID = Field(..., description="租户ID")
-    year_target_id: UUID = Field(
-        ..., description="年度目标ID（sales_targets.target_id）"
-    )
+    year_target_id: UUID = Field(..., description="年度目标ID（sales_targets.target_id）")
     decompose_to: list[str] = Field(
         default_factory=lambda: ["month", "week", "day"],
         description="分解到的粒度组合",
@@ -315,12 +264,8 @@ class DecomposeTargetResult(BaseModel):
     """decompose_target 返回体。"""
 
     ok: bool = Field(..., description="是否成功分解")
-    generated_target_ids: list[UUID] = Field(
-        default_factory=list, description="生成的子目标ID列表"
-    )
-    total_parent_value: int = Field(
-        default=0, ge=0, description="父目标合计（分/计数）"
-    )
+    generated_target_ids: list[UUID] = Field(default_factory=list, description="生成的子目标ID列表")
+    total_parent_value: int = Field(default=0, ge=0, description="父目标合计（分/计数）")
     total_children_value: int = Field(
         default=0,
         ge=0,
@@ -336,9 +281,7 @@ class DispatchDailyTasksParams(BaseModel):
 
     tenant_id: UUID = Field(..., description="租户ID")
     store_id: UUID | None = Field(default=None, description="门店ID")
-    employee_id: UUID | None = Field(
-        default=None, description="销售员工（为空则派全店）"
-    )
+    employee_id: UUID | None = Field(default=None, description="销售员工（为空则派全店）")
     plan_date: date = Field(..., description="派单目标日期")
     task_types: list[TaskType] = Field(
         default_factory=list,
@@ -350,12 +293,8 @@ class DispatchDailyTasksResult(BaseModel):
     """dispatch_daily_tasks 返回体。"""
 
     ok: bool = Field(..., description="是否派发完成")
-    dispatched_tasks: list[Task] = Field(
-        default_factory=list, description="本次派发的任务列表"
-    )
-    dispatched_count_by_type: dict[str, int] = Field(
-        default_factory=dict, description="按 task_type 计数"
-    )
+    dispatched_tasks: list[Task] = Field(default_factory=list, description="本次派发的任务列表")
+    dispatched_count_by_type: dict[str, int] = Field(default_factory=dict, description="按 task_type 计数")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -382,15 +321,9 @@ class GapRemediation(BaseModel):
         ...,
         description="建议类别：call_customers / push_recall_campaign / reassign_leads",
     )
-    suggested_call_count: int = Field(
-        default=0, ge=0, description="建议电话数量"
-    )
-    suggested_customer_ids: list[UUID] = Field(
-        default_factory=list, description="建议主攻客户"
-    )
-    expected_recovery_fen: int = Field(
-        default=0, ge=0, description="预期回补金额（分）"
-    )
+    suggested_call_count: int = Field(default=0, ge=0, description="建议电话数量")
+    suggested_customer_ids: list[UUID] = Field(default_factory=list, description="建议主攻客户")
+    expected_recovery_fen: int = Field(default=0, ge=0, description="预期回补金额（分）")
 
 
 class DiagnoseGapResult(BaseModel):
@@ -404,9 +337,7 @@ class DiagnoseGapResult(BaseModel):
         le=Decimal("9.9999"),
         description="当前达成率",
     )
-    remediations: list[GapRemediation] = Field(
-        default_factory=list, description="诊断建议列表"
-    )
+    remediations: list[GapRemediation] = Field(default_factory=list, description="诊断建议列表")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -431,18 +362,14 @@ class CoachingAdvice(BaseModel):
         default="normal",
         description="优先级：low/normal/high",
     )
-    message: str = Field(
-        ..., max_length=500, description="建议内容（自然语言）"
-    )
+    message: str = Field(..., max_length=500, description="建议内容（自然语言）")
 
 
 class CoachActionResult(BaseModel):
     """coach_action 返回体。"""
 
     ok: bool = Field(..., description="是否生成建议")
-    advice: list[CoachingAdvice] = Field(
-        default_factory=list, description="建议列表"
-    )
+    advice: list[CoachingAdvice] = Field(default_factory=list, description="建议列表")
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -470,12 +397,8 @@ class AuditCoverageResult(BaseModel):
         description="当前沉睡占比",
     )
     dormant_alert: bool = Field(..., description="是否超过阈值告警")
-    unmaintained_vip_count: int = Field(
-        default=0, ge=0, description="未维护 VIP 数量"
-    )
-    unmaintained_vip_ids: list[UUID] = Field(
-        default_factory=list, description="未维护 VIP ID 列表"
-    )
+    unmaintained_vip_count: int = Field(default=0, ge=0, description="未维护 VIP 数量")
+    unmaintained_vip_ids: list[UUID] = Field(default_factory=list, description="未维护 VIP ID 列表")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -516,12 +439,8 @@ class ProfileCompletenessResult(BaseModel):
     """score_profile_completeness 返回体。"""
 
     ok: bool = Field(..., description="是否评分完成")
-    scores: list[ProfileScoreEntry] = Field(
-        default_factory=list, description="按员工聚合得分"
-    )
-    dispatched_task_count: int = Field(
-        default=0, ge=0, description="触发补录任务数量"
-    )
+    scores: list[ProfileScoreEntry] = Field(default_factory=list, description="按员工聚合得分")
+    dispatched_task_count: int = Field(default=0, ge=0, description="触发补录任务数量")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -538,9 +457,7 @@ class GenerateContractParams(BaseModel):
     tenant_id: UUID = Field(..., description="租户ID")
     lead_id: UUID = Field(..., description="商机ID")
     customer_id: UUID = Field(..., description="客户ID")
-    sales_employee_id: UUID | None = Field(
-        default=None, description="销售员工ID"
-    )
+    sales_employee_id: UUID | None = Field(default=None, description="销售员工ID")
     banquet_type: BanquetType = Field(..., description="宴会类型")
     tables: int = Field(..., ge=1, le=500, description="桌数")
     total_amount_fen: int = Field(..., ge=0, description="合同总金额（分）")
@@ -550,27 +467,17 @@ class GenerateContractParams(BaseModel):
         le=Decimal("1"),
         description="订金比例（默认 30%）",
     )
-    scheduled_date: date | None = Field(
-        default=None, description="预定宴会日期"
-    )
-    template_id: str | None = Field(
-        default=None, max_length=64, description="PDF 模板ID"
-    )
+    scheduled_date: date | None = Field(default=None, description="预定宴会日期")
+    template_id: str | None = Field(default=None, max_length=64, description="PDF 模板ID")
 
 
 class GenerateContractResult(BaseModel):
     """generate_contract 返回体。"""
 
     ok: bool = Field(..., description="是否成功生成")
-    contract: BanquetContract | None = Field(
-        default=None, description="生成的合同记录"
-    )
-    pdf_url: str | None = Field(
-        default=None, max_length=500, description="PDF 地址"
-    )
-    generation_ms: int = Field(
-        default=0, ge=0, description="PDF 生成耗时（毫秒）"
-    )
+    contract: BanquetContract | None = Field(default=None, description="生成的合同记录")
+    pdf_url: str | None = Field(default=None, max_length=500, description="PDF 地址")
+    generation_ms: int = Field(default=0, ge=0, description="PDF 生成耗时（毫秒）")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -597,9 +504,7 @@ class SplitEOResult(BaseModel):
     """split_eo 返回体。"""
 
     ok: bool = Field(..., description="是否成功拆分")
-    tickets: list[BanquetEOTicket] = Field(
-        default_factory=list, description="生成的 EO 工单列表"
-    )
+    tickets: list[BanquetEOTicket] = Field(default_factory=list, description="生成的 EO 工单列表")
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     reasoning: str = Field(default="")
     decision_id: UUID | None = Field(default=None)
@@ -620,9 +525,7 @@ class RouteApprovalParams(BaseModel):
         default=None,
         description="审批动作（首次路由为 None，再次调用时填写决策）",
     )
-    notes: str | None = Field(
-        default=None, max_length=500, description="审批备注"
-    )
+    notes: str | None = Field(default=None, max_length=500, description="审批备注")
 
 
 class RouteApprovalResult(BaseModel):
@@ -633,9 +536,7 @@ class RouteApprovalResult(BaseModel):
         default=None,
         description="下一审批角色（None 表示审批链结束）",
     )
-    final_status: ContractStatus = Field(
-        ..., description="合同当前状态"
-    )
+    final_status: ContractStatus = Field(..., description="合同当前状态")
     auto_passed: bool = Field(
         default=False,
         description="是否自动过（金额 < 10W 且非婚宴）",
@@ -652,9 +553,7 @@ class LockScheduleParams(BaseModel):
     contract_id: UUID = Field(..., description="合同ID")
     scheduled_date: date = Field(..., description="锁定日期")
     store_id: UUID = Field(..., description="门店ID")
-    deposit_paid_fen: int = Field(
-        ..., ge=0, description="已支付订金（分）"
-    )
+    deposit_paid_fen: int = Field(..., ge=0, description="已支付订金（分）")
 
 
 class LockScheduleResult(BaseModel):
@@ -690,9 +589,7 @@ class ProgressReminderResult(BaseModel):
     """progress_reminder 返回体。"""
 
     ok: bool = Field(..., description="是否成功推送")
-    notified_ticket_ids: list[UUID] = Field(
-        default_factory=list, description="被通知的 EO 工单ID"
-    )
+    notified_ticket_ids: list[UUID] = Field(default_factory=list, description="被通知的 EO 工单ID")
     skipped_reason: str | None = Field(
         default=None,
         max_length=200,
@@ -724,21 +621,13 @@ class AgentDecisionLogRecord(BaseModel):
         ...,
         description="决策分类：suggest / auto / fully_autonomous",
     )
-    input_context: dict[str, Any] = Field(
-        default_factory=dict, description="输入上下文快照"
-    )
+    input_context: dict[str, Any] = Field(default_factory=dict, description="输入上下文快照")
     reasoning: str = Field(default="", description="推理过程摘要")
-    output_action: dict[str, Any] = Field(
-        default_factory=dict, description="输出动作快照"
-    )
+    output_action: dict[str, Any] = Field(default_factory=dict, description="输出动作快照")
     constraints_check: dict[str, Any] = Field(
         default_factory=dict,
         description="三条硬约束校验结果：margin/safety/experience",
     )
-    confidence: float = Field(
-        default=0.0, ge=0.0, le=1.0, description="置信度"
-    )
-    inference_layer: str = Field(
-        default="cloud", description="推理层：edge/cloud"
-    )
+    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="置信度")
+    inference_layer: str = Field(default="cloud", description="推理层：edge/cloud")
     created_at: datetime = Field(..., description="创建时间")

@@ -80,18 +80,10 @@ class RFMFilter(BaseModel):
 
     recency_max_days: Optional[int] = Field(None, ge=0, description="最近消费天数上限（天）")
     recency_min_days: Optional[int] = Field(None, ge=0, description="最近消费天数下限（天）")
-    frequency_min_count: Optional[int] = Field(
-        None, ge=0, description="90 天内下单次数下限"
-    )
-    frequency_max_count: Optional[int] = Field(
-        None, ge=0, description="90 天内下单次数上限"
-    )
-    monetary_min_fen: Optional[int] = Field(
-        None, ge=0, description="90 天累计消费下限（分）"
-    )
-    monetary_max_fen: Optional[int] = Field(
-        None, ge=0, description="90 天累计消费上限（分）"
-    )
+    frequency_min_count: Optional[int] = Field(None, ge=0, description="90 天内下单次数下限")
+    frequency_max_count: Optional[int] = Field(None, ge=0, description="90 天内下单次数上限")
+    monetary_min_fen: Optional[int] = Field(None, ge=0, description="90 天累计消费下限（分）")
+    monetary_max_fen: Optional[int] = Field(None, ge=0, description="90 天累计消费上限（分）")
 
 
 class TargetSegmentOutput(BaseModel):
@@ -103,9 +95,7 @@ class TargetSegmentOutput(BaseModel):
     rfm_filter: RFMFilter = Field(..., description="RFM 筛选条件")
     estimated_size: int = Field(..., ge=0, description="预计触达人数")
     segment_rationale: str = Field(..., description="选择该分群的理由（一句话）")
-    expected_delta_pct: float = Field(
-        ..., description="预期 KPI 提升百分点（如复购率 +5pp 填 5.0）"
-    )
+    expected_delta_pct: float = Field(..., description="预期 KPI 提升百分点（如复购率 +5pp 填 5.0）")
     confidence: float = Field(..., ge=0.0, le=1.0, description="置信度 0-1")
 
 
@@ -119,9 +109,7 @@ class RfmOutreachAgent(SkillAgent):
 
     agent_id = "rfm_outreach"
     agent_name = "RFM 触达文案"
-    description = (
-        "基于 RFM 分层为客户群生成多版本触达文案 + 推送时段建议 + 分群筛选（Level 1 建议级）"
-    )
+    description = "基于 RFM 分层为客户群生成多版本触达文案 + 推送时段建议 + 分群筛选（Level 1 建议级）"
     priority = "P1"
     run_location = "cloud"
     agent_level = 1  # 仅建议
@@ -335,9 +323,7 @@ class RfmOutreachAgent(SkillAgent):
         return result
 
     @staticmethod
-    def _parse_llm_output(
-        text: str, output_model: type[BaseModel]
-    ) -> Optional[BaseModel]:
+    def _parse_llm_output(text: str, output_model: type[BaseModel]) -> Optional[BaseModel]:
         """解析 LLM 输出到指定 Pydantic 模型；失败返回 None。
 
         容错：

@@ -87,13 +87,15 @@ async def create_evidence_chain(payload: CreateEvidenceChainReq) -> dict:
                 {"tid": str(tenant_uuid)},
             )
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO ai_evidence_chains
                     (tenant_id, chain_id, merchant_code, conclusion_type, conclusion_text,
                      evidence_links, merchant_target_refs, confidence)
                     VALUES (:tid, :chain_id, :mc, :ctype, :ctext,
                             :elinks::jsonb, :trefs::jsonb, :conf)
-                """),
+                """
+                ),
                 {
                     "tid": str(tenant_uuid),
                     "chain_id": chain_id,
@@ -140,14 +142,16 @@ async def get_evidence_chain(chain_id: str) -> dict:
     try:
         async with async_session_factory() as db:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT chain_id, merchant_code, conclusion_type, conclusion_text,
                            evidence_links, merchant_target_refs, confidence,
                            created_at
                     FROM ai_evidence_chains
                     WHERE chain_id = :chain_id
                     LIMIT 1
-                """),
+                """
+                ),
                 {"chain_id": chain_id},
             )
             row = result.fetchone()

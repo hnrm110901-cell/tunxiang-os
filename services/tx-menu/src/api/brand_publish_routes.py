@@ -112,7 +112,8 @@ async def list_brand_dishes(
         params["limit"] = size
         params["offset"] = (page - 1) * size
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT d.id, d.dish_name, d.dish_code, d.price_fen,
                        d.description, d.image_url, d.category_id,
                        d.is_available, d.brand_id, d.created_at
@@ -120,7 +121,8 @@ async def list_brand_dishes(
                 {where}
                 ORDER BY d.sort_order, d.dish_name
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [

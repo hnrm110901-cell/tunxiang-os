@@ -319,7 +319,8 @@ class CostEngine:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT bt.id, bt.dish_id, bt.yield_rate,
                            json_agg(json_build_object(
                                'ingredient_id', bi.ingredient_id,
@@ -334,7 +335,8 @@ class CostEngine:
                       AND bt.is_deleted = FALSE
                     GROUP BY bt.id, bt.dish_id, bt.yield_rate
                     LIMIT 1
-                """),
+                """
+                ),
                 {"dish_id": str(dish_id), "tenant_id": str(tenant_id)},
             )
             row = result.fetchone()
@@ -375,7 +377,8 @@ class CostEngine:
     ) -> Optional[dict[str, Any]]:
         """从 cost_snapshots 聚合查询订单级快照"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     order_id,
                     SUM(total_cost)      AS total_cost,
@@ -387,7 +390,8 @@ class CostEngine:
                   AND tenant_id = :tenant_id
                 GROUP BY order_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"order_id": str(order_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -433,7 +437,8 @@ class CostEngine:
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO cost_snapshots (
                     tenant_id, order_id, order_item_id, dish_id,
                     raw_material_cost, labor_cost_allocated, overhead_allocated,
@@ -454,7 +459,8 @@ class CostEngine:
                     bom_version_id    = EXCLUDED.bom_version_id,
                     cost_source       = EXCLUDED.cost_source,
                     computed_at       = EXCLUDED.computed_at
-            """),
+            """
+            ),
             rows,
         )
         await db.commit()

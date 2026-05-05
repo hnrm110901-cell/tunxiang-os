@@ -62,7 +62,8 @@ class BrandStrategyService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO brand_strategies
                     (tenant_id, brand_id, positioning, tone, target_audience,
                      price_range, signature_dishes, seasonal_plans,
@@ -86,7 +87,8 @@ class BrandStrategyService:
                           price_range, signature_dishes, seasonal_plans,
                           promo_boundaries, forbidden_expressions,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "brand_id": brand_id,
@@ -119,7 +121,8 @@ class BrandStrategyService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, brand_id, positioning, tone, target_audience,
                        price_range, signature_dishes, seasonal_plans,
                        promo_boundaries, forbidden_expressions,
@@ -128,7 +131,8 @@ class BrandStrategyService:
                 WHERE brand_id = :brand_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"brand_id": brand_id, "tenant_id": tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -186,7 +190,8 @@ class BrandStrategyService:
             return await self.get_brand_strategy(brand_id, tenant_id=tenant_id, db=db)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE brand_strategies
                 SET {", ".join(set_clauses)}
                 WHERE brand_id = :brand_id
@@ -196,7 +201,8 @@ class BrandStrategyService:
                           price_range, signature_dishes, seasonal_plans,
                           promo_boundaries, forbidden_expressions,
                           created_at, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().one_or_none()

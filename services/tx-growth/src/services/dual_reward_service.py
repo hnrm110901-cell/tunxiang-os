@@ -84,7 +84,8 @@ class DualRewardService:
         reward_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dual_rewards (
                     id, tenant_id, referrer_id, referee_id,
                     referral_campaign_id, referrer_reward, referee_reward
@@ -94,7 +95,8 @@ class DualRewardService:
                     :referrer_reward ::jsonb,
                     :referee_reward ::jsonb
                 )
-            """),
+            """
+            ),
             {
                 "id": str(reward_id),
                 "tenant_id": str(tenant_id),
@@ -146,7 +148,8 @@ class DualRewardService:
             {triggered_count}
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dual_rewards
                 SET trigger_order_id = :order_id,
                     trigger_order_amount_fen = :amount,
@@ -159,7 +162,8 @@ class DualRewardService:
                   AND referee_reward_status = 'pending'
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "order_id": str(order_id),
                 "amount": order_amount_fen,
@@ -213,11 +217,13 @@ class DualRewardService:
         claimed_col = f"{who}_claimed_at"
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, {status_col} AS reward_status
                 FROM dual_rewards
                 WHERE id = :reward_id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"reward_id": str(reward_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -234,13 +240,15 @@ class DualRewardService:
 
         now = datetime.now(timezone.utc)
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE dual_rewards
                 SET {status_col} = 'claimed',
                     {claimed_col} = :now,
                     updated_at = NOW()
                 WHERE id = :reward_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"now": now, "reward_id": str(reward_id), "tenant_id": str(tenant_id)},
         )
         await db.commit()
@@ -278,7 +286,8 @@ class DualRewardService:
 
         # 过期推荐人奖励
         r1 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dual_rewards
                 SET referrer_reward_status = 'expired', updated_at = NOW()
                 WHERE tenant_id = :tenant_id
@@ -286,14 +295,16 @@ class DualRewardService:
                   AND created_at < :cutoff
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "cutoff": cutoff},
         )
         expired_referrer = len(r1.fetchall())
 
         # 过期被推荐人奖励
         r2 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dual_rewards
                 SET referee_reward_status = 'expired', updated_at = NOW()
                 WHERE tenant_id = :tenant_id
@@ -301,7 +312,8 @@ class DualRewardService:
                   AND created_at < :cutoff
                   AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "cutoff": cutoff},
         )
         expired_referee = len(r2.fetchall())
@@ -335,7 +347,8 @@ class DualRewardService:
             [{reward_id, referee_id, referrer_reward, referee_reward, ...}]
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, referee_id, referral_campaign_id,
                        referrer_reward, referee_reward,
                        trigger_order_id, trigger_order_amount_fen,
@@ -347,7 +360,8 @@ class DualRewardService:
                   AND referrer_id = :referrer_id
                   AND is_deleted = false
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "referrer_id": str(referrer_id)},
         )
         rows = result.mappings().all()
@@ -387,7 +401,8 @@ class DualRewardService:
             [{referrer_id, successful_referrals, total_order_amount_fen}]
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     referrer_id,
                     COUNT(*) AS successful_referrals,
@@ -399,7 +414,8 @@ class DualRewardService:
                 GROUP BY referrer_id
                 ORDER BY successful_referrals DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "limit": limit},
         )
         rows = result.mappings().all()

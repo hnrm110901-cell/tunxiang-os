@@ -74,7 +74,8 @@ class SettlementScheduler:
 
         # 查询当天 pending 的分账流水
         count_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt,
                        COALESCE(SUM(ABS(total_amount_fen)), 0) AS total_fen
                 FROM stored_value_split_ledger
@@ -84,7 +85,8 @@ class SettlementScheduler:
                   AND settlement_batch_id IS NULL
                   AND created_at >= :start::date
                   AND created_at < (:end::date + INTERVAL '1 day')
-            """),
+            """
+            ),
             {"tid": self._tid, "start": period_start, "end": period_end},
         )
         row = count_result.fetchone()
@@ -108,14 +110,16 @@ class SettlementScheduler:
         # 创建结算批次
         batch_id = uuid.uuid4()
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sv_settlement_batches
                     (id, tenant_id, batch_no, period_start, period_end,
                      total_records, total_amount_fen, status)
                 VALUES
                     (:id, :tid, :batch_no, :p_start, :p_end,
                      :total_records, :total_fen, 'draft')
-            """),
+            """
+            ),
             {
                 "id": batch_id,
                 "tid": self._tid,
@@ -129,7 +133,8 @@ class SettlementScheduler:
 
         # 将流水关联到批次
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE stored_value_split_ledger
                 SET settlement_batch_id = :batch_id,
                     updated_at = NOW()
@@ -139,7 +144,8 @@ class SettlementScheduler:
                   AND settlement_batch_id IS NULL
                   AND created_at >= :start::date
                   AND created_at < (:end::date + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "batch_id": batch_id,
                 "tid": self._tid,
@@ -190,13 +196,15 @@ class SettlementScheduler:
 
         # 原子更新：WHERE status = 'draft' 防止并发重复确认
         update_result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sv_settlement_batches
                 SET status = 'confirmed', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
                   AND status = 'draft'
                 RETURNING id, batch_no, status, total_records, total_amount_fen
-            """),
+            """
+            ),
             {"id": bid, "tid": self._tid},
         )
         batch = update_result.fetchone()
@@ -216,7 +224,8 @@ class SettlementScheduler:
         # 关联流水标记为 settled
         now = datetime.now(timezone.utc)
         settle_result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE stored_value_split_ledger
                 SET settlement_status = 'settled',
                     settled_at = :now,
@@ -224,7 +233,8 @@ class SettlementScheduler:
                 WHERE settlement_batch_id = :batch_id
                   AND tenant_id = :tid
                   AND settlement_status = 'pending'
-            """),
+            """
+            ),
             {"batch_id": bid, "tid": self._tid, "now": now},
         )
         settled_count = settle_result.rowcount
@@ -258,13 +268,15 @@ class SettlementScheduler:
 
         # 原子更新：WHERE status = 'confirmed' 防止并发
         update_result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sv_settlement_batches
                 SET status = 'settled', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
                   AND status = 'confirmed'
                 RETURNING id, batch_no
-            """),
+            """
+            ),
             {"id": bid, "tid": self._tid},
         )
         batch = update_result.fetchone()
@@ -323,7 +335,8 @@ class SettlementScheduler:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, batch_no, period_start, period_end,
                        total_records, total_amount_fen, status,
                        created_at, updated_at
@@ -331,7 +344,8 @@ class SettlementScheduler:
                 {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -354,13 +368,15 @@ class SettlementScheduler:
         """查询单个结算批次详情"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, batch_no, period_start, period_end,
                        total_records, total_amount_fen, status,
                        created_at, updated_at
                 FROM sv_settlement_batches
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": uuid.UUID(batch_id), "tid": self._tid},
         )
         r = result.fetchone()

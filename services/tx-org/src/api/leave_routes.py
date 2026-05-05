@@ -25,6 +25,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.leave_repository import (
     BALANCE_CHECKED_TYPES,
@@ -334,7 +335,7 @@ async def cancel_leave(
     try:
         result = await cancel_leave_request(leave_id, req.employee_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return _ok(result)
 
@@ -357,7 +358,7 @@ async def approve_callback(
     try:
         result = await on_leave_approved(leave_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     log.info(
         "leave_approve_callback",
@@ -383,6 +384,6 @@ async def reject_callback(
     try:
         result = await on_leave_rejected(leave_id, req.reject_reason, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return _ok(result)

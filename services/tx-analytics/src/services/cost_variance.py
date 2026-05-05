@@ -277,7 +277,8 @@ def _calculate_ingredient_level_variances(
 
         # 取当日实际消耗
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT it.ingredient_id,
                    i.ingredient_name,
                    SUM(ABS(it.quantity)) as actual_qty,
@@ -291,7 +292,8 @@ def _calculate_ingredient_level_variances(
               AND DATE(it.transaction_time) = :target_date
               AND it.is_deleted = FALSE
             GROUP BY it.ingredient_id, i.ingredient_name
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
 
@@ -336,7 +338,8 @@ def _get_daily_sold_with_costs(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name,
                    SUM(oi.quantity) as quantity_sold,
                    AVG(oi.food_cost_fen) as theoretical_cost_fen,
@@ -351,7 +354,8 @@ def _get_daily_sold_with_costs(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name, d.cost_fen
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         rows = []

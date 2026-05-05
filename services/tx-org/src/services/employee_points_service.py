@@ -593,11 +593,13 @@ async def _get_pt_balance(
 ) -> int:
     """从 point_transactions 表计算员工积分余额。"""
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(points), 0) AS bal
             FROM {POINT_TX_TABLE}
             WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tid": tenant_uuid, "eid": employee_uuid},
     )
     return int(r.scalar_one() or 0)
@@ -629,12 +631,14 @@ async def award_points_v2(
 
     tx_id = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {POINT_TX_TABLE}
                 (id, tenant_id, employee_id, rule_code, points, balance_after, reason, source, operator_id, created_at)
             VALUES
                 (:id, :tid, :eid, :rcode, :pts, :bal, :reason, :src, :oid, NOW())
-        """),
+        """
+        ),
         {
             "id": tx_id,
             "tid": tid,
@@ -693,12 +697,14 @@ async def deduct_points_v2(
 
     tx_id = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {POINT_TX_TABLE}
                 (id, tenant_id, employee_id, rule_code, points, balance_after, reason, source, operator_id, created_at)
             VALUES
                 (:id, :tid, :eid, :rcode, :pts, :bal, :reason, :src, :oid, NOW())
-        """),
+        """
+        ),
         {
             "id": tx_id,
             "tid": tid,
@@ -760,23 +766,27 @@ async def get_points_history_v2(
     await _set_tenant(db, tenant_id)
 
     cr = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) FROM {POINT_TX_TABLE}
             WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tid": tid, "eid": eid},
     )
     total = int(cr.scalar_one() or 0)
 
     offset = (page - 1) * size
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, rule_code, points, balance_after, reason, source, operator_id, created_at
             FROM {POINT_TX_TABLE}
             WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
             ORDER BY created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"tid": tid, "eid": eid, "lim": size, "off": offset},
     )
     items: list[dict[str, Any]] = []
@@ -816,7 +826,8 @@ async def get_leaderboard_v2(
 
     store_clause = "TRUE" if sid is None else "e.store_id = :sid"
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             WITH agg AS (
                 SELECT
                     pt.employee_id,
@@ -836,7 +847,8 @@ async def get_leaderboard_v2(
             FROM agg
             ORDER BY rank
             LIMIT :lim
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "lim": limit},
     )
     items: list[dict[str, Any]] = []
@@ -871,12 +883,14 @@ async def redeem_reward(
 
     # 查询商品（FOR UPDATE 锁定行，防止并发兑换竞态）
     rr = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, reward_name, reward_type, points_cost, stock, is_active
             FROM {POINT_REWARDS_TABLE}
             WHERE tenant_id = :tid AND id = :rid AND is_deleted = FALSE
             FOR UPDATE
-        """),
+        """
+        ),
         {"tid": tid, "rid": rid},
     )
     reward = rr.mappings().first()
@@ -893,12 +907,14 @@ async def redeem_reward(
 
     # 检查余额（锁定员工积分流水行，防止并发扣减）
     bal_r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COALESCE(SUM(points), 0) AS bal
             FROM {POINT_TX_TABLE}
             WHERE tenant_id = :tid AND employee_id = :eid AND is_deleted = FALSE
             FOR UPDATE
-        """),
+        """
+        ),
         {"tid": tid, "eid": eid},
     )
     balance = int(bal_r.scalar_one() or 0)
@@ -908,11 +924,13 @@ async def redeem_reward(
     # 扣减库存（stock > 0 时）
     if stock > 0:
         await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE {POINT_REWARDS_TABLE}
                 SET stock = stock - 1, updated_at = NOW()
                 WHERE id = :rid AND tenant_id = :tid AND stock > 0
-            """),
+            """
+            ),
             {"rid": rid, "tid": tid},
         )
 
@@ -920,12 +938,14 @@ async def redeem_reward(
     new_balance = balance - cost
     tx_id = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {POINT_TX_TABLE}
                 (id, tenant_id, employee_id, rule_code, points, balance_after, reason, source, created_at)
             VALUES
                 (:id, :tid, :eid, 'redeem', :pts, :bal, :reason, 'auto', NOW())
-        """),
+        """
+        ),
         {
             "id": tx_id,
             "tid": tid,
@@ -939,12 +959,14 @@ async def redeem_reward(
     # 写入兑换记录
     redemption_id = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {POINT_REDEMPTIONS_TABLE}
                 (id, tenant_id, employee_id, reward_id, points_spent, status, created_at)
             VALUES
                 (:id, :tid, :eid, :rid, :cost, 'pending', NOW())
-        """),
+        """
+        ),
         {"id": redemption_id, "tid": tid, "eid": eid, "rid": rid, "cost": cost},
     )
     await db.flush()
@@ -979,12 +1001,14 @@ async def list_rewards(
     await _set_tenant(db, tenant_id)
     active_clause = "AND is_active = TRUE" if active_only else ""
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, reward_name, reward_type, points_cost, stock, description, is_active, created_at
             FROM {POINT_REWARDS_TABLE}
             WHERE tenant_id = :tid AND is_deleted = FALSE {active_clause}
             ORDER BY points_cost ASC
-        """),
+        """
+        ),
         {"tid": tid},
     )
     items: list[dict[str, Any]] = []
@@ -1019,12 +1043,14 @@ async def create_reward(
     await _set_tenant(db, tenant_id)
     rid = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {POINT_REWARDS_TABLE}
                 (id, tenant_id, reward_name, reward_type, points_cost, stock, description, created_at, updated_at)
             VALUES
                 (:id, :tid, :name, :rtype, :cost, :stock, :desc, NOW(), NOW())
-        """),
+        """
+        ),
         {
             "id": rid,
             "tid": tid,
@@ -1049,12 +1075,14 @@ async def toggle_reward(
     rid = _parse_uuid(reward_id, "reward_id")
     await _set_tenant(db, tenant_id)
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE {POINT_REWARDS_TABLE}
             SET is_active = NOT is_active, updated_at = NOW()
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id, is_active
-        """),
+        """
+        ),
         {"rid": rid, "tid": tid},
     )
     row = r.mappings().first()
@@ -1090,13 +1118,15 @@ async def create_horse_race_season(
 
     season_id = uuid.uuid4()
     await db.execute(
-        text(f"""
+        text(
+            f"""
             INSERT INTO {HORSE_RACE_TABLE}
                 (id, tenant_id, season_name, scope_type, scope_id, start_date, end_date,
                  ranking_dimension, prizes, rules, status, created_at, updated_at)
             VALUES
                 (:id, :tid, :name, :stype, :sid, :sd, :ed, :dim, :prizes::jsonb, :rules::jsonb, 'upcoming', NOW(), NOW())
-        """),
+        """
+        ),
         {
             "id": season_id,
             "tid": tid,
@@ -1128,13 +1158,15 @@ async def list_horse_race_seasons(
     if status:
         params["status"] = status
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, season_name, scope_type, scope_id, start_date, end_date,
                    ranking_dimension, status, prizes, rules, created_at
             FROM {HORSE_RACE_TABLE}
             WHERE tenant_id = :tid AND is_deleted = FALSE {status_clause}
             ORDER BY start_date DESC
-        """),
+        """
+        ),
         params,
     )
     items: list[dict[str, Any]] = []
@@ -1173,11 +1205,13 @@ async def get_horse_race_season_ranking(
 
     # 先查赛季信息
     sr = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, season_name, scope_type, scope_id, start_date, end_date, ranking_dimension, status
             FROM {HORSE_RACE_TABLE}
             WHERE tenant_id = :tid AND id = :ssid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tid": tid, "ssid": ssid},
     )
     season = sr.mappings().first()
@@ -1194,7 +1228,8 @@ async def get_horse_race_season_ranking(
         params["scope_id"] = season["scope_id"]
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             WITH agg AS (
                 SELECT
                     pt.employee_id,
@@ -1213,7 +1248,8 @@ async def get_horse_race_season_ranking(
             FROM agg
             ORDER BY rank
             LIMIT :lim
-        """),
+        """
+        ),
         params,
     )
     items: list[dict[str, Any]] = []
@@ -1257,12 +1293,14 @@ async def update_horse_race_status(
     ssid = _parse_uuid(season_id, "season_id")
     await _set_tenant(db, tenant_id)
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE {HORSE_RACE_TABLE}
             SET status = :status, updated_at = NOW()
             WHERE id = :ssid AND tenant_id = :tid AND is_deleted = FALSE
             RETURNING id, season_name, status
-        """),
+        """
+        ),
         {"ssid": ssid, "tid": tid, "status": new_status},
     )
     row = r.mappings().first()
@@ -1289,7 +1327,8 @@ async def get_points_stats(
 
     store_clause = "TRUE" if sid is None else "e.store_id = :sid"
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 COUNT(DISTINCT pt.employee_id) AS active_employees,
                 COALESCE(SUM(pt.points) FILTER (WHERE pt.points > 0), 0) AS total_earned,
@@ -1299,18 +1338,21 @@ async def get_points_stats(
             JOIN {EMPLOYEES_TABLE} e ON e.id = pt.employee_id AND e.tenant_id = pt.tenant_id
             WHERE pt.tenant_id = :tid AND pt.is_deleted = FALSE
               AND e.is_deleted = FALSE AND ({store_clause})
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid},
     )
     row = r.mappings().one()
 
     # 兑换统计
     rr = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT COUNT(*) AS total_redemptions, COALESCE(SUM(points_spent), 0) AS total_redeemed
             FROM {POINT_REDEMPTIONS_TABLE}
             WHERE tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tid": tid},
     )
     rrow = rr.mappings().one()

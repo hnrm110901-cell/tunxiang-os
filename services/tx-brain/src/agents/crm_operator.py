@@ -279,25 +279,29 @@ class CRMOperator:
 
                 if store_id:
                     result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT tenant_id, store_id, total_members, active_members,
                                    avg_clv, churn_risk_count, top_segments
                             FROM mv_member_clv
                             WHERE tenant_id = :tid
                               AND store_id = :sid
                             LIMIT 1
-                        """),
+                        """
+                        ),
                         {"tid": tenant_id, "sid": store_id},
                     )
                 else:
                     result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT tenant_id, store_id, total_members, active_members,
                                    avg_clv, churn_risk_count, top_segments
                             FROM mv_member_clv
                             WHERE tenant_id = :tid
                             LIMIT 1
-                        """),
+                        """
+                        ),
                         {"tid": tenant_id},
                     )
 
@@ -336,14 +340,16 @@ class CRMOperator:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) FILTER (WHERE churn_probability > 0.7) AS high_churn_count,
                         AVG(clv_score) AS avg_clv,
                         SUM(stored_value_balance_fen) AS total_stored_value_fen
                     FROM mv_member_clv
                     WHERE tenant_id = :tenant_id AND store_id = :store_id
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id},
             )
             row = result.mappings().one_or_none()

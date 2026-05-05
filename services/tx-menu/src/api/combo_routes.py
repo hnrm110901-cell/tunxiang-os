@@ -203,7 +203,8 @@ async def get_combo_detail(
     # graceful 降级：若表不存在则返回空分组列表并记录 warning
     try:
         groups_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     cg.id::TEXT         AS group_id,
                     cg.group_name,
@@ -225,7 +226,8 @@ async def get_combo_detail(
                   AND cg.tenant_id = :tenant_id
                   AND cg.is_deleted = false
                 ORDER BY cg.sort_order ASC, cgi.sort_order ASC
-            """),
+            """
+            ),
             {"combo_id": uuid.UUID(combo_id), "tenant_id": tenant_uuid},
         )
         rows = list(groups_result.mappings())
@@ -511,7 +513,8 @@ async def list_combo_groups(
         raise HTTPException(status_code=404, detail="套餐不存在")
 
     # 查分组
-    groups_sql = text("""
+    groups_sql = text(
+        """
         SELECT id, combo_id, group_name, min_select, max_select,
                is_required, sort_order
         FROM combo_groups
@@ -519,7 +522,8 @@ async def list_combo_groups(
           AND tenant_id  = :tenant_id
           AND is_deleted = false
         ORDER BY sort_order ASC, created_at ASC
-    """)
+    """
+    )
     groups_result = await db.execute(
         groups_sql,
         {
@@ -537,7 +541,8 @@ async def list_combo_groups(
     id_placeholders = ", ".join([f":gid_{i}" for i in range(len(group_ids))])
 
     # 查所有分组的菜品（一次查询）
-    items_sql = text(f"""
+    items_sql = text(
+        f"""
         SELECT id, group_id, dish_id, dish_name, quantity,
                extra_price_fen, is_default, sort_order
         FROM combo_group_items
@@ -545,7 +550,8 @@ async def list_combo_groups(
           AND tenant_id  = :tenant_id
           AND is_deleted = false
         ORDER BY sort_order ASC, created_at ASC
-    """)
+    """
+    )
     items_result = await db.execute(items_sql, {"tenant_id": tenant_id, **gid_params})
     item_rows = items_result.fetchall()
 
@@ -599,7 +605,8 @@ async def create_combo_group(
         raise HTTPException(status_code=422, detail="max_select 不能小于 min_select")
 
     new_id = str(uuid.uuid4())
-    insert_sql = text("""
+    insert_sql = text(
+        """
         INSERT INTO combo_groups
           (id, tenant_id, combo_id, group_name, min_select, max_select,
            is_required, sort_order, created_at, updated_at, is_deleted)
@@ -608,7 +615,8 @@ async def create_combo_group(
            :is_required, :sort_order, NOW(), NOW(), false)
         RETURNING id, combo_id, group_name, min_select, max_select,
                   is_required, sort_order
-    """)
+    """
+    )
     result = await db.execute(
         insert_sql,
         {
@@ -646,13 +654,15 @@ async def add_item_to_combo_group(
     await _rls_menu(db, tenant_id)
 
     # 校验分组存在且属于该套餐
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT id FROM combo_groups
         WHERE id        = :group_id
           AND combo_id  = :combo_id
           AND tenant_id = :tenant_id
           AND is_deleted = false
-    """)
+    """
+    )
     check_result = await db.execute(
         check_sql,
         {
@@ -665,7 +675,8 @@ async def add_item_to_combo_group(
         raise HTTPException(status_code=404, detail="分组不存在或不属于该套餐")
 
     new_id = str(uuid.uuid4())
-    insert_sql = text("""
+    insert_sql = text(
+        """
         INSERT INTO combo_group_items
           (id, tenant_id, group_id, dish_id, dish_name, quantity,
            extra_price_fen, is_default, sort_order, created_at, updated_at, is_deleted)
@@ -674,7 +685,8 @@ async def add_item_to_combo_group(
            :extra_price_fen, :is_default, :sort_order, NOW(), NOW(), false)
         RETURNING id, group_id, dish_id, dish_name, quantity,
                   extra_price_fen, is_default, sort_order
-    """)
+    """
+    )
     result = await db.execute(
         insert_sql,
         {
@@ -720,7 +732,8 @@ async def remove_item_from_combo_group(
     await _rls_menu(db, tenant_id)
 
     # 校验 item 存在且属于该分组
-    check_sql = text("""
+    check_sql = text(
+        """
         SELECT i.id FROM combo_group_items i
         JOIN combo_groups g ON g.id = i.group_id
         WHERE i.id        = :item_id
@@ -728,7 +741,8 @@ async def remove_item_from_combo_group(
           AND g.combo_id  = :combo_id
           AND i.tenant_id = :tenant_id
           AND i.is_deleted = false
-    """)
+    """
+    )
     check_result = await db.execute(
         check_sql,
         {
@@ -741,11 +755,13 @@ async def remove_item_from_combo_group(
     if not check_result.fetchone():
         raise HTTPException(status_code=404, detail="菜品不存在于该分组")
 
-    del_sql = text("""
+    del_sql = text(
+        """
         UPDATE combo_group_items
         SET is_deleted = true, updated_at = NOW()
         WHERE id = :item_id AND tenant_id = :tenant_id
-    """)
+    """
+    )
     await db.execute(del_sql, {"item_id": item_id, "tenant_id": tenant_id})
     await db.commit()
 
@@ -773,13 +789,15 @@ async def validate_combo_selection(
     await _rls_menu(db, tenant_id)
 
     # 查套餐所有分组
-    groups_sql = text("""
+    groups_sql = text(
+        """
         SELECT id, group_name, min_select, max_select, is_required
         FROM combo_groups
         WHERE combo_id   = :combo_id
           AND tenant_id  = :tenant_id
           AND is_deleted = false
-    """)
+    """
+    )
     groups_result = await db.execute(
         groups_sql,
         {
@@ -806,14 +824,16 @@ async def validate_combo_selection(
     if all_selected_ids:
         id_params = {f"iid_{i}": iid for i, iid in enumerate(all_selected_ids)}
         id_placeholders = ", ".join([f":iid_{i}" for i in range(len(all_selected_ids))])
-        valid_sql = text(f"""
+        valid_sql = text(
+            f"""
             SELECT i.id, i.group_id FROM combo_group_items i
             JOIN combo_groups g ON g.id = i.group_id
             WHERE i.id       IN ({id_placeholders})
               AND g.combo_id  = :combo_id
               AND i.tenant_id = :tenant_id
               AND i.is_deleted = false
-        """)
+        """
+        )
         valid_result = await db.execute(
             valid_sql,
             {
@@ -830,14 +850,16 @@ async def validate_combo_selection(
     if all_selected_ids:
         id_params_2 = {f"iid2_{i}": iid for i, iid in enumerate(all_selected_ids)}
         id_placeholders_2 = ", ".join([f":iid2_{i}" for i in range(len(all_selected_ids))])
-        item_group_sql = text(f"""
+        item_group_sql = text(
+            f"""
             SELECT i.id, i.group_id FROM combo_group_items i
             JOIN combo_groups g ON g.id = i.group_id
             WHERE i.id       IN ({id_placeholders_2})
               AND g.combo_id  = :combo_id
               AND i.tenant_id = :tenant_id
               AND i.is_deleted = false
-        """)
+        """
+        )
         item_group_result = await db.execute(
             item_group_sql,
             {

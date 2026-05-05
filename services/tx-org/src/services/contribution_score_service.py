@@ -251,7 +251,8 @@ class ContributionScoreService:
         计算：员工关联营收 / 同岗位同店平均营收 * 100，封顶100
         """
         try:
-            sql_employee = text("""
+            sql_employee = text(
+                """
                 SELECT COALESCE(SUM(total_fen), 0) AS revenue_fen,
                        COUNT(*) AS order_count
                 FROM orders
@@ -260,7 +261,8 @@ class ContributionScoreService:
                   AND (waiter_id = CAST(:eid AS TEXT) OR cashier_id = CAST(:eid AS TEXT))
                   AND created_at BETWEEN :start AND :end
                   AND status = 'paid'
-            """)
+            """
+            )
             row = await db.execute(
                 sql_employee,
                 {
@@ -278,7 +280,8 @@ class ContributionScoreService:
                 return _BASELINE
 
             # 同店同岗均值
-            sql_avg = text("""
+            sql_avg = text(
+                """
                 SELECT COALESCE(AVG(emp_rev), 0) AS avg_revenue_fen
                 FROM (
                     SELECT (waiter_id) AS eid,
@@ -290,7 +293,8 @@ class ContributionScoreService:
                       AND status = 'paid'
                     GROUP BY waiter_id
                 ) sub
-            """)
+            """
+            )
             avg_row = await db.execute(
                 sql_avg,
                 {
@@ -331,7 +335,8 @@ class ContributionScoreService:
         """
         try:
             # 人效 = 关联订单数 / 出勤天数
-            sql_orders = text("""
+            sql_orders = text(
+                """
                 SELECT COUNT(*) AS order_count
                 FROM orders
                 WHERE tenant_id = CAST(:tid AS uuid)
@@ -339,7 +344,8 @@ class ContributionScoreService:
                   AND (waiter_id = CAST(:eid AS TEXT) OR cashier_id = CAST(:eid AS TEXT))
                   AND created_at BETWEEN :start AND :end
                   AND status = 'paid'
-            """)
+            """
+            )
             o_row = await db.execute(
                 sql_orders,
                 {
@@ -352,14 +358,16 @@ class ContributionScoreService:
             )
             order_count = int((o_row.mappings().first() or {}).get("order_count", 0))
 
-            sql_attendance = text("""
+            sql_attendance = text(
+                """
                 SELECT COUNT(*) AS work_days
                 FROM daily_attendance
                 WHERE tenant_id = CAST(:tid AS TEXT)
                   AND employee_id = CAST(:eid AS TEXT)
                   AND attendance_date BETWEEN :start AND :end
                   AND status IN ('normal', 'late')
-            """)
+            """
+            )
             a_row = await db.execute(
                 sql_attendance,
                 {
@@ -406,7 +414,8 @@ class ContributionScoreService:
         """
         try:
             # 退菜率：查订单明细
-            sql_refund = text("""
+            sql_refund = text(
+                """
                 SELECT
                     COUNT(*) AS total_items,
                     SUM(CASE WHEN oi.status = 'refunded' THEN 1 ELSE 0 END) AS refunded_items
@@ -416,7 +425,8 @@ class ContributionScoreService:
                   AND o.store_id = CAST(:store_id AS TEXT)
                   AND (o.waiter_id = CAST(:eid AS TEXT) OR o.cashier_id = CAST(:eid AS TEXT))
                   AND o.created_at BETWEEN :start AND :end
-            """)
+            """
+            )
             row = await db.execute(
                 sql_refund,
                 {
@@ -458,7 +468,8 @@ class ContributionScoreService:
     ) -> float:
         """出勤纪律维度 -- 从考勤数据计算"""
         try:
-            sql = text("""
+            sql = text(
+                """
                 SELECT
                     COUNT(*) AS total_days,
                     SUM(CASE WHEN status = 'normal' THEN 1 ELSE 0 END) AS normal_days,
@@ -468,7 +479,8 @@ class ContributionScoreService:
                 WHERE tenant_id = CAST(:tid AS TEXT)
                   AND employee_id = CAST(:eid AS TEXT)
                   AND attendance_date BETWEEN :start AND :end
-            """)
+            """
+            )
             row = await db.execute(
                 sql,
                 {
@@ -515,7 +527,8 @@ class ContributionScoreService:
         """团队协作维度 -- 跨岗支援次数/帮带新人"""
         try:
             # 查跨岗支援：unified_schedules中非本岗位排班
-            sql = text("""
+            sql = text(
+                """
                 SELECT COUNT(*) AS cross_support_count
                 FROM unified_schedules us
                 WHERE us.tenant_id = CAST(:tid AS uuid)
@@ -524,7 +537,8 @@ class ContributionScoreService:
                   AND us.schedule_date BETWEEN :start AND :end
                   AND us.is_cross_position = TRUE
                   AND us.is_deleted = FALSE
-            """)
+            """
+            )
             row = await db.execute(
                 sql,
                 {
@@ -610,13 +624,15 @@ class ContributionScoreService:
         employee_id: str,
     ) -> Optional[dict[str, Any]]:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text AS employee_id, emp_name, role, store_id::text AS store_id
                 FROM employees
                 WHERE tenant_id = CAST(:tid AS uuid)
                   AND id = CAST(:eid AS uuid)
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": employee_id},
         )
         m = row.mappings().first()
@@ -629,7 +645,8 @@ class ContributionScoreService:
         store_id: str,
     ) -> list[dict[str, Any]]:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text AS employee_id, emp_name, role
                 FROM employees
                 WHERE tenant_id = CAST(:tid AS uuid)
@@ -637,7 +654,8 @@ class ContributionScoreService:
                   AND is_deleted = FALSE
                   AND COALESCE(is_active, true) = true
                 ORDER BY emp_name
-            """),
+            """
+            ),
             {"tid": tenant_id, "store_id": store_id},
         )
         return [dict(r) for r in rows.mappings().fetchall()]

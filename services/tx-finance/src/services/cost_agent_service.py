@@ -97,7 +97,8 @@ class CostAgentService:
 
         try:
             # 从 cost_snapshots 聚合当日菜品成本
-            sql = text("""
+            sql = text(
+                """
                 SELECT
                     oi.dish_name,
                     COALESCE(cs.raw_material_cost, 0)::int          AS actual_cost_fen,
@@ -115,7 +116,8 @@ class CostAgentService:
                 GROUP BY oi.dish_name, cs.raw_material_cost, d.cost_fen, oi.unit_price
                 ORDER BY SUM(oi.quantity) DESC
                 LIMIT 50
-            """)
+            """
+            )
             result = await self._db.execute(
                 sql,
                 {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
@@ -159,7 +161,8 @@ class CostAgentService:
 
         try:
             since = date.today() - timedelta(days=days)
-            sql = text("""
+            sql = text(
+                """
                 SELECT
                     DATE(it.created_at)          AS purchase_date,
                     it.unit_cost_fen::int         AS unit_cost_fen,
@@ -172,7 +175,8 @@ class CostAgentService:
                   AND it.transaction_type = 'purchase'
                   AND DATE(it.created_at) >= :since
                 ORDER BY it.created_at ASC
-            """)
+            """
+            )
             result = await self._db.execute(
                 sql,
                 {
@@ -252,7 +256,8 @@ class CostAgentService:
 
     async def _get_daily_pnl(self, store_id: str, target_date: date, tenant_id: str) -> dict:
         """从 daily_pnl 取当日P&L数据"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 food_cost_fen, labor_cost_fen, total_revenue_fen,
                 gross_profit_fen, food_cost_rate, status
@@ -261,7 +266,8 @@ class CostAgentService:
               AND tenant_id = :tenant_id
               AND pnl_date = :target_date
             LIMIT 1
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 sql, {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date}
@@ -278,7 +284,8 @@ class CostAgentService:
         self, store_id: str, target_date: date, tenant_id: str, limit: int = 10
     ) -> list[dict]:
         """取当日成本率最高的菜品"""
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 oi.dish_name,
                 AVG(CASE WHEN oi.unit_price > 0
@@ -296,7 +303,8 @@ class CostAgentService:
             GROUP BY oi.dish_name
             ORDER BY cost_rate DESC
             LIMIT :limit
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 sql,
@@ -336,7 +344,8 @@ class CostAgentService:
         Returns: list of {ingredient_name, ingredient_id, consecutive_rises, last_price_fen, drift_pct}
         """
         since = date.today() - timedelta(days=lookback_days)
-        sql = text("""
+        sql = text(
+            """
             WITH ranked AS (
                 SELECT
                     it.ingredient_id,
@@ -355,7 +364,8 @@ class CostAgentService:
             WHERE rn <= :n
             GROUP BY ingredient_id, ingredient_name
             HAVING count(*) >= :n
-        """)
+        """
+        )
         try:
             result = await self._db.execute(
                 sql,

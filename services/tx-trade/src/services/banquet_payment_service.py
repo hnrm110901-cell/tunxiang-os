@@ -203,7 +203,8 @@ class BanquetPaymentService:
             raise ValueError("total_deposit_fen 必须大于 0")
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_deposits
                     (tenant_id, banquet_id, total_deposit_fen, due_date)
                 VALUES
@@ -211,7 +212,8 @@ class BanquetPaymentService:
                 RETURNING
                     id, banquet_id, total_deposit_fen, paid_fen,
                     status, due_date, paid_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "banquet_id": str(banquet_id),
@@ -242,11 +244,13 @@ class BanquetPaymentService:
         """
         # 1. 查询定金记录
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, total_deposit_fen, status, payment_no, wechat_prepay_id
                 FROM banquet_deposits
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": str(deposit_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -291,13 +295,15 @@ class BanquetPaymentService:
         )
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_deposits
                 SET payment_no       = :payment_no,
                     wechat_prepay_id = :prepay_id,
                     updated_at       = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "payment_no": payment_no,
                 "prepay_id": wechat_result["prepay_id"],
@@ -328,13 +334,15 @@ class BanquetPaymentService:
     ) -> BanquetDeposit:
         """处理微信支付回调，更新定金状态为 paid（**幂等**：已 paid 且金额一致则直接返回）。"""
         cur = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, banquet_id, total_deposit_fen, paid_fen,
                        status, due_date, paid_at
                 FROM banquet_deposits
                 WHERE payment_no = :payment_no
                 LIMIT 1
-            """),
+            """
+            ),
             {"payment_no": payment_no},
         )
         existing = cur.mappings().first()
@@ -358,7 +366,8 @@ class BanquetPaymentService:
             raise ValueError(f"支付回调状态非法: payment_no={payment_no}, status={existing['status']}")
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_deposits
                 SET status     = 'paid',
                     paid_fen   = :paid_fen,
@@ -369,7 +378,8 @@ class BanquetPaymentService:
                 RETURNING
                     id, banquet_id, total_deposit_fen, paid_fen,
                     status, due_date, paid_at
-            """),
+            """
+            ),
             {
                 "payment_no": payment_no,
                 "paid_fen": paid_fen,
@@ -395,7 +405,8 @@ class BanquetPaymentService:
     ) -> Optional[BanquetDeposit]:
         """获取定金记录（取最新一条）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, banquet_id, total_deposit_fen, paid_fen,
                        status, due_date, paid_at
                 FROM banquet_deposits
@@ -403,7 +414,8 @@ class BanquetPaymentService:
                   AND tenant_id  = :tenant_id
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"banquet_id": str(banquet_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -436,7 +448,8 @@ class BanquetPaymentService:
         expires_at = _now_utc() + timedelta(days=7)
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_confirmations (
                     tenant_id, banquet_id, confirmation_no,
                     menu_items_json, total_fen, guest_count,
@@ -451,7 +464,8 @@ class BanquetPaymentService:
                 RETURNING
                     id, banquet_id, confirmation_no, menu_items_json,
                     total_fen, guest_count, status, confirmed_at, expires_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "banquet_id": str(banquet_id),
@@ -482,7 +496,8 @@ class BanquetPaymentService:
     ) -> BanquetConfirmation:
         """顾客确认签字，状态更新为 confirmed"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_confirmations
                 SET status         = 'confirmed',
                     confirmed_at   = NOW(),
@@ -493,7 +508,8 @@ class BanquetPaymentService:
                 RETURNING
                     id, banquet_id, confirmation_no, menu_items_json,
                     total_fen, guest_count, status, confirmed_at, expires_at
-            """),
+            """
+            ),
             {
                 "id": str(confirmation_id),
                 "tenant_id": str(tenant_id),
@@ -517,7 +533,8 @@ class BanquetPaymentService:
     ) -> Optional[BanquetConfirmation]:
         """获取确认单（取最新一条）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, banquet_id, confirmation_no, menu_items_json,
                        total_fen, guest_count, status, confirmed_at, expires_at
                 FROM banquet_confirmations
@@ -525,7 +542,8 @@ class BanquetPaymentService:
                   AND tenant_id  = :tenant_id
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"banquet_id": str(banquet_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()
@@ -538,7 +556,8 @@ class BanquetPaymentService:
     ) -> ConfirmationSummary:
         """生成确认单摘要（用于前端展示/PDF导出）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, banquet_id, confirmation_no, menu_items_json,
                        total_fen, guest_count, special_requirements,
                        confirmed_by_name, confirmed_by_phone,
@@ -546,7 +565,8 @@ class BanquetPaymentService:
                 FROM banquet_confirmations
                 WHERE id        = :id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"id": str(confirmation_id), "tenant_id": str(tenant_id)},
         )
         row = result.mappings().first()

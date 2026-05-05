@@ -14,13 +14,14 @@ import sys
 import types
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-SVC_DIR = os.path.dirname(__file__)       # services/tx-trade/
-SRC_DIR = os.path.join(SVC_DIR, "src")   # services/tx-trade/src/
+SVC_DIR = os.path.dirname(__file__)  # services/tx-trade/
+SRC_DIR = os.path.join(SVC_DIR, "src")  # services/tx-trade/src/
 
 # 1. ROOT 先入 path（shared.ontology 等跨服务包）
 for p in [ROOT, SRC_DIR]:
     if p not in sys.path:
         sys.path.insert(0, p)
+
 
 # 2. 建立 services.tx_trade / services.tx_trade.src 命名空间包
 #    注意：不注册顶级 "services"，避免覆盖 SRC_DIR/services/ 路径
@@ -39,9 +40,10 @@ def _ensure_ns(name: str, path: str) -> None:
         mod.__package__ = name
         sys.modules[name] = mod
 
+
 # tx_trade 包（注意：不动顶级 services，避免冲突）
-_ensure_ns("services.tx_trade",       SVC_DIR)
-_ensure_ns("services.tx_trade.src",   SRC_DIR)
+_ensure_ns("services.tx_trade", SVC_DIR)
+_ensure_ns("services.tx_trade.src", SRC_DIR)
 
 for _sub in ("api", "models", "services", "repositories", "tests", "routers"):
     _sub_path = os.path.join(SRC_DIR, _sub)

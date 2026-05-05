@@ -31,10 +31,12 @@ async def run_auto_review(
     """执行AI自动审核."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.auto_reviews
+        text(
+            """INSERT INTO forge.auto_reviews
                 (tenant_id, app_id, app_version_id, status)
                 VALUES (:tid, :app_id, :app_version_id, 'running')
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -57,8 +59,10 @@ async def get_auto_review(
     """获取审核结果."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""SELECT * FROM forge.auto_reviews
-                WHERE tenant_id = :tid AND review_id = :review_id"""),
+        text(
+            """SELECT * FROM forge.auto_reviews
+                WHERE tenant_id = :tid AND review_id = :review_id"""
+        ),
         {"tid": x_tenant_id, "review_id": review_id},
     )
     row = result.mappings().first()
@@ -91,9 +95,11 @@ async def list_auto_reviews(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.auto_reviews
+        text(
+            f"""SELECT * FROM forge.auto_reviews
                 WHERE {where}
-                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -118,9 +124,11 @@ async def list_review_templates(
     where = " AND ".join(clauses)
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.review_templates
+        text(
+            f"""SELECT * FROM forge.review_templates
                 WHERE {where}
-                ORDER BY template_name"""),
+                ORDER BY template_name"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()]}

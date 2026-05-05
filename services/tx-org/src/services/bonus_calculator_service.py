@@ -68,7 +68,8 @@ class BonusCalculatorService:
 
         # 1. 查询月均分
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT employee_id, employee_name, role,
                        AVG(total_score)::NUMERIC(5,1) AS avg_score,
                        COUNT(*) AS score_days
@@ -78,7 +79,8 @@ class BonusCalculatorService:
                   AND is_deleted = FALSE
                 GROUP BY employee_id, employee_name, role
                 ORDER BY avg_score DESC
-            """),
+            """
+            ),
             {"tid": tenant_id, "sid": store_id, "d0": month_start, "d1": month_end},
         )
         emp_scores = rows.mappings().fetchall()
@@ -102,17 +104,19 @@ class BonusCalculatorService:
             multiplier = self._match_tier(avg_score, tier_config)
             bonus_fen = int(round(base_fen * multiplier))
 
-            results.append({
-                "employee_id": str(emp["employee_id"]),
-                "employee_name": emp["employee_name"],
-                "role": role,
-                "avg_score": avg_score,
-                "score_days": int(emp["score_days"] or 0),
-                "base_amount_fen": base_fen,
-                "multiplier": multiplier,
-                "bonus_fen": bonus_fen,
-                "bonus_yuan": round(bonus_fen / 100, 2),
-            })
+            results.append(
+                {
+                    "employee_id": str(emp["employee_id"]),
+                    "employee_name": emp["employee_name"],
+                    "role": role,
+                    "avg_score": avg_score,
+                    "score_days": int(emp["score_days"] or 0),
+                    "base_amount_fen": base_fen,
+                    "multiplier": multiplier,
+                    "bonus_fen": bonus_fen,
+                    "bonus_yuan": round(bonus_fen / 100, 2),
+                }
+            )
 
         log.info(
             "bonus.calculated",
@@ -198,14 +202,16 @@ class BonusCalculatorService:
 
         where = " AND ".join(conds)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, role, base_amount_fen,
                        tier_config, effective_from, effective_until,
                        is_active, created_at, updated_at
                 FROM bonus_rules
                 WHERE {where}
                 ORDER BY role, store_id NULLS LAST
-            """),
+            """
+            ),
             params,
         )
         items: list[dict[str, Any]] = []
@@ -247,35 +253,41 @@ class BonusCalculatorService:
         # 先软删除该角色旧规则
         if store_id is not None:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE bonus_rules
                     SET is_active = FALSE, is_deleted = TRUE, updated_at = NOW()
                     WHERE tenant_id = :tid AND store_id = :sid AND role = :role
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id, "role": role},
             )
         else:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE bonus_rules
                     SET is_active = FALSE, is_deleted = TRUE, updated_at = NOW()
                     WHERE tenant_id = :tid AND store_id IS NULL AND role = :role
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id, "role": role},
             )
 
         # 插入新规则
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO bonus_rules
                     (id, tenant_id, store_id, role, base_amount_fen, tier_config,
                      effective_from, effective_until, is_active)
                 VALUES
                     (:id, :tid, :sid, :role, :base, CAST(:tiers AS jsonb),
                      :ef, :eu, :active)
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tid": tenant_id,
@@ -316,14 +328,16 @@ class BonusCalculatorService:
         """加载奖金规则。优先门店级，降级品牌级。"""
         try:
             rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT role, base_amount_fen, tier_config, store_id
                     FROM bonus_rules
                     WHERE tenant_id = :tid
                       AND (store_id = :sid OR store_id IS NULL)
                       AND is_active = TRUE AND is_deleted = FALSE
                     ORDER BY store_id NULLS LAST
-                """),
+                """
+                ),
                 {"tid": tenant_id, "sid": store_id},
             )
 

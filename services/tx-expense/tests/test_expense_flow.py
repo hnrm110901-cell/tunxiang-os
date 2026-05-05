@@ -26,6 +26,7 @@ import pytest_asyncio
 
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
 except ImportError:
     HTTPX_AVAILABLE = False
@@ -38,16 +39,16 @@ BASE_URL = os.getenv("EXPENSE_TEST_URL", "http://localhost:8015")
 
 # 测试专用固定UUID（与seed脚本不同，避免冲突）
 TEST_TENANT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-TEST_USER_ID   = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
-TEST_BRAND_ID  = "cccccccc-cccc-cccc-cccc-cccccccccccc"
-TEST_STORE_ID  = "dddddddd-dddd-dddd-dddd-dddddddddddd"
+TEST_USER_ID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+TEST_BRAND_ID = "cccccccc-cccc-cccc-cccc-cccccccccccc"
+TEST_STORE_ID = "dddddddd-dddd-dddd-dddd-dddddddddddd"
 TEST_KEEPER_ID = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-TEST_CAT_ID    = "ffffffff-ffff-ffff-ffff-ffffffffffff"  # 占位科目ID
+TEST_CAT_ID = "ffffffff-ffff-ffff-ffff-ffffffffffff"  # 占位科目ID
 
 # 公共 Headers
 HEADERS = {
     "X-Tenant-ID": TEST_TENANT_ID,
-    "X-User-ID":   TEST_USER_ID,
+    "X-User-ID": TEST_USER_ID,
     "Content-Type": "application/json",
 }
 
@@ -61,6 +62,7 @@ pytestmark = pytest.mark.asyncio
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest_asyncio.fixture
 async def client():
@@ -94,11 +96,10 @@ def random_id() -> str:
 # 辅助函数
 # ---------------------------------------------------------------------------
 
+
 def assert_ok(resp: "httpx.Response", context: str = "") -> Dict[str, Any]:
     """断言响应成功，返回 JSON body"""
-    assert resp.status_code in (200, 201), (
-        f"{context} 期望 200/201，实际 {resp.status_code}：{resp.text}"
-    )
+    assert resp.status_code in (200, 201), f"{context} 期望 200/201，实际 {resp.status_code}：{resp.text}"
     body = resp.json()
     return body
 
@@ -115,6 +116,7 @@ def extract_id(body: Dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 # 测试用例
 # ---------------------------------------------------------------------------
+
 
 class TestCreateAndSubmitExpense:
     """用例1：费控申请全流程（创建→明细→提交→状态验证）"""
@@ -159,7 +161,7 @@ class TestCreateAndSubmitExpense:
         item_payload = {
             "category_id": TEST_CAT_ID,
             "description": "包装盒（100套）",
-            "amount": 90_00,          # 90元（分）
+            "amount": 90_00,  # 90元（分）
             "quantity": 100.0,
             "unit": "套",
             "expense_date": today_str(-1),
@@ -176,18 +178,21 @@ class TestCreateAndSubmitExpense:
             f"/api/v1/expense/applications/{app_id}/submit",
             json={},
         )
-        assert submit_resp.status_code in (200, 201, 422), (
-            f"提交申请应返回 200/201/422，实际：{submit_resp.status_code}"
-        )
+        assert submit_resp.status_code in (
+            200,
+            201,
+            422,
+        ), f"提交申请应返回 200/201/422，实际：{submit_resp.status_code}"
         if submit_resp.status_code in (200, 201):
             # 验证提交后状态
             detail_resp = await client.get(f"/api/v1/expense/applications/{app_id}")
             if detail_resp.status_code == 200:
                 detail = detail_resp.json()
                 status_val = detail.get("status") or detail.get("data", {}).get("status")
-                assert status_val in ("submitted", "in_review"), (
-                    f"提交后状态应为 submitted/in_review，实际：{status_val}"
-                )
+                assert status_val in (
+                    "submitted",
+                    "in_review",
+                ), f"提交后状态应为 submitted/in_review，实际：{status_val}"
 
     @pytest.mark.asyncio
     async def test_list_expenses_with_filter(self, client: "httpx.AsyncClient"):
@@ -200,20 +205,21 @@ class TestCreateAndSubmitExpense:
         if resp.status_code == 200:
             body = resp.json()
             # 验证响应结构
-            assert "items" in body or "data" in body or isinstance(body, list), (
-                "列表响应应包含 items 或 data 字段"
-            )
+            assert "items" in body or "data" in body or isinstance(body, list), "列表响应应包含 items 或 data 字段"
 
     @pytest.mark.asyncio
     async def test_cancel_draft_expense(self, client: "httpx.AsyncClient"):
         """撤回草稿申请"""
         # 先创建一个草稿
-        resp = await client.post("/api/v1/expense/applications", json={
-            "title": "测试-待撤回申请",
-            "scenario_code": "OTHER_EXPENSE",
-            "store_id": TEST_STORE_ID,
-            "brand_id": TEST_BRAND_ID,
-        })
+        resp = await client.post(
+            "/api/v1/expense/applications",
+            json={
+                "title": "测试-待撤回申请",
+                "scenario_code": "OTHER_EXPENSE",
+                "store_id": TEST_STORE_ID,
+                "brand_id": TEST_BRAND_ID,
+            },
+        )
         if resp.status_code not in (200, 201):
             pytest.skip("创建申请失败，跳过撤回测试")
 
@@ -222,9 +228,7 @@ class TestCreateAndSubmitExpense:
             f"/api/v1/expense/applications/{app_id}/cancel",
             json={"reason": "测试撤回"},
         )
-        assert cancel_resp.status_code in (200, 201, 404, 405), (
-            f"撤回接口意外失败：{cancel_resp.status_code}"
-        )
+        assert cancel_resp.status_code in (200, 201, 404, 405), f"撤回接口意外失败：{cancel_resp.status_code}"
 
 
 class TestApprovalFlow:
@@ -234,12 +238,15 @@ class TestApprovalFlow:
     async def test_approval_flow(self, client: "httpx.AsyncClient"):
         """提交申请后审批路由，验证审批实例自动创建"""
         # 先创建并提交申请
-        resp = await client.post("/api/v1/expense/applications", json={
-            "title": "测试-审批流验证",
-            "scenario_code": "DAILY_EXPENSE",
-            "store_id": TEST_STORE_ID,
-            "brand_id": TEST_BRAND_ID,
-        })
+        resp = await client.post(
+            "/api/v1/expense/applications",
+            json={
+                "title": "测试-审批流验证",
+                "scenario_code": "DAILY_EXPENSE",
+                "store_id": TEST_STORE_ID,
+                "brand_id": TEST_BRAND_ID,
+            },
+        )
         if resp.status_code not in (200, 201):
             pytest.skip("创建申请失败，跳过审批流测试")
 
@@ -254,27 +261,26 @@ class TestApprovalFlow:
             "/api/v1/expense/approval/instances",
             params={"application_id": app_id},
         )
-        assert instances_resp.status_code in (200, 404), (
-            f"审批实例查询意外失败：{instances_resp.status_code}"
-        )
+        assert instances_resp.status_code in (200, 404), f"审批实例查询意外失败：{instances_resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_approve_action(self, client: "httpx.AsyncClient"):
         """审批通过动作"""
         # 创建并提交申请以获得审批实例
-        resp = await client.post("/api/v1/expense/applications", json={
-            "title": "测试-审批通过验证",
-            "scenario_code": "DAILY_EXPENSE",
-            "store_id": TEST_STORE_ID,
-            "brand_id": TEST_BRAND_ID,
-        })
+        resp = await client.post(
+            "/api/v1/expense/applications",
+            json={
+                "title": "测试-审批通过验证",
+                "scenario_code": "DAILY_EXPENSE",
+                "store_id": TEST_STORE_ID,
+                "brand_id": TEST_BRAND_ID,
+            },
+        )
         if resp.status_code not in (200, 201):
             pytest.skip("无法创建申请，跳过审批动作测试")
 
         app_id = extract_id(resp.json())
-        submit_resp = await client.post(
-            f"/api/v1/expense/applications/{app_id}/submit", json={}
-        )
+        submit_resp = await client.post(f"/api/v1/expense/applications/{app_id}/submit", json={})
         if submit_resp.status_code not in (200, 201):
             pytest.skip("申请提交失败，跳过审批动作测试")
 
@@ -301,19 +307,20 @@ class TestApprovalFlow:
             f"/api/v1/expense/approval/instances/{instance_id}/action",
             json={"action": "approve", "comment": "测试自动审批通过"},
         )
-        assert approve_resp.status_code in (200, 201, 403, 404, 422), (
-            f"审批动作意外失败：{approve_resp.status_code}"
-        )
+        assert approve_resp.status_code in (200, 201, 403, 404, 422), f"审批动作意外失败：{approve_resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_reject_action(self, client: "httpx.AsyncClient"):
         """审批驳回动作（验证申请状态变更为 rejected）"""
-        resp = await client.post("/api/v1/expense/applications", json={
-            "title": "测试-审批驳回验证",
-            "scenario_code": "ENTERTAINMENT",
-            "store_id": TEST_STORE_ID,
-            "brand_id": TEST_BRAND_ID,
-        })
+        resp = await client.post(
+            "/api/v1/expense/applications",
+            json={
+                "title": "测试-审批驳回验证",
+                "scenario_code": "ENTERTAINMENT",
+                "store_id": TEST_STORE_ID,
+                "brand_id": TEST_BRAND_ID,
+            },
+        )
         if resp.status_code not in (200, 201):
             pytest.skip("无法创建申请")
 
@@ -340,9 +347,7 @@ class TestApprovalFlow:
             f"/api/v1/expense/approval/instances/{instance_id}/action",
             json={"action": "reject", "comment": "测试驳回：金额不符合差标"},
         )
-        assert reject_resp.status_code in (200, 201, 403, 404, 422), (
-            f"驳回动作意外失败：{reject_resp.status_code}"
-        )
+        assert reject_resp.status_code in (200, 201, 403, 404, 422), f"驳回动作意外失败：{reject_resp.status_code}"
 
 
 class TestInvoiceUploadAndVerify:
@@ -369,9 +374,7 @@ class TestInvoiceUploadAndVerify:
             "/api/v1/expense/invoices/duplicate-check",
             json=check_payload,
         )
-        assert resp.status_code in (200, 201, 404, 422), (
-            f"去重检查接口意外失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 201, 404, 422), f"去重检查接口意外失败：{resp.status_code}"
         if resp.status_code in (200, 201):
             body = resp.json()
             # 验证响应包含 is_duplicate 或等价字段
@@ -446,9 +449,7 @@ class TestPettyCashFlow:
             "opening_balance": 300_00,
         }
         resp = await client.post("/api/v1/expense/petty-cash/accounts", json=payload)
-        assert resp.status_code in (200, 201, 409), (
-            f"备用金账户创建失败：{resp.status_code} {resp.text}"
-        )
+        assert resp.status_code in (200, 201, 409), f"备用金账户创建失败：{resp.status_code} {resp.text}"
         if resp.status_code in (200, 201):
             body = resp.json()
             acc_id = extract_id(body)
@@ -458,14 +459,17 @@ class TestPettyCashFlow:
     async def test_petty_cash_flow(self, client: "httpx.AsyncClient"):
         """备用金支出录入→余额验证"""
         # Step 1: 创建账户
-        create_resp = await client.post("/api/v1/expense/petty-cash/accounts", json={
-            "store_id": TEST_STORE_ID,
-            "brand_id": TEST_BRAND_ID,
-            "keeper_id": TEST_KEEPER_ID,
-            "approved_limit": 500_00,
-            "warning_threshold": 100_00,
-            "opening_balance": 300_00,
-        })
+        create_resp = await client.post(
+            "/api/v1/expense/petty-cash/accounts",
+            json={
+                "store_id": TEST_STORE_ID,
+                "brand_id": TEST_BRAND_ID,
+                "keeper_id": TEST_KEEPER_ID,
+                "approved_limit": 500_00,
+                "warning_threshold": 100_00,
+                "opening_balance": 300_00,
+            },
+        )
         if create_resp.status_code not in (200, 201, 409):
             pytest.skip("备用金账户创建失败，跳过流程测试")
 
@@ -474,9 +478,7 @@ class TestPettyCashFlow:
             "/api/v1/expense/petty-cash/accounts",
             params={"store_id": TEST_STORE_ID},
         )
-        assert list_resp.status_code in (200, 404, 422), (
-            f"备用金账户查询失败：{list_resp.status_code}"
-        )
+        assert list_resp.status_code in (200, 404, 422), f"备用金账户查询失败：{list_resp.status_code}"
 
         if list_resp.status_code != 200:
             pytest.skip("无法获取备用金账户列表")
@@ -503,22 +505,18 @@ class TestPettyCashFlow:
             f"/api/v1/expense/petty-cash/accounts/{acc_id}/expenses",
             json=expense_payload,
         )
-        assert expense_resp.status_code in (200, 201, 404, 422), (
-            f"备用金支出录入失败：{expense_resp.status_code}"
-        )
+        assert expense_resp.status_code in (200, 201, 404, 422), f"备用金支出录入失败：{expense_resp.status_code}"
 
         # Step 4: 验证余额变化（如支出成功）
         if expense_resp.status_code in (200, 201):
-            balance_resp = await client.get(
-                f"/api/v1/expense/petty-cash/accounts/{acc_id}/balance"
-            )
+            balance_resp = await client.get(f"/api/v1/expense/petty-cash/accounts/{acc_id}/balance")
             if balance_resp.status_code == 200:
                 balance_body = balance_resp.json()
                 new_balance = balance_body.get("current_balance", balance_body.get("balance"))
                 if new_balance is not None and initial_balance is not None:
-                    assert new_balance <= initial_balance, (
-                        f"支出后余额应减少或不变，支出前：{initial_balance}，支出后：{new_balance}"
-                    )
+                    assert (
+                        new_balance <= initial_balance
+                    ), f"支出后余额应减少或不变，支出前：{initial_balance}，支出后：{new_balance}"
 
     @pytest.mark.asyncio
     async def test_petty_cash_transactions_list(self, client: "httpx.AsyncClient"):
@@ -527,9 +525,7 @@ class TestPettyCashFlow:
             "/api/v1/expense/petty-cash/transactions",
             params={"store_id": TEST_STORE_ID, "page": 1, "size": 10},
         )
-        assert resp.status_code in (200, 404, 422), (
-            f"备用金流水查询意外失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 404, 422), f"备用金流水查询意外失败：{resp.status_code}"
 
 
 class TestStandardComplianceCheck:
@@ -574,9 +570,7 @@ class TestStandardComplianceCheck:
             json={},
         )
         # 可能返回 200（标记超标）或 422（要求说明）或 200（直接通过）
-        assert submit_resp.status_code in (200, 201, 422), (
-            f"超标申请提交意外失败：{submit_resp.status_code}"
-        )
+        assert submit_resp.status_code in (200, 201, 422), f"超标申请提交意外失败：{submit_resp.status_code}"
 
         # 若提交成功，检查响应中是否有超标标记
         if submit_resp.status_code in (200, 201):
@@ -598,9 +592,7 @@ class TestStandardComplianceCheck:
             json=check_payload,
         )
         # 接口可能不存在（404）或正常返回
-        assert resp.status_code in (200, 201, 404, 405, 422), (
-            f"合规检查接口意外失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 201, 404, 405, 422), f"合规检查接口意外失败：{resp.status_code}"
         if resp.status_code in (200, 201):
             body = resp.json()
             assert isinstance(body, dict), "合规检查应返回 JSON 对象"
@@ -640,9 +632,7 @@ class TestStandardComplianceCheck:
             json={},
         )
         # 正常金额应正常提交（200/201），不应被强制拦截
-        assert submit_resp.status_code in (200, 201, 422), (
-            f"正常金额申请提交失败：{submit_resp.status_code}"
-        )
+        assert submit_resp.status_code in (200, 201, 422), f"正常金额申请提交失败：{submit_resp.status_code}"
 
 
 class TestTravelFromInspection:
@@ -665,9 +655,7 @@ class TestTravelFromInspection:
             "notes": "测试差旅申请",
         }
         resp = await client.post("/api/v1/expense/travel/requests", json=payload)
-        assert resp.status_code in (200, 201, 422), (
-            f"差旅申请创建失败：{resp.status_code} {resp.text}"
-        )
+        assert resp.status_code in (200, 201, 422), f"差旅申请创建失败：{resp.status_code} {resp.text}"
         if resp.status_code in (200, 201):
             body = resp.json()
             travel_id = extract_id(body)
@@ -677,18 +665,21 @@ class TestTravelFromInspection:
     async def test_travel_from_inspection(self, client: "httpx.AsyncClient"):
         """完整流程：创建差旅→添加行程→提交审批"""
         # Step 1: 创建差旅申请
-        create_resp = await client.post("/api/v1/expense/travel/requests", json={
-            "brand_id": TEST_BRAND_ID,
-            "store_id": TEST_STORE_ID,
-            "traveler_id": TEST_USER_ID,
-            "planned_start_date": today_str(5),
-            "planned_end_date": today_str(7),
-            "departure_city": "长沙",
-            "destination_cities": ["成都"],
-            "task_type": "inspection",
-            "transport_mode": "flight",
-            "estimated_cost_fen": 4500_00,
-        })
+        create_resp = await client.post(
+            "/api/v1/expense/travel/requests",
+            json={
+                "brand_id": TEST_BRAND_ID,
+                "store_id": TEST_STORE_ID,
+                "traveler_id": TEST_USER_ID,
+                "planned_start_date": today_str(5),
+                "planned_end_date": today_str(7),
+                "departure_city": "长沙",
+                "destination_cities": ["成都"],
+                "task_type": "inspection",
+                "transport_mode": "flight",
+                "estimated_cost_fen": 4500_00,
+            },
+        )
         if create_resp.status_code not in (200, 201):
             pytest.skip("差旅申请创建失败，跳过流程测试")
 
@@ -705,23 +696,17 @@ class TestTravelFromInspection:
                 "check_items": ["食安检查", "备用金盘点"],
             },
         )
-        assert itin_resp.status_code in (200, 201, 404, 422), (
-            f"添加行程失败：{itin_resp.status_code}"
-        )
+        assert itin_resp.status_code in (200, 201, 404, 422), f"添加行程失败：{itin_resp.status_code}"
 
         # Step 3: 提交审批
         submit_resp = await client.post(
             f"/api/v1/expense/travel/requests/{travel_id}/submit",
             json={},
         )
-        assert submit_resp.status_code in (200, 201, 404, 422), (
-            f"差旅申请提交失败：{submit_resp.status_code}"
-        )
+        assert submit_resp.status_code in (200, 201, 404, 422), f"差旅申请提交失败：{submit_resp.status_code}"
 
     @pytest.mark.asyncio
-    async def test_inspection_event_creates_travel_draft(
-        self, client: "httpx.AsyncClient"
-    ):
+    async def test_inspection_event_creates_travel_draft(self, client: "httpx.AsyncClient"):
         """
         模拟巡店事件触发差旅草稿自动生成
 
@@ -746,9 +731,7 @@ class TestTravelFromInspection:
             json=webhook_payload,
         )
         # webhook 端点可能不存在（404）或正确处理（200/201/202）
-        assert resp.status_code in (200, 201, 202, 404, 405, 422), (
-            f"巡店事件 Webhook 意外失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 201, 202, 404, 405, 422), f"巡店事件 Webhook 意外失败：{resp.status_code}"
         # 若响应成功，验证响应格式
         if resp.status_code in (200, 201, 202):
             body = resp.json()
@@ -761,19 +744,16 @@ class TestTravelFromInspection:
             "/api/v1/expense/travel/requests",
             params={"page": 1, "size": 10},
         )
-        assert resp.status_code in (200, 422), (
-            f"差旅列表查询失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 422), f"差旅列表查询失败：{resp.status_code}"
         if resp.status_code == 200:
             body = resp.json()
-            assert "items" in body or "data" in body or isinstance(body, list), (
-                "差旅列表应包含 items/data 字段"
-            )
+            assert "items" in body or "data" in body or isinstance(body, list), "差旅列表应包含 items/data 字段"
 
 
 # ---------------------------------------------------------------------------
 # 综合流程测试
 # ---------------------------------------------------------------------------
+
 
 class TestFullExpenseCycle:
     """综合端到端：费控完整周期测试"""
@@ -782,9 +762,7 @@ class TestFullExpenseCycle:
     async def test_dashboard_summary(self, client: "httpx.AsyncClient"):
         """费控看板汇总接口可用性"""
         resp = await client.get("/api/v1/expense/dashboard/summary")
-        assert resp.status_code in (200, 422), (
-            f"费控看板汇总接口失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 422), f"费控看板汇总接口失败：{resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_budget_overview(self, client: "httpx.AsyncClient"):
@@ -793,9 +771,7 @@ class TestFullExpenseCycle:
             "/api/v1/expense/budgets",
             params={"budget_year": 2026, "page": 1, "size": 10},
         )
-        assert resp.status_code in (200, 422), (
-            f"预算列表接口失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 422), f"预算列表接口失败：{resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_contract_list(self, client: "httpx.AsyncClient"):
@@ -804,9 +780,7 @@ class TestFullExpenseCycle:
             "/api/v1/expense/contracts",
             params={"page": 1, "size": 10},
         )
-        assert resp.status_code in (200, 422), (
-            f"合同列表接口失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 422), f"合同列表接口失败：{resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_cost_report(self, client: "httpx.AsyncClient"):
@@ -815,17 +789,13 @@ class TestFullExpenseCycle:
             "/api/v1/expense/costs/daily-report",
             params={"report_date": today_str(-1)},
         )
-        assert resp.status_code in (200, 404, 422), (
-            f"成本日报接口意外失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 404, 422), f"成本日报接口意外失败：{resp.status_code}"
 
     @pytest.mark.asyncio
     async def test_category_list(self, client: "httpx.AsyncClient"):
         """费用科目列表接口可用性"""
         resp = await client.get("/api/v1/expense/categories")
-        assert resp.status_code in (200, 422), (
-            f"科目列表接口失败：{resp.status_code}"
-        )
+        assert resp.status_code in (200, 422), f"科目列表接口失败：{resp.status_code}"
         if resp.status_code == 200:
             body = resp.json()
             # 允许空列表（未初始化）或有数据

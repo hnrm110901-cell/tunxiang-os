@@ -42,12 +42,14 @@ class ReputationCrawlerWorker:
 
         # 查找所有有舆情数据的活跃租户
         tenant_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT tenant_id
                 FROM public_opinion_mentions
                 WHERE is_deleted = FALSE
                 LIMIT 200
-            """),
+            """
+            ),
         )
         tenant_ids = [str(r[0]) for r in tenant_rows.fetchall()]
 
@@ -65,13 +67,15 @@ class ReputationCrawlerWorker:
 
                 # 获取该租户下所有门店
                 store_rows = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT DISTINCT store_id
                         FROM public_opinion_mentions
                         WHERE tenant_id = :tid
                           AND store_id IS NOT NULL
                           AND is_deleted = FALSE
-                    """),
+                    """
+                    ),
                     {"tid": tid_str},
                 )
                 store_ids = [uuid.UUID(str(r[0])) for r in store_rows.fetchall()]

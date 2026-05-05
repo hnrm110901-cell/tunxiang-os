@@ -173,7 +173,8 @@ async def create_issue(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO ops_issues
                     (tenant_id, store_id, issue_date, issue_type, severity,
                      title, description, evidence_urls, assigned_to, due_at,
@@ -183,7 +184,8 @@ async def create_issue(
                      :title, :description, :evidence_urls::jsonb, :assigned_to, :due_at,
                      'open', :created_by)
                 RETURNING {_ISSUE_COLUMNS}
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": body.store_id,
@@ -273,13 +275,15 @@ async def list_issues(
         params["offset"] = offset
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT {_ISSUE_COLUMNS}
                 FROM ops_issues
                 WHERE {where_clause}
                 ORDER BY {severity_order}, created_at ASC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(r)) for r in rows_result.mappings()]
@@ -349,12 +353,14 @@ async def update_issue(
             set_clauses.append("due_at = :due_at")
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE ops_issues
                 SET {", ".join(set_clauses)}
                 WHERE id = :iid
                 RETURNING {_ISSUE_COLUMNS}
-            """),
+            """
+            ),
             params,
         )
         updated = result.mappings().first()
@@ -393,7 +399,8 @@ async def resolve_issue(
             raise HTTPException(status_code=409, detail=f"问题已是 {existing['status']} 状态")
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE ops_issues
                 SET status           = 'resolved',
                     resolved_at      = NOW(),
@@ -402,7 +409,8 @@ async def resolve_issue(
                     updated_at       = NOW()
                 WHERE id = :iid
                 RETURNING {_ISSUE_COLUMNS}
-            """),
+            """
+            ),
             {
                 "iid": issue_id,
                 "resolved_by": body.resolved_by,
@@ -505,7 +513,8 @@ async def auto_detect_issues(
         await _set_tenant(db, x_tenant_id)
         for params in inserts:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO ops_issues
                         (tenant_id, store_id, issue_date, issue_type, severity,
                          title, description, evidence_urls, due_at, status, created_by)
@@ -513,7 +522,8 @@ async def auto_detect_issues(
                         (:tenant_id, :store_id, :issue_date, :issue_type, :severity,
                          :title, :description, :evidence_urls::jsonb, :due_at, 'open', :created_by)
                     RETURNING id
-                """),
+                """
+                ),
                 params,
             )
             row = result.mappings().one()

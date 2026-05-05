@@ -22,7 +22,7 @@ import os
 import random
 import time
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Dict, Optional, Set
 
 import structlog
@@ -418,7 +418,7 @@ async def _upsert_reservation(
                     "type": "new_reservation",
                     "reservation": result,
                     "source": str(normalized["source_channel"]),
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                 },
             )
             return result
@@ -577,7 +577,8 @@ async def _sample_customer_from_reservations(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT customer_name, phone
             FROM reservations
             WHERE store_id = :store_id
@@ -586,7 +587,8 @@ async def _sample_customer_from_reservations(
               AND phone IS NOT NULL
             ORDER BY RANDOM()
             LIMIT 1
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         row = result.fetchone()
         if row:

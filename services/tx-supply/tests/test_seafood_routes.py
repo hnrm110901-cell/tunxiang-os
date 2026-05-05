@@ -25,8 +25,8 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from services.tx_supply.src.api.seafood_routes import router as seafood_router
 
+from services.tx_supply.src.api.seafood_routes import router as seafood_router
 from shared.ontology.src.database import get_db
 
 # ── 应用组装 ──────────────────────────────────────────────────────────────────

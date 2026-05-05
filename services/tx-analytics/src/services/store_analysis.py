@@ -95,7 +95,8 @@ async def revenue_analysis(
 
     # 每日营收
     daily_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT DATE(created_at) AS d,
                    COALESCE(SUM(total_amount_fen), 0) AS revenue_fen,
                    COUNT(*) AS order_count
@@ -108,7 +109,8 @@ async def revenue_analysis(
               AND is_deleted = false
             GROUP BY DATE(created_at)
             ORDER BY d
-        """),
+        """
+        ),
         params,
     )
     daily_rows = daily_result.mappings().all()
@@ -141,7 +143,8 @@ async def revenue_analysis(
 
     # 按渠道
     channel_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(channel, 'dine_in') AS channel,
                    COALESCE(SUM(total_amount_fen), 0) AS revenue_fen
             FROM orders
@@ -153,7 +156,8 @@ async def revenue_analysis(
               AND is_deleted = false
             GROUP BY COALESCE(channel, 'dine_in')
             ORDER BY revenue_fen DESC
-        """),
+        """
+        ),
         params,
     )
     channel_rows = channel_result.mappings().all()
@@ -168,7 +172,8 @@ async def revenue_analysis(
 
     # 按餐段
     meal_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(total_amount_fen), 0) AS revenue_fen
             FROM orders
@@ -179,7 +184,8 @@ async def revenue_analysis(
               AND status = 'paid'
               AND is_deleted = false
             GROUP BY EXTRACT(HOUR FROM created_at)::int
-        """),
+        """
+        ),
         params,
     )
     meal_rows = meal_result.mappings().all()
@@ -280,7 +286,8 @@ async def turnover_deep_analysis(
 
     # 按区域分析
     area_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT t.area,
                    COUNT(o.id) AS order_count,
                    COUNT(DISTINCT t.id) AS table_count,
@@ -296,14 +303,16 @@ async def turnover_deep_analysis(
               AND t.is_deleted = false
             GROUP BY t.area
             ORDER BY order_count DESC
-        """),
+        """
+        ),
         params,
     )
     area_rows = area_result.mappings().all()
 
     # 查询各区域桌台总数
     area_tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT area, COUNT(*) AS cnt
             FROM tables
             WHERE store_id = :store_id
@@ -311,7 +320,8 @@ async def turnover_deep_analysis(
               AND is_deleted = false
               AND is_active = true
             GROUP BY area
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     area_table_counts = {r["area"]: int(r["cnt"]) for r in area_tables_result.mappings().all()}
@@ -331,7 +341,8 @@ async def turnover_deep_analysis(
 
     # 高峰时段翻台
     peak_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM o.created_at)::int AS hour,
                    COUNT(o.id) AS order_count
             FROM orders o
@@ -344,19 +355,22 @@ async def turnover_deep_analysis(
             GROUP BY EXTRACT(HOUR FROM o.created_at)::int
             ORDER BY order_count DESC
             LIMIT 5
-        """),
+        """
+        ),
         params,
     )
     # 获取门店总桌台数
     total_tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS cnt
             FROM tables
             WHERE store_id = :store_id
               AND tenant_id = :tenant_id
               AND is_deleted = false
               AND is_active = true
-        """),
+        """
+        ),
         {"store_id": store_id, "tenant_id": tenant_id},
     )
     total_tables = total_tables_result.scalar() or 1
@@ -420,7 +434,8 @@ async def ticket_analysis(
 
     # 整体客单
     overall_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(AVG(total_amount_fen), 0) AS avg_ticket_fen,
                    COALESCE(SUM(total_amount_fen), 0) AS total_fen,
                    COALESCE(SUM(guest_count), 0) AS total_guests,
@@ -432,7 +447,8 @@ async def ticket_analysis(
               AND created_at < :day_end
               AND status = 'paid'
               AND is_deleted = false
-        """),
+        """
+        ),
         params,
     )
     overall = overall_result.mappings().first()
@@ -444,7 +460,8 @@ async def ticket_analysis(
 
     # 客单价分布（分段统计）
     dist_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 CASE
                     WHEN total_amount_fen < 5000 THEN '0-50'
@@ -463,7 +480,8 @@ async def ticket_analysis(
               AND is_deleted = false
             GROUP BY range_label
             ORDER BY MIN(total_amount_fen)
-        """),
+        """
+        ),
         params,
     )
     dist_rows = dist_result.mappings().all()
@@ -478,7 +496,8 @@ async def ticket_analysis(
 
     # 按桌台规格
     by_size_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT t.seats,
                    COALESCE(AVG(o.total_amount_fen), 0) AS avg_ticket_fen,
                    COUNT(o.id) AS order_count
@@ -493,7 +512,8 @@ async def ticket_analysis(
               AND t.is_deleted = false
             GROUP BY t.seats
             ORDER BY t.seats
-        """),
+        """
+        ),
         params,
     )
     by_table_size = [
@@ -555,7 +575,8 @@ async def peak_hour_analysis(
     }
 
     hourly_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT EXTRACT(HOUR FROM created_at)::int AS hour,
                    COALESCE(SUM(total_amount_fen), 0) AS revenue_fen,
                    COUNT(*) AS order_count
@@ -568,7 +589,8 @@ async def peak_hour_analysis(
               AND is_deleted = false
             GROUP BY EXTRACT(HOUR FROM created_at)::int
             ORDER BY hour
-        """),
+        """
+        ),
         params,
     )
     hourly_rows = hourly_result.mappings().all()
@@ -669,7 +691,8 @@ async def shift_analysis(
 
     # 按班次查询营收
     shift_revenue_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 CASE
                     WHEN EXTRACT(HOUR FROM created_at) >= 6
@@ -689,14 +712,16 @@ async def shift_analysis(
               AND is_deleted = false
             GROUP BY shift
             ORDER BY MIN(EXTRACT(HOUR FROM created_at))
-        """),
+        """
+        ),
         params,
     )
     shift_rows = shift_revenue_result.mappings().all()
 
     # 查询班次排班人数
     staff_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 CASE
                     WHEN shift_type = 'morning' THEN 'morning'
@@ -712,7 +737,8 @@ async def shift_analysis(
               AND schedule_date < :day_end
               AND is_deleted = false
             GROUP BY shift
-        """),
+        """
+        ),
         params,
     )
     staff_map = {r["shift"]: int(r["staff_count"]) for r in staff_result.mappings().all()}
@@ -796,7 +822,8 @@ async def store_comparison(
     # 查询所有目标门店的核心指标
     store_id_strs = [str(sid) for sid in store_ids]
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT s.id AS store_id,
                    s.store_name,
                    COALESCE(SUM(o.total_amount_fen), 0) AS revenue_fen,
@@ -814,7 +841,8 @@ async def store_comparison(
               AND s.tenant_id = :tenant_id
               AND s.is_deleted = false
             GROUP BY s.id, s.store_name
-        """),
+        """
+        ),
         {
             "store_ids": store_id_strs,
             "tenant_id": tenant_id,
@@ -826,7 +854,8 @@ async def store_comparison(
 
     # 查询各门店桌台数（用于翻台率）
     tables_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, COUNT(*) AS cnt
             FROM tables
             WHERE store_id = ANY(:store_ids)
@@ -834,7 +863,8 @@ async def store_comparison(
               AND is_deleted = false
               AND is_active = true
             GROUP BY store_id
-        """),
+        """
+        ),
         {"store_ids": store_id_strs, "tenant_id": tenant_id},
     )
     table_counts = {str(r["store_id"]): int(r["cnt"]) for r in tables_result.mappings().all()}

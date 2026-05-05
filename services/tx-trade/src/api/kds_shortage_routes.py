@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.kds_shortage_link import (
     get_production_rhythm,
@@ -68,7 +69,7 @@ async def api_on_shortage_reported(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "KDS 操作失败", e)
 
 
 @router.post("/rhythm")
@@ -88,7 +89,7 @@ async def api_get_production_rhythm(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "KDS 操作失败", e)
 
 
 @router.post("/optimize")
@@ -108,4 +109,4 @@ async def api_optimize_production_sequence(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "KDS 操作失败", e)

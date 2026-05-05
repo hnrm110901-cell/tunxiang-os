@@ -464,7 +464,8 @@ class MemberInsightAgent(SkillAgent):
             now = datetime.now(timezone.utc)
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     o.customer_id,
                     COUNT(DISTINCT o.id) as frequency,
@@ -480,7 +481,8 @@ class MemberInsightAgent(SkillAgent):
                 GROUP BY o.customer_id
                 ORDER BY monetary_fen DESC
                 LIMIT :top_n
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id, "top_n": top_n},
             )
 
@@ -606,7 +608,8 @@ class MemberInsightAgent(SkillAgent):
             from sqlalchemy import text
 
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(DISTINCT id) as frequency,
                     EXTRACT(DAY FROM NOW() - MAX(completed_at)) as recency_days,
@@ -615,7 +618,8 @@ class MemberInsightAgent(SkillAgent):
                 WHERE tenant_id = :tenant_id
                   AND customer_id = :customer_id
                   AND status = 'completed'
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "customer_id": customer_id},
             )
             r = dict(row.mappings().first() or {})
@@ -695,7 +699,8 @@ class MemberInsightAgent(SkillAgent):
             )
 
         rows = await self._db.execute(
-            text("""
+            text(
+                """
             SELECT
                 customer_id, visit_count,
                 total_spend_fen, clv_fen,
@@ -707,7 +712,8 @@ class MemberInsightAgent(SkillAgent):
               AND churn_probability >= :churn_threshold
             ORDER BY clv_fen DESC
             LIMIT :top_n
-        """),
+        """
+            ),
             {
                 "tenant_id": self.tenant_id,
                 "min_clv_fen": min_clv_fen,

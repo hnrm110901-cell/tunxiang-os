@@ -51,12 +51,14 @@ class ForgeBuilderService:
 
         # 加载模板脚手架
         tpl_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT template_id, template_name, scaffold_canvas, scaffold_code
                 FROM forge_builder_templates
                 WHERE template_type = :tt AND is_deleted = false
                 ORDER BY created_at DESC LIMIT 1
-            """),
+            """
+            ),
             {"tt": template_type},
         )
         tpl = tpl_row.mappings().first()
@@ -64,7 +66,8 @@ class ForgeBuilderService:
         initial_code = tpl["scaffold_code"] if tpl else ""
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_builder_projects
                     (id, tenant_id, project_id, developer_id, project_name,
                      template_type, canvas, generated_code, status)
@@ -73,7 +76,8 @@ class ForgeBuilderService:
                      :project_id, :developer_id, :project_name,
                      :template_type, :canvas::jsonb, :generated_code, 'draft')
                 RETURNING project_id, developer_id, project_name, template_type, status, created_at
-            """),
+            """
+            ),
             {
                 "project_id": project_id,
                 "developer_id": developer_id,
@@ -113,14 +117,16 @@ class ForgeBuilderService:
         total = total_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT project_id, developer_id, project_name, template_type,
                        status, created_at, updated_at
                 FROM forge_builder_projects
                 WHERE {where}
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -129,12 +135,14 @@ class ForgeBuilderService:
     # ── 获取项目详情 ─────────────────────────────────────────
     async def get_project(self, db: AsyncSession, project_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT project_id, developer_id, project_name, template_type,
                        canvas, generated_code, status, created_at, updated_at
                 FROM forge_builder_projects
                 WHERE project_id = :pid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": project_id},
         )
         row = result.mappings().first()
@@ -172,12 +180,14 @@ class ForgeBuilderService:
                 params[key] = val
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_builder_projects
                 SET {", ".join(set_parts)}
                 WHERE project_id = :pid AND is_deleted = false
                 RETURNING project_id, project_name, status, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -197,18 +207,21 @@ class ForgeBuilderService:
 
         # 更新项目状态为 submitted
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_builder_projects
                 SET status = 'submitted', updated_at = NOW()
                 WHERE project_id = :pid AND is_deleted = false
-            """),
+            """
+            ),
             {"pid": project_id},
         )
 
         # 自动创建 forge_app 记录
         app_id = f"app_{uuid4().hex[:12]}"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_apps
                     (id, tenant_id, app_id, developer_id, app_name, category,
                      description, status, current_version, source_project_id)
@@ -216,7 +229,8 @@ class ForgeBuilderService:
                     (gen_random_uuid(), current_setting('app.tenant_id')::uuid,
                      :app_id, :developer_id, :app_name, 'ai_addon',
                      :description, 'pending_review', '1.0.0', :project_id)
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "developer_id": existing["developer_id"],
@@ -250,13 +264,15 @@ class ForgeBuilderService:
 
         where = " AND ".join(conditions)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT template_id, template_name, template_type,
                        description, created_at
                 FROM forge_builder_templates
                 WHERE {where}
                 ORDER BY template_type, template_name
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -264,12 +280,14 @@ class ForgeBuilderService:
     # ── 模板详情 ─────────────────────────────────────────────
     async def get_template(self, db: AsyncSession, template_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT template_id, template_name, template_type, description,
                        scaffold_canvas, scaffold_code, created_at
                 FROM forge_builder_templates
                 WHERE template_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": template_id},
         )
         row = result.mappings().first()

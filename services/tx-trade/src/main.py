@@ -164,9 +164,7 @@ async def lifespan(app: FastAPI):
 
     await init_db()
     _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
-    _register_background_task(
-        asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory))
-    )
+    _register_background_task(asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory)))
 
     # PR-4 / R-A4-2：audit JSONL outbox 后台 flusher（消费 PR-3 落本地的审计行）。
     # 60s 间隔（默认）；TX_AUDIT_OUTBOX_FLUSHER_DISABLED=true 可紧急关停。
@@ -245,9 +243,7 @@ async def lifespan(app: FastAPI):
         )
 
         _payment_consumer = create_payment_event_consumer(async_session_factory)
-        payment_event_consumer_task = await start_payment_event_consumer(
-            _payment_consumer, async_session_factory
-        )
+        payment_event_consumer_task = await start_payment_event_consumer(_payment_consumer, async_session_factory)
         _register_background_task(payment_event_consumer_task)
         import structlog as _structlog
 
@@ -320,7 +316,7 @@ Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -506,6 +502,12 @@ app.include_router(corporate_order_router)
 app.include_router(self_delivery_router)
 
 
+# ── v391: 配送调度持久化（达达 / 顺丰同城 / 自有骑手）──
+from .api.delivery_dispatch_routes import router as delivery_dispatch_router
+
+app.include_router(delivery_dispatch_router)
+
+
 # ── Y-A5: 外卖聚合深度（美团/饿了么/抖音聚合落库 + 异常补偿 + 对账指标）──
 from .api.aggregator_reconcile_routes import router as aggregator_reconcile_router
 from .api.delivery_aggregator_routes import router as delivery_aggregator_router
@@ -589,9 +591,9 @@ _sprint_e_mount = auto_mount_routes(
     api_dir=_Path(__file__).parent / "api",
     modules=[
         ("canonical_delivery_routes", "router"),  # E1 #91
-        ("dish_publish_routes", "router"),         # E2 #92
-        ("xiaohongshu_routes", "router"),          # E3 #93
-        ("dispute_routes", "router"),              # E4 #94
+        ("dish_publish_routes", "router"),  # E2 #92
+        ("xiaohongshu_routes", "router"),  # E3 #93
+        ("dispute_routes", "router"),  # E4 #94
     ],
 )
 # 校验：失败 → stderr + WARNING；env AUTO_MOUNT_STRICT=1 时 sys.exit(1)
@@ -625,6 +627,11 @@ from .api.reservation_invitation_routes import (
 )
 
 app.include_router(reservation_invitation_router)
+
+# ── W12-5：TV 菜单屏后端（25 端点，对齐前端 menuWallApi.ts 25 函数）──
+from .api.tv_menu_routes import router as tv_menu_router
+
+app.include_router(tv_menu_router)
 
 
 @app.get("/health")

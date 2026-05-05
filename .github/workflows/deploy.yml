@@ -38,7 +38,7 @@ jobs:
           python-version: '3.11'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-deploy
@@ -108,8 +108,8 @@ jobs:
           script: |
             cd /opt/tunxiang-os
             git pull origin main
-            docker-compose -f docker-compose.staging.yml --env-file .env.staging pull
-            docker-compose -f docker-compose.staging.yml --env-file .env.staging up -d
+            docker compose -f infra/compose/base.yml -f infra/compose/envs/staging.yml --env-file .env.staging pull
+            docker compose -f infra/compose/base.yml -f infra/compose/envs/staging.yml --env-file .env.staging up -d
             echo "Staging deploy completed at $(date)"
 
       - name: Health check (staging)
@@ -184,8 +184,8 @@ jobs:
             ./scripts/migrate.sh up
 
             # 拉取新镜像并滚动重启
-            docker-compose -f docker-compose.prod.yml pull
-            docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml pull
+            docker compose -f infra/compose/base.yml -f infra/compose/envs/prod.yml up -d --remove-orphans
 
             echo "Production deploy completed at $(date)"
 

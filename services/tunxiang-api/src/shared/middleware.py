@@ -3,14 +3,14 @@
 与 gateway/src/middleware/ 包内中间件职责对齐，适配单体入口（独立实现）。
 """
 
-import logging
 import time
 import uuid
 
+import structlog
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
-logger = logging.getLogger("tunxiang-api")
+logger = structlog.get_logger("tunxiang-api")
 
 
 class TenantMiddleware(BaseHTTPMiddleware):
@@ -40,11 +40,11 @@ class RequestLogMiddleware(BaseHTTPMiddleware):
         duration_ms = round((time.perf_counter() - start) * 1000, 2)
 
         logger.info(
-            "request method=%s path=%s status=%d duration_ms=%.2f tenant_id=%s",
-            request.method,
-            request.url.path,
-            response.status_code,
-            duration_ms,
-            getattr(request.state, "tenant_id", None),
+            "request",
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=duration_ms,
+            tenant_id=getattr(request.state, "tenant_id", None),
         )
         return response

@@ -43,6 +43,7 @@ from services.webhook_dispatcher import WebhookDispatcher
 #  Helpers
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _make_db_mock() -> AsyncMock:
     """创建模拟AsyncSession"""
     db = AsyncMock()
@@ -86,14 +87,16 @@ def _configure_db_for_issue_token(
         if call_count == 1:
             # 第1次: SELECT app by app_key
             row = MagicMock()
-            row.__getitem__ = MagicMock(side_effect=lambda k: {
-                "id": app_id,
-                "tenant_id": tenant_id,
-                "app_secret_hash": secret_hash,
-                "status": status,
-                "scopes": scopes,
-                "rate_limit_per_min": 60,
-            }[k])
+            row.__getitem__ = MagicMock(
+                side_effect=lambda k: {
+                    "id": app_id,
+                    "tenant_id": tenant_id,
+                    "app_secret_hash": secret_hash,
+                    "status": status,
+                    "scopes": scopes,
+                    "rate_limit_per_min": 60,
+                }[k]
+            )
             mock_result.mappings.return_value.fetchone.return_value = row
         elif call_count == 2:
             # 第2次: INSERT token
@@ -133,14 +136,16 @@ def _configure_db_for_verify_token(
         mock_result = MagicMock()
         if call_count == 1:
             row = MagicMock()
-            row.__getitem__ = MagicMock(side_effect=lambda k: {
-                "id": token_id,
-                "tenant_id": tenant_id,
-                "app_id": app_id,
-                "scopes": scopes,
-                "expires_at": expires_at,
-                "revoked_at": revoked_at,
-            }[k])
+            row.__getitem__ = MagicMock(
+                side_effect=lambda k: {
+                    "id": token_id,
+                    "tenant_id": tenant_id,
+                    "app_id": app_id,
+                    "scopes": scopes,
+                    "expires_at": expires_at,
+                    "revoked_at": revoked_at,
+                }[k]
+            )
             mock_result.mappings.return_value.fetchone.return_value = row
         else:
             mock_result.fetchone = MagicMock(return_value=None)
@@ -153,6 +158,7 @@ def _configure_db_for_verify_token(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 1: 应用注册返回app_key + app_secret（明文只一次）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_create_application_returns_app_key_and_secret() -> None:
@@ -180,6 +186,7 @@ async def test_create_application_returns_app_key_and_secret() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 2: secret以hash形式存储，不含明文
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_create_application_secret_stored_as_hash() -> None:
@@ -223,6 +230,7 @@ async def test_create_application_secret_stored_as_hash() -> None:
 #  Test 3: issue_token成功返回access_token
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_issue_token_success() -> None:
     svc = OAuth2Service()
@@ -251,6 +259,7 @@ async def test_issue_token_success() -> None:
 #  Test 4: issue_token with wrong secret → PermissionError
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_issue_token_wrong_secret_raises() -> None:
     svc = OAuth2Service()
@@ -272,6 +281,7 @@ async def test_issue_token_wrong_secret_raises() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 5: issue_token with suspended app → PermissionError
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_issue_token_suspended_app_raises() -> None:
@@ -295,6 +305,7 @@ async def test_issue_token_suspended_app_raises() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 6: verify_token成功
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_verify_token_success() -> None:
@@ -320,6 +331,7 @@ async def test_verify_token_success() -> None:
 #  Test 7: verify_token expired → None
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_verify_token_expired_returns_none() -> None:
     svc = OAuth2Service()
@@ -330,8 +342,7 @@ async def test_verify_token_expired_returns_none() -> None:
     tenant_id = str(uuid4())
 
     _configure_db_for_verify_token(
-        db, svc, raw_token, token_id, app_id, tenant_id,
-        scopes=["orders:read"], expired=True
+        db, svc, raw_token, token_id, app_id, tenant_id, scopes=["orders:read"], expired=True
     )
 
     result = await svc.verify_token(raw_token, None, db)
@@ -341,6 +352,7 @@ async def test_verify_token_expired_returns_none() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 8: verify_token revoked → None
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_verify_token_revoked_returns_none() -> None:
@@ -352,8 +364,7 @@ async def test_verify_token_revoked_returns_none() -> None:
     tenant_id = str(uuid4())
 
     _configure_db_for_verify_token(
-        db, svc, raw_token, token_id, app_id, tenant_id,
-        scopes=["orders:read"], revoked=True
+        db, svc, raw_token, token_id, app_id, tenant_id, scopes=["orders:read"], revoked=True
     )
 
     result = await svc.verify_token(raw_token, None, db)
@@ -364,6 +375,7 @@ async def test_verify_token_revoked_returns_none() -> None:
 #  Test 9: scope超集检查（requested > allowed → PermissionError）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_issue_token_scope_exceeded_raises() -> None:
     svc = OAuth2Service()
@@ -373,10 +385,7 @@ async def test_issue_token_scope_exceeded_raises() -> None:
     secret = "scope-test-secret"
 
     # app只有orders:read权限
-    _configure_db_for_issue_token(
-        db, svc, app_id, tenant_id, secret,
-        scopes=["orders:read"]
-    )
+    _configure_db_for_issue_token(db, svc, app_id, tenant_id, secret, scopes=["orders:read"])
 
     with pytest.raises(PermissionError, match="scope"):
         await svc.issue_token(
@@ -390,6 +399,7 @@ async def test_issue_token_scope_exceeded_raises() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 10: rate_limit超出限制
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_exceeded() -> None:
@@ -409,6 +419,7 @@ async def test_rate_limit_exceeded() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 11: rate_limit Redis不可用时优雅降级
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_rate_limit_redis_unavailable_degrades_gracefully() -> None:
@@ -437,6 +448,7 @@ async def test_rate_limit_redis_not_configured_degrades_gracefully() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 12: rotate_secret吊销旧token
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_rotate_secret_revokes_old_tokens() -> None:
@@ -481,6 +493,7 @@ async def test_rotate_secret_revokes_old_tokens() -> None:
 #  Test 13: webhook dispatch发送HMAC签名
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_webhook_dispatch_sends_hmac_signature() -> None:
     dispatcher = WebhookDispatcher()
@@ -503,8 +516,7 @@ async def test_webhook_dispatch_sends_hmac_signature() -> None:
     row = MagicMock()
     row.__iter__ = MagicMock(return_value=iter([]))
     webhooks_list = [
-        {"id": webhook_id, "endpoint_url": "https://example.com/hook",
-         "secret_hash": secret_hash, "retry_count": 3}
+        {"id": webhook_id, "endpoint_url": "https://example.com/hook", "secret_hash": secret_hash, "retry_count": 3}
     ]
     db_result.mappings.return_value.fetchall.return_value = [MagicMock(**wh) for wh in webhooks_list]
 
@@ -561,6 +573,7 @@ async def test_webhook_dispatch_sends_hmac_signature() -> None:
 #  Test 14: webhook signature验证
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_webhook_signature_verify() -> None:
     dispatcher = WebhookDispatcher()
     secret_hash = "my-webhook-secret"
@@ -583,6 +596,7 @@ def test_webhook_signature_tampered_body_fails() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 15: webhook retry on failure
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_webhook_retry_on_server_error() -> None:
@@ -626,13 +640,20 @@ async def test_webhook_retry_on_server_error() -> None:
 #  Test 16: 请求日志不含金额/敏感字段
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def test_request_log_schema_no_sensitive_fields() -> None:
     """验证api_request_logs表结构不含金额/密钥敏感字段"""
     # 从migration文件中验证字段定义
     migration_path = os.path.join(
         os.path.dirname(__file__),
-        "..", "..", "..", "..",
-        "shared", "db-migrations", "versions", "v069_open_api_platform.py"
+        "..",
+        "..",
+        "..",
+        "..",
+        "shared",
+        "db-migrations",
+        "versions",
+        "v069_open_api_platform.py",
     )
     migration_path = os.path.normpath(migration_path)
 
@@ -660,6 +681,7 @@ def test_request_log_schema_no_sensitive_fields() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Test 17: 租户隔离（跨租户不可见）
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 @pytest.mark.asyncio
 async def test_tenant_isolation_app_not_visible_cross_tenant() -> None:
@@ -701,6 +723,7 @@ async def test_tenant_isolation_rotate_secret_wrong_tenant() -> None:
 #  Test 18: revoke_token后verify返回None
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 @pytest.mark.asyncio
 async def test_revoke_token_then_verify_returns_none() -> None:
     svc = OAuth2Service()
@@ -720,9 +743,7 @@ async def test_revoke_token_then_verify_returns_none() -> None:
     # 第二次调用: verify_token — 查不到（已吊销）
     db.reset_mock()
     _configure_db_for_verify_token(
-        db, svc, raw_token, token_id,
-        app_id=str(uuid4()), tenant_id=str(uuid4()),
-        scopes=["orders:read"], revoked=True
+        db, svc, raw_token, token_id, app_id=str(uuid4()), tenant_id=str(uuid4()), scopes=["orders:read"], revoked=True
     )
 
     result = await svc.verify_token(raw_token, None, db)
@@ -732,6 +753,7 @@ async def test_revoke_token_then_verify_returns_none() -> None:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  额外: PBKDF2哈希一致性
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 def test_hash_secret_deterministic() -> None:
     """相同输入，哈希结果相同"""

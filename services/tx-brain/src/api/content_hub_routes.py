@@ -19,6 +19,8 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services.content_hub import (
     BrandVoiceConfig,
     CampaignContentRequest,
@@ -137,7 +139,7 @@ async def generate_campaign_content(
         return {"ok": True, "data": package.model_dump()}
     except ValueError as exc:
         logger.warning("content_generate_validation_error", tenant_id=tenant_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     except (ConnectionError, TimeoutError) as exc:
         logger.error("content_generate_upstream_error", tenant_id=tenant_id, error=str(exc))
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
@@ -165,7 +167,7 @@ async def generate_review_response(
         )
         return {"ok": True, "data": {"response": response_text, "rating": body.rating}}
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     except (ConnectionError, TimeoutError) as exc:
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
 
@@ -186,7 +188,7 @@ async def generate_dish_story(
         )
         return {"ok": True, "data": {"story": story, "dish_name": body.dish_name}}
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     except (ConnectionError, TimeoutError) as exc:
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
 
@@ -220,7 +222,7 @@ async def generate_xiaohongshu_note(
         return {"ok": True, "data": result}
     except ValueError as exc:
         logger.warning("xhs_note_validation_error", tenant_id=tenant_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     except (ConnectionError, TimeoutError) as exc:
         logger.error("xhs_note_upstream_error", tenant_id=tenant_id, error=str(exc))
         raise HTTPException(status_code=503, detail="AI service temporarily unavailable") from exc
@@ -240,7 +242,8 @@ async def get_cache_stats(
             {"tid": str(tenant_id)},
         )
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE expires_at > NOW()) AS active_count,
                     COUNT(*) FILTER (WHERE expires_at <= NOW()) AS expired_count,
@@ -250,7 +253,8 @@ async def get_cache_stats(
                 FROM ai_content_cache
                 WHERE tenant_id = current_setting('app.tenant_id')::uuid
                   AND NOT is_deleted
-            """),
+            """
+            ),
         )
         stats = row.mappings().one_or_none()
         return {

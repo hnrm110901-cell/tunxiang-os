@@ -550,7 +550,8 @@ async def save_analysis_to_db(
     status = "escalated" if result.has_critical or result.has_legal_risk else "analyzed"
 
     await db.execute(
-        text("""
+        text(
+            """
         INSERT INTO salary_anomaly_analyses (
             id, tenant_id, store_id, employee_id,
             analysis_month, analysis_scope, employee_count, total_payroll_fen, city,
@@ -584,7 +585,8 @@ async def save_analysis_to_db(
             status = EXCLUDED.status,
             updated_at = NOW()
         RETURNING id
-    """),
+    """
+        ),
         {
             "id": record_id,
             "tenant_id": tenant_id,

@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@ant-design/charts": "^2.6.7",
-    "@ant-design/icons": "^6.1.1",
+    "@ant-design/icons": "^6.2.2",
     "@ant-design/pro-components": "^2.8.10",
     "antd": "^5.12.0",
     "dayjs": "^1.11.0",
@@ -20,7 +20,7 @@
     "dompurify": "^3.1.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^7.14.1",
+    "react-router-dom": "^7.14.2",
     "zustand": "^5.0.12",
     "@tunxiang/design-system": "workspace:*",
     "@tx/tokens": "workspace:*"
@@ -29,9 +29,9 @@
     "@types/dompurify": "^3.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.2.0",
-    "typescript": "^6.0.2",
-    "vite": "^5.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.3",
     "eslint": "^10.2.1"
   }
 }

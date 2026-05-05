@@ -22,6 +22,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.omni_channel_service import (
     OmniChannelError,
@@ -179,10 +180,10 @@ async def webhook_receive_order(
         log.info("omni_channel.webhook.ok", platform_order_id=order.platform_order_id)
         return {"ok": True, "data": {"order_id": order.internal_order_id, "platform": platform}, "error": None}
     except UnsupportedPlatformError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except OmniChannelError as exc:
         log.error("omni_channel.webhook.failed", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise safe_http_exception(500, "服务器内部错误", exc) from exc
 
 
 @router.get("/orders/pending", summary="待接单列表（所有平台混合）")
@@ -248,7 +249,7 @@ async def accept_order(
         await db.commit()
         return {"ok": True, "data": result, "error": None}
     except OmniChannelError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.post("/orders/{order_id}/reject", summary="拒单")
@@ -274,7 +275,7 @@ async def reject_order(
         await db.commit()
         return {"ok": True, "data": result, "error": None}
     except OmniChannelError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 @router.get("/orders", summary="历史订单（含渠道）")
@@ -396,7 +397,7 @@ async def get_unified_orders_hq(
             size=size,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return {"ok": True, "data": data, "error": None}
 
 
@@ -502,7 +503,8 @@ async def _enrich_order_with_mappings(
             continue
 
         mapping_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT dish_id
                 FROM platform_dish_mappings
                 WHERE tenant_id       = :tid
@@ -511,7 +513,8 @@ async def _enrich_order_with_mappings(
                   AND platform_item_id = :platform_item_id
                   AND is_active       = true
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "sid": sid,
@@ -528,7 +531,8 @@ async def _enrich_order_with_mappings(
             # 未映射：upsert 占位记录（is_active=false，待人工处理）
             try:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO platform_dish_mappings
                             (tenant_id, store_id, platform, platform_item_id,
                              platform_item_name, dish_id, is_active, updated_at)
@@ -543,7 +547,8 @@ async def _enrich_order_with_mappings(
                             ),
                             updated_at = NOW()
                         WHERE platform_dish_mappings.dish_id IS NULL
-                    """),
+                    """
+                    ),
                     {
                         "tid": tid,
                         "sid": sid,
@@ -589,7 +594,8 @@ async def get_unmapped_items(
     all_unmapped: list[dict] = []
     for plat in platforms_to_check:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT platform_item_id, platform_item_name, created_at, updated_at
                 FROM platform_dish_mappings
                 WHERE tenant_id = :tid
@@ -597,7 +603,8 @@ async def get_unmapped_items(
                   AND platform  = :platform
                   AND dish_id IS NULL
                 ORDER BY updated_at DESC
-            """),
+            """
+            ),
             {"tid": tid, "sid": sid, "platform": plat},
         )
         for row in result.fetchall():
@@ -616,7 +623,8 @@ async def get_unmapped_items(
     if include_suggestions and all_unmapped:
         # 获取内部菜品候选
         dish_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_name
                 FROM dishes
                 WHERE tenant_id = :tid
@@ -624,7 +632,8 @@ async def get_unmapped_items(
                   AND is_available = true
                   AND is_deleted = false
                 ORDER BY dish_name
-            """),
+            """
+            ),
             {"tid": tid, "sid": sid},
         )
         dish_rows = dish_result.fetchall()

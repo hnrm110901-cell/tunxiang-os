@@ -167,7 +167,8 @@ class TableSessionService:
         ]
 
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO table_sessions
                     (id, tenant_id, store_id, table_id, session_token,
                      participants, cart_items, status, expires_at,
@@ -177,7 +178,8 @@ class TableSessionService:
                      :participants::jsonb, '[]'::jsonb, 'active', :expires_at,
                      :now, :now)
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "id": session_id,
                 "tenant_id": self._tenant_id,
@@ -226,14 +228,16 @@ class TableSessionService:
 
         now = _now_utc()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE table_sessions
                 SET participants = :participants::jsonb,
                     updated_at   = :now
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "participants": json.dumps(participants, ensure_ascii=False),
                 "now": now,
@@ -258,11 +262,13 @@ class TableSessionService:
     ) -> Optional[TableSession]:
         """获取会话（含实时 cart_items）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM table_sessions
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
-            """),
+            """
+            ),
             {"token": session_token, "tenant_id": self._tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -312,7 +318,8 @@ class TableSessionService:
 
         now = _now_utc()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE table_sessions
                 SET cart_items   = :cart::jsonb,
                     participants = :participants::jsonb,
@@ -320,7 +327,8 @@ class TableSessionService:
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "cart": json.dumps(cart, ensure_ascii=False),
                 "participants": json.dumps(participants, ensure_ascii=False),
@@ -369,7 +377,8 @@ class TableSessionService:
 
         now = _now_utc()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE table_sessions
                 SET cart_items   = :cart::jsonb,
                     participants = :participants::jsonb,
@@ -377,7 +386,8 @@ class TableSessionService:
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "cart": json.dumps(new_cart, ensure_ascii=False),
                 "participants": json.dumps(participants, ensure_ascii=False),
@@ -425,7 +435,8 @@ class TableSessionService:
 
         # 插入 Order
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO orders
                     (id, tenant_id, store_id, order_no, table_number,
                      sales_channel, total_amount_fen, discount_amount_fen,
@@ -435,7 +446,8 @@ class TableSessionService:
                     (:id, :tenant_id, :store_id, :order_no, :table_number,
                      'collab_scan_order', :total_fen, 0,
                      :total_fen, 'confirmed', :now, :now, FALSE)
-            """),
+            """
+            ),
             {
                 "id": order_id,
                 "tenant_id": self._tenant_id,
@@ -454,7 +466,8 @@ class TableSessionService:
             item_id = uuid.uuid4()
             order_item_ids.append(str(item_id))
             await self._db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO order_items
                         (id, tenant_id, order_id, dish_id, item_name,
                          quantity, unit_price_fen, subtotal_fen,
@@ -465,7 +478,8 @@ class TableSessionService:
                          :quantity, :price_fen, :subtotal_fen,
                          '', FALSE, FALSE,
                          :now, :now)
-                """),
+                """
+                ),
                 {
                     "id": item_id,
                     "tenant_id": self._tenant_id,
@@ -502,12 +516,14 @@ class TableSessionService:
             )
             # 标记已发送 KDS
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE order_items
                     SET sent_to_kds_flag = TRUE
                     WHERE order_id   = :order_id
                       AND tenant_id  = :tenant_id
-                """),
+                """
+                ),
                 {"order_id": order_id, "tenant_id": self._tenant_id},
             )
             kds_sent = True
@@ -523,7 +539,8 @@ class TableSessionService:
 
         # 更新 session 状态
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE table_sessions
                 SET order_id     = :order_id,
                     status       = 'submitted',
@@ -531,7 +548,8 @@ class TableSessionService:
                     updated_at   = :now
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
-            """),
+            """
+            ),
             {
                 "order_id": order_id,
                 "now": now,
@@ -573,7 +591,8 @@ class TableSessionService:
         call_id = uuid.uuid4()
         now = _now_utc()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO waiter_calls
                     (id, tenant_id, store_id, table_id, session_id,
                      call_type, note, status, created_at)
@@ -581,7 +600,8 @@ class TableSessionService:
                     (:id, :tenant_id, :store_id, :table_id, :session_id,
                      :call_type, :note, 'pending', :now)
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "id": call_id,
                 "tenant_id": self._tenant_id,
@@ -612,7 +632,8 @@ class TableSessionService:
         """服务员确认响应"""
         now = _now_utc()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE waiter_calls
                 SET status          = 'acknowledged',
                     acknowledged_by = :waiter_id,
@@ -621,7 +642,8 @@ class TableSessionService:
                   AND tenant_id = :tenant_id
                   AND status    = 'pending'
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "waiter_id": waiter_id,
                 "now": now,
@@ -647,13 +669,15 @@ class TableSessionService:
     ) -> list[WaiterCall]:
         """获取门店当前未处理的呼叫（服务员端使用）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM waiter_calls
                 WHERE tenant_id = :tenant_id
                   AND store_id  = :store_id
                   AND status    = 'pending'
                 ORDER BY created_at ASC
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "store_id": store_id},
         )
         rows = result.mappings().all()
@@ -664,11 +688,13 @@ class TableSessionService:
     async def _fetch_session_row(self, session_token: str) -> dict:
         """获取会话行（不校验状态）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM table_sessions
                 WHERE session_token = :token
                   AND tenant_id     = :tenant_id
-            """),
+            """
+            ),
             {"token": session_token, "tenant_id": self._tenant_id},
         )
         row = result.mappings().one_or_none()

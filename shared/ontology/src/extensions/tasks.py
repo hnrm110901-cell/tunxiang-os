@@ -100,10 +100,7 @@ class Task(BaseModel):
     )
     payload: dict[str, Any] = Field(
         default_factory=dict,
-        description=(
-            "任务上下文，典型结构："
-            "{reservation_id, banquet_lead_id, target_id, channel, notes}"
-        ),
+        description=("任务上下文，典型结构：{reservation_id, banquet_lead_id, target_id, channel, notes}"),
     )
     dispatched_at: datetime = Field(
         ...,

@@ -12,7 +12,7 @@
 """
 
 import uuid as _uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 import structlog
@@ -91,7 +91,8 @@ async def list_today_banquet_sessions(
     await _rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT bs.id, bs.session_name, bs.scheduled_at, bs.actual_open_at,
                bs.status, bs.guest_count, bs.table_count,
                bs.current_section_id, bs.next_section_at,
@@ -106,7 +107,8 @@ async def list_today_banquet_sessions(
           AND bs.is_deleted = false
           AND bs.status NOT IN ('cancelled')
         ORDER BY bs.scheduled_at
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(store_id), "tid": _uuid.UUID(tid)},
     )
 
@@ -116,7 +118,10 @@ async def list_today_banquet_sessions(
         # 计算到开席倒计时秒数
         countdown_seconds = None
         if r[2] and r[4] == "scheduled":
-            delta = r[2].replace(tzinfo=None) - datetime.utcnow()
+            # PG TIMESTAMPTZ → aware datetime；datetime.now(timezone.utc) 也是 aware
+            # PG.2 codemod 把 utcnow() → now(timezone.utc) 但漏删 .replace(tzinfo=None)，
+            # 导致 naive - aware TypeError。两边都 aware 即可（结果相同）
+            delta = r[2] - datetime.now(timezone.utc)
             countdown_seconds = max(0, int(delta.total_seconds()))
 
         sessions.append(
@@ -161,12 +166,14 @@ async def banquet_open(
 
     # 查宴席场次
     session_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT bs.id, bs.status, bs.table_ids, bs.order_ids,
                bs.banquet_menu_id, bs.table_count, bs.guest_count
         FROM banquet_sessions bs
         WHERE bs.id = :sid AND bs.tenant_id = :tid AND bs.is_deleted = false
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(req.session_id), "tid": tiduid},
     )
     session = session_result.fetchone()
@@ -177,7 +184,8 @@ async def banquet_open(
 
     # 获取宴席菜单第一节菜品
     first_section_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT s.id AS section_id, s.section_name, s.serve_delay_minutes,
                mi.dish_id, mi.dish_name, mi.quantity_per_table, mi.note
         FROM banquet_menu_sections s
@@ -188,7 +196,8 @@ async def banquet_open(
             WHERE menu_id = :mid AND tenant_id = :tid
           )
         ORDER BY mi.sort_order
-    """),
+    """
+        ),
         {"mid": session[4], "tid": tiduid},
     )
     first_section_items = first_section_result.fetchall()
@@ -207,11 +216,13 @@ async def banquet_open(
 
         # 查找菜品对应档口
         dept_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT dept_id FROM dish_dept_mappings
             WHERE dish_id = :did AND tenant_id = :tid
             LIMIT 1
-        """),
+        """
+            ),
             {"did": dish_id, "tid": tiduid},
         )
         dept_row = dept_result.fetchone()
@@ -232,7 +243,8 @@ async def banquet_open(
 
             task_id = _uuid.uuid4()
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO kds_tasks
                     (id, tenant_id, dept_id, dish_id, dish_name,
                      quantity, table_number, notes, status, priority,
@@ -242,7 +254,8 @@ async def banquet_open(
                      :qty, :tno, :notes, 'pending', 'normal',
                      :session_id, :section_id)
                 ON CONFLICT DO NOTHING
-            """),
+            """
+                ),
                 {
                     "id": task_id,
                     "tid": tiduid,
@@ -260,14 +273,16 @@ async def banquet_open(
 
     # 更新场次状态
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE banquet_sessions SET
             status = 'serving',
             actual_open_at = now(),
             current_section_id = :section_id,
             updated_at = now()
         WHERE id = :sid AND tenant_id = :tid
-    """),
+    """
+        ),
         {"section_id": _uuid.UUID(first_section_id), "sid": _uuid.UUID(req.session_id), "tid": tiduid},
     )
 
@@ -308,14 +323,16 @@ async def push_next_section(
 
     # 查该节菜品
     items_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT mi.dish_id, mi.dish_name, mi.quantity_per_table, mi.note,
                s.section_name, s.serve_sequence
         FROM banquet_menu_items mi
         JOIN banquet_menu_sections s ON s.id = mi.section_id
         WHERE mi.section_id = :sec_id AND mi.tenant_id = :tid
         ORDER BY mi.sort_order
-    """),
+    """
+        ),
         {"sec_id": _uuid.UUID(req.section_id), "tid": tiduid},
     )
     items = items_result.fetchall()
@@ -326,10 +343,12 @@ async def push_next_section(
 
     # 获取场次桌台信息
     session_result = await db.execute(
-        text("""
+        text(
+            """
         SELECT table_count, table_ids FROM banquet_sessions
         WHERE id = :sid AND tenant_id = :tid
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(req.session_id), "tid": tiduid},
     )
     session = session_result.fetchone()
@@ -345,10 +364,12 @@ async def push_next_section(
 
         # 查档口映射
         dept_result = await db.execute(
-            text("""
+            text(
+                """
             SELECT dept_id FROM dish_dept_mappings
             WHERE dish_id = :did AND tenant_id = :tid LIMIT 1
-        """),
+        """
+            ),
             {"did": dish_id, "tid": tiduid},
         )
         dept_row = dept_result.fetchone()
@@ -367,7 +388,8 @@ async def push_next_section(
 
             task_id = _uuid.uuid4()
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO kds_tasks
                     (id, tenant_id, dept_id, dish_id, dish_name,
                      quantity, table_number, notes, status, priority,
@@ -376,7 +398,8 @@ async def push_next_section(
                     (:id, :tid, :dept, :did, :dname,
                      :qty, :tno, :notes, 'pending', 'normal',
                      :session_id, :section_id)
-            """),
+            """
+                ),
                 {
                     "id": task_id,
                     "tid": tiduid,
@@ -394,11 +417,13 @@ async def push_next_section(
 
     # 更新场次当前节
     await db.execute(
-        text("""
+        text(
+            """
         UPDATE banquet_sessions SET
             current_section_id = :sec_id, updated_at = now()
         WHERE id = :sid AND tenant_id = :tid
-    """),
+    """
+        ),
         {"sec_id": _uuid.UUID(req.section_id), "sid": _uuid.UUID(req.session_id), "tid": tiduid},
     )
 
@@ -430,7 +455,8 @@ async def get_banquet_progress(
     await _rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
         SELECT
             s.section_name,
             s.serve_sequence,
@@ -448,7 +474,8 @@ async def get_banquet_progress(
         ) AND s.tenant_id = :tid
         GROUP BY s.id, s.section_name, s.serve_sequence
         ORDER BY s.serve_sequence
-    """),
+    """
+        ),
         {"sid": _uuid.UUID(session_id), "tid": _uuid.UUID(tid)},
     )
 

@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.customer_journey_service import CustomerJourneyService
 
@@ -197,7 +198,7 @@ async def update_template(
             max_concurrent=req.max_concurrent,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -216,7 +217,7 @@ async def delete_template(
             template_id=template_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -235,7 +236,7 @@ async def toggle_template(
             template_id=template_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -290,7 +291,7 @@ async def update_step(
             skip_if_responded=req.skip_if_responded,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -309,7 +310,7 @@ async def delete_step(
             step_id=step_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -415,7 +416,7 @@ async def pause_enrollment(
             enrollment_id=enrollment_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -434,7 +435,7 @@ async def resume_enrollment(
             enrollment_id=enrollment_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 
@@ -453,7 +454,7 @@ async def cancel_enrollment(
             enrollment_id=enrollment_id,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
     await db.commit()
     return {"ok": True, "data": result}
 

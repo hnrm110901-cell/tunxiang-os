@@ -155,13 +155,15 @@ async def _get_current_market_session_id(
     now_time = datetime.now().time()
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, start_time, end_time
             FROM store_market_sessions
             WHERE tenant_id = :tid
               AND store_id = :sid
               AND is_active = TRUE
-        """),
+        """
+        ),
         {"tid": tenant_id, "sid": store_id},
     )
     rows = result.fetchall()
@@ -206,14 +208,16 @@ async def get_current_session(
 
     # 1. 先查门店自定义配置
     store_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, start_time, end_time, template_id, menu_plan_id
             FROM store_market_sessions
             WHERE tenant_id = :tid
               AND store_id = :sid
               AND is_active = TRUE
             ORDER BY start_time
-        """),
+        """
+        ),
         {"tid": tid, "sid": str(store_id)},
     )
     store_rows = store_result.fetchall()
@@ -244,13 +248,15 @@ async def get_current_session(
 
     # 2. 回落到集团模板
     tmpl_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, code, start_time, end_time
             FROM market_session_templates
             WHERE tenant_id = :tid
               AND is_active = TRUE
             ORDER BY display_order, start_time
-        """),
+        """
+        ),
         {"tid": tid},
     )
     tmpl_rows = tmpl_result.fetchall()
@@ -293,13 +299,15 @@ async def list_store_sessions(
     await _set_rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, start_time, end_time, template_id, menu_plan_id,
                    is_active, created_at, updated_at
             FROM store_market_sessions
             WHERE tenant_id = :tid AND store_id = :sid
             ORDER BY start_time
-        """),
+        """
+        ),
         {"tid": tid, "sid": str(store_id)},
     )
     rows = result.fetchall()
@@ -332,14 +340,16 @@ async def create_store_session(
 
     new_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO store_market_sessions
                 (id, tenant_id, store_id, template_id, name, start_time, end_time,
                  menu_plan_id, is_active)
             VALUES
                 (:id, :tid, :sid, :template_id, :name, :start_time, :end_time,
                  :menu_plan_id, :is_active)
-        """),
+        """
+        ),
         {
             "id": new_id,
             "tid": tid,
@@ -368,11 +378,13 @@ async def delete_store_session(
     await _set_rls(db, tid)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE store_market_sessions
             SET is_active = FALSE, updated_at = NOW()
             WHERE id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": str(session_id), "tid": tid},
     )
     await db.commit()
@@ -397,13 +409,15 @@ async def list_templates(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, code, display_order, start_time, end_time,
                        brand_id, is_active, created_at
                 FROM market_session_templates
                 WHERE tenant_id = :tid
                 ORDER BY display_order, start_time
-            """),
+            """
+            ),
             {"tid": tid},
         )
         rows = result.fetchall()
@@ -444,14 +458,16 @@ async def create_template(
 
     new_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO market_session_templates
                 (id, tenant_id, brand_id, name, code, display_order,
                  start_time, end_time, is_active)
             VALUES
                 (:id, :tid, :brand_id, :name, :code, :display_order,
                  :start_time, :end_time, :is_active)
-        """),
+        """
+        ),
         {
             "id": new_id,
             "tid": tid,
@@ -538,11 +554,13 @@ async def switch_market_session(
 
     # 验证目标市别存在
     session_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, start_time, end_time
             FROM store_market_sessions
             WHERE id = :sid AND store_id = :store_id AND tenant_id = :tid AND is_active = TRUE
-        """),
+        """
+        ),
         {"sid": body.new_session_id, "store_id": str(store_id), "tid": tid},
     )
     session_row = session_result.mappings().one_or_none()

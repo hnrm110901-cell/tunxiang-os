@@ -225,17 +225,13 @@ class CustomerLifecycleProjector(ProjectorBase):
         否则从 customers 表 fallback 近似——last_order_at / total_order_count
         均为"本次退款已扣除"后的快照（假设业务层在发事件前已更新）。
         """
-        reversal_type = (
-            "order_cancelled" if event_type == _ORDER_CANCELLED else "order_refunded"
-        )
+        reversal_type = "order_cancelled" if event_type == _ORDER_CANCELLED else "order_refunded"
 
         previous_paid_order_at_raw = payload.get("previous_paid_order_at")
         previous_paid_order_at: datetime | None = None
         if isinstance(previous_paid_order_at_raw, str):
             try:
-                previous_paid_order_at = datetime.fromisoformat(
-                    previous_paid_order_at_raw
-                )
+                previous_paid_order_at = datetime.fromisoformat(previous_paid_order_at_raw)
             except ValueError:
                 previous_paid_order_at = None
         elif isinstance(previous_paid_order_at_raw, datetime):
@@ -263,9 +259,7 @@ class CustomerLifecycleProjector(ProjectorBase):
             )
 
         if previous_paid_order_at is not None and previous_paid_order_at.tzinfo is None:
-            previous_paid_order_at = previous_paid_order_at.replace(
-                tzinfo=timezone.utc
-            )
+            previous_paid_order_at = previous_paid_order_at.replace(tzinfo=timezone.utc)
 
         await fsm.handle_order_reversal(
             customer_id=customer_id,

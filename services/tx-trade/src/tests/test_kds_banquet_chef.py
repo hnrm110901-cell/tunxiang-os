@@ -164,9 +164,9 @@ def test_list_today_banquet_sessions_success():
     # r[7]=current_section_id, r[8]=next_section_at,
     # r[9]=menu_name, r[10]=per_person_fen,
     # r[11]=current_section_name, r[12]=current_serve_sequence
-    from datetime import datetime, timedelta
+    from datetime import datetime, timedelta, timezone
 
-    scheduled = datetime.utcnow() + timedelta(hours=1)
+    scheduled = datetime.now(timezone.utc) + timedelta(hours=1)
 
     fake_row = MagicMock()
     fake_row.__getitem__ = lambda self, idx: [

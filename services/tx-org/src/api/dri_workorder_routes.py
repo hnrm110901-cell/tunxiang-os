@@ -88,12 +88,14 @@ async def _generate_order_no(db: AsyncSession) -> str:
     prefix = f"DRI-{today_str}-"
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT MAX(order_no) AS max_no
             FROM dri_work_orders
             WHERE order_no LIKE :prefix || '%'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"prefix": prefix},
     )
     row = result.fetchone()
@@ -311,7 +313,8 @@ async def create_work_order(
     order_no = await _generate_order_no(db)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO dri_work_orders (
                 id, tenant_id, order_no, order_type, store_id, title,
                 description, severity, status, dri_user_id, collaborators,
@@ -324,7 +327,8 @@ async def create_work_order(
                 FALSE, :now, :now
             )
             RETURNING id::text AS order_id, order_no
-        """),
+        """
+        ),
         {
             "id": order_id,
             "tid": tenant_id,
@@ -394,7 +398,8 @@ async def get_work_order_statistics(
         params["date_to"] = datetime.combine(date_to, datetime.max.time(), tzinfo=timezone.utc)
 
     # 按状态统计
-    status_sql = text(f"""
+    status_sql = text(
+        f"""
         SELECT
             COUNT(*) FILTER (WHERE wo.status = 'draft') AS draft,
             COUNT(*) FILTER (WHERE wo.status = 'assigned') AS assigned,
@@ -404,47 +409,55 @@ async def get_work_order_statistics(
             COUNT(*) FILTER (WHERE wo.status = 'cancelled') AS cancelled
         FROM dri_work_orders wo
         WHERE wo.is_deleted = FALSE {extra_filters}
-    """)
+    """
+    )
     status_result = await db.execute(status_sql, params)
     status_row = dict(status_result.fetchone()._mapping)
     by_status = {k: int(v or 0) for k, v in status_row.items()}
 
     # 按工单类型统计
-    type_sql = text(f"""
+    type_sql = text(
+        f"""
         SELECT wo.order_type, COUNT(*) AS count
         FROM dri_work_orders wo
         WHERE wo.is_deleted = FALSE {extra_filters}
         GROUP BY wo.order_type
-    """)
+    """
+    )
     type_result = await db.execute(type_sql, params)
     by_type_raw = {r._mapping["order_type"]: int(r._mapping["count"]) for r in type_result.fetchall()}
     by_type = {t: by_type_raw.get(t, 0) for t in VALID_ORDER_TYPES}
 
     # 按严重度统计
-    sev_sql = text(f"""
+    sev_sql = text(
+        f"""
         SELECT wo.severity, COUNT(*) AS count
         FROM dri_work_orders wo
         WHERE wo.is_deleted = FALSE {extra_filters}
         GROUP BY wo.severity
-    """)
+    """
+    )
     sev_result = await db.execute(sev_sql, params)
     by_sev_raw = {r._mapping["severity"]: int(r._mapping["count"]) for r in sev_result.fetchall()}
     by_severity = {s: by_sev_raw.get(s, 0) for s in VALID_SEVERITIES}
 
     # 逾期数量
-    overdue_sql = text(f"""
+    overdue_sql = text(
+        f"""
         SELECT COUNT(*) AS overdue_count
         FROM dri_work_orders wo
         WHERE wo.is_deleted = FALSE
           AND wo.due_date < CURRENT_DATE
           AND wo.status NOT IN ('completed', 'closed', 'cancelled')
           {extra_filters}
-    """)
+    """
+    )
     overdue_result = await db.execute(overdue_sql, params)
     overdue_count = int(overdue_result.scalar() or 0)
 
     # 平均解决天数
-    avg_sql = text(f"""
+    avg_sql = text(
+        f"""
         SELECT COALESCE(
             AVG(EXTRACT(EPOCH FROM (wo.completed_at - wo.created_at)) / 86400),
             0
@@ -454,7 +467,8 @@ async def get_work_order_statistics(
           AND wo.status = 'completed'
           AND wo.completed_at IS NOT NULL
           {extra_filters}
-    """)
+    """
+    )
     avg_result = await db.execute(avg_sql, params)
     avg_resolution_days = round(float(avg_result.scalar() or 0), 2)
 
@@ -565,7 +579,8 @@ async def get_work_order_detail(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             wo.id::text AS order_id,
             wo.order_no,
@@ -591,7 +606,8 @@ async def get_work_order_detail(
         LEFT JOIN stores s ON s.id = wo.store_id AND s.is_deleted = FALSE
         LEFT JOIN employees e ON e.id = wo.dri_user_id AND e.is_deleted = FALSE
         WHERE wo.id = :order_id AND wo.is_deleted = FALSE
-    """)
+    """
+    )
 
     result = await db.execute(sql, {"order_id": order_id})
     row = result.fetchone()
@@ -624,10 +640,12 @@ async def update_work_order(
 
     # 先查当前状态，校验是否可编辑
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT status FROM dri_work_orders
             WHERE id = :order_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"order_id": order_id},
     )
     check_row = check.fetchone()
@@ -677,12 +695,14 @@ async def update_work_order(
 
     set_sql = ", ".join(set_clauses)
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE dri_work_orders
             SET {set_sql}
             WHERE id = :order_id AND is_deleted = FALSE
             RETURNING id::text AS order_id
-        """),
+        """
+        ),
         params,
     )
     row = result.fetchone()
@@ -729,10 +749,12 @@ async def transition_work_order(
 
     # 查询当前状态
     current = await db.execute(
-        text("""
+        text(
+            """
             SELECT status FROM dri_work_orders
             WHERE id = :order_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"order_id": order_id},
     )
     current_row = current.fetchone()
@@ -776,12 +798,14 @@ async def transition_work_order(
         params["resolution"] = req.resolution
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE dri_work_orders
             SET status = :target, updated_at = :now {extra_sets}
             WHERE id = :order_id AND is_deleted = FALSE
             RETURNING id::text AS order_id, status
-        """),
+        """
+        ),
         params,
     )
     row = result.fetchone()
@@ -835,13 +859,15 @@ async def add_action_item(
     }
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE dri_work_orders
             SET actions = COALESCE(actions, '[]'::jsonb) || :new_action::jsonb,
                 updated_at = :now
             WHERE id = :order_id AND is_deleted = FALSE
             RETURNING id::text AS order_id, actions
-        """),
+        """
+        ),
         {
             "order_id": order_id,
             "new_action": json.dumps(new_action),
@@ -890,11 +916,13 @@ async def complete_action_item(
 
     # 先查询当前 actions 长度以验证 index
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT jsonb_array_length(COALESCE(actions, '[]'::jsonb)) AS len
             FROM dri_work_orders
             WHERE id = :order_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"order_id": order_id},
     )
     check_row = check.fetchone()
@@ -910,7 +938,8 @@ async def complete_action_item(
 
     # 使用嵌套 jsonb_set 更新 status / result / completed_at
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE dri_work_orders
             SET actions = jsonb_set(
                     jsonb_set(
@@ -928,7 +957,8 @@ async def complete_action_item(
                 updated_at = :now
             WHERE id = :order_id AND is_deleted = FALSE
             RETURNING id::text AS order_id, actions
-        """),
+        """
+        ),
         {
             "order_id": order_id,
             "path_status": f"{{{action_index},status}}",
@@ -981,10 +1011,12 @@ async def delete_work_order(
 
     # 先查状态，仅 draft 可删
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT status FROM dri_work_orders
             WHERE id = :order_id AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"order_id": order_id},
     )
     check_row = check.fetchone()
@@ -1000,12 +1032,14 @@ async def delete_work_order(
 
     now = datetime.now(timezone.utc)
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE dri_work_orders
             SET is_deleted = TRUE, updated_at = :now
             WHERE id = :order_id AND is_deleted = FALSE AND status = 'draft'
             RETURNING id::text AS order_id
-        """),
+        """
+        ),
         {"order_id": order_id, "now": now},
     )
     row = result.fetchone()

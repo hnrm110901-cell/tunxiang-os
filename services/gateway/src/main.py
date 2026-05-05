@@ -23,8 +23,8 @@ from .hub_api import router as hub_router
 from .material_routes import router as material_router
 from .middleware import AuthMiddleware, RequestLogMiddleware, TenantMiddleware
 from .middleware.api_key_middleware import ApiKeyMiddleware
-from .middleware.domain_authz_middleware import DomainAuthzMiddleware
 from .middleware.audit_middleware import AuditMiddleware
+from .middleware.domain_authz_middleware import DomainAuthzMiddleware
 from .personalization_middleware import PersonalizationMiddleware
 from .proxy import router as proxy_router
 from .response import ok

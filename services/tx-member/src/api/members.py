@@ -8,13 +8,14 @@ from uuid import uuid4
 import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
-from services.repository import WecomRepository
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import MemberEventType
 from shared.ontology.src.database import get_db_with_tenant
+
+from ..services.repository import WecomRepository
 
 logger = structlog.get_logger()
 
@@ -400,9 +401,12 @@ async def bind_customer_by_external_id(
     log.info("bind_customer_by_external_id")
 
     try:
-        follow_at = datetime.fromisoformat(req.wecom_follow_at)
-    except ValueError:
-        follow_at = datetime.utcnow()
+        # 微信回调 follow_at 可能不带时区（"2024-01-01T08:00:00"）→ 强制视为 UTC
+        # 否则 naive 与下游 aware 字段比较 TypeError，且 JSONB 序列化丢时区
+        parsed = datetime.fromisoformat(req.wecom_follow_at)
+        follow_at = parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        follow_at = datetime.now(timezone.utc)
 
     try:
         async with get_db_with_tenant(x_tenant_id) as db:

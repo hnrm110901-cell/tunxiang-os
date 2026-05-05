@@ -525,7 +525,8 @@ class IMSOPBridgeService:
             from sqlalchemy import text
 
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE sop_task_instances
                     SET result = COALESCE(result, '{}'::jsonb)
                         || jsonb_build_object(
@@ -543,7 +544,8 @@ class IMSOPBridgeService:
                         updated_at = NOW()
                     WHERE id = :instance_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "photo_url": photo_url,
                     "user_id": user_id,
@@ -968,7 +970,8 @@ class IMSOPBridgeService:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE sop_task_instances
                     SET status = 'completed',
                         completed_at = NOW(),
@@ -979,7 +982,8 @@ class IMSOPBridgeService:
                       AND tenant_id = :tenant_id
                       AND status IN ('pending', 'in_progress')
                     RETURNING id
-                """),
+                """
+                ),
                 {"instance_id": instance_id, "tenant_id": tenant_id},
             )
             row = result.fetchone()
@@ -1019,7 +1023,8 @@ class IMSOPBridgeService:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sop_corrective_actions
                         (tenant_id, store_id, source_instance_id,
                          action_type, severity, title, description,
@@ -1032,7 +1037,8 @@ class IMSOPBridgeService:
                          :user_id,
                          NOW() + INTERVAL '2 hours')
                     RETURNING id
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "store_id": store_id,
@@ -1071,7 +1077,8 @@ class IMSOPBridgeService:
 
             try:
                 await self.db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE sop_corrective_actions
                         SET status = 'escalated',
                             escalated_to = :user_id,
@@ -1079,7 +1086,8 @@ class IMSOPBridgeService:
                             updated_at = NOW()
                         WHERE id = :action_id
                           AND tenant_id = :tenant_id
-                    """),
+                    """
+                    ),
                     {
                         "action_id": action_id,
                         "tenant_id": tenant_id,
@@ -1114,7 +1122,8 @@ class IMSOPBridgeService:
 
         try:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE sop_task_instances
                     SET result = COALESCE(result, '{}'::jsonb)
                         || jsonb_build_object(
@@ -1131,7 +1140,8 @@ class IMSOPBridgeService:
                         updated_at = NOW()
                     WHERE id = :instance_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "note": note,
                     "user_id": user_id,

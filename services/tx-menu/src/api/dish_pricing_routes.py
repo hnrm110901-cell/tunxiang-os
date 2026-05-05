@@ -10,13 +10,14 @@
   POST /api/v1/menu/dish/pricing/revert/{id}  → reverted
   GET  /api/v1/menu/dish/pricing/summary      按 store 聚合
 """
+
 from __future__ import annotations
 
-import logging
 from datetime import date as date_cls
 from typing import Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -32,7 +33,7 @@ from ..services.dish_dynamic_pricing_service import (
     transition_status,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/menu/dish/pricing",
     tags=["menu-dish-pricing"],
@@ -40,6 +41,7 @@ router = APIRouter(
 
 
 # ── 请求/响应模型 ────────────────────────────────────────────────
+
 
 class ObservationInput(BaseModel):
     day: date_cls
@@ -54,13 +56,15 @@ class SuggestRequest(BaseModel):
     cost_fen: int = Field(ge=0)
     current_daily_qty: int = Field(ge=0, description="当前日均销量（用于估算收益变化）")
     observations: list[ObservationInput] = Field(
-        ..., min_length=0,
+        ...,
+        min_length=0,
         description="历史 price-qty 观测点，≥14 点走 log-log，不足走 prior",
     )
     store_id: Optional[str] = None
 
 
 # ── 端点 ────────────────────────────────────────────────────────
+
 
 @router.post("/suggest", response_model=dict)
 async def suggest_pricing(
@@ -73,10 +77,7 @@ async def suggest_pricing(
     _parse_uuid(req.dish_id, "dish_id")
 
     observations = [
-        PricingObservation(
-            day=o.day, price_fen=o.price_fen, quantity_sold=o.quantity_sold
-        )
-        for o in req.observations
+        PricingObservation(day=o.day, price_fen=o.price_fen, quantity_sold=o.quantity_sold) for o in req.observations
     ]
 
     service = DishDynamicPricingService()
@@ -92,8 +93,9 @@ async def suggest_pricing(
     if not suggestion.constraint_check.get("margin_floor_passed"):
         # 本 PR 仍持久化（方便审计），但标记 rejected 建议
         logger.warning(
-            "dish_pricing_margin_floor_violation dish=%s current_margin=%s",
-            req.dish_name, suggestion.current_margin_rate,
+            "dish_pricing_margin_floor_violation",
+            dish=req.dish_name,
+            current_margin=suggestion.current_margin_rate,
         )
 
     try:
@@ -280,7 +282,9 @@ async def pricing_summary(
         raise HTTPException(status_code=400, detail="months_back ∈ [1, 12]")
 
     try:
-        result = await db.execute(text("""
+        result = await db.execute(
+            text(
+                """
             SELECT
                 status,
                 sonnet_risk_level,
@@ -297,7 +301,10 @@ async def pricing_summary(
               AND created_at >= CURRENT_DATE - (:months_back || ' months')::interval
             GROUP BY status, sonnet_risk_level
             ORDER BY status, sonnet_risk_level NULLS LAST
-        """), {"tenant_id": x_tenant_id, "months_back": str(months_back)})
+        """
+            ),
+            {"tenant_id": x_tenant_id, "months_back": str(months_back)},
+        )
         rows = [dict(r) for r in result.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("dish_pricing_summary_failed")
@@ -322,8 +329,7 @@ async def pricing_summary(
                 "actual_total_margin_delta_fen": total_actual,
                 "actual_total_margin_delta_yuan": round(total_actual / 100, 2),
                 "actual_vs_expected_pct": (
-                    round(total_actual / total_expected * 100, 2)
-                    if total_expected > 0 else None
+                    round(total_actual / total_expected * 100, 2) if total_expected > 0 else None
                 ),
             },
         },
@@ -332,10 +338,9 @@ async def pricing_summary(
 
 # ── 辅助 ────────────────────────────────────────────────────────
 
+
 def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

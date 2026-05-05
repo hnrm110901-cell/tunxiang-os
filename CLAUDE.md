@@ -145,8 +145,35 @@ tunxiang-os/
     skill_registry/             # Agent Skill 注册表
     api-types/                  # 跨服务 API 类型定义（TypeScript）
   infra/
-    docker/                     # Docker Compose（dev/prod/staging/gray/demo）
-    helm/                       # Kubernetes Helm Chart（11 个）
+    compose/                    # Docker Compose（P0.5 收敛后唯一权威源）
+      base.yml                  #   16 服务公共定义（image/build/端口/env/network）
+      envs/                     #   环境 override（叠加 base 使用）
+        dev.yml                 #     开发环境（端口暴露 + 热重载 + Vite Dev）
+        staging.yml             #     预发（镜像构建 + auth=on + 资源减半）
+        prod.yml                #     生产（PG 主从 + Nginx + Celery + pg-backup）
+        demo.yml                #     演示（精简 6 业务 + migrate + seed）
+        gray.yml                #     灰度（network_mode=host + 复用生产 PG）
+      tenants/                  #   租户身份层（纯商户身份，无端口偏移；
+                                #     生产独立部署 / 演示叠加 demo / 联调叠加
+                                #     special/multi-host-dev 三种用法）
+        czyz.yml                #     尝在一起
+        zqx.yml                 #     最黔线
+        sgc.yml                 #     尚宫厨
+      special/                  #   叠加层（叠加任意 env 使用）
+        resource-limits.yml     #     压测资源限制
+        toxiproxy.yml           #     故障注入设施
+        multi-host-dev.yml      #     同机多租户联调端口暴露层（dev-only）
+        .env.czyz.dev.example   #     czyz 联调端口偏移示例（offset 0）
+        .env.zqx.dev.example    #     zqx 联调端口偏移示例（offset +100）
+        .env.sgc.dev.example    #     sgc 联调端口偏移示例（offset +200）
+    docker/                     # Dockerfile + init-rls.sql + .env.example（保留）
+    helm/                       # Kubernetes Helm Chart（21 个，工件齐全）— P0.6（2026-05）
+                                # 每 chart 含 11 文件：Chart.yaml + values.yaml +
+                                # _helpers.tpl + deployment + service + hpa +
+                                # NOTES.txt + serviceaccount + poddisruptionbudget +
+                                # networkpolicy + configmap（部分 chart 另含 ingress）
+                                # PDB Tier 化：T1 minA=1 / T2 maxU=1 / T3 default off
+                                # NetPol/ConfigMap 全部默认 disabled，业务按需启用
     nginx/                      # Nginx 反代 + SSL + WebSocket
     tailscale/                  # Tailscale 网络配置
     jumpserver/                 # 堡垒机配置

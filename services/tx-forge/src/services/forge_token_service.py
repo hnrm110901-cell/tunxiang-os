@@ -42,7 +42,8 @@ class ForgeTokenService:
 
         # UPSERT 日粒度
         daily_result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_token_meters
                     (app_id, period_type, period_key,
                      input_tokens, output_tokens, total_tokens, cost_fen)
@@ -59,7 +60,8 @@ class ForgeTokenService:
                 RETURNING app_id, period_type, period_key,
                           input_tokens, output_tokens, total_tokens,
                           cost_fen, budget_fen, alert_threshold, alert_sent
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "period_key": today,
@@ -73,7 +75,8 @@ class ForgeTokenService:
 
         # UPSERT 月粒度
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_token_meters
                     (app_id, period_type, period_key,
                      input_tokens, output_tokens, total_tokens, cost_fen)
@@ -87,7 +90,8 @@ class ForgeTokenService:
                     total_tokens  = forge_token_meters.total_tokens  + EXCLUDED.total_tokens,
                     cost_fen      = forge_token_meters.cost_fen      + EXCLUDED.cost_fen,
                     updated_at    = NOW()
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "period_key": month,
@@ -107,13 +111,15 @@ class ForgeTokenService:
 
         if budget_fen > 0 and usage_pct >= threshold and not alert_sent:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE forge_token_meters
                     SET alert_sent = true
                     WHERE app_id = :app_id
                       AND period_type = 'daily'
                       AND period_key = :period_key
-                """),
+                """
+                ),
                 {"app_id": app_id, "period_key": today},
             )
             logger.warning(
@@ -163,7 +169,8 @@ class ForgeTokenService:
             period_key = date.today().isoformat() if period_type == "daily" else date.today().strftime("%Y-%m")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, period_type, period_key,
                        input_tokens, output_tokens, total_tokens,
                        cost_fen, budget_fen, alert_threshold, alert_sent,
@@ -172,7 +179,8 @@ class ForgeTokenService:
                 WHERE app_id = :app_id
                   AND period_type = :period_type
                   AND period_key = :period_key
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "period_type": period_type,
@@ -208,7 +216,8 @@ class ForgeTokenService:
     ) -> list[dict]:
         """最近 N 天的日用量趋势。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT period_key, input_tokens, output_tokens,
                        total_tokens, cost_fen
                 FROM forge_token_meters
@@ -216,7 +225,8 @@ class ForgeTokenService:
                   AND period_type = 'daily'
                   AND period_key >= (CURRENT_DATE - :days)::text
                 ORDER BY period_key ASC
-            """),
+            """
+            ),
             {"app_id": app_id, "days": days},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -233,7 +243,8 @@ class ForgeTokenService:
     ) -> dict:
         """UPSERT Token 单价配置。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_token_prices
                     (app_id, input_price_per_1k_fen, output_price_per_1k_fen,
                      markup_rate)
@@ -247,7 +258,8 @@ class ForgeTokenService:
                     updated_at              = NOW()
                 RETURNING app_id, input_price_per_1k_fen, output_price_per_1k_fen,
                           markup_rate, updated_at
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "input_price": input_price_per_1k_fen,
@@ -275,12 +287,14 @@ class ForgeTokenService:
     ) -> dict:
         """查询应用的 Token 单价配置。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, input_price_per_1k_fen, output_price_per_1k_fen,
                        markup_rate, updated_at
                 FROM forge_token_prices
                 WHERE app_id = :app_id
-            """),
+            """
+            ),
             {"app_id": app_id},
         )
         row = result.mappings().first()
@@ -311,7 +325,8 @@ class ForgeTokenService:
         period_key = date.today().isoformat() if period_type == "daily" else date.today().strftime("%Y-%m")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_token_meters
                     (app_id, period_type, period_key, budget_fen, alert_threshold)
                 VALUES
@@ -324,7 +339,8 @@ class ForgeTokenService:
                     updated_at      = NOW()
                 RETURNING app_id, period_type, period_key,
                           budget_fen, alert_threshold, cost_fen, total_tokens
-            """),
+            """
+            ),
             {
                 "app_id": app_id,
                 "period_type": period_type,
@@ -352,7 +368,8 @@ class ForgeTokenService:
     ) -> list[dict]:
         """查询所有超预算且未发送告警的应用。"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, period_type, period_key,
                        total_tokens, cost_fen, budget_fen, alert_threshold
                 FROM forge_token_meters
@@ -360,7 +377,8 @@ class ForgeTokenService:
                   AND alert_sent = false
                   AND cost_fen >= budget_fen * alert_threshold / 100
                 ORDER BY cost_fen DESC
-            """),
+            """
+            ),
         )
         rows = [dict(r) for r in result.mappings().all()]
         for row in rows:

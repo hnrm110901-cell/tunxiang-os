@@ -1,0 +1,138 @@
+# ============================================================
+# 屯象OS 租户身份层 — 尝在一起 (czyz)
+# ============================================================
+# 本文件是 **纯商户身份层**，只承载与该商户绑定的：
+#   - 独占数据库（tunxiang_czyz）
+#   - 商户编码 / 租户ID / 品牌名 env
+#   - 商户专属种子（scripts/seed_czyz.py）
+#   - 独占 volume / network 命名空间
+#
+# 本文件 **不再承载**：
+#   - host 端口映射（生产部署各家在自己的 VM/服务器上跑，
+#     端口走默认 8000/5432/6379 等，docker-network 内部直连即可，
+#     外部访问由各 VM 的 nginx/反代自配）
+#   - 端口偏移（同机多实例联调请叠加 special/multi-host-dev.yml）
+#
+# 生产场景用法（独立部署，无偏移）:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/prod.yml \
+#                  -f infra/compose/tenants/czyz.yml up -d
+#
+# 演示场景用法:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/demo.yml \
+#                  -f infra/compose/tenants/czyz.yml up -d
+#
+# 同机多家联调（dev 专用，不要叠加到生产）:
+#   见 infra/compose/special/multi-host-dev.yml 与
+#   .env.czyz.dev.example
+#
+# KPI 重点：翻台率 / 出餐时间 / 座位利用率
+# ============================================================
+
+x-czyz-env: &czyz-env
+  TX_MERCHANT_CODE: czyz
+  TX_TENANT_ID: czyz-demo-tenant
+  TX_MERCHANT_NAME: 尝在一起
+  DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_czyz_2024@postgres:5432/tunxiang_czyz
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_czyz_2024
+      POSTGRES_DB: tunxiang_czyz
+    volumes:
+      - czyz_pg_data:/var/lib/postgresql/data
+      - ../docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+
+  gateway:
+    environment:
+      <<: *czyz-env
+
+  tx-trade:
+    environment:
+      <<: *czyz-env
+
+  tx-menu:
+    environment:
+      <<: *czyz-env
+
+  tx-member:
+    environment:
+      <<: *czyz-env
+
+  tx-ops:
+    environment:
+      <<: *czyz-env
+
+  tx-finance:
+    environment:
+      <<: *czyz-env
+
+  tx-analytics:
+    environment:
+      <<: *czyz-env
+
+  # 种子数据：迁移完成后执行 czyz 专属 seed
+  # profiles: [seed] —— 默认不启动；需要播种时显式 `--profile seed`
+  # （生产部署只在初始化时跑一次，独立部署也不需要常驻此 service）
+  # 依赖的 migrate 服务由 envs/demo.yml 提供；prod 场景因 profile 不激活
+  # 而被 compose 整体丢弃，不会触发 depends_on 校验。
+  seed-data:
+    image: python:3.11-slim
+    working_dir: /app
+    restart: "no"
+    profiles:
+      - seed
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             sqlalchemy asyncpg psycopg2-binary httpx &&
+             python3 /app/scripts/seed_czyz.py &&
+             echo 'czyz 种子数据植入完成'"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_czyz_2024@postgres:5432/tunxiang_czyz
+      PYTHONPATH: /app
+      TX_MERCHANT_CODE: czyz
+      TX_TENANT_ID: czyz-demo-tenant
+    volumes:
+      - ../../scripts:/app/scripts
+      - ../../shared:/app/shared
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-czyz}"
+      tunxiang.tenant: czyz
+
+  web-admin:
+    environment:
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    volumes: !override
+      - ../../apps/web-admin:/app
+      - czyz_web_admin_nm:/app/node_modules
+
+  web-pos:
+    environment:
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    volumes: !override
+      - ../../apps/web-pos:/app
+      - czyz_web_pos_nm:/app/node_modules
+
+  web-kds:
+    environment:
+      VITE_MERCHANT_CODE: czyz
+      VITE_TENANT_ID: czyz-demo-tenant
+    volumes: !override
+      - ../../apps/web-kds:/app
+      - czyz_web_kds_nm:/app/node_modules
+
+volumes:
+  czyz_pg_data:
+  czyz_web_admin_nm:
+  czyz_web_pos_nm:
+  czyz_web_kds_nm:

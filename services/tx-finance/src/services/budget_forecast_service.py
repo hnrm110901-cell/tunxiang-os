@@ -29,19 +29,20 @@
 Service 层硬编码 model_id=claude-sonnet-4-7 覆盖 ModelRouter 默认值，
 走 Anthropic Prompt Cache beta。
 """
+
 from __future__ import annotations
 
 import json
-import logging
 import re
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Awaitable, Callable, Optional
 
+import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 # ─────────────────────────────────────────────────────────────
 # 常量
@@ -91,13 +92,7 @@ class MonthlyPnL:
 
     @property
     def total_cost_fen(self) -> int:
-        return (
-            self.food_cost_fen
-            + self.labor_cost_fen
-            + self.rent_fen
-            + self.utility_fen
-            + self.other_fen
-        )
+        return self.food_cost_fen + self.labor_cost_fen + self.rent_fen + self.utility_fen + self.other_fen
 
     @property
     def net_fen(self) -> int:
@@ -236,11 +231,7 @@ class BudgetForecastResult:
 
     @property
     def cache_hit_rate(self) -> float:
-        total = (
-            self.cache_read_tokens
-            + self.cache_creation_tokens
-            + self.input_tokens
-        )
+        total = self.cache_read_tokens + self.cache_creation_tokens + self.input_tokens
         if total <= 0:
             return 0.0
         return round(self.cache_read_tokens / total, 4)
@@ -442,7 +433,7 @@ def parse_sonnet_response(raw: str) -> dict:
     try:
         return json.loads(stripped)
     except json.JSONDecodeError:
-        logger.warning("budget_forecast_parse_failed", extra={"raw_preview": raw[:200]})
+        logger.warning("budget_forecast_parse_failed", raw_preview=raw[:200])
         return {}
 
 
@@ -561,7 +552,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                 risk_type="compliance_breach",
                 severity=severity,
                 delta_fen=labor_pred - _median(labor_costs),
-                evidence=f"人工占营收 {labor_ratio*100:.1f}%，超法规红线 30%",
+                evidence=f"人工占营收 {labor_ratio * 100:.1f}%，超法规红线 30%",
                 legal_flag=True,
             )
         )
@@ -583,7 +574,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                 risk_type="cost_overrun",
                 severity=severity,
                 delta_fen=food_pred - _median(food_costs),
-                evidence=f"食材占营收 {food_ratio*100:.1f}%，超行业红线 45%",
+                evidence=f"食材占营收 {food_ratio * 100:.1f}%，超行业红线 45%",
                 legal_flag=True,
             )
         )
@@ -607,7 +598,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                     risk_type="margin_compression",
                     severity="medium" if margin >= 0 else "critical",
                     delta_fen=net_pred - _median([m.net_fen for m in history]),
-                    evidence=f"预测净利率 {margin*100:.1f}% 比历史中位数 {hist_median*100:.1f}% 低 {(hist_median-margin)*100:.1f}pp",
+                    evidence=f"预测净利率 {margin * 100:.1f}% 比历史中位数 {hist_median * 100:.1f}% 低 {(hist_median - margin) * 100:.1f}pp",
                     legal_flag=False,
                 )
             )
@@ -626,7 +617,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
                     risk_type="cost_overrun",
                     severity="medium",
                     delta_fen=current - med,
-                    evidence=f"{item} 环比涨幅 {((current-med)/med)*100:.1f}%，超 {COST_OVERRUN_THRESHOLD_PCT*100:.0f}% 阈值",
+                    evidence=f"{item} 环比涨幅 {((current - med) / med) * 100:.1f}%，超 {COST_OVERRUN_THRESHOLD_PCT * 100:.0f}% 阈值",
                     legal_flag=False,
                 )
             )
@@ -645,7 +636,7 @@ def fallback_forecast(bundle: BudgetSignalBundle) -> BudgetForecastResult:
     result.preventive_actions = actions
     result.sonnet_analysis = (
         f"[规则引擎] 基于 {len(history)} 个月历史中位数 × 近期趋势系数预测。"
-        f"预测营收 {rev_pred/100:.0f}元，净利 {net_pred/100:.0f}元（{margin*100:.1f}%）。"
+        f"预测营收 {rev_pred / 100:.0f}元，净利 {net_pred / 100:.0f}元（{margin * 100:.1f}%）。"
         f"共识别 {len(risks)} 个 variance 风险。"
     )
 
@@ -675,10 +666,11 @@ class BudgetForecastService:
 
     async def forecast(self, bundle: BudgetSignalBundle) -> BudgetForecastResult:
         if self._invoker is None:
-            logger.info("budget_forecast_fallback_rule_engine", extra={
-                "forecast_month": bundle.forecast_month.isoformat(),
-                "business_type": bundle.business_type,
-            })
+            logger.info(
+                "budget_forecast_fallback_rule_engine",
+                forecast_month=bundle.forecast_month.isoformat(),
+                business_type=bundle.business_type,
+            )
             return fallback_forecast(bundle)
 
         request = CachedPromptBuilder.build_messages(bundle)
@@ -692,18 +684,14 @@ class BudgetForecastService:
 
         return self._parse_response(response, fallback_bundle=bundle)
 
-    def _parse_response(
-        self, response: dict, fallback_bundle: BudgetSignalBundle
-    ) -> BudgetForecastResult:
+    def _parse_response(self, response: dict, fallback_bundle: BudgetSignalBundle) -> BudgetForecastResult:
         """从 Anthropic 响应中提取 JSON + usage"""
         result = BudgetForecastResult(model_id=SONNET_CACHED_MODEL)
 
         # usage
         usage = response.get("usage", {}) or {}
         result.cache_read_tokens = int(usage.get("cache_read_input_tokens", 0) or 0)
-        result.cache_creation_tokens = int(
-            usage.get("cache_creation_input_tokens", 0) or 0
-        )
+        result.cache_creation_tokens = int(usage.get("cache_creation_input_tokens", 0) or 0)
         result.input_tokens = int(usage.get("input_tokens", 0) or 0)
         result.output_tokens = int(usage.get("output_tokens", 0) or 0)
 
@@ -778,9 +766,10 @@ class BudgetForecastService:
         # 一致性校验：如 Sonnet 没返回 7 项 line_item，补规则引擎
         predicted_items = {li.line_item for li in result.predicted_line_items}
         if not set(LINE_ITEMS).issubset(predicted_items):
-            logger.warning("budget_forecast_incomplete_line_items", extra={
-                "missing": list(set(LINE_ITEMS) - predicted_items),
-            })
+            logger.warning(
+                "budget_forecast_incomplete_line_items",
+                missing=list(set(LINE_ITEMS) - predicted_items),
+            )
             fb = fallback_forecast(fallback_bundle)
             result.predicted_line_items = fb.predicted_line_items
             result.sonnet_analysis += "\n[行数不全，line_items 使用规则引擎补齐]"
@@ -822,15 +811,9 @@ async def save_forecast_to_db(
             },
             ensure_ascii=False,
         ),
-        "predicted_line_items": json.dumps(
-            [li.to_dict() for li in result.predicted_line_items], ensure_ascii=False
-        ),
-        "variance_risks": json.dumps(
-            [r.to_dict() for r in result.variance_risks], ensure_ascii=False
-        ),
-        "preventive_actions": json.dumps(
-            [a.to_dict() for a in result.preventive_actions], ensure_ascii=False
-        ),
+        "predicted_line_items": json.dumps([li.to_dict() for li in result.predicted_line_items], ensure_ascii=False),
+        "variance_risks": json.dumps([r.to_dict() for r in result.variance_risks], ensure_ascii=False),
+        "preventive_actions": json.dumps([a.to_dict() for a in result.preventive_actions], ensure_ascii=False),
         "sonnet_analysis": result.sonnet_analysis,
         "predicted_revenue_fen": max(0, result.predicted_revenue_fen),
         "predicted_net_fen": result.predicted_net_fen,
@@ -844,7 +827,8 @@ async def save_forecast_to_db(
     }
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO budget_forecast_analyses (
                 tenant_id, brand_id, store_id, forecast_month, forecast_scope,
                 history_months, business_type, history_snapshot,
@@ -888,7 +872,8 @@ async def save_forecast_to_db(
                 status = EXCLUDED.status,
                 updated_at = NOW()
             RETURNING id
-        """),
+        """
+        ),
         payload,
     )
     analysis_id = row.scalar_one()

@@ -106,7 +106,8 @@ async def ai_recommend_dishes(
 
     # 获取门店在售菜品
     dish_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT d.id, d.name, d.category, d.price_fen,
                    d.tags, d.margin_rate, d.monthly_sales
             FROM dishes d
@@ -114,7 +115,8 @@ async def ai_recommend_dishes(
               AND d.is_deleted = false AND d.on_sale = true
             ORDER BY d.monthly_sales DESC
             LIMIT 200
-        """),
+        """
+        ),
         {"tid": tenant_id, "sid": store_id},
     )
     dishes = [dict(r) for r in dish_rows.mappings().all()]
@@ -123,14 +125,16 @@ async def ai_recommend_dishes(
     history_dish_ids: set[str] = set()
     if customer_id:
         hist_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT oi.dish_id
                 FROM order_items oi
                 JOIN orders o ON o.id = oi.order_id
                 WHERE o.customer_id = :cid AND o.tenant_id = :tid
                 ORDER BY oi.dish_id
                 LIMIT 50
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": tenant_id},
         )
         history_dish_ids = {str(r[0]) for r in hist_rows.fetchall() if r[0]}
@@ -248,14 +252,16 @@ async def calculate_combo_suggestion(
 
     # 查询可用菜品 (按类别分组)
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, category, price_fen, margin_rate
             FROM dishes
             WHERE tenant_id = :tid AND store_id = :sid
               AND is_deleted = false AND on_sale = true
             ORDER BY margin_rate DESC, price_fen ASC
             LIMIT 100
-        """),
+        """
+        ),
         {"tid": tenant_id, "sid": store_id},
     )
     dishes = [dict(r) for r in rows.mappings().all()]
@@ -428,10 +434,12 @@ async def calculate_aa_split(
 
     # 查订单总额
     order_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT final_amount_fen FROM orders
             WHERE id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     order = order_row.mappings().first()
@@ -450,11 +458,13 @@ async def calculate_aa_split(
 
     # 按菜分: 查询订单明细
     item_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, item_name, subtotal_fen, notes
             FROM order_items
             WHERE order_id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     items = [dict(r) for r in item_rows.mappings().all()]
@@ -501,11 +511,13 @@ async def track_preparation(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT cooking_status, accepted_at, estimated_minutes
             FROM orders
             WHERE id = :oid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"oid": order_id, "tid": tenant_id},
     )
     order = row.mappings().first()
@@ -569,12 +581,14 @@ async def get_nearest_stores(
     await _set_tenant(db, tenant_id)
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, address, lat, lng, is_open,
                    current_queue_count, avg_wait_minutes
             FROM stores
             WHERE tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id},
     )
     all_stores = [dict(r) for r in rows.mappings().all()]
@@ -634,20 +648,23 @@ async def estimate_wait_time(
 
     # 当前未完成订单数
     pending_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) as cnt
             FROM orders
             WHERE store_id = :sid AND tenant_id = :tid
               AND status IN ('pending', 'confirmed')
               AND is_deleted = false
-        """),
+        """
+        ),
         {"sid": store_id, "tid": tenant_id},
     )
     pending_count = pending_row.scalar() or 0
 
     # 最近30单的平均出餐时间
     avg_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT AVG(EXTRACT(EPOCH FROM (completed_at - order_time)) / 60) as avg_min
             FROM orders
             WHERE store_id = :sid AND tenant_id = :tid
@@ -656,7 +673,8 @@ async def estimate_wait_time(
               AND order_time IS NOT NULL
             ORDER BY completed_at DESC
             LIMIT 30
-        """),
+        """
+        ),
         {"sid": store_id, "tid": tenant_id},
     )
     avg_cook_minutes = avg_row.scalar() or 15.0

@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..security.rbac import UserContext, require_mfa_audited, require_role_audited
 from ..services.payment_direct import (
@@ -103,7 +104,7 @@ async def api_wechat_pay(
             description=body.description,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "支付参数无效", e)
     await write_audit(
         db,
         tenant_id=tenant_id,
@@ -137,7 +138,7 @@ async def api_alipay_pay(
             subject=body.subject,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "支付参数无效", e)
     await write_audit(
         db,
         tenant_id=tenant_id,
@@ -170,7 +171,7 @@ async def api_unionpay_pay(
             card_no_masked=body.card_no_masked,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "支付参数无效", e)
     await write_audit(
         db,
         tenant_id=tenant_id,
@@ -197,9 +198,9 @@ async def api_query_status(
     try:
         result = await query_payment_status(payment_id, tenant_id)
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "支付记录不存在", e)
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e)
     return _ok(result)
 
 
@@ -220,9 +221,9 @@ async def api_refund(
             tenant_id=tenant_id,
         )
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "退款参数无效", e)
     except PermissionError as e:
-        raise HTTPException(status_code=403, detail=str(e))
+        raise safe_http_exception(403, "权限不足", e)
     await write_audit(
         db,
         tenant_id=tenant_id,

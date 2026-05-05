@@ -264,7 +264,8 @@ async def create_order(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_orders (
                     id, tenant_id, store_id,
                     contact_name, contact_phone,
@@ -285,7 +286,8 @@ async def create_order(
                     NULL, NULL, FALSE
                 )
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "id": order_id,
                 "tenant_id": tenant_id,
@@ -436,7 +438,8 @@ async def cancel_order(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET status = 'cancelled',
                     cancel_reason = :reason,
@@ -444,7 +447,8 @@ async def cancel_order(
                     updated_at = NOW()
                 WHERE id = :oid::UUID
                 RETURNING *
-            """),
+            """
+            ),
             {"oid": order_id, "reason": body.cancel_reason},
         )
         await db.commit()
@@ -519,7 +523,8 @@ async def pay_deposit(
 
     try:
         pay_r = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_payments (
                     id, tenant_id, banquet_order_id,
                     payment_stage, amount_fen, payment_method,
@@ -532,7 +537,8 @@ async def pay_deposit(
                     0, NULL, NULL, :notes
                 )
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "id": pay_id,
                 "tenant_id": tenant_id,
@@ -544,7 +550,8 @@ async def pay_deposit(
             },
         )
         order_r2 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET deposit_status = 'paid',
                     balance_status = :balance_status,
@@ -552,7 +559,8 @@ async def pay_deposit(
                     updated_at = NOW()
                 WHERE id = :oid::UUID
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "oid": order_id,
                 "balance_status": new_balance_status,
@@ -641,7 +649,8 @@ async def pay_balance(
 
     try:
         pay_r = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_payments (
                     id, tenant_id, banquet_order_id,
                     payment_stage, amount_fen, payment_method,
@@ -654,7 +663,8 @@ async def pay_balance(
                     0, NULL, NULL, :notes
                 )
                 RETURNING *
-            """),
+            """
+            ),
             {
                 "id": pay_id,
                 "tenant_id": tenant_id,
@@ -666,14 +676,16 @@ async def pay_balance(
             },
         )
         order_r2 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_orders
                 SET balance_status = 'paid',
                     payment_status = 'fully_paid',
                     updated_at = NOW()
                 WHERE id = :oid::UUID
                 RETURNING *
-            """),
+            """
+            ),
             {"oid": order_id},
         )
         # 取全部支付记录（含刚插入的）
@@ -771,26 +783,30 @@ async def refund_payment(
                     detail=f"退款金额不可超过已付定金 {_fen_to_yuan_str(target_pay['amount_fen'])}",
                 )
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_payments
                     SET payment_status = 'refunded',
                         refund_amount_fen = :refund_fen,
                         refunded_at = NOW(),
                         updated_at = NOW()
                     WHERE id = :pid::UUID
-                """),
+                """
+                ),
                 {"pid": str(target_pay["id"]), "refund_fen": body.amount_fen},
             )
             new_payment_status = "refunded" if order["balance_status"] == "unpaid" else "deposit_paid"
             order_result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_orders
                     SET deposit_status = 'unpaid',
                         payment_status = :payment_status,
                         updated_at = NOW()
                     WHERE id = :oid::UUID
                     RETURNING *
-                """),
+                """
+                ),
                 {"oid": order_id, "payment_status": new_payment_status},
             )
 
@@ -810,25 +826,29 @@ async def refund_payment(
                     detail=f"退款金额不可超过已付尾款 {_fen_to_yuan_str(target_pay['amount_fen'])}",
                 )
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_payments
                     SET payment_status = 'refunded',
                         refund_amount_fen = :refund_fen,
                         refunded_at = NOW(),
                         updated_at = NOW()
                     WHERE id = :pid::UUID
-                """),
+                """
+                ),
                 {"pid": str(target_pay["id"]), "refund_fen": body.amount_fen},
             )
             order_result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_orders
                     SET balance_status = 'unpaid',
                         payment_status = 'deposit_paid',
                         updated_at = NOW()
                     WHERE id = :oid::UUID
                     RETURNING *
-                """),
+                """
+                ),
                 {"oid": order_id},
             )
 
@@ -841,19 +861,22 @@ async def refund_payment(
             paid_ids = [str(p["id"]) for p in payments if p["payment_status"] == "paid"]
             if paid_ids:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE banquet_payments
                         SET payment_status = 'refunded',
                             refund_amount_fen = amount_fen,
                             refunded_at = NOW(),
                             updated_at = NOW()
                         WHERE id = ANY(:ids::UUID[])
-                    """),
+                    """
+                    ),
                     {"ids": paid_ids},
                 )
             refunded_total = sum(p["amount_fen"] for p in payments if p["payment_status"] == "paid")
             order_result = await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_orders
                     SET deposit_status = 'unpaid',
                         balance_status = 'unpaid',
@@ -861,7 +884,8 @@ async def refund_payment(
                         updated_at = NOW()
                     WHERE id = :oid::UUID
                     RETURNING *
-                """),
+                """
+                ),
                 {"oid": order_id},
             )
             logger.info(
@@ -971,7 +995,8 @@ async def get_stats(
 
     try:
         stats_r = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_count,
                     COUNT(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
@@ -982,13 +1007,15 @@ async def get_stats(
                 WHERE is_deleted = FALSE
                   AND banquet_date >= :month_start::DATE
                   AND banquet_date < :month_end::DATE
-            """),
+            """
+            ),
             {"month_start": month_start, "month_end": month_end},
         )
         stats_row = stats_r.mappings().first()
 
         income_r = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(bp.amount_fen) FILTER (WHERE bp.payment_stage = 'deposit'), 0) AS deposit_income,
                     COALESCE(SUM(bp.amount_fen) FILTER (WHERE bp.payment_stage = 'balance'), 0) AS balance_income
@@ -998,7 +1025,8 @@ async def get_stats(
                   AND bo.is_deleted = FALSE
                   AND bo.banquet_date >= :month_start::DATE
                   AND bo.banquet_date < :month_end::DATE
-            """),
+            """
+            ),
             {"month_start": month_start, "month_end": month_end},
         )
         income_row = income_r.mappings().first()

@@ -314,7 +314,7 @@ async def get_growth_profile(
     """获取客户增长画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.get_profile(UUID(customer_id), str(tenant_id), db)
             if result is None:
@@ -333,7 +333,7 @@ async def update_growth_profile(
     """更新客户增长画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.upsert_profile(
                 UUID(customer_id),
@@ -363,7 +363,7 @@ async def list_journey_templates(
     """列出旅程模板（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_templates(
                 journey_type=journey_type,
@@ -384,7 +384,7 @@ async def create_journey_template(
     """创建旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.create_template(
                 body.model_dump(),
@@ -405,7 +405,7 @@ async def get_journey_template(
     """获取旅程模板详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.get_template(UUID(template_id), str(tenant_id), db)
             if result is None:
@@ -424,7 +424,7 @@ async def update_journey_template(
     """更新旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.update_template(
                 UUID(template_id),
@@ -446,7 +446,7 @@ async def activate_journey_template(
     """激活旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.activate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
@@ -463,7 +463,7 @@ async def deactivate_journey_template(
     """停用旅程模板。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.deactivate_template(UUID(template_id), str(tenant_id), db)
             await db.commit()
@@ -488,7 +488,7 @@ async def list_journey_enrollments(
     """列出旅程参与记录（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.list_enrollments(
                 str(tenant_id),
@@ -511,7 +511,7 @@ async def create_journey_enrollment(
     """创建旅程参与。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.enroll_customer(
                 customer_id=UUID(body.customer_id),
@@ -539,7 +539,7 @@ async def get_journey_enrollment(
     """获取旅程参与详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _journey_svc.get_enrollment(UUID(enrollment_id), str(tenant_id), db)
             if result is None:
@@ -558,7 +558,7 @@ async def update_enrollment_state(
     """更新旅程参与状态（暂停/恢复/取消）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             target = body.journey_state
             eid = UUID(enrollment_id)
@@ -606,7 +606,7 @@ async def list_touch_executions(
     """列出触达执行记录（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.list_executions(
                 tenant_id=str(tenant_id),
@@ -629,7 +629,7 @@ async def create_touch_execution(
     """创建触达执行。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.execute_touch(
                 customer_id=UUID(body.customer_id),
@@ -657,7 +657,7 @@ async def update_touch_execution_state(
     """更新触达执行状态。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_execution_state(
                 UUID(execution_id),
@@ -680,7 +680,7 @@ async def update_touch_attribution(
     """更新触达归因（关联订单和收入）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _touch_svc.update_attribution_by_execution(
                 execution_id=UUID(execution_id),
@@ -713,7 +713,7 @@ async def list_repair_cases(
     """列出服务修复案例（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.list_cases(
                 customer_id=UUID(customer_id) if customer_id else None,
@@ -736,7 +736,7 @@ async def create_repair_case(
     """创建服务修复案例。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.create_case(
                 customer_id=UUID(body.customer_id),
@@ -762,7 +762,7 @@ async def get_repair_case(
     """获取服务修复案例详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.get_case(UUID(case_id), str(tenant_id), db)
             if result is None:
@@ -781,7 +781,7 @@ async def update_repair_case_state(
     """更新服务修复状态。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.transition_state(
                 case_id=UUID(case_id),
@@ -804,7 +804,7 @@ async def update_repair_compensation(
     """更新服务修复补偿方案。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _repair_svc.submit_compensation(
                 case_id=UUID(case_id),
@@ -836,7 +836,7 @@ async def list_agent_suggestions(
     """列出 Agent 策略建议（支持筛选）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.list_suggestions(
                 review_state=review_state,
@@ -860,7 +860,7 @@ async def create_agent_suggestion(
     """创建 Agent 策略建议。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.create_suggestion(
                 body.model_dump(),
@@ -881,7 +881,7 @@ async def get_agent_suggestion(
     """获取 Agent 策略建议详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.get_suggestion(UUID(suggestion_id), str(tenant_id), db)
             if result is None:
@@ -900,7 +900,7 @@ async def review_agent_suggestion(
     """审核 Agent 策略建议。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             revised_data = None
             if body.review_result == "revised":
@@ -934,7 +934,7 @@ async def publish_agent_suggestion(
     """发布 Agent 策略建议（触发执行）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _suggestion_svc.publish_suggestion(
                 UUID(suggestion_id),
@@ -966,7 +966,8 @@ async def get_dashboard_stats(
 
             # 1. 客户增长画像统计
             profile_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_profiles,
                     COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
@@ -976,13 +977,15 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE service_repair_status NOT IN ('none', 'repair_completed')) AS active_repairs
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             ps = profile_stats.fetchone()
 
             # 2. 旅程enrollment统计
             enrollment_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_enrollments,
                     COUNT(*) FILTER (WHERE journey_state = 'active') AS active_enrollments,
@@ -991,13 +994,15 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE journey_state = 'waiting_observe') AS observing_enrollments
                 FROM growth_journey_enrollments
                 WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             es = enrollment_stats.fetchone()
 
             # 3. 触达执行统计（近7天）
             touch_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_touches_7d,
                     COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
@@ -1007,13 +1012,15 @@ async def get_dashboard_stats(
                     COALESCE(SUM(attributed_revenue_fen) FILTER (WHERE attributed_order_id IS NOT NULL), 0) AS attributed_revenue_fen_7d
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """)
+            """
+                )
             )
             ts = touch_stats.fetchone()
 
             # 4. Agent建议统计
             suggestion_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_suggestions,
                     COUNT(*) FILTER (WHERE review_state = 'pending_review') AS pending_review,
@@ -1022,7 +1029,8 @@ async def get_dashboard_stats(
                     COUNT(*) FILTER (WHERE review_state = 'rejected') AS rejected
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """)
+            """
+                )
             )
             ss = suggestion_stats.fetchone()
 
@@ -1061,7 +1069,8 @@ async def get_dashboard_stats(
 
             # 7. mechanism_type 分组摘要（近7天）
             mech_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT mechanism_type, COUNT(*),
                        COUNT(*) FILTER (WHERE execution_state IN ('opened','clicked','replied')),
                        COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL)
@@ -1069,7 +1078,8 @@ async def get_dashboard_stats(
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
                   AND mechanism_type IS NOT NULL
                 GROUP BY mechanism_type
-            """)
+            """
+                )
             )
             mech_rows = mech_stats.fetchall()
             mechanism_summary = []
@@ -1088,61 +1098,71 @@ async def get_dashboard_stats(
 
             # 8. 可识别客户占比
             identifiable = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE primary_phone IS NOT NULL OR wechat_openid IS NOT NULL) AS identifiable
                 FROM customers WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             id_row = identifiable.fetchone()
 
             # 9. 首单入会率
             first_join = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) FILTER (WHERE first_order_at IS NOT NULL) AS first_orders,
                     COUNT(*) FILTER (WHERE first_order_at IS NOT NULL AND repurchase_stage != 'not_started') AS joined
                 FROM customer_growth_profiles WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             fj_row = first_join.fetchone()
 
             # 10. 30天复购率
             thirty_day = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '90 days') AS active_90d,
                     COUNT(*) FILTER (WHERE last_order_at >= NOW() - INTERVAL '30 days'
                         AND repurchase_stage IN ('second_order_done','stable_repeat')) AS repeat_30d
                 FROM customer_growth_profiles WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             td_row = thirty_day.fetchone()
 
             # 11. 召回成功率
             recall = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_reactivation,
                     COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS completed
                 FROM growth_journey_enrollments gje
                 JOIN growth_journey_templates gjt ON gjt.id = gje.journey_template_id
                 WHERE gje.is_deleted = FALSE AND gjt.journey_type = 'reactivation'
-            """)
+            """
+                )
             )
             rc_row = recall.fetchone()
 
             # 12. 单客触达毛利贡献
             per_customer = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(DISTINCT customer_id) AS unique_customers,
                     COALESCE(SUM(attributed_revenue_fen), 0) AS total_revenue,
                     COALESCE(SUM(attributed_gross_profit_fen), 0) AS total_profit
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND attributed_order_id IS NOT NULL
-            """)
+            """
+                )
             )
             pc_row = per_customer.fetchone()
 
@@ -1233,7 +1253,8 @@ async def get_agent_suggestion_metrics(
 
             # 建议总体统计
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE review_state = 'approved') AS approved,
@@ -1250,7 +1271,8 @@ async def get_agent_suggestion_metrics(
                     COUNT(*) FILTER (WHERE mechanism_type = 'service_repair') AS repair_mech_count
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
-            """),
+            """
+                ),
                 {"days": days},
             )
             r = result.fetchone()
@@ -1261,7 +1283,8 @@ async def get_agent_suggestion_metrics(
 
             # 每日趋势
             trend = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     created_at::date AS day,
                     COUNT(*) AS total,
@@ -1272,7 +1295,8 @@ async def get_agent_suggestion_metrics(
                 WHERE is_deleted = FALSE AND created_at >= NOW() - make_interval(days => :days)
                 GROUP BY created_at::date
                 ORDER BY day
-            """),
+            """
+                ),
                 {"days": days},
             )
             daily_trend = [
@@ -1282,7 +1306,8 @@ async def get_agent_suggestion_metrics(
 
             # 发布后命中率
             hit_result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_published,
                     COUNT(*) FILTER (WHERE gje.journey_state = 'completed') AS hit_count
@@ -1292,7 +1317,8 @@ async def get_agent_suggestion_metrics(
                 WHERE gass.is_deleted = FALSE
                   AND gass.review_state = 'published'
                   AND gass.created_at >= NOW() - make_interval(days => :days)
-            """),
+            """
+                ),
                 {"days": days},
             )
             hr = hit_result.fetchone()
@@ -1354,7 +1380,8 @@ async def get_funnel_stats(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             profile_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_profiles,
                     COUNT(*) FILTER (WHERE repurchase_stage = 'first_order_done') AS first_order_only,
@@ -1363,18 +1390,21 @@ async def get_funnel_stats(
                     COUNT(*) FILTER (WHERE reactivation_priority IN ('high', 'critical')) AS high_priority_reactivation
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
-            """)
+            """
+                )
             )
             ps = profile_stats.fetchone()
 
             touch_stats = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) FILTER (WHERE execution_state = 'delivered') AS delivered_7d,
                     COUNT(*) FILTER (WHERE attributed_order_id IS NOT NULL) AS attributed_7d
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND created_at >= NOW() - INTERVAL '7 days'
-            """)
+            """
+                )
             )
             ts = touch_stats.fetchone()
 
@@ -1425,7 +1455,8 @@ async def get_attribution_by_mechanism(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     mechanism_type,
                     COUNT(*) AS total_touches,
@@ -1441,7 +1472,8 @@ async def get_attribution_by_mechanism(
                   AND mechanism_type IS NOT NULL
                 GROUP BY mechanism_type
                 ORDER BY attributed DESC
-            """),
+            """
+                ),
                 {"days": days},
             )
 
@@ -1480,7 +1512,8 @@ async def get_attribution_by_journey_template(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     gjt.name AS template_name,
                     gjt.journey_type,
@@ -1501,7 +1534,8 @@ async def get_attribution_by_journey_template(
                 WHERE gjt.is_deleted = FALSE AND gjt.is_active = TRUE
                 GROUP BY gjt.id, gjt.name, gjt.journey_type, gjt.mechanism_family
                 ORDER BY attributed DESC
-            """),
+            """
+                ),
                 {"days": days},
             )
 
@@ -1541,7 +1575,8 @@ async def get_repair_effectiveness(
             await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": tenant_id})
 
             result = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) AS total_cases,
                     COUNT(*) FILTER (WHERE repair_state = 'recovered') AS recovered,
@@ -1555,7 +1590,8 @@ async def get_repair_effectiveness(
                 FROM growth_service_repair_cases
                 WHERE is_deleted = FALSE
                   AND created_at >= NOW() - make_interval(days => :days)
-            """),
+            """
+                ),
                 {"days": days},
             )
 
@@ -1590,19 +1626,21 @@ async def get_segment_rule_presets(
     """P0 预置分群规则模板 + 实时命中人数。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             presets = []
 
             # 规则1: 首单后7天未二访
             r1 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND repurchase_stage = 'first_order_done'
                   AND first_order_at < NOW() - INTERVAL '7 days'
                   AND second_order_at IS NULL
-            """)
+            """
+                )
             )
             presets.append(
                 {
@@ -1623,13 +1661,15 @@ async def get_segment_rule_presets(
 
             # 规则2: 近30天沉默+有已拥有权益
             r2 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND reactivation_priority IN ('high', 'critical')
                   AND has_active_owned_benefit = TRUE
                   AND owned_benefit_expire_at > NOW()
-            """)
+            """
+                )
             )
             presets.append(
                 {
@@ -1650,11 +1690,13 @@ async def get_segment_rule_presets(
 
             # 规则3: 投诉关闭后待修复
             r3 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE
                   AND service_repair_status = 'complaint_closed_pending_repair'
-            """)
+            """
+                )
             )
             presets.append(
                 {
@@ -1683,33 +1725,39 @@ async def get_tag_distribution(
     """增长标签分布统计。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 复购阶段分布
             r1 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT repurchase_stage, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE GROUP BY repurchase_stage ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             repurchase = [{"stage": row[0], "count": row[1]} for row in r1.fetchall()]
 
             # 召回优先级分布
             r2 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT reactivation_priority, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE GROUP BY reactivation_priority ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             reactivation = [{"priority": row[0], "count": row[1]} for row in r2.fetchall()]
 
             # 修复状态分布
             r3 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT service_repair_status, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND service_repair_status != 'none'
                 GROUP BY service_repair_status ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             repair = [{"status": row[0], "count": row[1]} for row in r3.fetchall()]
 
@@ -1762,45 +1810,53 @@ async def get_p1_distribution(
     """P1四维分布统计（心理距离/超级用户/里程碑/裂变场景）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 心理距离分布
             r1 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT psych_distance_level, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND psych_distance_level IS NOT NULL
                 GROUP BY psych_distance_level ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             psych_distance = [{"level": row[0], "count": row[1]} for row in r1.fetchall()]
 
             # 超级用户分布
             r2 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT super_user_level, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND super_user_level IS NOT NULL
                 GROUP BY super_user_level ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             super_user = [{"level": row[0], "count": row[1]} for row in r2.fetchall()]
 
             # 成长里程碑分布
             r3 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT growth_milestone_stage, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND growth_milestone_stage IS NOT NULL
                 GROUP BY growth_milestone_stage ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             milestones = [{"stage": row[0], "count": row[1]} for row in r3.fetchall()]
 
             # 裂变场景分布
             r4 = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT referral_scenario, COUNT(*) FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND referral_scenario IS NOT NULL AND referral_scenario != 'none'
                 GROUP BY referral_scenario ORDER BY COUNT(*) DESC
-            """)
+            """
+                )
             )
             referral = [{"scenario": row[0], "count": row[1]} for row in r4.fetchall()]
 
@@ -1823,7 +1879,7 @@ async def trigger_p1_recompute(
     """手动触发P1字段重算（心理距离/超级用户/里程碑/裂变场景）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _profile_svc.batch_compute_p1_fields(str(tenant_id), db)
             await db.commit()
@@ -1867,7 +1923,7 @@ async def list_brand_configs(
     """列出所有品牌增长配置。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.list_brand_configs(str(tenant_id), db)
             return ok(result)
@@ -1884,7 +1940,7 @@ async def upsert_brand_config(
     """创建或更新品牌配置。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.upsert_brand_config(
                 brand_id=brand_id,
@@ -1905,7 +1961,7 @@ async def get_brand_config(
     """获取品牌增长配置详情。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.get_brand_config(brand_id, str(tenant_id), db)
             if result is None:
@@ -1923,7 +1979,7 @@ async def check_brand_budget(
     """检查品牌预算使用情况（今日触达量/本月offer金额）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.check_brand_budget(brand_id, str(tenant_id), db)
             return ok(result)
@@ -1940,7 +1996,7 @@ async def check_brand_frequency(
     """检查品牌级客户频控（日/周触达次数 vs 上限）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _brand_svc.check_brand_frequency(
                 brand_id,
@@ -1965,11 +2021,12 @@ async def get_dashboard_stats_by_brand(
     """按品牌分组的驾驶舱KPI（画像/旅程/触达/建议）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             # 1) 画像按品牌
             r_profiles = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     brand_id,
                     COUNT(*) AS total_profiles,
@@ -1978,7 +2035,8 @@ async def get_dashboard_stats_by_brand(
                 FROM customer_growth_profiles
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """)
+            """
+                )
             )
             profiles_by_brand = [
                 {
@@ -1992,7 +2050,8 @@ async def get_dashboard_stats_by_brand(
 
             # 2) 旅程参与按品牌
             r_enrollments = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     brand_id,
                     COUNT(*) AS total_enrollments,
@@ -2001,7 +2060,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_journey_enrollments
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """)
+            """
+                )
             )
             enrollments_by_brand = [
                 {
@@ -2015,7 +2075,8 @@ async def get_dashboard_stats_by_brand(
 
             # 3) 触达按品牌
             r_touches = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     brand_id,
                     COUNT(*) AS total_touches,
@@ -2025,7 +2086,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_touch_executions
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """)
+            """
+                )
             )
             touches_by_brand = [
                 {
@@ -2040,7 +2102,8 @@ async def get_dashboard_stats_by_brand(
 
             # 4) 建议按品牌
             r_suggestions = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     brand_id,
                     COUNT(*) AS total_suggestions,
@@ -2049,7 +2112,8 @@ async def get_dashboard_stats_by_brand(
                 FROM growth_agent_strategy_suggestions
                 WHERE is_deleted = FALSE AND brand_id IS NOT NULL
                 GROUP BY brand_id
-            """)
+            """
+                )
             )
             suggestions_by_brand = [
                 {
@@ -2086,10 +2150,11 @@ async def get_attribution_by_store(
     """按门店分组的触达归因统计。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         gte.store_id,
                         COUNT(*) AS total_touches,
@@ -2103,7 +2168,8 @@ async def get_attribution_by_store(
                       AND gte.created_at >= NOW() - make_interval(days => :days)
                     GROUP BY gte.store_id
                     ORDER BY attributed DESC
-                """),
+                """
+                ),
                 {"days": days},
             )
             items = [
@@ -2134,7 +2200,7 @@ async def get_experiment_summary(
     """获取旅程模板的A/B实验摘要。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.get_experiment_summary(
                 UUID(template_id),
@@ -2154,7 +2220,7 @@ async def select_variant(
     """Thompson Sampling选择最优variant。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.select_variant(
                 UUID(template_id),
@@ -2175,7 +2241,7 @@ async def auto_pause_check(
     """检查是否应自动暂停低效variant。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.should_auto_pause(
                 UUID(template_id),
@@ -2201,7 +2267,7 @@ async def get_cross_brand_profile(
     """获取客户跨品牌统一画像。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.get_customer_cross_brand_profile(
                 UUID(customer_id),
@@ -2221,7 +2287,7 @@ async def check_cross_brand_frequency(
     """跨品牌频控检查。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.check_cross_brand_frequency(
                 UUID(customer_id),
@@ -2243,7 +2309,7 @@ async def list_cross_brand_opportunities(
     """发现跨品牌增长机会。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.find_cross_brand_opportunities(
                 str(tenant_id),
@@ -2269,7 +2335,7 @@ async def trigger_auto_iterate(
     """手动触发自动迭代 — 暂停低效variant，调整流量分配。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.auto_iterate(str(tenant_id), db)
             await db.commit()
@@ -2285,7 +2351,7 @@ async def get_experiment_adjustments(
     """获取最近的自动调整建议 — 低效mechanism/旅程分析。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _experiment_svc.auto_adjust_journey_params(str(tenant_id), db)
             return ok(result)
@@ -2303,7 +2369,7 @@ async def get_cross_brand_recommendation(
     """为特定客户生成跨品牌推荐策略。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _cross_brand_svc.get_cross_brand_recommendation(
                 customer_id=UUID(customer_id),
@@ -2390,7 +2456,7 @@ async def get_store_capabilities(
     """获取门店能力标签（包厢/活鲜/外卖/储值等）。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_capabilities(
                 UUID(store_id),
@@ -2410,7 +2476,7 @@ async def get_store_growth_readiness(
     """门店增长就绪度评估 — 支撑旅程比例。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_store_growth_readiness(
                 UUID(store_id),
@@ -2429,7 +2495,7 @@ async def get_stores_readiness_ranking(
     """所有门店增长就绪度排行。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.get_all_stores_readiness(str(tenant_id), db)
             return ok(result)
@@ -2445,7 +2511,7 @@ async def match_journey_to_stores(
     """查找支持特定旅程的所有门店。"""
     tenant_id = _parse_tenant(x_tenant_id)
     async with async_session_factory() as db:
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         try:
             result = await _store_cap_svc.match_journey_to_stores(
                 journey_code,

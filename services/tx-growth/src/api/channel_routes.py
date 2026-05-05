@@ -135,11 +135,13 @@ async def send_message(
         # 查询 channel_configs 覆盖默认值
         try:
             cfg_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT max_daily_per_user FROM channel_configs
                     WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid, "channel": req.channel},
             )
             cfg = cfg_result.fetchone()
@@ -153,7 +155,8 @@ async def send_message(
         today = datetime.now(timezone.utc).date()
         try:
             count_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM message_send_logs
                     WHERE tenant_id = :tid
                       AND channel = :channel
@@ -161,7 +164,8 @@ async def send_message(
                       AND sent_at::date = :today
                       AND status = 'sent'
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "channel": req.channel, "uid": req.user_id, "today": today},
             )
             sent_today = count_result.scalar() or 0
@@ -205,14 +209,16 @@ async def send_message(
 
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO message_send_logs
                         (id, tenant_id, channel, customer_id, external_user_id,
                          content_summary, offer_id, campaign_id, status, sent_at, created_at)
                     VALUES
                         (:id, :tid, :channel, :customer_id, :uid,
                          :content, :offer_id, :campaign_id, 'sent', :now, :now)
-                """),
+                """
+                ),
                 {
                     "id": log_id,
                     "tid": tid,
@@ -290,11 +296,13 @@ async def check_frequency(
         max_daily = channel_info.get("max_daily", 3)
         try:
             cfg_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT max_daily_per_user, is_enabled FROM channel_configs
                     WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid, "channel": channel},
             )
             cfg = cfg_result.fetchone()
@@ -307,7 +315,8 @@ async def check_frequency(
         sent_today = 0
         try:
             count_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM message_send_logs
                     WHERE tenant_id = :tid
                       AND channel = :channel
@@ -315,7 +324,8 @@ async def check_frequency(
                       AND sent_at::date = :today
                       AND status = 'sent'
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "channel": channel, "uid": user_id, "today": today},
             )
             sent_today = count_result.scalar() or 0
@@ -373,7 +383,8 @@ async def get_channel_stats(
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) AS total,
                         COUNT(*) FILTER (WHERE status = 'sent')    AS sent_count,
@@ -385,7 +396,8 @@ async def get_channel_stats(
                       AND channel = :channel
                       AND sent_at::date BETWEEN :start_date AND :end_date
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "channel": channel, "start_date": start_date, "end_date": end_date},
             )
             row = result.fetchone()
@@ -453,7 +465,8 @@ async def configure_channel(
         max_daily = req.max_daily_per_user or channel_info.get("max_daily", 3)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO channel_configs
                     (id, tenant_id, channel, max_daily_per_user, settings, is_enabled, created_at, updated_at)
                 VALUES
@@ -462,7 +475,8 @@ async def configure_channel(
                 SET max_daily_per_user = EXCLUDED.max_daily_per_user,
                     settings = EXCLUDED.settings,
                     updated_at = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "channel": req.channel,
@@ -557,7 +571,8 @@ async def get_send_log(
             total = count_result.scalar() or 0
 
             result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT id, channel, customer_id, external_user_id,
                            content_summary, offer_id, campaign_id,
                            status, error_reason, sent_at
@@ -565,7 +580,8 @@ async def get_send_log(
                     WHERE {where_clause}
                     ORDER BY sent_at DESC
                     LIMIT :limit OFFSET :offset
-                """),
+                """
+                ),
                 params,
             )
             rows = result.fetchall()

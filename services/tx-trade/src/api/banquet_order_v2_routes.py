@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
-from ..services.banquet_crm_service import BanquetCRMService
+from ..services.banquet_crm_service import BanquetCrmService as BanquetCRMService
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1/banquet/orders", tags=["banquet-order"])

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
@@ -57,7 +57,7 @@ async def send_notification(
         raise ValueError(f"Invalid channel '{channel}'. Valid channels: {', '.join(VALID_CHANNELS)}")
 
     notification_id = f"notif_{uuid.uuid4().hex[:8]}"
-    sent_at = datetime.utcnow().isoformat()
+    sent_at = datetime.now(timezone.utc).isoformat()
 
     record = {
         "notification_id": notification_id,

@@ -20,6 +20,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -150,7 +151,7 @@ async def create_contract(
         )
         return {"ok": True, "data": {"id": str(result.id), "contract_name": result.contract_name}}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("contract_create_db_failed", error=str(exc), tenant_id=str(tenant_id), exc_info=True)
@@ -309,7 +310,7 @@ async def update_contract(
     except LookupError:
         raise HTTPException(status_code=404, detail="合同不存在或无权访问")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("contract_update_db_failed", error=str(exc), contract_id=str(contract_id), exc_info=True)
@@ -351,7 +352,7 @@ async def terminate_contract(
     except LookupError:
         raise HTTPException(status_code=404, detail="合同不存在或无权访问")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("contract_terminate_db_failed", error=str(exc), contract_id=str(contract_id), exc_info=True)
@@ -391,7 +392,7 @@ async def add_payment_plan(
     except LookupError:
         raise HTTPException(status_code=404, detail="合同不存在或无权访问")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("payment_plan_add_db_failed", error=str(exc), contract_id=str(contract_id), exc_info=True)
@@ -443,7 +444,7 @@ async def mark_payment_paid(
     except LookupError:
         raise HTTPException(status_code=404, detail="付款计划不存在或无权访问")
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.error("mark_payment_paid_db_failed", error=str(exc), payment_id=str(payment_id), exc_info=True)

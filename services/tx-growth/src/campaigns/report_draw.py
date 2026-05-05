@@ -111,14 +111,16 @@ async def _handle_report(
     # 检查已报名
     try:
         exists_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM campaign_report_entries
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND customer_id = :customer_id
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": uuid.UUID(tenant_id),
                 "campaign_id": campaign_id,
@@ -136,12 +138,14 @@ async def _handle_report(
     if max_p > 0:
         try:
             count_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM campaign_report_entries
                     WHERE tenant_id = :tenant_id
                       AND campaign_id = :campaign_id
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {
                     "tenant_id": uuid.UUID(tenant_id),
                     "campaign_id": campaign_id,
@@ -158,12 +162,14 @@ async def _handle_report(
     try:
         entry_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO campaign_report_entries
                     (id, tenant_id, campaign_id, customer_id, is_winner, is_deleted)
                 VALUES
                     (:id, :tenant_id, :campaign_id, :customer_id, false, false)
-            """),
+            """
+            ),
             {
                 "id": entry_id,
                 "tenant_id": uuid.UUID(tenant_id),
@@ -180,12 +186,14 @@ async def _handle_report(
     # 返回当前报名人数（作为 position）
     try:
         pos_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM campaign_report_entries
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "tenant_id": uuid.UUID(tenant_id),
                 "campaign_id": campaign_id,
@@ -231,14 +239,16 @@ async def _handle_draw(
     # 统计参与人数，判断是否有人报名
     try:
         count_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM campaign_report_entries
                 WHERE tenant_id = :tenant_id
                   AND campaign_id = :campaign_id
                   AND is_winner = false
                   AND drawn_at IS NULL
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": uuid.UUID(tenant_id), "campaign_id": campaign_id},
         )
         total_entries: int = count_res.scalar() or 0
@@ -260,7 +270,8 @@ async def _handle_draw(
         try:
             exclude_ids = [uuid.UUID(w["entry_id"]) for w in winners] if winners else []
             rows_res = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, customer_id FROM campaign_report_entries
                     WHERE tenant_id = :tenant_id
                       AND campaign_id = :campaign_id
@@ -271,7 +282,8 @@ async def _handle_draw(
                     ORDER BY random()
                     LIMIT :limit
                     FOR UPDATE SKIP LOCKED
-                """),
+                """
+                ),
                 {
                     "tenant_id": uuid.UUID(tenant_id),
                     "campaign_id": campaign_id,
@@ -291,7 +303,8 @@ async def _handle_draw(
             for w in winners:
                 prize_json = json.dumps(w["prize"], ensure_ascii=False)
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE campaign_report_entries
                         SET is_winner = true,
                             prize = :prize::jsonb,
@@ -299,7 +312,8 @@ async def _handle_draw(
                             updated_at = NOW()
                         WHERE id = :entry_id
                           AND tenant_id = :tenant_id
-                    """),
+                    """
+                    ),
                     {
                         "entry_id": uuid.UUID(w["entry_id"]),
                         "prize": prize_json,

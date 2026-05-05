@@ -26,6 +26,7 @@ if _gateway_src not in sys.path:
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
+
 @pytest.fixture(autouse=True)
 def jwt_env(monkeypatch):
     """为所有测试注入安全 JWT 环境变量"""
@@ -97,6 +98,7 @@ def _make_token(role="tenant_owner", tenant_id="a0000000-0000-0000-0000-00000000
 
 # ── T1: 无 JWT 访问业务 API 必须返回 401 ─────────────────────────────
 
+
 def test_t1_missing_jwt_returns_401(client):
     """无任何认证信息访问业务 API → 401"""
     resp = client.get("/api/v1/finance/reports")
@@ -110,6 +112,7 @@ def test_t1_missing_jwt_post_returns_401(client):
 
 
 # ── T2: 随便传 X-API-Key 不能绕过 JWT ────────────────────────────────
+
 
 def test_t2_random_api_key_without_tenant_returns_401(client):
     """随机 X-API-Key 无 X-Tenant-ID → 401（格式校验失败）"""
@@ -131,9 +134,7 @@ def test_t2_random_api_key_with_tenant_blocked(client):
         },
     )
     # 绝对不能是 200 — 修复后 api_key_pending 不再绕过
-    assert resp.status_code != 200, (
-        f"BYPASS STILL ACTIVE! Got {resp.status_code}: {resp.json()}"
-    )
+    assert resp.status_code != 200, f"BYPASS STILL ACTIVE! Got {resp.status_code}: {resp.json()}"
     # 格式不对的 key → ApiKeyMiddleware 返回 401
     assert resp.status_code == 401
 
@@ -151,6 +152,7 @@ def test_t2_api_key_wrong_format_returns_401(client):
 
 
 # ── T3: 普通角色不能访问 finance 高危域 ───────────────────────────────
+
 
 def test_t3_cashier_access_finance_blocked(client):
     """收银员访问 finance 域 → 403（DomainAuthzMiddleware）"""
@@ -175,6 +177,7 @@ def test_t3_cashier_access_trade_allowed(client):
 
 # ── T4: API Key 必须校验格式 ──────────────────────────────────────────
 
+
 def test_t4_api_key_format_enforced(client):
     """ApiKeyMiddleware 拒绝错误格式的 key"""
     resp = client.get(
@@ -188,6 +191,7 @@ def test_t4_api_key_format_enforced(client):
 
 
 # ── T5: 高危操作必须 MFA ─────────────────────────────────────────────
+
 
 def test_t5_finance_split_no_mfa_blocked(client):
     """无 MFA 执行分账 → 403 MFA_REQUIRED"""
@@ -210,13 +214,16 @@ def test_t5_finance_split_with_mfa(client):
     assert resp.status_code == 200
 
 
-@pytest.mark.parametrize("mfa_path,role", [
-    ("/api/v1/finance/refunds/123", "finance_staff"),
-    ("/api/v1/ops/daily-settlement/close", "store_manager"),
-    ("/api/v1/org/salary/compute", "tenant_admin"),
-    ("/api/v1/analytics/export/report", "tenant_owner"),
-    ("/api/v1/member/export/csv", "tenant_owner"),
-])
+@pytest.mark.parametrize(
+    "mfa_path,role",
+    [
+        ("/api/v1/finance/refunds/123", "finance_staff"),
+        ("/api/v1/ops/daily-settlement/close", "store_manager"),
+        ("/api/v1/org/salary/compute", "tenant_admin"),
+        ("/api/v1/analytics/export/report", "tenant_owner"),
+        ("/api/v1/member/export/csv", "tenant_owner"),
+    ],
+)
 def test_t5_mfa_required_paths_blocked_without_mfa(client, mfa_path, role):
     """所有 MFA 路径在无 MFA 时返回 403"""
     token = _make_token(role=role, mfa=False)
@@ -229,6 +236,7 @@ def test_t5_mfa_required_paths_blocked_without_mfa(client, mfa_path, role):
 
 
 # ── T6: JWT 必须校验 iss/aud/type ────────────────────────────────────
+
 
 def test_t6_refresh_token_used_as_access_blocked():
     """refresh token 不能当作 access token 使用"""
@@ -247,7 +255,6 @@ def test_t6_jwt_wrong_issuer_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-
     from services.jwt_service import JWTService
 
     svc = JWTService()
@@ -265,9 +272,7 @@ def test_t6_jwt_wrong_issuer_rejected():
     bad_token = pyjwt.encode(payload, "x" * 64, algorithm="HS256")
     result = svc.verify_access_token(bad_token)
 
-    assert result is None, (
-        "verify_access_token must reject tokens with mismatched iss claim"
-    )
+    assert result is None, "verify_access_token must reject tokens with mismatched iss claim"
 
 
 def test_t6_jwt_wrong_audience_rejected():
@@ -276,7 +281,6 @@ def test_t6_jwt_wrong_audience_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-
     from services.jwt_service import JWTService
 
     svc = JWTService()
@@ -289,18 +293,17 @@ def test_t6_jwt_wrong_audience_rejected():
         "jti": str(uuid.uuid4()),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
-        "iss": "tunxiang-os-gateway",         # 正确的 iss
-        "aud": "wrong-audience",               # 不匹配 TX_JWT_AUDIENCE
+        "iss": "tunxiang-os-gateway",  # 正确的 iss
+        "aud": "wrong-audience",  # 不匹配 TX_JWT_AUDIENCE
     }
     bad_token = pyjwt.encode(payload, "x" * 64, algorithm="HS256")
     result = svc.verify_access_token(bad_token)
 
-    assert result is None, (
-        "verify_access_token must reject tokens with mismatched aud claim"
-    )
+    assert result is None, "verify_access_token must reject tokens with mismatched aud claim"
 
 
 # ── T7: 生产环境缺少 TX_JWT_SECRET_KEY 必须启动失败 ──────────────────
+
 
 def test_t7_prod_without_jwt_secret_raises(monkeypatch):
     """生产环境缺少密钥 → RuntimeError"""
@@ -325,6 +328,7 @@ def test_t7_dev_without_jwt_secret_uses_fallback(monkeypatch):
 
 
 # ── T8: 正常登录/刷新/普通 API 不能被误杀 ─────────────────────────────
+
 
 def test_t8_health_endpoint_no_auth(client):
     """健康检查端点免认证"""

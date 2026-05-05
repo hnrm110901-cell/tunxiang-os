@@ -123,9 +123,7 @@ class ProphetBaselineService:
             InsufficientHistoricalDataError: 训练数据 < 14 天
         """
         if train_window_days < MIN_TRAINING_DAYS:
-            raise InsufficientHistoricalDataError(
-                f"训练窗口必须 ≥ {MIN_TRAINING_DAYS} 天，收到 {train_window_days}"
-            )
+            raise InsufficientHistoricalDataError(f"训练窗口必须 ≥ {MIN_TRAINING_DAYS} 天，收到 {train_window_days}")
         if not predict_dates:
             raise ValueError("predict_dates 不能为空")
         if predict_dates != sorted(predict_dates):
@@ -141,9 +139,7 @@ class ProphetBaselineService:
         # 强校验
         actual_days = len({p.day for p in history})
         if actual_days < MIN_TRAINING_DAYS:
-            raise InsufficientHistoricalDataError(
-                f"实际可用历史天数 {actual_days} < {MIN_TRAINING_DAYS}"
-            )
+            raise InsufficientHistoricalDataError(f"实际可用历史天数 {actual_days} < {MIN_TRAINING_DAYS}")
 
         # 补全缺失日期（线性插值），输出按日升序
         filled = _fill_missing_days(history, start=start_train, end=end_train)
@@ -287,9 +283,7 @@ def _fill_missing_days(
             out.append(HistoricalGmvPoint(day=d, gmv_fen=by_day[d]))
             continue
         # 找前后最近的已知点做线性插值
-        before = next(
-            (p for p in reversed(out) if p.gmv_fen is not None), None
-        )
+        before = next((p for p in reversed(out) if p.gmv_fen is not None), None)
         after = None
         for off2 in range(offset + 1, days_total):
             d2 = start + timedelta(days=off2)

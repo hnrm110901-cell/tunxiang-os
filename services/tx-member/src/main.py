@@ -4,6 +4,7 @@ Golden ID 全渠道画像、RFM 分层、营销活动、用户旅程、私域运
 """
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 # Feature Flag SDK（try/except 保护，SDK不可用时自动降级为全量开启）
@@ -23,7 +24,6 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from workers.rfm_updater import RFMEventListener, RFMUpdater
 
 from shared.events.event_publisher import MemberEventPublisher
 from shared.ontology.src.database import async_session_factory, init_db
@@ -60,6 +60,7 @@ from .api.stored_value_card_routes import router as stored_value_card_router
 from .api.stored_value_router import router as stored_value_v2_router
 from .api.stored_value_routes import router as stored_value_router
 from .api.subscription_routes import router as subscription_router  # 付费会员订阅
+from .workers.rfm_updater import RFMEventListener, RFMUpdater
 
 logger = structlog.get_logger(__name__)
 
@@ -184,7 +185,7 @@ Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -237,8 +238,8 @@ _sprint_d3_mount = auto_mount_routes(
     pkg=__package__,
     api_dir=_Path(__file__).parent / "api",
     modules=[
-        ("rfm_outreach_routes", "router"),            # D3a #82
-        ("campaign_roi_forecast_routes", "router"),    # D3b #83
+        ("rfm_outreach_routes", "router"),  # D3a #82
+        ("campaign_roi_forecast_routes", "router"),  # D3b #83
     ],
 )
 validate_result(_sprint_d3_mount)

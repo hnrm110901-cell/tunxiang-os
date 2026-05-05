@@ -173,7 +173,8 @@ async def create_delivery_order(
             {"tid": x_tenant_id},
         )
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO self_delivery_orders (
                     id, tenant_id, order_id, store_id,
                     delivery_address, delivery_lat, delivery_lng,
@@ -187,7 +188,8 @@ async def create_delivery_order(
                     :delivery_fee_fen, :tip_fen,
                     'pending', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": delivery_id,
                 "tenant_id": x_tenant_id,
@@ -286,7 +288,8 @@ async def assign_rider(
     now = datetime.now(timezone.utc)
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE self_delivery_orders SET
                     rider_id = :rider_id::uuid,
                     rider_name = :rider_name,
@@ -295,7 +298,8 @@ async def assign_rider(
                     dispatch_at = :now,
                     updated_at = :now
                 WHERE id = :id
-            """),
+            """
+            ),
             {
                 "rider_id": req.rider_id,
                 "rider_name": req.rider_name,
@@ -371,13 +375,15 @@ async def confirm_pickup(
     now = datetime.now(timezone.utc)
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE self_delivery_orders SET
                     status = 'picked_up',
                     picked_up_at = :now,
                     updated_at = :now
                 WHERE id = :id
-            """),
+            """
+            ),
             {"now": now, "id": delivery_id},
         )
         await db.commit()
@@ -453,14 +459,16 @@ async def complete_delivery(
 
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE self_delivery_orders SET
                     status = 'delivered',
                     delivered_at = :now,
                     actual_minutes = :actual_minutes,
                     updated_at = :now
                 WHERE id = :id
-            """),
+            """
+            ),
             {"now": now, "actual_minutes": actual_minutes, "id": delivery_id},
         )
         await db.commit()
@@ -526,13 +534,15 @@ async def fail_delivery(
     now = datetime.now(timezone.utc)
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE self_delivery_orders SET
                     status = 'failed',
                     failed_reason = :reason,
                     updated_at = :now
                 WHERE id = :id
-            """),
+            """
+            ),
             {"reason": req.reason, "now": now, "id": delivery_id},
         )
         await db.commit()
@@ -575,7 +585,8 @@ async def list_riders(
         )
         today = _today_str()
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     rider_id::text,
                     rider_name,
@@ -587,7 +598,8 @@ async def list_riders(
                   AND rider_id IS NOT NULL
                   AND is_deleted = false
                 GROUP BY rider_id, rider_name, rider_phone
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "today": today},
         )
         riders = []
@@ -637,7 +649,8 @@ async def get_rider_workload(
         )
         today = _today_str()
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     rider_id::text,
                     rider_name,
@@ -650,7 +663,8 @@ async def get_rider_workload(
                   AND rider_id = :rider_id::uuid
                   AND is_deleted = false
                 GROUP BY rider_id, rider_name, rider_phone
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "rider_id": rider_id, "today": today},
         )
         rider_row = row.first()
@@ -701,7 +715,8 @@ async def get_delivery_stats(
         )
         today = _today_str()
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                                        AS dispatched_count,
                     COUNT(*) FILTER (WHERE status = 'delivered')                   AS completed_count,
@@ -721,7 +736,8 @@ async def get_delivery_stats(
                 WHERE tenant_id = :tenant_id
                   AND created_at::date = :today
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "today": today},
         )
         stats_row = row.first()

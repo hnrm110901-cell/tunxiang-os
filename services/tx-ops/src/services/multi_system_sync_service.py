@@ -120,14 +120,16 @@ class MultiSystemSyncService:
         }
         try:
             await conn.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO operation_logs
                         (id, tenant_id, log_type, status, store_id, payload, created_at)
                     VALUES
                         (:id, :tenant_id, 'sync_record', :status, :store_id,
                          :payload::jsonb, NOW())
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": log_id,
                     "tenant_id": tenant_id,
@@ -197,7 +199,8 @@ class MultiSystemSyncService:
 
                 try:
                     result = await conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO orders
                                 (id, tenant_id, store_id, order_number, order_type, order_status,
                                  total_fen, source_system, raw_data, created_at, updated_at)
@@ -209,7 +212,8 @@ class MultiSystemSyncService:
                                     total_fen    = EXCLUDED.total_fen,
                                     updated_at   = NOW()
                             RETURNING (xmax = 0) AS was_inserted
-                        """),
+                        """
+                        ),
                         {
                             "id": order_id,
                             "tenant_id": tenant_id,
@@ -293,7 +297,8 @@ class MultiSystemSyncService:
             async with self._engine.begin() as conn:
                 # 获取需要刷新的会员（有 aoqiwei_cno 或 aoqiwei_mobile 字段）
                 rows = await conn.execute(
-                    text("""
+                    text(
+                        """
                         SELECT id, golden_id,
                                extra_data->>'aoqiwei_cno'    AS cno,
                                extra_data->>'aoqiwei_mobile' AS mobile,
@@ -303,7 +308,8 @@ class MultiSystemSyncService:
                           AND  source_system = 'aoqiwei'
                           AND  is_deleted    = FALSE
                         LIMIT  500
-                    """),
+                    """
+                    ),
                     {"tenant_id": tenant_id},
                 )
                 candidates = rows.fetchall()
@@ -331,7 +337,8 @@ class MultiSystemSyncService:
                 try:
                     async with self._engine.begin() as conn:
                         await conn.execute(
-                            text("""
+                            text(
+                                """
                                 INSERT INTO customers
                                     (id, tenant_id, golden_id, name, phone,
                                      balance_fen, points, level, source_system,
@@ -348,7 +355,8 @@ class MultiSystemSyncService:
                                     level        = EXCLUDED.level,
                                     extra_data   = EXCLUDED.extra_data,
                                     updated_at   = NOW()
-                            """),
+                            """
+                            ),
                             {
                                 "id": str(row.id),
                                 "tenant_id": tenant_id,
@@ -429,7 +437,8 @@ class MultiSystemSyncService:
 
                 try:
                     await conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO ingredients
                                 (id, tenant_id, store_id, ingredient_code, ingredient_name,
                                  stock_qty, unit_price_fen, source_system,
@@ -444,7 +453,8 @@ class MultiSystemSyncService:
                                 unit_price_fen   = EXCLUDED.unit_price_fen,
                                 extra_data       = EXCLUDED.extra_data,
                                 updated_at       = NOW()
-                        """),
+                        """
+                        ),
                         {
                             "id": ingredient_id,
                             "tenant_id": tenant_id,
@@ -543,7 +553,8 @@ class MultiSystemSyncService:
 
                 try:
                     await conn.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO reservations
                                 (id, tenant_id, store_id, reservation_no, guest_name, guest_phone,
                                  party_size, resv_date, resv_time, status, source_system,
@@ -555,7 +566,8 @@ class MultiSystemSyncService:
                             ON CONFLICT (tenant_id, reservation_no) DO UPDATE SET
                                 status     = EXCLUDED.status,
                                 updated_at = NOW()
-                        """),
+                        """
+                        ),
                         {
                             "id": resv_id,
                             "tenant_id": tenant_id,
@@ -734,7 +746,8 @@ class MultiSystemSyncService:
 
         async with self._engine.connect() as conn:
             rows = await conn.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         payload->>'system'   AS system,
                         status,
@@ -746,7 +759,8 @@ class MultiSystemSyncService:
                       AND created_at >= NOW() - INTERVAL '24 hours'
                     ORDER BY created_at DESC
                     LIMIT 200
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id},
             )
             records = rows.fetchall()

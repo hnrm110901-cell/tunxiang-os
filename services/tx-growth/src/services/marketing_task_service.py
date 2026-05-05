@@ -76,7 +76,8 @@ class MarketingTaskService:
         """创建营销任务"""
         task_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO marketing_tasks (
                     id, tenant_id, task_name, description, task_type,
                     channel, audience_pack_id, audience_filter,
@@ -91,7 +92,8 @@ class MarketingTaskService:
                     :target_employee_ids::jsonb,
                     :priority, :created_by
                 )
-            """),
+            """
+            ),
             {
                 "id": str(task_id),
                 "tenant_id": str(tenant_id),
@@ -122,10 +124,12 @@ class MarketingTaskService:
     ) -> dict:
         """获取任务详情"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM marketing_tasks
                 WHERE tenant_id = :tenant_id AND id = :task_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         row = result.mappings().first()
@@ -240,10 +244,12 @@ class MarketingTaskService:
     ) -> dict:
         """软删除任务"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE marketing_tasks SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :task_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         if result.rowcount == 0:
@@ -367,7 +373,8 @@ class MarketingTaskService:
             assignment_id = uuid.uuid4()
             customer_count = item.get("customer_count", 0)
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO marketing_task_assignments (
                         id, tenant_id, task_id, store_id, employee_id,
                         assigned_customer_count
@@ -375,7 +382,8 @@ class MarketingTaskService:
                         :id, :tenant_id, :task_id, :store_id, :employee_id,
                         :customer_count
                     )
-                """),
+                """
+                ),
                 {
                     "id": str(assignment_id),
                     "tenant_id": str(tenant_id),
@@ -390,11 +398,13 @@ class MarketingTaskService:
 
         # 更新任务的目标人数
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE marketing_tasks
                 SET total_target_count = :count, updated_at = now()
                 WHERE id = :task_id
-            """),
+            """
+            ),
             {"task_id": str(task_id), "count": total_customers},
         )
 
@@ -452,7 +462,8 @@ class MarketingTaskService:
         sent_at = datetime.now(timezone.utc) if send_status == "sent" else None
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO marketing_task_executions (
                     id, tenant_id, task_id, assignment_id,
                     store_id, employee_id, customer_id,
@@ -464,7 +475,8 @@ class MarketingTaskService:
                     :wecom_external_userid, :group_chat_id, :channel,
                     :send_status, :coupon_instance_id, :failure_reason, :sent_at
                 )
-            """),
+            """
+            ),
             {
                 "id": str(exec_id),
                 "tenant_id": str(tenant_id),
@@ -571,7 +583,8 @@ class MarketingTaskService:
     ) -> dict:
         """获取任务整体效果"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(total_sent), 0) AS total_sent,
                     COALESCE(SUM(delivered), 0) AS total_delivered,
@@ -595,7 +608,8 @@ class MarketingTaskService:
                     END AS conversion_rate
                 FROM marketing_task_effects
                 WHERE tenant_id = :tenant_id AND task_id = :task_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         row = result.mappings().first()
@@ -609,7 +623,8 @@ class MarketingTaskService:
     ) -> list[dict]:
         """按门店维度统计效果"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT store_id,
                     SUM(total_sent) AS total_sent,
                     SUM(delivered) AS total_delivered,
@@ -620,7 +635,8 @@ class MarketingTaskService:
                 WHERE tenant_id = :tenant_id AND task_id = :task_id AND is_deleted = FALSE
                 GROUP BY store_id
                 ORDER BY total_revenue_fen DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -633,7 +649,8 @@ class MarketingTaskService:
     ) -> list[dict]:
         """按员工维度统计效果"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT employee_id,
                     SUM(total_sent) AS total_sent,
                     SUM(delivered) AS total_delivered,
@@ -645,7 +662,8 @@ class MarketingTaskService:
                   AND is_deleted = FALSE AND employee_id IS NOT NULL
                 GROUP BY employee_id
                 ORDER BY total_revenue_fen DESC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -658,7 +676,8 @@ class MarketingTaskService:
     ) -> dict:
         """优惠券效果统计"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(coupon_issued_count), 0) AS total_issued,
                     COALESCE(SUM(redeemed_count), 0) AS total_redeemed,
@@ -669,7 +688,8 @@ class MarketingTaskService:
                     COALESCE(SUM(revenue_fen), 0) AS revenue_from_coupons_fen
                 FROM marketing_task_effects
                 WHERE tenant_id = :tenant_id AND task_id = :task_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "task_id": str(task_id)},
         )
         row = result.mappings().first()
@@ -693,7 +713,8 @@ class MarketingTaskService:
             raise MarketingTaskError("INVALID_DIMENSION", f"不支持的维度: {dimension}")
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT {group_col},
                     COUNT(*) AS total_executions,
                     COUNT(*) FILTER (WHERE send_status = 'sent') AS sent_count,
@@ -712,7 +733,8 @@ class MarketingTaskService:
                 GROUP BY {group_col}
                 ORDER BY sent_count DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "task_id": str(task_id),
@@ -733,7 +755,8 @@ class MarketingTaskService:
         """检查到期的 scheduled 任务，自动转为 executing"""
         now = datetime.now(timezone.utc)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE marketing_tasks
                 SET status = 'executing', updated_at = now()
                 WHERE tenant_id = :tenant_id
@@ -742,14 +765,16 @@ class MarketingTaskService:
                   AND schedule_at IS NOT NULL
                   AND schedule_at <= :now
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "now": now},
         )
         started_ids = [str(r[0]) for r in result.fetchall()]
 
         # 检查已到结束时间的 executing 任务
         end_result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE marketing_tasks
                 SET status = 'completed', updated_at = now()
                 WHERE tenant_id = :tenant_id
@@ -758,7 +783,8 @@ class MarketingTaskService:
                   AND schedule_end_at IS NOT NULL
                   AND schedule_end_at <= :now
                 RETURNING id
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "now": now},
         )
         completed_ids = [str(r[0]) for r in end_result.fetchall()]

@@ -36,10 +36,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: "pip"
@@ -84,7 +84,7 @@ jobs:
           K6_BASE_URL: ${{ github.event.inputs.base_url || 'http://localhost:8000' }}
         run: |
           chmod +x infra/performance/run-k6.sh
-          infra/performance/run-k6.sh "${K6_BASE_URL}" || true
+          infra/performance/run-k6.sh "${K6_BASE_URL}"
 
       - name: Verify results file
         run: |

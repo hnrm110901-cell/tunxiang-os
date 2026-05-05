@@ -18,9 +18,7 @@ import uuid
 from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
-sys.path.insert(
-    0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..")
-)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
 import pytest
 from fastapi import FastAPI
@@ -43,6 +41,7 @@ def _reset_stores():
 
 class DictRow(dict):
     """dict that also supports attribute access, mimicking SQLAlchemy RowMapping."""
+
     def __getattr__(self, key):
         try:
             return self[key]
@@ -75,7 +74,7 @@ class FakeAsyncSession:
         self._committed = False
 
     async def execute(self, stmt, params=None):
-        sql = str(stmt.text if hasattr(stmt, 'text') else stmt).strip().lower()
+        sql = str(stmt.text if hasattr(stmt, "text") else stmt).strip().lower()
         params = params or {}
 
         if "set_config" in sql:
@@ -189,13 +188,12 @@ app.dependency_overrides[get_db_with_tenant] = _fake_get_db_with_tenant
 
 # ─── 测试用例 1: 完整生命周期 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_edi_full_lifecycle():
     """EDI完整流程：推送订单 → 供应商确认发货 → 门店确认收货。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # Step 1: 推送订单
         push_resp = await client.post(
             "/api/v1/supply/edi/order-push",
@@ -205,10 +203,8 @@ async def test_edi_full_lifecycle():
                 "store_id": "store-001",
                 "store_name": "长沙五一广场店",
                 "items": [
-                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 50,
-                     "unit": "kg", "unit_price_fen": 3500},
-                    {"ingredient_id": "ing-002", "name": "基围虾", "qty": 30,
-                     "unit": "kg", "unit_price_fen": 6000},
+                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 50, "unit": "kg", "unit_price_fen": 3500},
+                    {"ingredient_id": "ing-002", "name": "基围虾", "qty": 30, "unit": "kg", "unit_price_fen": 6000},
                 ],
                 "notes": "EDI测试订单",
             },
@@ -255,13 +251,12 @@ async def test_edi_full_lifecycle():
 
 # ─── 测试用例 2: 状态追踪查询 ────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_edi_order_status_query():
     """推送多个订单后查询状态追踪。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 推送两个订单
         for i in range(2):
             await client.post(
@@ -270,8 +265,13 @@ async def test_edi_order_status_query():
                     "supplier_id": "sup-001",
                     "store_id": f"store-{i + 1:03d}",
                     "items": [
-                        {"ingredient_id": f"ing-{i}", "name": f"食材{i}",
-                         "qty": 10, "unit": "kg", "unit_price_fen": 1000},
+                        {
+                            "ingredient_id": f"ing-{i}",
+                            "name": f"食材{i}",
+                            "qty": 10,
+                            "unit": "kg",
+                            "unit_price_fen": 1000,
+                        },
                     ],
                 },
                 headers=HEADERS,
@@ -310,13 +310,12 @@ async def test_edi_order_status_query():
 
 # ─── 测试用例 3: 非法状态发货拒绝 ────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_edi_delivery_invalid_status():
     """已收货的订单不可再次确认发货。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 推送 + 发货 + 收货
         push_resp = await client.post(
             "/api/v1/supply/edi/order-push",
@@ -324,8 +323,7 @@ async def test_edi_delivery_invalid_status():
                 "supplier_id": "sup-001",
                 "store_id": "store-001",
                 "items": [
-                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 10,
-                     "unit": "kg", "unit_price_fen": 3500},
+                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 10, "unit": "kg", "unit_price_fen": 3500},
                 ],
             },
             headers=HEADERS,
@@ -358,13 +356,12 @@ async def test_edi_delivery_invalid_status():
 
 # ─── 测试用例 4: 收货必须在已发货后 ──────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_edi_receive_requires_shipped():
     """未发货的订单不可确认收货。"""
     _reset_stores()
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 推送订单（状态: pushed）
         push_resp = await client.post(
             "/api/v1/supply/edi/order-push",
@@ -372,8 +369,7 @@ async def test_edi_receive_requires_shipped():
                 "supplier_id": "sup-001",
                 "store_id": "store-001",
                 "items": [
-                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 10,
-                     "unit": "kg", "unit_price_fen": 3500},
+                    {"ingredient_id": "ing-001", "name": "鲈鱼", "qty": 10, "unit": "kg", "unit_price_fen": 3500},
                 ],
             },
             headers=HEADERS,

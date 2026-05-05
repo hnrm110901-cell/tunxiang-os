@@ -96,13 +96,7 @@ def _incomplete_beta(x: float, a: float, b: float) -> float:
         return 1.0
 
     # 用对称性使 x < (a+1)/(a+b+2) 收敛快
-    bt = math.exp(
-        math.lgamma(a + b)
-        - math.lgamma(a)
-        - math.lgamma(b)
-        + a * math.log(x)
-        + b * math.log(1.0 - x)
-    )
+    bt = math.exp(math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log(1.0 - x))
     if x < (a + 1.0) / (a + b + 2.0):
         return bt * _betacf(x, a, b) / a
     return 1.0 - bt * _betacf(1.0 - x, b, a) / b
@@ -204,7 +198,7 @@ def welch_t_test(sample_a: list[float], sample_b: list[float]) -> WelchResult:
     t_stat = diff / se_diff
 
     # Welch–Satterthwaite df
-    num = se_diff_sq ** 2
+    num = se_diff_sq**2
     denom = (var_a / n_a) ** 2 / (n_a - 1) + (var_b / n_b) ** 2 / (n_b - 1)
     df = num / denom if denom > 0 else float(n_a + n_b - 2)
 

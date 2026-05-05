@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.traffic_predictor import TrafficPredictor
 
@@ -38,7 +39,8 @@ async def _get_avg_check(store_id: str, tenant_id: str, db: AsyncSession) -> flo
     """获取门店近30天平均客单价（分）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(AVG(total_amount_fen), 0)
                 FROM orders
                 WHERE tenant_id = :tenant_id::uuid
@@ -46,7 +48,8 @@ async def _get_avg_check(store_id: str, tenant_id: str, db: AsyncSession) -> flo
                   AND is_deleted = FALSE
                   AND created_at >= NOW() - INTERVAL '30 days'
                   AND total_amount_fen > 0
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id},
         )
         return float(result.scalar() or 0)
@@ -59,12 +62,14 @@ async def _get_store_list(tenant_id: str, db: AsyncSession) -> list[dict]:
     """获取租户下所有门店"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, store_name, city
                 FROM stores
                 WHERE tenant_id = :tenant_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id},
         )
         return [{"store_id": r[0], "store_name": r[1], "city": r[2]} for r in result.fetchall()]
@@ -101,7 +106,7 @@ async def get_revenue_forecast(
         traffic = await predictor.forecast_7days(store_id, tenant_id, db, city=city)
     except (ValueError, KeyError) as exc:
         logger.warning("revenue_forecast.traffic_error", store_id=store_id, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     avg_check_fen = await _get_avg_check(store_id, tenant_id, db)
 

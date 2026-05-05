@@ -21,13 +21,14 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_vouchers_idempotency_void_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
 import re
 import sys
 import uuid
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -35,7 +36,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-
 
 # ─── 真实场景 #1-3: 幂等行为 (ORM + 迁移文件双视角) ──────────────────────
 
@@ -191,7 +191,9 @@ class TestV268MigrationFileStructure:
     def _load_migration(self):
         path = (
             Path(__file__).resolve().parents[4]
-            / "shared" / "db-migrations" / "versions"
+            / "shared"
+            / "db-migrations"
+            / "versions"
             / "v268_financial_vouchers_idempotency_void.py"
         )
         assert path.exists(), f"v268 迁移文件不存在: {path}"
@@ -217,7 +219,8 @@ class TestV268MigrationFileStructure:
         for col in required:
             assert re.search(
                 rf"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+{col}\b",
-                self.migration_src, re.I,
+                self.migration_src,
+                re.I,
             ), f"v268 缺少 ADD COLUMN {col}"
 
     def test_check_void_consistency_exists(self):
@@ -226,7 +229,8 @@ class TestV268MigrationFileStructure:
         # 表达式必须同时含 voided=TRUE 分支的三重条件
         assert re.search(
             r"voided\s*=\s*TRUE\s+AND\s+voided_at\s+IS\s+NOT\s+NULL\s+AND\s+voided_by\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         ), "CHECK 表达式必须强制 voided=TRUE 时 voided_at + voided_by 非空"
 
     def test_partial_unique_idempotency_index(self):
@@ -241,28 +245,29 @@ class TestV268MigrationFileStructure:
         assert re.search(
             r"CREATE\s+UNIQUE\s+INDEX\s+CONCURRENTLY.*?uq_fv_tenant_event"
             r".*?WHERE\s+event_id\s+IS\s+NOT\s+NULL\s+AND\s+event_type\s+IS\s+NOT\s+NULL",
-            self.migration_src, re.S | re.I,
-        ), (
-            "uq_fv_tenant_event 必须是 partial WHERE "
-            "event_id IS NOT NULL AND event_type IS NOT NULL (防 NULL 幂等失效)"
-        )
+            self.migration_src,
+            re.S | re.I,
+        ), "uq_fv_tenant_event 必须是 partial WHERE event_id IS NOT NULL AND event_type IS NOT NULL (防 NULL 幂等失效)"
 
     def test_concurrently_used_for_all_indexes(self):
         """老表索引必须 CONCURRENTLY (不阻塞日结 DML)."""
         # 与 v266 (新空表) 对称: v268 改老表, CONCURRENTLY 是刚需
         create_index_stmts = re.findall(
             r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?(\w+)",
-            self.migration_src, re.I,
+            self.migration_src,
+            re.I,
         )
         assert len(create_index_stmts) >= 3, (
-            f"期望 3+ CREATE INDEX 语句 (uq_fv_tenant_event + ix_fv_event + ix_fv_voided_at), "
-            f"实际 {create_index_stmts}"
+            f"期望 3+ CREATE INDEX 语句 (uq_fv_tenant_event + ix_fv_event + ix_fv_voided_at), 实际 {create_index_stmts}"
         )
         # 所有 CREATE INDEX 都必须带 CONCURRENTLY (老表刚需)
-        concurrent_count = len(re.findall(
-            r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY",
-            self.migration_src, re.I,
-        ))
+        concurrent_count = len(
+            re.findall(
+                r"CREATE\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY",
+                self.migration_src,
+                re.I,
+            )
+        )
         assert concurrent_count == len(create_index_stmts), (
             f"v268 所有 {len(create_index_stmts)} 个 CREATE INDEX 都必须 CONCURRENTLY, "
             f"实际 CONCURRENTLY {concurrent_count} 个 — 老表加索引锁表风险"
@@ -274,7 +279,8 @@ class TestV268MigrationFileStructure:
         # autocommit_block 应出现在 upgrade() 里
         upgrade_body = re.search(
             r"def upgrade\(\) -> None:(.*?)(?=\Z|^def downgrade)",
-            self.migration_src, re.S | re.M,
+            self.migration_src,
+            re.S | re.M,
         )
         assert upgrade_body is not None
         assert "autocommit_block" in upgrade_body.group(1), (
@@ -284,13 +290,13 @@ class TestV268MigrationFileStructure:
     def test_downgrade_drops_indexes_concurrently(self):
         """downgrade 也应 CONCURRENTLY DROP (避免锁表)."""
         downgrade_body = re.search(
-            r"def downgrade\(\) -> None:(.*)", self.migration_src, re.S,
+            r"def downgrade\(\) -> None:(.*)",
+            self.migration_src,
+            re.S,
         )
         assert downgrade_body is not None
         body = downgrade_body.group(1)
-        assert re.search(r"DROP\s+INDEX\s+CONCURRENTLY", body, re.I), (
-            "downgrade DROP INDEX 也应 CONCURRENTLY"
-        )
+        assert re.search(r"DROP\s+INDEX\s+CONCURRENTLY", body, re.I), "downgrade DROP INDEX 也应 CONCURRENTLY"
 
     def test_upgrade_has_raise_notice_markers(self):
         """RAISE NOTICE 分步可观测性 (>= 4 步)."""
@@ -306,10 +312,7 @@ class TestV268MigrationFileStructure:
 
     def test_orm_table_args_has_check_constraint(self):
         """ORM 的 __table_args__ 必须镜像 DB 层 CHECK (提供应用层早期校验)."""
-        orm_path = (
-            Path(__file__).resolve().parents[1]
-            / "models" / "voucher.py"
-        )
+        orm_path = Path(__file__).resolve().parents[1] / "models" / "voucher.py"
         orm_src = orm_path.read_text(encoding="utf-8")
         assert "chk_voucher_void_consistency" in orm_src, (
             "ORM __table_args__ 必须含 CheckConstraint 以供 SQLAlchemy 在 flush 前校验"

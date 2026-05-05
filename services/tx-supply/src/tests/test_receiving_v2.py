@@ -75,12 +75,14 @@ async def db_session():
 
         # 创建测试门店（stores 表依赖）
         await session.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stores (id, tenant_id, store_name, address,
                     created_at, updated_at, is_deleted)
                 VALUES (:id, :tenant_id, :name, :addr,
                     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)
-            """),
+            """
+            ),
             {
                 "id": STORE_ID,
                 "tenant_id": TENANT_ID,

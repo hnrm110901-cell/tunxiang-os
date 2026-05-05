@@ -86,7 +86,8 @@ class CookTimeStatsService:
             dept_filter = "AND dept_id = :dept_id"
             params["dept_id"] = dept_id
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 dish_id,
                 dept_id,
@@ -106,7 +107,8 @@ class CookTimeStatsService:
                 AND tenant_id = :tenant_id::uuid
                 {dept_filter}
             GROUP BY dish_id, dept_id, hour_bucket, day_type
-        """)
+        """
+        )
 
         try:
             result = await self._db.execute(sql, params)
@@ -300,14 +302,16 @@ class CookTimeStatsService:
 
         # 查询pending和cooking状态的任务
         try:
-            pending_sql = text("""
+            pending_sql = text(
+                """
                 SELECT kt.order_item_id, oi.dish_id
                 FROM kds_tasks kt
                 LEFT JOIN order_items oi ON oi.id = kt.order_item_id
                 WHERE kt.dept_id = :dept_id::uuid
                   AND kt.tenant_id = :tenant_id::uuid
                   AND kt.status IN ('pending', 'cooking')
-            """)
+            """
+            )
             result = await self._db.execute(
                 pending_sql,
                 {

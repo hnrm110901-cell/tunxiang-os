@@ -122,7 +122,8 @@ async def collect_deposit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO biz_deposits (
                     tenant_id, store_id, customer_id, reservation_id, order_id,
                     amount_fen, applied_amount_fen, refunded_amount_fen,
@@ -136,7 +137,8 @@ async def collect_deposit(
                     NOW(), :expires_at, :operator_id::UUID, :remark
                 )
                 RETURNING id, status, collected_at, expires_at
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(body.store_id),
@@ -213,11 +215,13 @@ async def apply_deposit(
     try:
         # 查询当前押金状态
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, amount_fen, applied_amount_fen, refunded_amount_fen, status
                 FROM biz_deposits
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
@@ -247,7 +251,8 @@ async def apply_deposit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_deposits
                 SET applied_amount_fen = :new_applied,
                     status = :new_status,
@@ -255,7 +260,8 @@ async def apply_deposit(
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, status, applied_amount_fen, amount_fen, refunded_amount_fen
-            """),
+            """
+            ),
             {
                 "new_applied": new_applied,
                 "new_status": new_status,
@@ -325,11 +331,13 @@ async def refund_deposit(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, amount_fen, applied_amount_fen, refunded_amount_fen, status
                 FROM biz_deposits
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
@@ -359,14 +367,16 @@ async def refund_deposit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_deposits
                 SET refunded_amount_fen = :new_refunded,
                     status = :new_status,
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, status, refunded_amount_fen, amount_fen, applied_amount_fen
-            """),
+            """
+            ),
             {
                 "new_refunded": new_refunded,
                 "new_status": new_status,
@@ -430,11 +440,13 @@ async def convert_deposit(
 
     try:
         fetch = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, amount_fen, applied_amount_fen, refunded_amount_fen, status
                 FROM biz_deposits
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(did), "tenant_id": str(tid)},
         )
         deposit = fetch.mappings().first()
@@ -457,13 +469,15 @@ async def convert_deposit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE biz_deposits
                 SET status = 'converted',
                     updated_at = NOW()
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
                 RETURNING id, status, amount_fen, applied_amount_fen, refunded_amount_fen
-            """),
+            """
+            ),
             {"id": str(did), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -515,7 +529,8 @@ async def get_deposit(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, customer_id, reservation_id, order_id,
                        amount_fen, applied_amount_fen, refunded_amount_fen,
                        (amount_fen - applied_amount_fen - refunded_amount_fen) AS remaining_fen,
@@ -524,7 +539,8 @@ async def get_deposit(
                        created_at, updated_at
                 FROM biz_deposits
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
-            """),
+            """
+            ),
             {"id": str(did), "tenant_id": str(tid)},
         )
         row = result.mappings().first()
@@ -587,7 +603,8 @@ async def list_by_store(
         total = count_result.scalar()
 
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, customer_id, reservation_id, order_id,
                        amount_fen, applied_amount_fen, refunded_amount_fen,
                        (amount_fen - applied_amount_fen - refunded_amount_fen) AS remaining_fen,
@@ -596,7 +613,8 @@ async def list_by_store(
                 WHERE {where_sql}
                 ORDER BY collected_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [_serialize_row(dict(row)) for row in items_result.mappings().all()]
@@ -628,7 +646,8 @@ async def ledger_report(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_count,
                     COALESCE(SUM(amount_fen), 0) AS total_collected_fen,
@@ -649,7 +668,8 @@ async def ledger_report(
                   AND store_id = :store_id::UUID
                   AND collected_at >= :start_date::DATE
                   AND collected_at < (:end_date::DATE + INTERVAL '1 day')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(sid),
@@ -689,7 +709,8 @@ async def aging_report(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     SUM(CASE WHEN age_days <= 7 THEN 1 ELSE 0 END) AS cnt_0_7d,
                     COALESCE(SUM(CASE WHEN age_days <= 7 THEN remaining_fen ELSE 0 END), 0) AS amt_0_7d,
@@ -709,7 +730,8 @@ async def aging_report(
                       AND status NOT IN ('refunded', 'fully_applied', 'converted', 'written_off')
                       AND (amount_fen - applied_amount_fen - refunded_amount_fen) > 0
                 ) aged
-            """),
+            """
+            ),
             {"tenant_id": str(tid), "store_id": str(sid)},
         )
         row = result.mappings().first()
@@ -764,7 +786,8 @@ async def shift_summary_report(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE collected_at >= :start AND collected_at <= :end_ts)
                         AS received_count,
@@ -782,7 +805,8 @@ async def shift_summary_report(
                 FROM biz_deposits
                 WHERE tenant_id = :tenant_id::UUID
                   AND store_id = :store_id::UUID
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tid),
                 "store_id": str(sid),

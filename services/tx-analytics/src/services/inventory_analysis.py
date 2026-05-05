@@ -51,7 +51,8 @@ async def inventory_turnover(
 
     # 查询期间消耗成本
     consumption_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(cost_fen), 0) AS total_consumption_fen
             FROM inventory_transactions
             WHERE store_id = :store_id
@@ -59,7 +60,8 @@ async def inventory_turnover(
               AND tx_type = 'consumption'
               AND tx_date BETWEEN :start_date AND :end_date
               AND is_deleted = false
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -71,7 +73,8 @@ async def inventory_turnover(
 
     # 查询期初和期末库存成本，计算平均库存
     inventory_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(CASE WHEN snapshot_date = :start_date THEN cost_fen END), 0)
                     AS start_cost_fen,
@@ -82,7 +85,8 @@ async def inventory_turnover(
               AND tenant_id = :tenant_id
               AND snapshot_date IN (:start_date, :end_date)
               AND is_deleted = false
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -149,7 +153,8 @@ async def price_fluctuation_monitor(
     end_date = date_range["end"]
 
     result = await db.execute(
-        text("""
+        text(
+            """
             WITH period_prices AS (
                 SELECT
                     ingredient_id,
@@ -196,7 +201,8 @@ async def price_fluctuation_monitor(
             LEFT JOIN ingredients i ON i.id = pp.ingredient_id AND i.tenant_id = :tenant_id
             ORDER BY ABS(COALESCE(pp.end_price_fen, 0) - COALESCE(pp.start_price_fen, 0)) DESC
             LIMIT 50
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_uuid,
             "start_date": start_date,
@@ -261,7 +267,8 @@ async def waste_ranking(
     store_uuid = uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 w.ingredient_id,
                 i.name AS ingredient_name,
@@ -278,7 +285,8 @@ async def waste_ranking(
             GROUP BY w.ingredient_id, i.name, w.unit
             ORDER BY SUM(w.waste_cost_fen) DESC
             LIMIT 30
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -338,7 +346,8 @@ async def stocktake_variance_analysis(
     store_uuid = uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 s.ingredient_id,
                 i.name AS ingredient_name,
@@ -357,7 +366,8 @@ async def stocktake_variance_analysis(
             GROUP BY s.ingredient_id, i.name, s.unit
             ORDER BY ABS(SUM(s.variance_cost_fen)) DESC
             LIMIT 30
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -420,7 +430,8 @@ async def procurement_variance(
     store_uuid = uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 po.ingredient_id,
                 i.name AS ingredient_name,
@@ -439,7 +450,8 @@ async def procurement_variance(
             GROUP BY po.ingredient_id, i.name, po.unit
             ORDER BY ABS(SUM(po.actual_cost_fen) - SUM(po.planned_cost_fen)) DESC
             LIMIT 30
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -509,7 +521,8 @@ async def dish_cost_variance_deep(
 
     # 查询菜品维度汇总
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 dcv.dish_id,
                 d.name AS dish_name,
@@ -525,7 +538,8 @@ async def dish_cost_variance_deep(
             GROUP BY dcv.dish_id, d.name
             ORDER BY ABS(SUM(dcv.actual_cost_fen) - SUM(dcv.theoretical_cost_fen)) DESC
             LIMIT 20
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -544,7 +558,8 @@ async def dish_cost_variance_deep(
 
         # 查询原料级明细
         detail_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     dcvd.ingredient_id,
                     i.name AS ingredient_name,
@@ -562,7 +577,8 @@ async def dish_cost_variance_deep(
                   AND dcvd.is_deleted = false
                 GROUP BY dcvd.ingredient_id, i.name, dcvd.unit
                 ORDER BY ABS(SUM(dcvd.actual_cost_fen) - SUM(dcvd.theoretical_cost_fen)) DESC
-            """),
+            """
+            ),
             {
                 "dish_id": dr["dish_id"],
                 "store_id": store_uuid,
@@ -632,7 +648,8 @@ async def seafood_waste_analysis(
     store_uuid = uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 sw.ingredient_id,
                 i.name AS ingredient_name,
@@ -649,7 +666,8 @@ async def seafood_waste_analysis(
               AND sw.is_deleted = false
             GROUP BY sw.ingredient_id, i.name, sw.waste_category, sw.unit
             ORDER BY SUM(sw.waste_cost_fen) DESC
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -727,7 +745,8 @@ async def food_safety_risk_graph(
 
     # 1. 临期/过期原料
     expiry_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 inv.ingredient_id,
                 i.name AS ingredient_name,
@@ -748,7 +767,8 @@ async def food_safety_risk_graph(
               AND inv.is_deleted = false
               AND inv.expiry_date < :now + interval '3 days'
             ORDER BY inv.expiry_date ASC
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -772,7 +792,8 @@ async def food_safety_risk_graph(
 
     # 2. 异常温度记录
     temp_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 ta.equipment_id,
                 ta.equipment_name,
@@ -787,7 +808,8 @@ async def food_safety_risk_graph(
               AND ta.is_deleted = false
             ORDER BY ta.recorded_at DESC
             LIMIT 20
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,
@@ -810,7 +832,8 @@ async def food_safety_risk_graph(
 
     # 3. 高风险原料（过敏原 / 高耗损 / 特殊储存要求）
     risk_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 i.id AS ingredient_id,
                 i.name AS ingredient_name,
@@ -828,7 +851,8 @@ async def food_safety_risk_graph(
               AND i.risk_level >= 3
               AND i.is_deleted = false
             ORDER BY i.risk_level DESC
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tenant_id": tenant_uuid,

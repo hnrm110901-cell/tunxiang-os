@@ -127,13 +127,15 @@ async def list_customers(
     total = count_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT *, credit_limit_fen - used_credit_fen AS available_credit_fen
             FROM corporate_customers
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -161,7 +163,8 @@ async def create_customer(
             raise HTTPException(status_code=409, detail=f"企业编码 '{req.company_code}' 已存在")
 
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO corporate_customers
                 (tenant_id, store_id, company_name, company_code, contact_name, contact_phone,
                  billing_type, credit_limit_fen, tax_no, invoice_title, discount_rate, approved_menu_ids)
@@ -169,7 +172,8 @@ async def create_customer(
                 (:tenant_id, :tenant_id, :name, :code, :contact, :phone,
                  :billing, :credit, :tax, :invoice, :discount, :menu_ids::jsonb)
             RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "name": req.company_name,
@@ -216,12 +220,14 @@ async def update_customer(
     set_parts.append("updated_at = NOW()")
 
     row = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE corporate_customers
             SET {", ".join(set_parts)}
             WHERE id = :cid AND is_deleted = FALSE
             RETURNING *, credit_limit_fen - used_credit_fen AS available_credit_fen
-        """),
+        """
+        ),
         params,
     )
     await db.commit()
@@ -237,7 +243,8 @@ async def update_customer(
 @router.get("/customers/{customer_id}/credit", summary="授信额度查询")
 async def get_credit(customer_id: str, db: AsyncSession = Depends(_get_db)) -> dict:
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, company_name, credit_limit_fen, used_credit_fen, billing_type,
                    credit_limit_fen - used_credit_fen AS available_credit_fen,
                    CASE WHEN credit_limit_fen > 0
@@ -245,7 +252,8 @@ async def get_credit(customer_id: str, db: AsyncSession = Depends(_get_db)) -> d
                         ELSE 0 END AS usage_percent
             FROM corporate_customers
             WHERE id = :cid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": customer_id},
     )
     customer = row.fetchone()
@@ -267,12 +275,14 @@ async def create_corporate_order(
 
     # 查询客户
     cust_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, company_name, status, credit_limit_fen, used_credit_fen,
                    discount_rate, approved_menu_ids
             FROM corporate_customers
             WHERE id = :cid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"cid": req.corporate_customer_id},
     )
     customer = cust_row.fetchone()
@@ -304,7 +314,8 @@ async def create_corporate_order(
     # 创建订单 + 更新授信（事务内）
     order_no = f"CO-{uuid.uuid4().hex[:12].upper()}"
     order_row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO corporate_orders
                 (tenant_id, store_id, corporate_customer_id, order_no, items,
                  original_amount_fen, discount_rate, final_amount_fen)
@@ -312,7 +323,8 @@ async def create_corporate_order(
                 (:tid, :sid, :cid, :no, :items::jsonb,
                  :original, :discount, :final)
             RETURNING id, order_no, final_amount_fen, ordered_at
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "sid": req.store_id,
@@ -327,11 +339,13 @@ async def create_corporate_order(
 
     # 更新已用授信
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE corporate_customers
             SET used_credit_fen = used_credit_fen + :amount, updated_at = NOW()
             WHERE id = :cid
-        """),
+        """
+        ),
         {"cid": req.corporate_customer_id, "amount": final_fen},
     )
     await db.commit()
@@ -381,14 +395,16 @@ async def list_corporate_orders(
     total = count_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT o.*, c.company_name
             FROM corporate_orders o
             JOIN corporate_customers c ON c.id = o.corporate_customer_id
             WHERE {where}
             ORDER BY o.ordered_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -417,13 +433,15 @@ async def bulk_bill(
 
     # 汇总未出账订单
     agg = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS cnt, COALESCE(SUM(final_amount_fen), 0) AS total
             FROM corporate_orders
             WHERE corporate_customer_id = :cid
               AND billed = FALSE
               AND ordered_at::date BETWEEN :start AND :end
-        """),
+        """
+        ),
         {"cid": req.corporate_customer_id, "start": req.billing_period_start, "end": req.billing_period_end},
     )
     summary = agg.fetchone()
@@ -433,14 +451,16 @@ async def bulk_bill(
     # 创建账单
     bill_no = f"BILL-{uuid.uuid4().hex[:10].upper()}"
     bill_row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO corporate_bills
                 (tenant_id, store_id, corporate_customer_id, bill_no,
                  period_start, period_end, order_count, total_amount_fen)
             VALUES
                 (:tid, :tid, :cid, :bno, :start, :end, :cnt, :total)
             RETURNING id
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "cid": req.corporate_customer_id,
@@ -455,13 +475,15 @@ async def bulk_bill(
 
     # 标记订单已出账
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE corporate_orders
             SET billed = TRUE, bill_id = :bill_id
             WHERE corporate_customer_id = :cid
               AND billed = FALSE
               AND ordered_at::date BETWEEN :start AND :end
-        """),
+        """
+        ),
         {
             "bill_id": bill_id,
             "cid": req.corporate_customer_id,
@@ -498,7 +520,8 @@ async def export_reconciliation(
     db: AsyncSession = Depends(_get_db),
 ) -> PlainTextResponse:
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.order_no, c.company_name, o.store_id,
                    o.original_amount_fen, o.discount_rate, o.final_amount_fen,
                    CASE WHEN o.billed THEN 'billed' ELSE 'unbilled' END AS billing_status,
@@ -508,7 +531,8 @@ async def export_reconciliation(
             WHERE o.corporate_customer_id = :cid
               AND o.ordered_at::date BETWEEN :start AND :end
             ORDER BY o.ordered_at
-        """),
+        """
+        ),
         {"cid": corporate_customer_id, "start": date_from, "end": date_to},
     )
     orders = rows.fetchall()

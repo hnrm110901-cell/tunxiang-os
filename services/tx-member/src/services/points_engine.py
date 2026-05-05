@@ -124,6 +124,116 @@ def validate_multiplier_conditions(conditions: dict) -> bool:
     return True
 
 
+# ── 硬约束：抵现毛利底线 ──────────────────────────────────────
+#
+# 三条硬约束之一（CLAUDE.md §6 "毛利底线"）。
+# 任何积分抵现行为不可使该笔订单实付毛利率低于阈值（默认 15%）。
+#
+# 计算口径（与 tx-agent.constraints.gross_margin 保持一致）：
+#   实际毛利率 = (实付金额 - 食材成本) / 实付金额
+#   实付金额  = 订单金额 - 抵扣金额
+#
+# 拒绝抵现的代价是顾客无法用积分；通过抵现的代价是真金白银的毛利损失。
+# 这条约束确保后者不超过 1 - threshold。
+
+DEFAULT_MIN_MARGIN_RATE = 0.15
+
+
+def check_offset_against_margin_floor(
+    order_total_fen: int,
+    food_cost_fen: int,
+    offset_fen: int,
+    min_margin_rate: float = DEFAULT_MIN_MARGIN_RATE,
+) -> dict[str, Any]:
+    """检查积分抵现是否会击穿毛利底线。
+
+    Args:
+        order_total_fen:  订单原始金额（分）
+        food_cost_fen:    本单食材成本（分），由 BOM 推算
+        offset_fen:       拟抵扣金额（分）
+        min_margin_rate:  毛利率下限（默认 15%，门店级可覆盖）
+
+    Returns:
+        {
+          "allowed": bool,               # 是否允许此次抵现
+          "reason": str,                 # 拒绝原因（人话）
+          "actual_margin_rate": float,   # 抵现后实际毛利率
+          "max_offset_fen": int,         # 在毛利底线下，本单可抵的最大金额（分）
+        }
+
+    设计：
+      - offset_fen=0 总是允许
+      - order_total_fen<=0 视为非法订单 → 拒绝
+      - 毛利率 >= 阈值 → 允许
+      - 同时返回 max_offset_fen，便于前端建议"最多可抵 X 分"
+    """
+    if offset_fen == 0:
+        return {
+            "allowed": True,
+            "reason": "no_offset",
+            "actual_margin_rate": 1.0 if order_total_fen <= 0 else (order_total_fen - food_cost_fen) / order_total_fen,
+            "max_offset_fen": 0,
+        }
+
+    if order_total_fen <= 0:
+        return {
+            "allowed": False,
+            "reason": "invalid_order_total",
+            "actual_margin_rate": 0.0,
+            "max_offset_fen": 0,
+        }
+
+    if offset_fen < 0 or food_cost_fen < 0:
+        return {
+            "allowed": False,
+            "reason": "invalid_amounts",
+            "actual_margin_rate": 0.0,
+            "max_offset_fen": 0,
+        }
+
+    paid_after_offset = order_total_fen - offset_fen
+    if paid_after_offset <= 0:
+        return {
+            "allowed": False,
+            "reason": "offset_exceeds_total",
+            "actual_margin_rate": 0.0,
+            "max_offset_fen": _max_offset_for_margin(order_total_fen, food_cost_fen, min_margin_rate),
+        }
+
+    actual_margin_rate = (paid_after_offset - food_cost_fen) / paid_after_offset
+    allowed = actual_margin_rate >= min_margin_rate
+
+    return {
+        "allowed": allowed,
+        "reason": (
+            f"margin_ok:{actual_margin_rate:.4f}>={min_margin_rate:.4f}"
+            if allowed
+            else f"margin_floor_violated:{actual_margin_rate:.4f}<{min_margin_rate:.4f}"
+        ),
+        "actual_margin_rate": round(actual_margin_rate, 4),
+        "max_offset_fen": _max_offset_for_margin(order_total_fen, food_cost_fen, min_margin_rate),
+    }
+
+
+def _max_offset_for_margin(order_total_fen: int, food_cost_fen: int, min_margin_rate: float) -> int:
+    """求解满足毛利下限的最大抵扣金额（向下取整到分）。
+
+    数学推导：
+        margin = (P - O - C) / (P - O) >= r
+      ⇒ (P - O) - C >= r*(P - O)
+      ⇒ (1-r)*(P - O) >= C
+      ⇒ P - O >= C / (1-r)
+      ⇒ O <= P - C / (1-r)
+    """
+    if order_total_fen <= 0 or min_margin_rate >= 1.0:
+        return 0
+    paid_floor = food_cost_fen / (1.0 - min_margin_rate)
+    max_offset = order_total_fen - paid_floor
+    if max_offset <= 0:
+        return 0
+    return int(max_offset)  # 向下取整到分
+
+
 # ── 服务函数 ──────────────────────────────────────────────────
 
 
@@ -157,22 +267,26 @@ async def earn_points(
 
     # 更新积分余额
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points + :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
 
     # 记录积分流水
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'earn', :src, :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -248,21 +362,25 @@ async def spend_points(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET points = points - :pts, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"pts": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
 
     log_id = str(uuid.uuid4())
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO points_log
                 (id, tenant_id, card_id, direction, source, points, created_at)
             VALUES (:id, :tid, :cid, 'spend', :src, :pts, :now)
-        """),
+        """
+        ),
         {
             "id": log_id,
             "tid": tenant_id,
@@ -320,10 +438,12 @@ async def set_earn_rules(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET earn_rules = :rules::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -370,10 +490,12 @@ async def set_spend_rules(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET spend_rules = :rules::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -425,10 +547,12 @@ async def set_multiplier(
     config = {"multiplier": multiplier, "conditions": conditions}
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE card_types SET multiplier_config = :cfg::jsonb, updated_at = :now
             WHERE id = :ctid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {
             "ctid": card_type_id,
             "tid": tenant_id,
@@ -482,11 +606,13 @@ async def manage_growth_value(
     now = _now_utc()
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE member_cards
             SET growth_value = growth_value + :amt, updated_at = :now
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"amt": amount, "cid": card_id, "tid": tenant_id, "now": now},
     )
     await db.flush()
@@ -525,11 +651,13 @@ async def get_points_balance(
     await _set_tenant(db, tenant_id)
 
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT points, growth_value
             FROM member_cards
             WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id},
     )
     result = row.mappings().first()
@@ -568,13 +696,15 @@ async def get_points_history(
 
     # 明细
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, direction, source, points, created_at
             FROM points_log
             WHERE card_id = :cid AND tenant_id = :tid
             ORDER BY created_at DESC
             LIMIT :lim OFFSET :off
-        """),
+        """
+        ),
         {"cid": card_id, "tid": tenant_id, "lim": size, "off": offset},
     )
     items = [
@@ -626,7 +756,8 @@ async def cross_store_settlement(
 
     # 按门店汇总获取积分
     earn_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT pl.source AS store_context, SUM(pl.points) AS total_earned
             FROM points_log pl
             WHERE pl.tenant_id = :tid
@@ -634,14 +765,16 @@ async def cross_store_settlement(
               AND pl.created_at >= :start::timestamptz
               AND pl.created_at < :end::timestamptz
             GROUP BY pl.source
-        """),
+        """
+        ),
         {"tid": tenant_id, "start": start_date, "end": end_date},
     )
     earn_by_source = {r["store_context"]: int(r["total_earned"]) for r in earn_rows.mappings().all()}
 
     # 按门店汇总消耗积分
     spend_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT pl.source AS store_context, SUM(pl.points) AS total_spent
             FROM points_log pl
             WHERE pl.tenant_id = :tid
@@ -649,7 +782,8 @@ async def cross_store_settlement(
               AND pl.created_at >= :start::timestamptz
               AND pl.created_at < :end::timestamptz
             GROUP BY pl.source
-        """),
+        """
+        ),
         {"tid": tenant_id, "start": start_date, "end": end_date},
     )
     spend_by_source = {r["store_context"]: int(r["total_spent"]) for r in spend_rows.mappings().all()}

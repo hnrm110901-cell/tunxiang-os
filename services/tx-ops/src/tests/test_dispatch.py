@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -191,7 +191,7 @@ async def test_margin_drop_dispatch():
 @pytest.mark.asyncio
 async def test_sla_timeout_escalation():
     """超时任务应自动升级到上一级角色。"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # 创建一个已超时的任务
     tasks = [
@@ -243,7 +243,7 @@ async def test_sla_timeout_escalation():
 @pytest.mark.asyncio
 async def test_dispatch_dashboard():
     """看板应正确归类: pending/in_progress/overdue/resolved。"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     tasks = [
         {

@@ -1,9 +1,11 @@
 """LHDN MyInvois e-Invoice API 路由"""
 
-from typing import Any, Optional
+from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
+
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.e_invoice_service import EinvoiceService, get_current_phase
 
@@ -76,7 +78,7 @@ async def submit_einvoice(
             rejected_count=result["rejected_count"],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/status/{document_uuid}", response_model=StatusResponse)
@@ -96,7 +98,7 @@ async def get_einvoice_status(
             status=result["status"],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{document_uuid}/cancel")
@@ -115,7 +117,7 @@ async def cancel_einvoice(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/documents")
@@ -138,7 +140,7 @@ async def search_documents(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/submissions/recent")
@@ -155,7 +157,7 @@ async def get_recent_submissions(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/health")

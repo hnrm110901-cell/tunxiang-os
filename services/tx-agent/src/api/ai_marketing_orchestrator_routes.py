@@ -222,7 +222,8 @@ async def get_touch_log(
     # Single query: use window function to avoid a separate COUNT round-trip.
     # _get_db dependency (get_db_with_tenant) already called set_config.
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 message_id,
                 member_id::text,
@@ -238,7 +239,8 @@ async def get_touch_log(
               AND NOT is_deleted
             ORDER BY sent_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "days": days, "size": size, "offset": offset},
     )
 

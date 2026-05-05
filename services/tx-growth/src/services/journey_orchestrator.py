@@ -86,7 +86,8 @@ class JourneyOrchestratorService:
             "converted_count": 0,
         }
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journeys
                     (tenant_id, name, journey_type, trigger, nodes,
                      target_segment_id, status, stats)
@@ -95,7 +96,8 @@ class JourneyOrchestratorService:
                      :nodes::jsonb, :target_segment_id, 'draft', :stats::jsonb)
                 RETURNING id, tenant_id, name, journey_type, trigger, nodes,
                           target_segment_id, status, stats, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "name": name,
@@ -153,13 +155,15 @@ class JourneyOrchestratorService:
 
         where = " AND ".join(conditions)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, name, journey_type, trigger, nodes, target_segment_id,
                        status, stats, created_at, updated_at
                 FROM journeys
                 WHERE {where}
                 ORDER BY updated_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -188,14 +192,16 @@ class JourneyOrchestratorService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, journey_type, trigger, nodes, target_segment_id,
                        status, stats, created_at, updated_at
                 FROM journeys
                 WHERE id = :journey_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -223,7 +229,8 @@ class JourneyOrchestratorService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journeys
                 SET status = 'active', updated_at = NOW()
                 WHERE id = :journey_id
@@ -231,7 +238,8 @@ class JourneyOrchestratorService:
                   AND is_deleted = FALSE
                   AND status IN ('draft', 'paused')
                 RETURNING id, name, status, updated_at
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -255,7 +263,8 @@ class JourneyOrchestratorService:
             {"tid": tenant_id},
         )
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE journeys
                 SET status = 'paused', updated_at = NOW()
                 WHERE id = :journey_id
@@ -263,7 +272,8 @@ class JourneyOrchestratorService:
                   AND is_deleted = FALSE
                   AND status = 'active'
                 RETURNING id, name, status, updated_at
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -299,13 +309,15 @@ class JourneyOrchestratorService:
 
         # 校验旅程是否存在且激活
         check = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, nodes FROM journeys
                 WHERE id = :journey_id
                   AND tenant_id = :tenant_id
                   AND status = 'active'
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         journey_row = check.mappings().one_or_none()
@@ -317,7 +329,8 @@ class JourneyOrchestratorService:
         first_node_id = nodes[0].get("node_id") if nodes else None
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO journey_executions
                     (tenant_id, journey_id, member_id, trigger_event,
                      current_node_id, status)
@@ -326,7 +339,8 @@ class JourneyOrchestratorService:
                      :current_node_id, 'running')
                 RETURNING id, journey_id, member_id, trigger_event,
                           current_node_id, status, started_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "journey_id": journey_id,
@@ -374,13 +388,15 @@ class JourneyOrchestratorService:
 
         # 获取旅程基础信息
         j_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, status, stats
                 FROM journeys
                 WHERE id = :journey_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         j_row = j_result.mappings().one_or_none()
@@ -389,7 +405,8 @@ class JourneyOrchestratorService:
 
         # 聚合执行记录
         agg_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                              AS total_executions,
                     COUNT(DISTINCT member_id)                            AS unique_members,
@@ -400,7 +417,8 @@ class JourneyOrchestratorService:
                 WHERE journey_id = :journey_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"journey_id": journey_id, "tenant_id": tenant_id},
         )
         agg = agg_result.mappings().one()

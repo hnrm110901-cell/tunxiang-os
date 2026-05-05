@@ -135,7 +135,8 @@ class ContentEngine:
         now = datetime.now(timezone.utc)
         for key, tpl in _BUILTIN_TEMPLATES.items():
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO content_templates
                         (id, tenant_id, template_key, name, content_type,
                          body_template, variables, is_builtin, is_active,
@@ -145,7 +146,8 @@ class ContentEngine:
                          :body, :variables::jsonb, true, true,
                          0, :now, :now)
                     ON CONFLICT ON CONSTRAINT uq_content_templates_tenant_key DO NOTHING
-                """),
+                """
+                ),
                 {
                     "tid": tid,
                     "key": key,
@@ -192,7 +194,8 @@ class ContentEngine:
         new_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO content_templates
                     (id, tenant_id, template_key, name, content_type,
                      body_template, variables, is_builtin, is_active,
@@ -201,7 +204,8 @@ class ContentEngine:
                     (:id, :tid, null, :name, :content_type,
                      :body, :variables::jsonb, false, true,
                      0, :now, :now)
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tid": tid,
@@ -246,7 +250,8 @@ class ContentEngine:
         tpl_id = uuid.UUID(template_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, template_key, name, content_type, body_template,
                        variables, is_builtin, is_active, usage_count,
                        created_at, updated_at
@@ -254,7 +259,8 @@ class ContentEngine:
                 WHERE id = :tpl_id AND tenant_id = :tid
                   AND is_active = true AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tpl_id": tpl_id, "tid": tid},
         )
         row = result.fetchone()
@@ -302,13 +308,15 @@ class ContentEngine:
 
         where_clause = " AND ".join(where_parts)
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, template_key, name, content_type, body_template,
                        variables, is_builtin, usage_count, created_at, updated_at
                 FROM content_templates
                 WHERE {where_clause}
                 ORDER BY is_builtin DESC, usage_count DESC, created_at DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -352,13 +360,15 @@ class ContentEngine:
         tpl_id = uuid.UUID(template_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, body_template, variables
                 FROM content_templates
                 WHERE id = :tpl_id AND tenant_id = :tid
                   AND is_active = true AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tpl_id": tpl_id, "tid": tid},
         )
         row = result.fetchone()
@@ -380,11 +390,13 @@ class ContentEngine:
         # 递增使用次数（fire-and-forget：失败不影响主流程）
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE content_templates
                     SET usage_count = usage_count + 1, updated_at = NOW()
                     WHERE id = :tpl_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"tpl_id": tpl_id, "tid": tid},
             )
             await db.commit()

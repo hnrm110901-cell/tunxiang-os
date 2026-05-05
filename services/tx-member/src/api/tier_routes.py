@@ -85,7 +85,8 @@ async def list_tiers(
         await _set_rls(db, x_tenant_id)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     tc.id, tc.tenant_id, tc.level, tc.name,
                     tc.min_points, tc.min_spend_fen,
@@ -99,7 +100,8 @@ async def list_tiers(
                 WHERE tc.tenant_id = :tid
                 GROUP BY tc.id
                 ORDER BY tc.level ASC
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         all_rows = rows.all()
@@ -144,7 +146,8 @@ async def get_upgrade_log(
 
         offset = (page - 1) * size
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ul.id,
                     ul.customer_id,
@@ -163,7 +166,8 @@ async def get_upgrade_log(
                   AND ul.created_at >= NOW() - (:days || ' days')::interval
                 ORDER BY ul.created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "days": days, "lim": size, "off": offset},
         )
         all_rows = rows.all()
@@ -222,14 +226,16 @@ async def check_upgrade_eligibility(
 
         # 查询会员卡（积分+消费）
         card_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT mc.points_balance, mc.total_spend_fen, mc.tier_id
                 FROM member_cards mc
                 WHERE mc.customer_id = :cid AND mc.tenant_id = :tid
                   AND mc.is_deleted = false
                 ORDER BY mc.created_at ASC
                 LIMIT 1
-            """),
+            """
+            ),
             {"cid": customer_id, "tid": x_tenant_id},
         )
         card = card_row.first()
@@ -251,14 +257,16 @@ async def check_upgrade_eligibility(
 
         # 下一等级配置
         next_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, min_points, min_spend_fen
                 FROM member_tier_configs
                 WHERE tenant_id = :tid
                   AND (min_points > :pts OR min_spend_fen > :spend)
                 ORDER BY min_points ASC, min_spend_fen ASC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "pts": current_points, "spend": current_spend},
         )
         next_tier = next_row.first()
@@ -319,7 +327,8 @@ async def get_tier(
         await _set_rls(db, x_tenant_id)
 
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, level, name,
                        min_points, min_spend_fen,
                        discount_rate, points_multiplier,
@@ -328,7 +337,8 @@ async def get_tier(
                 FROM member_tier_configs
                 WHERE id = :tid_id AND tenant_id = :tid
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid_id": tier_id, "tid": x_tenant_id},
         )
         tier = row.first()
@@ -358,7 +368,8 @@ async def create_tier(
         await _set_rls(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO member_tier_configs
                     (tenant_id, level, name, min_points, min_spend_fen,
                      discount_rate, points_multiplier,
@@ -370,7 +381,8 @@ async def create_tier(
                      :bday_bonus, :free_delivery,
                      :benefits, :color, :icon, :is_active)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "level": body.level,
@@ -414,7 +426,8 @@ async def update_tier(
         await _set_rls(db, x_tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE member_tier_configs
                 SET level = :level, name = :name,
                     min_points = :min_pts, min_spend_fen = :min_spend,
@@ -426,7 +439,8 @@ async def update_tier(
                     updated_at = NOW()
                 WHERE id = :tier_id AND tenant_id = :tid
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tier_id": tier_id,
                 "tid": x_tenant_id,

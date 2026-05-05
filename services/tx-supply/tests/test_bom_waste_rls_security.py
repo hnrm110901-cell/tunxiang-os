@@ -28,7 +28,7 @@ CORRECT_SESSION_VAR = "app.tenant_id"
 # 禁止使用的变量名
 WRONG_VARS = [
     "app.current_store_id",  # 原漏洞中使用的错误变量
-    "app.current_tenant",    # 内存记录中应用代码曾用的变量（同样错误）
+    "app.current_tenant",  # 内存记录中应用代码曾用的变量（同样错误）
     "app.store_id",
     "app.tenant",
 ]
@@ -37,14 +37,13 @@ WRONG_VARS = [
 TARGET_TABLES = ["bom_templates", "bom_items", "waste_events"]
 
 # 正确的 NULLIF 安全条件（v056+ 标准）
-CORRECT_SAFE_CONDITION = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
-)
+CORRECT_SAFE_CONDITION = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Mock RLS 引擎（模拟 PostgreSQL RLS 行为）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class MockRow:
@@ -92,9 +91,7 @@ class MockRLSDatabase:
         """模拟 INSERT WITH CHECK。"""
         if table in self._rls_tables:
             if self._current_tenant is None or self._current_tenant == "":
-                raise PermissionError(
-                    "RLS INSERT blocked: app.tenant_id is not set (NULL/empty)"
-                )
+                raise PermissionError("RLS INSERT blocked: app.tenant_id is not set (NULL/empty)")
             if tenant_id != self._current_tenant:
                 raise PermissionError(
                     f"RLS INSERT blocked: row.tenant_id={tenant_id} != "
@@ -111,10 +108,7 @@ class MockRLSDatabase:
 
     def select(self, table: str) -> list[MockRow]:
         """模拟 SELECT USING 过滤。"""
-        return [
-            r for r in self._rows
-            if r.table == table and self._rls_check(table, r.tenant_id)
-        ]
+        return [r for r in self._rows if r.table == table and self._rls_check(table, r.tenant_id)]
 
     def select_bypass_rls(self, table: str) -> list[MockRow]:
         """超级用户视角（绕过 RLS，确认数据确实存在）。"""
@@ -147,11 +141,10 @@ def _make_db_with_data() -> tuple[MockRLSDatabase, str, str]:
 # 测试组 1：session 变量名正确性验证
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_correct_session_variable_in_safe_condition():
     """RLS 安全条件必须使用 app.tenant_id，不能使用 app.current_store_id 或 app.current_tenant。"""
-    assert CORRECT_SESSION_VAR in CORRECT_SAFE_CONDITION, (
-        f"安全条件必须包含 '{CORRECT_SESSION_VAR}'"
-    )
+    assert CORRECT_SESSION_VAR in CORRECT_SAFE_CONDITION, f"安全条件必须包含 '{CORRECT_SESSION_VAR}'"
     for wrong_var in WRONG_VARS:
         assert wrong_var not in CORRECT_SAFE_CONDITION, (
             f"安全条件不应包含错误变量 '{wrong_var}'；"
@@ -164,10 +157,7 @@ def test_rls_policy_sql_uses_correct_variable():
     for table in TARGET_TABLES:
         for action in ("select", "insert", "update", "delete"):
             if action == "select":
-                sql = (
-                    f"CREATE POLICY {table}_rls_{action} ON {table} "
-                    f"FOR SELECT USING ({CORRECT_SAFE_CONDITION})"
-                )
+                sql = f"CREATE POLICY {table}_rls_{action} ON {table} " f"FOR SELECT USING ({CORRECT_SAFE_CONDITION})"
             elif action == "insert":
                 sql = (
                     f"CREATE POLICY {table}_rls_{action} ON {table} "
@@ -180,23 +170,17 @@ def test_rls_policy_sql_uses_correct_variable():
                     f"WITH CHECK ({CORRECT_SAFE_CONDITION})"
                 )
             else:  # delete
-                sql = (
-                    f"CREATE POLICY {table}_rls_{action} ON {table} "
-                    f"FOR DELETE USING ({CORRECT_SAFE_CONDITION})"
-                )
+                sql = f"CREATE POLICY {table}_rls_{action} ON {table} " f"FOR DELETE USING ({CORRECT_SAFE_CONDITION})"
 
-            assert CORRECT_SESSION_VAR in sql, (
-                f"[{table}/{action}] SQL 未引用正确变量 '{CORRECT_SESSION_VAR}': {sql}"
-            )
+            assert CORRECT_SESSION_VAR in sql, f"[{table}/{action}] SQL 未引用正确变量 '{CORRECT_SESSION_VAR}': {sql}"
             for wrong_var in WRONG_VARS:
-                assert wrong_var not in sql, (
-                    f"[{table}/{action}] SQL 引用了错误变量 '{wrong_var}': {sql}"
-                )
+                assert wrong_var not in sql, f"[{table}/{action}] SQL 引用了错误变量 '{wrong_var}': {sql}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试组 2：同租户数据可访问（设置正确 session 后）
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_tenant_a_can_access_own_bom_templates():
     """设置正确的 app.tenant_id 后，tenant_a 可以访问自己的 bom_templates。"""
@@ -205,9 +189,7 @@ def test_tenant_a_can_access_own_bom_templates():
     db.set_tenant(tenant_a)
     visible = db.select("bom_templates")
 
-    assert len(visible) == 1, (
-        f"tenant_a 应能访问自己的 bom_templates，实际看到 {len(visible)} 条"
-    )
+    assert len(visible) == 1, f"tenant_a 应能访问自己的 bom_templates，实际看到 {len(visible)} 条"
     assert visible[0].tenant_id == tenant_a
 
 
@@ -218,9 +200,7 @@ def test_tenant_a_can_access_own_bom_items():
     db.set_tenant(tenant_a)
     visible = db.select("bom_items")
 
-    assert len(visible) == 1, (
-        f"tenant_a 应能访问自己的 bom_items，实际看到 {len(visible)} 条"
-    )
+    assert len(visible) == 1, f"tenant_a 应能访问自己的 bom_items，实际看到 {len(visible)} 条"
     assert visible[0].tenant_id == tenant_a
 
 
@@ -231,15 +211,14 @@ def test_tenant_a_can_access_own_waste_events():
     db.set_tenant(tenant_a)
     visible = db.select("waste_events")
 
-    assert len(visible) == 1, (
-        f"tenant_a 应能访问自己的 waste_events，实际看到 {len(visible)} 条"
-    )
+    assert len(visible) == 1, f"tenant_a 应能访问自己的 waste_events，实际看到 {len(visible)} 条"
     assert visible[0].tenant_id == tenant_a
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试组 3：不同租户数据不可越权访问
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_tenant_a_cannot_read_tenant_b_bom_templates():
     """tenant_a 不能读取 tenant_b 的 bom_templates。"""
@@ -329,6 +308,7 @@ def test_tenant_b_cannot_read_tenant_a_waste_events():
 # 测试组 4：NULL 防护（session 未设置时全表不可见）
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def test_bom_templates_invisible_when_tenant_not_set():
     """未设置 app.tenant_id 时，bom_templates 全表不可见（NULL 防护）。"""
     db, tenant_a, tenant_b = _make_db_with_data()
@@ -337,8 +317,7 @@ def test_bom_templates_invisible_when_tenant_not_set():
     visible = db.select("bom_templates")
 
     assert len(visible) == 0, (
-        f"未设置 app.tenant_id 时不应看到任何 bom_templates，"
-        f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
+        f"未设置 app.tenant_id 时不应看到任何 bom_templates，" f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
     )
 
 
@@ -350,8 +329,7 @@ def test_bom_items_invisible_when_tenant_not_set():
     visible = db.select("bom_items")
 
     assert len(visible) == 0, (
-        f"未设置 app.tenant_id 时不应看到任何 bom_items，"
-        f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
+        f"未设置 app.tenant_id 时不应看到任何 bom_items，" f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
     )
 
 
@@ -363,14 +341,14 @@ def test_waste_events_invisible_when_tenant_not_set():
     visible = db.select("waste_events")
 
     assert len(visible) == 0, (
-        f"未设置 app.tenant_id 时不应看到任何 waste_events，"
-        f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
+        f"未设置 app.tenant_id 时不应看到任何 waste_events，" f"但实际看到 {len(visible)} 条 —— RLS NULL 防护失效！"
     )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 测试组 5：跨租户 INSERT 被 RLS 阻止
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def test_cross_tenant_insert_blocked_bom_templates():
     """tenant_a 不能向 bom_templates 写入 tenant_b 的数据。"""
@@ -448,20 +426,18 @@ def test_insert_without_tenant_blocked():
 # 测试组 6：v063 迁移文件内容验证
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _get_migration_path(filename: str) -> str:
     """根据当前测试文件位置解析迁移文件路径。"""
     base = os.path.dirname(__file__)
-    return os.path.normpath(
-        os.path.join(base, "..", "..", "..", "shared", "db-migrations", "versions", filename)
-    )
+    return os.path.normpath(os.path.join(base, "..", "..", "..", "shared", "db-migrations", "versions", filename))
 
 
 def test_v063_migration_file_exists():
     """v063_fix_rls_bom_waste.py 迁移文件必须存在。"""
     migration_path = _get_migration_path("v063_fix_rls_bom_waste.py")
     assert os.path.exists(migration_path), (
-        f"修复迁移文件不存在: {migration_path}\n"
-        f"请创建 shared/db-migrations/versions/v063_fix_rls_bom_waste.py"
+        f"修复迁移文件不存在: {migration_path}\n" f"请创建 shared/db-migrations/versions/v063_fix_rls_bom_waste.py"
     )
 
 
@@ -475,9 +451,7 @@ def test_v063_covers_all_target_tables():
         content = f.read()
 
     for table in TARGET_TABLES:
-        assert table in content, (
-            f"v063 迁移文件未覆盖表 '{table}'，该表存在 RLS 漏洞"
-        )
+        assert table in content, f"v063 迁移文件未覆盖表 '{table}'，该表存在 RLS 漏洞"
 
 
 def test_v063_uses_correct_session_variable():
@@ -489,20 +463,14 @@ def test_v063_uses_correct_session_variable():
     with open(migration_path) as f:
         content = f.read()
 
-    assert CORRECT_SESSION_VAR in content, (
-        f"v063 迁移文件未使用正确 session 变量 '{CORRECT_SESSION_VAR}'"
-    )
+    assert CORRECT_SESSION_VAR in content, f"v063 迁移文件未使用正确 session 变量 '{CORRECT_SESSION_VAR}'"
 
     for wrong_var in WRONG_VARS:
         # 排除注释中的说明性文字（以 # 开头的行）
-        non_comment_lines = [
-            line for line in content.splitlines()
-            if not line.strip().startswith("#")
-        ]
+        non_comment_lines = [line for line in content.splitlines() if not line.strip().startswith("#")]
         non_comment_content = "\n".join(non_comment_lines)
         assert wrong_var not in non_comment_content, (
-            f"v063 迁移文件代码部分包含错误 session 变量 '{wrong_var}'，"
-            f"这是此次修复要解决的漏洞根因"
+            f"v063 迁移文件代码部分包含错误 session 变量 '{wrong_var}'，" f"这是此次修复要解决的漏洞根因"
         )
 
 
@@ -515,9 +483,7 @@ def test_v063_has_drop_old_policies():
     with open(migration_path) as f:
         content = f.read()
 
-    assert "DROP POLICY" in content, (
-        "v063 迁移文件必须包含 DROP POLICY 语句，否则新策略会与旧策略冲突"
-    )
+    assert "DROP POLICY" in content, "v063 迁移文件必须包含 DROP POLICY 语句，否则新策略会与旧策略冲突"
 
 
 def test_v063_has_force_row_level_security():
@@ -529,9 +495,9 @@ def test_v063_has_force_row_level_security():
     with open(migration_path) as f:
         content = f.read()
 
-    assert "FORCE ROW LEVEL SECURITY" in content, (
-        "v063 迁移文件必须包含 FORCE ROW LEVEL SECURITY，防止表 owner 绕过 RLS"
-    )
+    assert (
+        "FORCE ROW LEVEL SECURITY" in content
+    ), "v063 迁移文件必须包含 FORCE ROW LEVEL SECURITY，防止表 owner 绕过 RLS"
 
 
 def test_v063_has_nullif_guard():
@@ -543,7 +509,4 @@ def test_v063_has_nullif_guard():
     with open(migration_path) as f:
         content = f.read()
 
-    assert "NULLIF" in content, (
-        "v063 迁移文件必须使用 NULLIF guard，"
-        "防止 session 变量为空时 RLS 被绕过"
-    )
+    assert "NULLIF" in content, "v063 迁移文件必须使用 NULLIF guard，" "防止 session 变量为空时 RLS 被绕过"

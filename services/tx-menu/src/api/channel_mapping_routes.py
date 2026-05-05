@@ -23,6 +23,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.channel_mapping_service import (
     ChannelMappingService,
@@ -253,7 +254,7 @@ async def rollback_channel_version(
     try:
         version = await svc.rollback_channel_version(version_id=version_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     await db.commit()
     return {"ok": True, "data": version.model_dump(mode="json"), "error": None}
 
@@ -312,14 +313,16 @@ async def list_channels(
 
     # 统计各渠道已上架菜品数
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT channel, COUNT(*) AS cnt
             FROM channel_menu_items
             WHERE tenant_id = :tid
               AND store_id  = :sid
               AND is_available = true
             GROUP BY channel
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid},
     )
     counts: dict[str, int] = {row[0]: int(row[1]) for row in count_result.fetchall()}
@@ -352,7 +355,8 @@ async def list_channel_dishes(
     sid = _uuid.UUID(store_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 cmi.id,
                 cmi.dish_id,
@@ -371,7 +375,8 @@ async def list_channel_dishes(
               AND cmi.channel   = :channel
               AND d.is_deleted  = false
             ORDER BY cmi.sort_order, d.dish_name
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "channel": channel},
     )
     rows = result.fetchall()
@@ -435,7 +440,8 @@ async def add_dish_to_channel(
         raise HTTPException(status_code=404, detail=f"菜品不存在: {req.dish_id}")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO channel_menu_items
                 (tenant_id, store_id, dish_id, channel, channel_price_fen, is_available, sort_order)
             VALUES
@@ -446,7 +452,8 @@ async def add_dish_to_channel(
                 sort_order        = EXCLUDED.sort_order,
                 updated_at        = NOW()
             RETURNING id, channel_price_fen, is_available, sort_order
-        """),
+        """
+        ),
         {
             "tid": tid,
             "sid": sid,
@@ -499,7 +506,8 @@ async def remove_dish_from_channel(
     did = _uuid.UUID(dish_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE channel_menu_items
             SET is_available = false, updated_at = NOW()
             WHERE tenant_id = :tid
@@ -507,7 +515,8 @@ async def remove_dish_from_channel(
               AND dish_id   = :did
               AND channel   = :channel
             RETURNING id
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "did": did, "channel": channel},
     )
     row = result.fetchone()
@@ -542,7 +551,8 @@ async def update_channel_dish_price(
     did = _uuid.UUID(dish_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE channel_menu_items
             SET channel_price_fen = :price, updated_at = NOW()
             WHERE tenant_id = :tid
@@ -550,7 +560,8 @@ async def update_channel_dish_price(
               AND dish_id   = :did
               AND channel   = :channel
             RETURNING id, channel_price_fen
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "did": did, "channel": channel, "price": req.channel_price_fen},
     )
     row = result.fetchone()
@@ -593,7 +604,8 @@ async def publish_to_channel(
 
     # 读取当前渠道所有可用菜品
     items_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT dish_id, channel_price_fen, is_available
             FROM channel_menu_items
             WHERE tenant_id = :tid
@@ -601,7 +613,8 @@ async def publish_to_channel(
               AND channel   = :channel
               AND is_available = true
             ORDER BY sort_order
-        """),
+        """
+        ),
         {"tid": tid, "sid": sid, "channel": channel},
     )
     items = items_result.fetchall()

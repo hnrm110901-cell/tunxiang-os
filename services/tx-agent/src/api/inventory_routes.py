@@ -26,7 +26,8 @@ async def get_inventory_dashboard(
     """库存总览：缺货/临界/低库存/正常/即将临期/已过期 数量 + 低库存食材列表（前50条）"""
     try:
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'out_of_stock')                          AS out_of_stock,
                     COUNT(*) FILTER (WHERE status = 'critical')                              AS critical,
@@ -41,13 +42,15 @@ async def get_inventory_dashboard(
                 WHERE tenant_id = :tenant_id
                   AND store_id  = :store_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "store_id": store_id},
         )
         row = summary_result.fetchone()
 
         low_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     i.id::text                              AS id,
                     i.name                                  AS name,
@@ -73,7 +76,8 @@ async def get_inventory_dashboard(
                     END,
                     i.name
                 LIMIT 50
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "store_id": store_id},
         )
         low_items = low_result.fetchall()
@@ -186,7 +190,8 @@ async def get_latest_restock_plan(
     """获取最新一条 AI 补货计划（从 agent_decision_logs 查询，按时间倒序取第一条）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text          AS id,
                     output_action     AS output_action,
@@ -200,7 +205,8 @@ async def get_latest_restock_plan(
                   AND (input_context->>'store_id') = :store_id
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "store_id": store_id},
         )
         row = result.fetchone()

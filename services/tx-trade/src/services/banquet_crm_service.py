@@ -91,7 +91,8 @@ class BanquetCrmService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_leads (
                     id, tenant_id, store_id, lead_no, customer_name, phone,
                     event_type, event_date, guest_count_est, table_count_est,
@@ -103,7 +104,8 @@ class BanquetCrmService:
                     :budget_per_table_fen, :source_channel, :notes,
                     'new', :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": lead_id,
                 "tenant_id": self._tenant_id,
@@ -176,10 +178,12 @@ class BanquetCrmService:
 
         # 验证线索存在
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -196,11 +200,13 @@ class BanquetCrmService:
         updates["tenant_id"] = self._tenant_id
 
         await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE banquet_leads
                 SET {set_clauses}
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             updates,
         )
         await self._db.flush()
@@ -217,10 +223,12 @@ class BanquetCrmService:
     async def assign_sales(self, lead_id: str, sales_id: str) -> dict:
         """分配销售负责人，若未设置跟进时间则自动设为24小时后。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, follow_up_at FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -233,13 +241,15 @@ class BanquetCrmService:
         follow_up_at = lead["follow_up_at"] or (now + timedelta(hours=24))
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_leads
                 SET assigned_sales_id = :sales_id,
                     follow_up_at = :follow_up_at,
                     updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": lead_id,
                 "tenant_id": self._tenant_id,
@@ -288,10 +298,12 @@ class BanquetCrmService:
 
         # 验证线索存在且未终结
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -304,7 +316,8 @@ class BanquetCrmService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_lead_follow_ups (
                     id, tenant_id, lead_id, sales_id, follow_type,
                     content, next_action, next_follow_at, created_at
@@ -312,7 +325,8 @@ class BanquetCrmService:
                     :id, :tenant_id, :lead_id, :sales_id, :follow_type,
                     :content, :next_action, :next_follow_at, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": follow_id,
                 "tenant_id": self._tenant_id,
@@ -329,11 +343,13 @@ class BanquetCrmService:
         # 更新线索的下次跟进时间
         if next_follow_at:
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE banquet_leads
                     SET follow_up_at = :next_follow_at, updated_at = :now
                     WHERE id = :lead_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "lead_id": lead_id,
                     "tenant_id": self._tenant_id,
@@ -382,10 +398,12 @@ class BanquetCrmService:
             raise ValueError("转出和转入不能是同一人")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, assigned_sales_id FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -399,7 +417,8 @@ class BanquetCrmService:
 
         # 记录转移
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_lead_transfers (
                     id, tenant_id, lead_id, from_employee_id, to_employee_id,
                     reason, transferred_at
@@ -407,7 +426,8 @@ class BanquetCrmService:
                     :id, :tenant_id, :lead_id, :from_employee_id, :to_employee_id,
                     :reason, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": transfer_id,
                 "tenant_id": self._tenant_id,
@@ -421,11 +441,13 @@ class BanquetCrmService:
 
         # 更新线索负责人
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_leads
                 SET assigned_sales_id = :to_employee_id, updated_at = :now
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "id": lead_id,
                 "tenant_id": self._tenant_id,
@@ -469,10 +491,12 @@ class BanquetCrmService:
             raise ValueError(f"无效状态: {new_status}，可选: {LEAD_STATUSES}")
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -503,11 +527,13 @@ class BanquetCrmService:
             params["reason"] = reason
 
         await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE banquet_leads
                 SET status = :new_status, updated_at = :now{extra_set}
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             params,
         )
         await self._db.flush()
@@ -579,7 +605,8 @@ class BanquetCrmService:
         params["offset"] = offset
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, lead_no, customer_name, phone, event_type,
                        event_date, guest_count_est, table_count_est,
                        budget_per_table_fen, source_channel, status,
@@ -589,7 +616,8 @@ class BanquetCrmService:
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -621,14 +649,16 @@ class BanquetCrmService:
     async def get_lead(self, lead_id: str) -> dict:
         """获取单个线索详情，附带跟进次数。"""
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT l.*,
                        (SELECT COUNT(*) FROM banquet_lead_follow_ups f
                         WHERE f.lead_id = l.id AND f.tenant_id = l.tenant_id
                        ) AS follow_up_count
                 FROM banquet_leads l
                 WHERE l.id = :id AND l.tenant_id = :tenant_id AND l.is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         lead = row.mappings().first()
@@ -673,34 +703,40 @@ class BanquetCrmService:
 
         # 验证线索存在
         check = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM banquet_leads
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": lead_id, "tenant_id": self._tenant_id},
         )
         if not check.first():
             raise ValueError(f"线索不存在: {lead_id}")
 
         count_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt FROM banquet_lead_follow_ups
                 WHERE lead_id = :lead_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"lead_id": lead_id, "tenant_id": self._tenant_id},
         )
         total = count_row.scalar() or 0
 
         offset = (page - 1) * size
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, lead_id, sales_id, follow_type, content,
                        next_action, next_follow_at, created_at
                 FROM banquet_lead_follow_ups
                 WHERE lead_id = :lead_id AND tenant_id = :tenant_id
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {
                 "lead_id": lead_id,
                 "tenant_id": self._tenant_id,
@@ -752,12 +788,14 @@ class BanquetCrmService:
         where = " AND ".join(conditions)
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT status, COUNT(*) AS cnt
                 FROM banquet_leads
                 WHERE {where}
                 GROUP BY status
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()
@@ -803,14 +841,16 @@ class BanquetCrmService:
         where = " AND ".join(conditions)
 
         result = await self._db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, lead_no, customer_name, phone, event_type,
                        event_date, status, assigned_sales_id, follow_up_at
                 FROM banquet_leads
                 WHERE {where}
                 ORDER BY follow_up_at ASC
                 LIMIT 100
-            """),
+            """
+            ),
             params,
         )
         rows = result.mappings().all()

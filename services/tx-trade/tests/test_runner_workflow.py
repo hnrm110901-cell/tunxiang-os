@@ -24,6 +24,7 @@ from ..src.services.runner_service import (
 
 # ─── Fixtures ───
 
+
 @pytest.fixture
 def mock_db():
     return AsyncMock()
@@ -33,12 +34,14 @@ def mock_db():
 def clear_runner_store():
     """每个测试前清空内存任务存储"""
     from ..src.services import runner_service
+
     runner_service._runner_store.clear()
     yield
     runner_service._runner_store.clear()
 
 
 # ─── 1. KDS完成出品 → ready ───
+
 
 @pytest.mark.asyncio
 async def test_mark_ready_transitions_to_ready():
@@ -96,6 +99,7 @@ async def test_mark_ready_from_done_status():
 
 # ─── 2. 传菜员领取 → delivering ───
 
+
 @pytest.mark.asyncio
 async def test_pickup_dish_transitions_to_delivering():
     """传菜员领取后状态应变为delivering"""
@@ -146,6 +150,7 @@ async def test_pickup_records_timeline():
 
 # ─── 3. 送达确认 → served ───
 
+
 @pytest.mark.asyncio
 @patch("services.tx_trade.src.services.runner_service._push_to_crew", new_callable=AsyncMock)
 async def test_confirm_served_transitions_to_served(mock_push):
@@ -155,9 +160,7 @@ async def test_confirm_served_transitions_to_served(mock_push):
     task_id = "task-020"
     runner_id = "runner-liu"
 
-    runner_service._runner_store[task_id] = _make_delivering_task(
-        task_id, "store-1", "C01", "order-xyz", "tenant-t1"
-    )
+    runner_service._runner_store[task_id] = _make_delivering_task(task_id, "store-1", "C01", "order-xyz", "tenant-t1")
 
     result = await confirm_served(task_id, runner_id)
 
@@ -181,6 +184,7 @@ async def test_confirm_served_requires_delivering_status(mock_push):
 
 
 # ─── 4. 全桌上齐通知 ───
+
 
 @pytest.mark.asyncio
 @patch("services.tx_trade.src.services.runner_service._push_to_crew", new_callable=AsyncMock)
@@ -206,9 +210,9 @@ async def test_all_served_triggers_table_complete_notification(mock_push):
     # 第一道菜送达，另一道还在delivering，不应触发全桌通知
     await confirm_served(task_id_1, "runner-001")
     table_complete_calls_after_first = [
-        call for call in mock_push.call_args_list
-        if len(call[0]) > 1 and isinstance(call[0][1], dict)
-        and call[0][1].get("type") == "table_all_served"
+        call
+        for call in mock_push.call_args_list
+        if len(call[0]) > 1 and isinstance(call[0][1], dict) and call[0][1].get("type") == "table_all_served"
     ]
     assert len(table_complete_calls_after_first) == 0, "第一道菜送达后不应触发全桌通知"
 
@@ -218,9 +222,9 @@ async def test_all_served_triggers_table_complete_notification(mock_push):
 
     # 验证推送了全桌上齐通知
     table_complete_calls = [
-        call for call in mock_push.call_args_list
-        if len(call[0]) > 1 and isinstance(call[0][1], dict)
-        and call[0][1].get("type") == "table_all_served"
+        call
+        for call in mock_push.call_args_list
+        if len(call[0]) > 1 and isinstance(call[0][1], dict) and call[0][1].get("type") == "table_all_served"
     ]
     assert len(table_complete_calls) == 1, "全部送达后应推送一次 table_all_served 通知"
 
@@ -255,14 +259,15 @@ async def test_partial_served_no_table_complete(mock_push):
 
     # 不应有 table_all_served 通知
     table_complete_calls = [
-        call for call in mock_push.call_args_list
-        if len(call[0]) > 1 and isinstance(call[0][1], dict)
-        and call[0][1].get("type") == "table_all_served"
+        call
+        for call in mock_push.call_args_list
+        if len(call[0]) > 1 and isinstance(call[0][1], dict) and call[0][1].get("type") == "table_all_served"
     ]
     assert len(table_complete_calls) == 0, "未全部送达时不应触发全桌通知"
 
 
 # ─── 5. tenant_id隔离 ───
+
 
 @pytest.mark.asyncio
 async def test_get_runner_queue_tenant_isolation(mock_db):
@@ -307,6 +312,7 @@ async def test_mark_ready_with_tenant_id():
 
 
 # ─── 辅助函数 ───
+
 
 def _make_ready_task(task_id: str, store_id: str, table_number: str) -> dict:
     return {

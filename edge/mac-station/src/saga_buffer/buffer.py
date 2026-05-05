@@ -21,6 +21,7 @@
 关联：edge/mac-mini/offline_buffer.py 已有 aiosqlite 样板可对照
 Flag：edge.payment.saga_buffer（默认 off）
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -205,9 +206,7 @@ class SagaBuffer:
             # 安全做法是重新 enqueue 让下一轮 flush_ready 重新选中。
             now = int(self._clock())
             cur = await conn.execute(
-                "UPDATE saga_buffer "
-                "SET state = 'pending', last_attempt_at = ? "
-                "WHERE state = 'flushing'",
+                "UPDATE saga_buffer SET state = 'pending', last_attempt_at = ? WHERE state = 'flushing'",
                 (now,),
             )
             reset_count = cur.rowcount or 0
@@ -424,8 +423,10 @@ class SagaBuffer:
         async with self._lock:
             if self._memory_mode:
                 rows = [
-                    e for e in self._memory_rows.values()
-                    if e.state == _STATE_PENDING and e.expires_at > now
+                    e
+                    for e in self._memory_rows.values()
+                    if e.state == _STATE_PENDING
+                    and e.expires_at > now
                     and (tenant_id is None or e.tenant_id == tenant_id)
                 ]
                 rows.sort(key=lambda e: e.created_at)
@@ -475,9 +476,7 @@ class SagaBuffer:
             try:
                 db = self._conn
                 await db.execute(
-                    "UPDATE saga_buffer "
-                    "SET state = 'flushing', last_attempt_at = ? "
-                    "WHERE idempotency_key = ?",
+                    "UPDATE saga_buffer SET state = 'flushing', last_attempt_at = ? WHERE idempotency_key = ?",
                     (now, idempotency_key),
                 )
                 await db.commit()
@@ -540,9 +539,7 @@ class SagaBuffer:
             try:
                 db = self._conn
                 await db.execute(
-                    "UPDATE saga_buffer "
-                    "SET state = 'dead_letter', last_error = ? "
-                    "WHERE idempotency_key = ?",
+                    "UPDATE saga_buffer SET state = 'dead_letter', last_error = ? WHERE idempotency_key = ?",
                     (reason, idempotency_key),
                 )
                 await db.commit()
@@ -576,9 +573,7 @@ class SagaBuffer:
             try:
                 db = self._conn
                 await db.execute(
-                    "UPDATE saga_buffer "
-                    "SET state = 'pending' "
-                    "WHERE idempotency_key = ? AND state = 'flushing'",
+                    "UPDATE saga_buffer SET state = 'pending' WHERE idempotency_key = ? AND state = 'flushing'",
                     (idempotency_key,),
                 )
                 await db.commit()
@@ -627,9 +622,7 @@ class SagaBuffer:
                 return 0
             try:
                 # tempfile 试写：在父目录创建并立刻删除一个 0 字节文件
-                with tempfile.NamedTemporaryFile(
-                    dir=str(parent), prefix=".saga_buffer_probe_", delete=True
-                ):
+                with tempfile.NamedTemporaryFile(dir=str(parent), prefix=".saga_buffer_probe_", delete=True):
                     pass
             except OSError as exc:
                 logger.warning(
@@ -661,9 +654,7 @@ class SagaBuffer:
             replayed = 0
             try:
                 for entry in self._memory_rows.values():
-                    payload_json = json.dumps(
-                        entry.payload, ensure_ascii=False, sort_keys=True
-                    )
+                    payload_json = json.dumps(entry.payload, ensure_ascii=False, sort_keys=True)
                     await conn.execute(
                         "INSERT OR IGNORE INTO saga_buffer "
                         "(idempotency_key, tenant_id, store_id, device_id, "
@@ -905,10 +896,7 @@ class SagaBuffer:
             await self.initialize()
 
         if self._memory_mode:
-            rows = [
-                e for e in self._memory_rows.values()
-                if tenant_id is None or e.tenant_id == tenant_id
-            ]
+            rows = [e for e in self._memory_rows.values() if tenant_id is None or e.tenant_id == tenant_id]
             pending = [e for e in rows if e.state == _STATE_PENDING]
             flushing = [e for e in rows if e.state == _STATE_FLUSHING]
             sent = [e for e in rows if e.state == _STATE_SENT]
@@ -927,8 +915,7 @@ class SagaBuffer:
             db = self._conn
             if tenant_id is None:
                 cur = await db.execute(
-                    "SELECT state, COUNT(*) AS c, MIN(created_at) AS oldest "
-                    "FROM saga_buffer GROUP BY state"
+                    "SELECT state, COUNT(*) AS c, MIN(created_at) AS oldest FROM saga_buffer GROUP BY state"
                 )
             else:
                 cur = await db.execute(

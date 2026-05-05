@@ -41,3 +41,16 @@ repos:
     hooks:
       - id: detect-secrets
         args: [--baseline, .secrets.baseline]
+
+  # 防止异常信息泄漏：禁止 HTTPException(detail=str(e)) 模式
+  # 使用 shared.security.src.error_handler.safe_http_exception 替代
+  # 参见：shared/security/src/error_handler.py
+  - repo: local
+    hooks:
+      - id: no-detail-str-e
+        name: 禁止 HTTPException detail=str(e) 泄漏内部异常
+        language: pygrep
+        entry: 'HTTPException\(.*detail\s*=\s*str\(e\)'
+        types: [python]
+        files: '^services/|^edge/|^shared/'
+        pass_filenames: true

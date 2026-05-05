@@ -102,7 +102,8 @@ async def collect_deposit(
 
     now = datetime.now(timezone.utc)
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO banquet_session_deposits
                 (tenant_id, session_id, amount_fen, balance_fen, payment_method,
                  status, operator_id, notes, collected_at)
@@ -110,7 +111,8 @@ async def collect_deposit(
                 (:tid::UUID, :sid::UUID, :amt, :amt, :pm, 'active',
                  :op, :notes, :now)
             RETURNING id, amount_fen, balance_fen, payment_method, status, collected_at
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "sid": body.session_id,
@@ -125,12 +127,14 @@ async def collect_deposit(
 
     # 同步更新场次 deposit_fen 汇总字段
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE banquet_sessions
             SET deposit_fen = COALESCE(deposit_fen, 0) + :amt,
                 updated_at  = :now
             WHERE id = :sid::UUID
-        """),
+        """
+        ),
         {"amt": body.amount_fen, "now": now, "sid": body.session_id},
     )
     await db.commit()
@@ -172,10 +176,12 @@ async def get_deposit_balance(
     """汇总该场次所有有效定金记录，返回总收取额和可用余额。"""
     # 验证场次
     sess_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, contact_name, guest_count, status, total_amount_fen
             FROM banquet_sessions WHERE id = :sid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     sess = sess_r.mappings().first()
@@ -184,7 +190,8 @@ async def get_deposit_balance(
 
     # 汇总定金
     agg_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(SUM(amount_fen), 0)  AS total_collected_fen,
                 COALESCE(SUM(balance_fen), 0) AS total_balance_fen,
@@ -193,20 +200,23 @@ async def get_deposit_balance(
                 COUNT(*) FILTER (WHERE status = 'refunded') AS refunded_records
             FROM banquet_session_deposits
             WHERE session_id = :sid::UUID AND status != 'refunded'
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     agg = dict(agg_r.mappings().first())
 
     # 明细列表
     detail_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, amount_fen, balance_fen, payment_method, status,
                    collected_at, applied_at, notes
             FROM banquet_session_deposits
             WHERE session_id = :sid::UUID
             ORDER BY collected_at DESC
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     records = [_serialize(dict(r)) for r in detail_r.mappings().all()]
@@ -243,12 +253,14 @@ async def apply_deposit(
     # ── 加 FOR UPDATE 锁，防止并发抵扣同一批定金记录 ────────────────────
     # 锁定并读取所有 active 定金记录（单次查询，同时用于余额汇总和逐条扣减）
     active_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, balance_fen FROM banquet_session_deposits
             WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
             ORDER BY collected_at ASC
             FOR UPDATE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     actives = list(active_r.mappings().all())
@@ -274,14 +286,16 @@ async def apply_deposit(
         new_status = "applied" if new_balance == 0 else "active"
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_session_deposits
                 SET balance_fen = :bal,
                     status      = :st,
                     applied_at  = :now,
                     updated_at  = :now
                 WHERE id = :did::UUID
-            """),
+            """
+            ),
             {"bal": new_balance, "st": new_status, "now": now, "did": str(dep_id)},
         )
         left_to_deduct -= this_deduct
@@ -350,12 +364,14 @@ async def refund_deposit(
     # ── 加 FOR UPDATE 锁，防止并发退款超出余额 ──────────────────────────
     # 锁定并读取所有 active 定金记录（单次查询，同时用于余额校验和逐条扣减）
     active_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, balance_fen FROM banquet_session_deposits
             WHERE session_id = :sid::UUID AND status = 'active' AND balance_fen > 0
             ORDER BY collected_at ASC
             FOR UPDATE
-        """),
+        """
+        ),
         {"sid": session_id},
     )
     actives = list(active_r.mappings().all())
@@ -383,25 +399,29 @@ async def refund_deposit(
         new_status = "refunded" if new_balance == 0 else "active"
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_session_deposits
                 SET balance_fen = :bal,
                     status      = :st,
                     updated_at  = :now
                 WHERE id = :did::UUID
-            """),
+            """
+            ),
             {"bal": new_balance, "st": new_status, "now": now, "did": str(dep_id)},
         )
         left_to_refund -= this_refund
 
     # 同步更新场次 deposit_fen（减去退款金额）
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE banquet_sessions
             SET deposit_fen = GREATEST(0, COALESCE(deposit_fen, 0) - :amt),
                 updated_at  = :now
             WHERE id = :sid::UUID
-        """),
+        """
+        ),
         {"amt": body.refund_amount_fen, "now": now, "sid": session_id},
     )
     await db.commit()

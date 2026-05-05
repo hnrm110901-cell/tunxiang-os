@@ -34,6 +34,7 @@
   POST /api/v1/trade/delivery/disputes/sweep-sla
     cron 端点：扫描过期 dispute（status → expired）
 """
+
 from __future__ import annotations
 
 import logging
@@ -48,6 +49,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dispute_response_templates import (
     list_templates,
@@ -71,9 +73,7 @@ router = APIRouter(
 
 
 class DisputeIngestRequest(BaseModel):
-    platform: str = Field(
-        ..., description="meituan|eleme|douyin|xiaohongshu|wechat"
-    )
+    platform: str = Field(..., description="meituan|eleme|douyin|xiaohongshu|wechat")
     platform_dispute_id: str = Field(..., min_length=1, max_length=100)
     platform_order_id: str = Field(..., min_length=1, max_length=100)
     dispute_type: str = Field(..., description="quality_issue|missing_item|...")
@@ -212,7 +212,8 @@ async def list_disputes(
 
         list_params = {**params, "limit": size, "offset": offset}
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, platform, platform_dispute_id, platform_order_id,
                        store_id, dispute_type, status,
                        customer_claim_amount_fen,
@@ -223,7 +224,8 @@ async def list_disputes(
                 WHERE {where}
                 ORDER BY raised_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             list_params,
         )
         items = [dict(r) for r in rows.mappings()]
@@ -283,12 +285,14 @@ async def get_dispute(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM delivery_disputes
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": dispute_id, "tenant_id": x_tenant_id},
         )
         dispute = row.mappings().first()
@@ -296,14 +300,16 @@ async def get_dispute(
             raise HTTPException(status_code=404, detail="dispute 不存在")
 
         msgs_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, sender_role, sender_id, message_type, content,
                        attachment_urls, linked_refund_fen, sent_at
                 FROM delivery_dispute_messages
                 WHERE dispute_id = CAST(:id AS uuid)
                   AND is_deleted = false
                 ORDER BY sent_at ASC
-            """),
+            """
+            ),
             {"id": dispute_id},
         )
         messages = [dict(r) for r in msgs_row.mappings()]
@@ -332,7 +338,8 @@ async def list_messages(
 
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, sender_role, sender_id, message_type, content,
                        attachment_urls, linked_refund_fen, sent_at
                 FROM delivery_dispute_messages m
@@ -344,7 +351,8 @@ async def list_messages(
                   )
                   AND m.is_deleted = false
                 ORDER BY sent_at ASC
-            """),
+            """
+            ),
             {"id": dispute_id, "tenant_id": x_tenant_id},
         )
         messages = [dict(r) for r in rows.mappings()]
@@ -373,7 +381,7 @@ async def draft_response(
             extra_variables=req.extra_variables,
         )
     except DisputeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {"ok": True, "data": result.to_dict()}
 
@@ -401,15 +409,13 @@ async def respond(
             responded_by=x_operator_id,
         )
     except DisputeError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     service = DisputeService(db, tenant_id=x_tenant_id)
     try:
-        result = await service.submit_merchant_response(
-            dispute_id=dispute_id, response=response_input
-        )
+        result = await service.submit_merchant_response(dispute_id=dispute_id, response=response_input)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_respond_db_error")
@@ -437,11 +443,9 @@ async def platform_ruling(
     )
     service = DisputeService(db, tenant_id=x_tenant_id)
     try:
-        result = await service.record_platform_ruling(
-            dispute_id=dispute_id, ruling=ruling
-        )
+        result = await service.record_platform_ruling(dispute_id=dispute_id, ruling=ruling)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_ruling_db_error")
@@ -463,11 +467,9 @@ async def escalate(
 
     service = DisputeService(db, tenant_id=x_tenant_id)
     try:
-        result = await service.escalate(
-            dispute_id=dispute_id, reason=req.reason, escalated_by=x_operator_id
-        )
+        result = await service.escalate(dispute_id=dispute_id, reason=req.reason, escalated_by=x_operator_id)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_escalate_db_error")
@@ -490,7 +492,7 @@ async def withdraw(
     try:
         result = await service.withdraw(dispute_id=dispute_id, reason=req.reason)
     except DisputeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dispute_withdraw_db_error")
@@ -506,6 +508,4 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

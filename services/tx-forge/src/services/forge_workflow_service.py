@@ -55,7 +55,8 @@ class ForgeWorkflowService:
         workflow_id = f"wf_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_workflows
                     (id, tenant_id, workflow_id, workflow_name, description,
                      creator_id, steps, trigger, estimated_value_fen, status)
@@ -66,7 +67,8 @@ class ForgeWorkflowService:
                      :estimated_value_fen, 'draft')
                 RETURNING workflow_id, workflow_name, creator_id, status,
                           estimated_value_fen, created_at
-            """),
+            """
+            ),
             {
                 "workflow_id": workflow_id,
                 "workflow_name": workflow_name,
@@ -112,14 +114,16 @@ class ForgeWorkflowService:
         total = total_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT workflow_id, workflow_name, creator_id, status,
                        estimated_value_fen, created_at, updated_at
                 FROM forge_workflows
                 WHERE {where}
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -128,13 +132,15 @@ class ForgeWorkflowService:
     # ── 工作流详情 ─────────────────────────────────────────────
     async def get_workflow(self, db: AsyncSession, workflow_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT workflow_id, workflow_name, description, creator_id,
                        steps, trigger, estimated_value_fen, status,
                        created_at, updated_at
                 FROM forge_workflows
                 WHERE workflow_id = :wid AND is_deleted = false
-            """),
+            """
+            ),
             {"wid": workflow_id},
         )
         row = result.mappings().first()
@@ -145,14 +151,16 @@ class ForgeWorkflowService:
 
         # 附加最近运行摘要
         runs_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT count(*) AS total_runs,
                        count(*) FILTER (WHERE status = 'completed') AS completed,
                        count(*) FILTER (WHERE status = 'failed') AS failed,
                        count(*) FILTER (WHERE status = 'running') AS running
                 FROM forge_workflow_runs
                 WHERE workflow_id = :wid AND is_deleted = false
-            """),
+            """
+            ),
             {"wid": workflow_id},
         )
         workflow["run_summary"] = dict(runs_row.mappings().one())
@@ -191,12 +199,14 @@ class ForgeWorkflowService:
                 params[key] = val
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_workflows
                 SET {", ".join(set_parts)}
                 WHERE workflow_id = :wid AND is_deleted = false
                 RETURNING workflow_id, workflow_name, status, updated_at
-            """),
+            """
+            ),
             params,
         )
         row = result.mappings().first()
@@ -233,7 +243,8 @@ class ForgeWorkflowService:
         steps = wf.get("steps", [])
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_workflow_runs
                     (id, tenant_id, run_id, workflow_id, store_id,
                      trigger_type, trigger_data, status,
@@ -245,7 +256,8 @@ class ForgeWorkflowService:
                      :total_steps, 0, NOW())
                 RETURNING run_id, workflow_id, store_id, trigger_type,
                           status, total_steps, started_at
-            """),
+            """
+            ),
             {
                 "run_id": run_id,
                 "workflow_id": workflow_id,
@@ -302,13 +314,15 @@ class ForgeWorkflowService:
             set_parts.append("finished_at = NOW()")
 
         row = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE forge_workflow_runs
                 SET {", ".join(set_parts)}
                 WHERE run_id = :rid AND is_deleted = false
                 RETURNING run_id, workflow_id, status, steps_completed,
                           total_tokens, total_cost_fen, started_at, finished_at
-            """),
+            """
+            ),
             params,
         )
         updated = row.mappings().first()
@@ -320,14 +334,16 @@ class ForgeWorkflowService:
     # ── 获取运行详情 ─────────────────────────────────────────
     async def get_run(self, db: AsyncSession, run_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT run_id, workflow_id, store_id, trigger_type, trigger_data,
                        status, total_steps, steps_completed, result,
                        error_message, total_tokens, total_cost_fen,
                        started_at, finished_at, created_at
                 FROM forge_workflow_runs
                 WHERE run_id = :rid AND is_deleted = false
-            """),
+            """
+            ),
             {"rid": run_id},
         )
         row = result.mappings().first()
@@ -361,7 +377,8 @@ class ForgeWorkflowService:
         total = total_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT run_id, workflow_id, store_id, trigger_type,
                        status, steps_completed, total_steps,
                        total_tokens, total_cost_fen,
@@ -370,7 +387,8 @@ class ForgeWorkflowService:
                 WHERE {where}
                 ORDER BY started_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -382,7 +400,8 @@ class ForgeWorkflowService:
         await self.get_workflow(db, workflow_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     count(*) AS total_runs,
                     count(*) FILTER (WHERE status = 'completed') AS completed_runs,
@@ -398,7 +417,8 @@ class ForgeWorkflowService:
                     COALESCE(SUM(total_tokens), 0) AS total_tokens
                 FROM forge_workflow_runs
                 WHERE workflow_id = :wid AND is_deleted = false
-            """),
+            """
+            ),
             {"wid": workflow_id},
         )
         analytics = dict(result.mappings().one())

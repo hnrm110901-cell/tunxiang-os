@@ -81,7 +81,9 @@ GitHub Actions 在 UTC 18:00（北京时间 02:00）自动运行，见 `.github/
 
 ```bash
 # 启动 toxiproxy（监听 8474 管理口，代理 18001/18002/18008）
-docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d
+docker compose -f infra/compose/base.yml \
+               -f infra/compose/envs/dev.yml \
+               -f infra/compose/special/toxiproxy.yml up -d toxiproxy
 
 # 让 tx-trade 代理完全下线（模拟断网）
 ./e2e/scripts/toxiproxy-inject.sh down tx-trade

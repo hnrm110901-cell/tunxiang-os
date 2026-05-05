@@ -17,21 +17,23 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from services.stored_value_service import (
+from sqlalchemy import select, text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
+
+from ..services.stored_value_service import (
     CardNotActiveError,
     CardNotFoundError,
     InsufficientBalanceError,
     StoredValueService,
 )
-from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from shared.ontology.src.database import get_db_with_tenant
 
 logger = structlog.get_logger(__name__)
 
@@ -170,9 +172,9 @@ async def charge(
             },
         }
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -206,11 +208,11 @@ async def consume(
         )
         return {"ok": True, "data": result}
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except CardNotActiveError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -258,7 +260,7 @@ async def refund(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -296,7 +298,7 @@ async def get_balance(
         result = await _svc.get_balance(db=db, card_id=card.id, tenant_id=tenant_id)
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -356,7 +358,7 @@ async def list_charge_rules(
     tenant_id: uuid.UUID = Depends(_parse_tenant_id),
 ):
     """查询当前有效的充值赠送规则（is_active=true，在有效期内）。"""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     rows = await db.execute(
         text(
             "SELECT id, store_id, charge_amount, bonus_amount, description, "
@@ -461,11 +463,11 @@ async def exchange_points(
         )
         return {"ok": True, "data": result}
     except CardNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        raise safe_http_exception(404, "资源不存在", e) from e
     except InsufficientBalanceError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -483,7 +485,7 @@ async def _match_charge_bonus(
     策略：取 charge_amount <= amount_fen 中赠送金额最大的规则。
     无匹配则返回 0。
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     result = await db.execute(
         text(
             "SELECT bonus_amount FROM sv_charge_rules "

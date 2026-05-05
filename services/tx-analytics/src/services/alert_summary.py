@@ -139,13 +139,15 @@ async def _query_all_alerts_today(db: AsyncSession, tenant_id: str) -> list[dict
     """查询全租户今日告警"""
     today = datetime.now().date()
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT type, severity, status
             FROM alerts
             WHERE tenant_id = :tenant_id
               AND DATE(time) = :today
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "today": today},
     )
     return [dict(r) for r in row.mappings().all()]

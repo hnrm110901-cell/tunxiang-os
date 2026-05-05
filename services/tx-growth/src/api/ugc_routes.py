@@ -163,10 +163,12 @@ async def trigger_review(
 
     row = (
         await db.execute(
-            text("""
+            text(
+                """
             SELECT media_urls FROM ugc_submissions
             WHERE id = :ugc_id AND tenant_id = :tenant_id AND is_deleted = false
-        """),
+        """
+            ),
             {"ugc_id": str(ugc_id), "tenant_id": str(tenant_id)},
         )
     ).fetchone()

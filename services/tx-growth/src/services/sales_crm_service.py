@@ -70,7 +70,8 @@ class SalesCRMService:
         """创建销售目标"""
         target_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sales_targets (
                     tenant_id, id, store_id, brand_id, employee_id,
                     target_type, year, month,
@@ -82,7 +83,8 @@ class SalesCRMService:
                     :target_revenue_fen, :target_orders,
                     :target_new_customers, :target_reservations
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "id": str(target_id),
@@ -194,7 +196,8 @@ class SalesCRMService:
             params["actual_reservations"] = actual_reservations
 
         # 自动计算达成率（以营收为主）
-        set_parts.append("""
+        set_parts.append(
+            """
             achievement_rate = CASE
                 WHEN COALESCE(target_revenue_fen, 0) > 0
                 THEN ROUND(
@@ -203,7 +206,8 @@ class SalesCRMService:
                 )
                 ELSE 0
             END
-        """)
+        """
+        )
 
         sql = f"""
             UPDATE sales_targets SET {", ".join(set_parts)}
@@ -272,7 +276,8 @@ class SalesCRMService:
         """创建销售线索"""
         lead_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sales_leads (
                     tenant_id, id, store_id, customer_id,
                     customer_name, customer_phone,
@@ -286,7 +291,8 @@ class SalesCRMService:
                     :expected_revenue_fen, :expected_date,
                     :assigned_to, :priority, :notes
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "id": str(lead_id),
@@ -364,10 +370,12 @@ class SalesCRMService:
     ) -> dict:
         """获取线索详情"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM sales_leads
                 WHERE tenant_id = :tenant_id AND id = :lead_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "lead_id": str(lead_id)},
         )
         row = result.mappings().first()
@@ -425,11 +433,13 @@ class SalesCRMService:
     ) -> dict:
         """分配线索给员工"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE sales_leads
                 SET assigned_to = :assigned_to, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :lead_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "lead_id": str(lead_id),
@@ -544,7 +554,8 @@ class SalesCRMService:
         """创建销售任务"""
         task_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sales_tasks (
                     tenant_id, id, store_id, employee_id,
                     task_type, related_lead_id, related_customer_id,
@@ -554,7 +565,8 @@ class SalesCRMService:
                     :task_type, :related_lead_id, :related_customer_id,
                     :title, :description, :due_at, :priority, :reminder_at
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "id": str(task_id),
@@ -657,7 +669,8 @@ class SalesCRMService:
     ) -> dict:
         """完成任务"""
         res = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE sales_tasks
                 SET status = 'completed',
                     completed_at = now(),
@@ -665,7 +678,8 @@ class SalesCRMService:
                     updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :task_id
                   AND is_deleted = FALSE AND status IN ('pending', 'in_progress', 'overdue')
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "task_id": str(task_id),
@@ -721,14 +735,16 @@ class SalesCRMService:
     ) -> dict:
         """标记逾期任务"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE sales_tasks
                 SET status = 'overdue', updated_at = now()
                 WHERE tenant_id = :tenant_id
                   AND is_deleted = FALSE
                   AND status IN ('pending', 'in_progress')
                   AND due_at < now()
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         count = result.rowcount
@@ -758,7 +774,8 @@ class SalesCRMService:
         """创建拜访记录"""
         visit_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sales_visit_logs (
                     tenant_id, id, store_id, employee_id, customer_id,
                     visit_type, purpose, summary,
@@ -768,7 +785,8 @@ class SalesCRMService:
                     :visit_type, :purpose, :summary,
                     :customer_satisfaction, :next_action, :next_action_date
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "id": str(visit_id),
@@ -830,11 +848,13 @@ class SalesCRMService:
     ) -> list[dict]:
         """获取指定客户的拜访记录"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM sales_visit_logs
                 WHERE tenant_id = :tenant_id AND customer_id = :customer_id AND is_deleted = FALSE
                 ORDER BY created_at DESC LIMIT :limit
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "customer_id": str(customer_id), "limit": limit},
         )
         return [dict(r) for r in result.mappings().all()]

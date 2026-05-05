@@ -24,7 +24,8 @@ set -euo pipefail
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 readonly TUNXIANG_SERVER="42.194.229.21"
-readonly COMPOSE_BASE="${REPO_ROOT}/docker-compose.yml"
+# P0.5 收敛后：base 唯一权威源，env override 在 envs/<env>.yml
+readonly COMPOSE_BASE="${REPO_ROOT}/infra/compose/base.yml"
 
 # 所有合法环境列表
 readonly ENVS=(dev test uat pilot prod demo)
@@ -79,15 +80,16 @@ is_protected_env() {
 }
 
 get_compose_file() {
+  # 返回 env override 文件路径（base.yml 由 COMPOSE_BASE 单独叠加）
   local env="$1"
   case "$env" in
-    prod)    echo "${REPO_ROOT}/docker-compose.prod.yml" ;;
-    pilot)   echo "${REPO_ROOT}/docker-compose.staging.yml" ;;
-    dev)     echo "${REPO_ROOT}/docker-compose.yml" ;;
-    test)    echo "${REPO_ROOT}/docker-compose.yml" ;;
-    uat)     echo "${REPO_ROOT}/docker-compose.yml" ;;
-    demo)    echo "${REPO_ROOT}/docker-compose.yml" ;;
-    *)       echo "${REPO_ROOT}/docker-compose.yml" ;;
+    prod)    echo "${REPO_ROOT}/infra/compose/envs/prod.yml" ;;
+    pilot)   echo "${REPO_ROOT}/infra/compose/envs/staging.yml" ;;
+    dev)     echo "${REPO_ROOT}/infra/compose/envs/dev.yml" ;;
+    test)    echo "${REPO_ROOT}/infra/compose/envs/dev.yml" ;;
+    uat)     echo "${REPO_ROOT}/infra/compose/envs/staging.yml" ;;
+    demo)    echo "${REPO_ROOT}/infra/compose/envs/demo.yml" ;;
+    *)       echo "${REPO_ROOT}/infra/compose/envs/dev.yml" ;;
   esac
 }
 
@@ -159,22 +161,27 @@ cmd_start() {
   local compose_file
   compose_file=$(get_compose_file "$env")
 
-  # 检查 compose 文件是否存在
+  # 检查 base + env override 都存在
+  [[ ! -f "$COMPOSE_BASE" ]] && fatal "base compose 不存在: ${COMPOSE_BASE}"
   if [[ ! -f "$compose_file" ]]; then
-    warn "compose文件不存在: ${compose_file}，使用默认文件"
-    compose_file="${COMPOSE_BASE}"
+    warn "env override 不存在: ${compose_file}，仅用 base"
+    compose_file=""
   fi
 
-  info "使用配置文件: ${compose_file}"
+  info "使用 base: ${COMPOSE_BASE}"
+  [[ -n "$compose_file" ]] && info "叠加 override: ${compose_file}"
   info "正在启动服务..."
 
-  # 设置环境变量后启动
+  # base + env override 双文件叠加
+  local -a compose_args=(-f "$COMPOSE_BASE")
+  [[ -n "$compose_file" ]] && compose_args+=(-f "$compose_file")
+
   TUNXIANG_ENV="$env" \
   TUNXIANG_NAMESPACE="$(get_env_namespace "$env")" \
-    docker compose -f "$compose_file" --profile "${env}" up -d 2>&1 || {
+    docker compose "${compose_args[@]}" --profile "${env}" up -d 2>&1 || {
     # 如果 profile 不存在，降级不使用 profile
     warn "profile '${env}' 不存在，尝试默认启动"
-    TUNXIANG_ENV="$env" docker compose -f "$compose_file" up -d
+    TUNXIANG_ENV="$env" docker compose "${compose_args[@]}" up -d
   }
 
   ok "环境 ${env} 已启动"
@@ -211,11 +218,12 @@ cmd_stop() {
 
   local compose_file
   compose_file=$(get_compose_file "$env")
-  [[ ! -f "$compose_file" ]] && compose_file="${COMPOSE_BASE}"
+  local -a compose_args=(-f "$COMPOSE_BASE")
+  [[ -f "$compose_file" ]] && compose_args+=(-f "$compose_file")
 
   info "正在停止服务..."
-  TUNXIANG_ENV="$env" docker compose -f "$compose_file" --profile "${env}" stop 2>/dev/null || \
-    TUNXIANG_ENV="$env" docker compose -f "$compose_file" stop
+  TUNXIANG_ENV="$env" docker compose "${compose_args[@]}" --profile "${env}" stop 2>/dev/null || \
+    TUNXIANG_ENV="$env" docker compose "${compose_args[@]}" stop
 
   ok "环境 ${env} 已停止"
   info "总运行时长: $(format_duration $uptime)，估算费用: ¥${cost}"
@@ -333,12 +341,15 @@ cmd_demo() {
           --expires="${expires}"
       else
         warn "create-demo-env.sh 未找到，执行基础创建流程..."
-        # 基础流程：打标签启动 demo 容器
+        # 基础流程：打标签启动 demo 容器（base + demo override）
         TUNXIANG_ENV=demo \
         DEMO_TENANT="${tenant}" \
         DEMO_BRAND="${brand}" \
         DEMO_EXPIRES="${expires}" \
-          docker compose -f "${REPO_ROOT}/docker-compose.yml" up -d
+          docker compose \
+            -f "${REPO_ROOT}/infra/compose/base.yml" \
+            -f "${REPO_ROOT}/infra/compose/envs/demo.yml" \
+            up -d
 
         ok "演示环境基础容器已启动"
         info "访问地址: http://${tenant}.demo.tunxiang.com"

@@ -137,7 +137,8 @@ async def receive_webhook(
 
     # 幂等 UPSERT
     row = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO aggregator_orders
                 (tenant_id, platform, platform_order_id, store_id, items, total_fen,
                  customer_phone_hash, customer_phone_masked, estimated_delivery_at,
@@ -148,7 +149,8 @@ async def receive_webhook(
             ON CONFLICT (tenant_id, platform, platform_order_id) DO UPDATE
             SET status = EXCLUDED.status, updated_at = NOW()
             RETURNING id, (xmax = 0) AS is_new
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "platform": platform,
@@ -210,12 +212,14 @@ async def list_aggregator_orders(
 
     total = (await db.execute(text(f"SELECT COUNT(*) FROM aggregator_orders WHERE {where}"), params)).scalar() or 0
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
         SELECT id, platform, platform_order_id, store_id, status, total_fen,
                customer_phone_masked, estimated_delivery_at,
                jsonb_array_length(items) AS items_count, created_at, updated_at
         FROM aggregator_orders WHERE {where} ORDER BY created_at DESC LIMIT :limit OFFSET :offset
-    """),
+    """
+        ),
         params,
     )
     items = []
@@ -314,10 +318,12 @@ async def cancel_order(
 async def get_platforms_status(db: AsyncSession = Depends(_get_db)) -> dict:
     today = _now().date()
     rows = await db.execute(
-        text("""
+        text(
+            """
         SELECT platform, COUNT(*) AS cnt, COUNT(*) FILTER (WHERE status != 'cancelled') AS ok_cnt
         FROM aggregator_orders WHERE created_at::date = :today GROUP BY platform
-    """),
+    """
+        ),
         {"today": today},
     )
     stats = {r.platform: {"count": r.cnt, "ok": r.ok_cnt} for r in rows.fetchall()}
@@ -343,10 +349,12 @@ async def get_platforms_status(db: AsyncSession = Depends(_get_db)) -> dict:
 @router.get("/metrics", summary="失败率/延迟/平台对比KPI")
 async def get_metrics(hours: int = Query(24, ge=1, le=168), db: AsyncSession = Depends(_get_db)) -> dict:
     rows = await db.execute(
-        text("""
+        text(
+            """
         SELECT platform, success, duration_ms, error_code
         FROM aggregator_metrics WHERE recorded_at >= NOW() - (:hours * INTERVAL '1 hour')
-    """),
+    """
+        ),
         {"hours": hours},
     )
     records = rows.fetchall()

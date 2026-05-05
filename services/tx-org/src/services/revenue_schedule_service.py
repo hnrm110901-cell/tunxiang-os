@@ -161,7 +161,8 @@ class RevenueScheduleService:
     ) -> List[Dict[str, Any]]:
         """方案A：从 mv_store_pnl 查日营收。"""
         try:
-            q = text("""
+            q = text(
+                """
                 SELECT
                     stat_date,
                     total_revenue_fen,
@@ -172,7 +173,8 @@ class RevenueScheduleService:
                 WHERE store_id = CAST(:store_id AS TEXT)
                   AND stat_date >= CURRENT_DATE - :days * INTERVAL '1 day'
                 ORDER BY stat_date
-            """)
+            """
+            )
             result = await db.execute(
                 q,
                 {
@@ -204,7 +206,8 @@ class RevenueScheduleService:
     ) -> List[Dict[str, Any]]:
         """方案B：从 orders 表按小时聚合。"""
         try:
-            q = text("""
+            q = text(
+                """
                 SELECT
                     DATE(created_at) AS order_date,
                     EXTRACT(HOUR FROM created_at)::int AS hour,
@@ -219,7 +222,8 @@ class RevenueScheduleService:
                 GROUP BY DATE(created_at), EXTRACT(HOUR FROM created_at),
                          EXTRACT(DOW FROM created_at)
                 ORDER BY order_date, hour
-            """)
+            """
+            )
             result = await db.execute(
                 q,
                 {
@@ -437,7 +441,8 @@ class RevenueScheduleService:
     ) -> Dict[str, Dict[str, int]]:
         """从 unified_schedules 查当前排班，按时段×岗位统计人数。"""
         try:
-            q = text("""
+            q = text(
+                """
                 SELECT
                     us.start_time,
                     us.role,
@@ -448,7 +453,8 @@ class RevenueScheduleService:
                   AND us.shift_date = :target_date
                   AND COALESCE(us.is_deleted, false) = false
                 GROUP BY us.start_time, us.role
-            """)
+            """
+            )
             result = await db.execute(
                 q,
                 {
@@ -583,7 +589,8 @@ class RevenueScheduleService:
     ) -> List[Dict[str, Any]]:
         """加载门店在职员工（含岗位和技能）。"""
         try:
-            q = text("""
+            q = text(
+                """
                 SELECT
                     e.id::text AS employee_id,
                     e.emp_name,
@@ -596,7 +603,8 @@ class RevenueScheduleService:
                   AND e.status = 'active'
                   AND COALESCE(e.is_deleted, false) = false
                 ORDER BY e.emp_name
-            """)
+            """
+            )
             result = await db.execute(
                 q,
                 {
@@ -656,7 +664,8 @@ class RevenueScheduleService:
         VIP预订 → 需要资深服务员
         """
         try:
-            q = text("""
+            q = text(
+                """
                 SELECT
                     COUNT(*) AS total_reservations,
                     COALESCE(SUM(party_size), 0)::int AS total_guests,
@@ -667,7 +676,8 @@ class RevenueScheduleService:
                   AND store_id = CAST(:store_id AS TEXT)
                   AND reservation_date = :target_date
                   AND status IN ('confirmed', 'seated')
-            """)
+            """
+            )
             result = await db.execute(
                 q,
                 {
@@ -776,7 +786,8 @@ class RevenueScheduleService:
             for slot in day_plan["slots"]:
                 for emp in slot.get("suggested_employees", []):
                     try:
-                        q = text("""
+                        q = text(
+                            """
                             INSERT INTO unified_schedules
                                 (tenant_id, store_id, employee_id, shift_date,
                                  start_time, end_time, role, status,
@@ -787,7 +798,8 @@ class RevenueScheduleService:
                                  :start_time, :end_time, :role, 'draft',
                                  :notes, NOW(), NOW())
                             RETURNING id::text
-                        """)
+                        """
+                        )
                         result = await db.execute(
                             q,
                             {

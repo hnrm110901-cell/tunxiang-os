@@ -50,8 +50,7 @@ class TestRLSTenantIsolationTier1:
         results = mock_result.fetchall()
         for row in results:
             assert str(row.tenant_id) == TENANT_A, (
-                f"查询结果包含非本租户数据！tenant_id={row.tenant_id}，"
-                "这是严重的数据隔离漏洞"
+                f"查询结果包含非本租户数据！tenant_id={row.tenant_id}，" "这是严重的数据隔离漏洞"
             )
 
     @pytest.mark.asyncio
@@ -81,9 +80,7 @@ class TestRLSTenantIsolationTier1:
         # 验证：缺少 header 时应抛出错误
         with pytest.raises(ValueError) as exc_info:
             extract_tenant_id(mock_request_missing)
-        assert "X-Tenant-ID" in str(exc_info.value), (
-            "缺少 X-Tenant-ID 时错误信息应指明缺失的 header"
-        )
+        assert "X-Tenant-ID" in str(exc_info.value), "缺少 X-Tenant-ID 时错误信息应指明缺失的 header"
 
         # 验证：正常请求可以提取 tenant_id
         tenant_id = extract_tenant_id(mock_request_ok)
@@ -103,19 +100,19 @@ class TestRLSTenantIsolationTier1:
 
         # 模拟跨租户更新：用租户A的session尝试更新租户B的订单
         from sqlalchemy import text
+
         result = await mock_db.execute(
-            text("""
+            text(
+                """
                 UPDATE orders SET status = 'cancelled'
                 WHERE id = :order_id
                 -- RLS会自动追加: AND tenant_id = current_setting('app.tenant_id')::uuid
-            """),
+            """
+            ),
             {"order_id": str(uuid.uuid4())},
         )
 
-        assert result.rowcount == 0, (
-            "跨租户UPDATE应影响0行（RLS过滤），"
-            "rowcount > 0 说明RLS未生效，属于严重安全漏洞"
-        )
+        assert result.rowcount == 0, "跨租户UPDATE应影响0行（RLS过滤），" "rowcount > 0 说明RLS未生效，属于严重安全漏洞"
 
     def test_rls_session_variable_format(self):
         """
@@ -129,6 +126,7 @@ class TestRLSTenantIsolationTier1:
 
         # 扫描最近的迁移文件，确认使用正确的session变量
         import glob
+
         migration_dir = os.path.join(ROOT, "shared", "db-migrations", "versions")
         if not os.path.exists(migration_dir):
             pytest.skip("迁移目录不存在，跳过此测试")
@@ -156,11 +154,13 @@ class TestRLSNullBypassTier1:
         """
         # 验证ORM模型定义中 tenant_id 有 nullable=False
         import glob
-        model_files = glob.glob(
-            os.path.join(SRC, "models", "*.py")
-        ) + glob.glob(os.path.join(ROOT, "shared", "ontology", "src", "*.py"))
+
+        model_files = glob.glob(os.path.join(SRC, "models", "*.py")) + glob.glob(
+            os.path.join(ROOT, "shared", "ontology", "src", "*.py")
+        )
 
         import re
+
         nullable_tenant_id_files = []
         for model_file in model_files:
             if "__pycache__" in model_file:
@@ -174,19 +174,14 @@ class TestRLSNullBypassTier1:
                         continue
                     # 精确匹配：行中 tenant_id 是列名（赋值左侧），且该列 nullable=True
                     # 排除：tenant_id 仅出现在注释(comment=)或字符串中的情况
-                    is_tenant_col = re.search(
-                        r'^\s*tenant_id\s*=\s*Column', line
-                    ) or re.search(
+                    is_tenant_col = re.search(r"^\s*tenant_id\s*=\s*Column", line) or re.search(
                         r'["\']tenant_id["\']\s*,.*nullable\s*=\s*True', line
                     )
                     if is_tenant_col and "nullable=True" in line:
-                        nullable_tenant_id_files.append(
-                            f"{model_file}:{i+1}: {stripped[:100]}"
-                        )
+                        nullable_tenant_id_files.append(f"{model_file}:{i+1}: {stripped[:100]}")
             except Exception:
                 pass
 
         assert len(nullable_tenant_id_files) == 0, (
-            "以下行存在 tenant_id nullable=True，可能绕过 RLS，请逐行确认：\n"
-            + "\n".join(nullable_tenant_id_files)
+            "以下行存在 tenant_id nullable=True，可能绕过 RLS，请逐行确认：\n" + "\n".join(nullable_tenant_id_files)
         )

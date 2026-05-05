@@ -81,7 +81,8 @@ async def get_balance(
     await _set_rls(db, x_tenant_id)
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ROUND(balance * 100)::BIGINT        AS balance_fen,
                     ROUND(gift_balance * 100)::BIGINT   AS gift_balance_fen,
@@ -92,7 +93,8 @@ async def get_balance(
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND customer_id = :customer_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"customer_id": member_id},
         )
         row = result.mappings().first()
@@ -141,7 +143,8 @@ async def get_plans(
     await _set_rls(db, x_tenant_id)
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::TEXT        AS id,
                     name,
@@ -153,7 +156,8 @@ async def get_plans(
                   AND is_active = true
                   AND is_deleted = false
                 ORDER BY sort_order ASC, recharge_amount_fen ASC
-            """),
+            """
+            ),
         )
         items = [dict(r) for r in result.mappings()]
         return {"ok": True, "data": {"items": items}}
@@ -214,12 +218,14 @@ async def get_transactions(
     try:
         # 先查 account_id（stored_value_transactions 通过 account_id 关联会员）
         acct_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM stored_value_accounts
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND customer_id = :customer_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"customer_id": member_id},
         )
         acct_row = acct_result.mappings().first()
@@ -230,19 +236,22 @@ async def get_transactions(
 
         type_filter = "AND txn_type = :txn_type" if type else ""
         count_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM stored_value_transactions
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::UUID
                   AND account_id = :account_id
                   {type_filter}
-            """),
+            """
+            ),
             {"account_id": account_id, "txn_type": type} if type else {"account_id": account_id},
         )
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id::TEXT                                AS id,
                     txn_type                                AS type,
@@ -255,7 +264,8 @@ async def get_transactions(
                   {type_filter}
                 ORDER BY created_at DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "account_id": account_id,
                 **({"txn_type": type} if type else {}),
@@ -324,7 +334,8 @@ async def list_gift_cards(
     try:
         if direction == "received":
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         id::TEXT        AS id,
                         amount_fen,
@@ -339,12 +350,14 @@ async def list_gift_cards(
                       AND recipient_customer_id = :member_id
                       AND is_deleted = false
                     ORDER BY created_at DESC
-                """),
+                """
+                ),
                 {"member_id": member_id},
             )
         else:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         id::TEXT        AS id,
                         amount_fen,
@@ -358,7 +371,8 @@ async def list_gift_cards(
                       AND sender_customer_id = :member_id
                       AND is_deleted = false
                     ORDER BY created_at DESC
-                """),
+                """
+                ),
                 {"member_id": member_id},
             )
         items = []

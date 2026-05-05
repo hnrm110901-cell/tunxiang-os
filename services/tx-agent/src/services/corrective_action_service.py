@@ -58,21 +58,24 @@ class CorrectiveActionService:
 
         # 总数
         count_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT COUNT(*) AS total
                 FROM sop_corrective_actions ca
                 WHERE ca.tenant_id = :tenant_id
                   AND ca.store_id = :store_id
                   AND ca.is_deleted = FALSE
                   {filters}
-            """),
+            """
+            ),
             params,
         )
         total = count_result.scalar() or 0
 
         # 数据
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     ca.id,
                     ca.store_id,
@@ -105,7 +108,8 @@ class CorrectiveActionService:
                     END,
                     ca.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -123,7 +127,8 @@ class CorrectiveActionService:
         aid = UUID(action_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ca.id,
                     ca.store_id,
@@ -147,7 +152,8 @@ class CorrectiveActionService:
                 WHERE ca.id = :action_id
                   AND ca.tenant_id = :tenant_id
                   AND ca.is_deleted = FALSE
-            """),
+            """
+            ),
             {"action_id": aid, "tenant_id": tid},
         )
         row = result.fetchone()
@@ -172,7 +178,8 @@ class CorrectiveActionService:
 
         # 原子状态转换：WHERE 同时校验旧状态
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_corrective_actions
                 SET status = 'resolved',
                     resolution = :resolution,
@@ -182,7 +189,8 @@ class CorrectiveActionService:
                   AND status IN ('open', 'escalated')
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "action_id": aid,
                 "tenant_id": tid,
@@ -221,7 +229,8 @@ class CorrectiveActionService:
 
         # 原子状态转换
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_corrective_actions
                 SET status = 'verified',
                     verified_by = :verified_by,
@@ -232,7 +241,8 @@ class CorrectiveActionService:
                   AND status = 'resolved'
                   AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "action_id": aid,
                 "tenant_id": tid,
@@ -278,14 +288,16 @@ class CorrectiveActionService:
             raise ValueError(f"状态不允许升级: {row.status}")
 
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE sop_corrective_actions
                 SET status = 'escalated',
                     escalated_to = :escalated_to,
                     escalated_at = :now,
                     updated_at = :now
                 WHERE id = :action_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "action_id": aid,
                 "tenant_id": tid,
@@ -322,7 +334,8 @@ class CorrectiveActionService:
         sid = UUID(store_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'open') AS open_count,
@@ -338,7 +351,8 @@ class CorrectiveActionService:
                 WHERE tenant_id = :tenant_id
                   AND store_id = :store_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid},
         )
         row = result.fetchone()
@@ -363,13 +377,15 @@ class CorrectiveActionService:
     async def _get_action_row(self, tid: UUID, aid: UUID):
         """获取纠正动作行"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status
                 FROM sop_corrective_actions
                 WHERE id = :action_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"action_id": aid, "tenant_id": tid},
         )
         return result.fetchone()

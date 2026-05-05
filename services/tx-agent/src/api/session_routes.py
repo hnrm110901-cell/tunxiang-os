@@ -28,6 +28,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.session_cost_service import SessionCostService
 from ..services.session_runtime_service import (
@@ -230,9 +231,9 @@ async def resolve_checkpoint(
             comment=req.comment,
         )
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SessionStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
@@ -316,9 +317,9 @@ async def start_session(
     try:
         session_run = await svc.start_session(x_tenant_id, session_id)
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SessionStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
@@ -345,9 +346,9 @@ async def pause_session(
             pending_action=req.pending_action,
         )
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SessionStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     await db.commit()
     return {"ok": True, "data": _serialize_checkpoint(checkpoint)}
@@ -364,9 +365,9 @@ async def cancel_session(
     try:
         session_run = await svc.cancel_session(x_tenant_id, session_id)
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SessionStateError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
 
     await db.commit()
     return {"ok": True, "data": _serialize_session(session_run)}
@@ -388,7 +389,7 @@ async def get_session_checkpoints(
     try:
         checkpoints = await svc.get_session_checkpoints(x_tenant_id, session_id)
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     return {"ok": True, "data": [_serialize_checkpoint(c) for c in checkpoints]}
 
@@ -409,6 +410,6 @@ async def get_session_timeline(
     try:
         events = await svc.get_session_timeline(x_tenant_id, session_id)
     except SessionNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
     return {"ok": True, "data": [_serialize_event(e) for e in events]}

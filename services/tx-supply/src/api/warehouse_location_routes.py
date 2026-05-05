@@ -20,10 +20,11 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.warehouse_location import (
     AutoAllocateRequest,
@@ -66,9 +67,9 @@ async def create_zone(
         data = await svc.create_zone(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except DuplicateCodeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/zones")
@@ -95,14 +96,12 @@ async def update_zone(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.update_zone(
-            zone_id=zone_id, body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.update_zone(zone_id=zone_id, body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except ZoneNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/zones/{zone_id}/utilization")
@@ -112,12 +111,10 @@ async def zone_utilization(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.compute_zone_utilization(
-            zone_id=zone_id, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.compute_zone_utilization(zone_id=zone_id, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -135,11 +132,11 @@ async def create_location(
         data = await svc.create_location(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except ZoneNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except DuplicateCodeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/locations")
@@ -170,12 +167,10 @@ async def abc_suggestion(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.suggest_abc_optimization(
-            store_id=store_id, tenant_id=x_tenant_id, db=db, days=days
-        )
+        data = await svc.suggest_abc_optimization(store_id=store_id, tenant_id=x_tenant_id, db=db, days=days)
         return {"ok": True, "data": data, "error": None}
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/locations/auto-allocate")
@@ -185,9 +180,7 @@ async def auto_allocate(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.auto_allocate_location(
-            body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.auto_allocate_location(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except TemperatureMismatchError as exc:
         return _err("temperature_mismatch", str(exc))
@@ -196,7 +189,7 @@ async def auto_allocate(
     except LocationNotFoundError as exc:
         return _err("no_location", str(exc))
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/locations/move")
@@ -206,16 +199,14 @@ async def move_location(
     db: AsyncSession = Depends(_get_db),
 ):
     try:
-        data = await svc.move_between_locations(
-            body=body, tenant_id=x_tenant_id, db=db
-        )
+        data = await svc.move_between_locations(body=body, tenant_id=x_tenant_id, db=db)
         return {"ok": True, "data": data, "error": None}
     except InsufficientInventoryError as exc:
         return _err("insufficient_inventory", str(exc))
     except LocationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/locations/{location_id}/bind-ingredient")
@@ -234,9 +225,9 @@ async def bind_ingredient(
         )
         return {"ok": True, "data": data, "error": None}
     except LocationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except WarehouseLocationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ─────────────────────────────────────────────────────────────────────────────

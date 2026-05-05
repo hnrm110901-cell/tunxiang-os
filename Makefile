@@ -47,37 +47,43 @@ test-integration:
 	@echo "=== integration ==="
 	@python3 -m pytest tests/test_cross_domain_integration.py -q
 
-# ─── Docker ───
+# ─── Docker (P0.5 后 compose 收敛到 infra/compose/) ───
+
+COMPOSE_BASE := -f infra/compose/base.yml
+COMPOSE_DEV := $(COMPOSE_BASE) -f infra/compose/envs/dev.yml
+COMPOSE_PROD := $(COMPOSE_BASE) -f infra/compose/envs/prod.yml
+COMPOSE_STAGING := $(COMPOSE_BASE) -f infra/compose/envs/staging.yml
+COMPOSE_GRAY := $(COMPOSE_BASE) -f infra/compose/envs/gray.yml
 
 up:
-	docker-compose up -d
+	docker compose $(COMPOSE_DEV) up -d
 
 down:
-	docker-compose down
+	docker compose $(COMPOSE_DEV) down
 
 logs:
-	docker-compose logs -f
+	docker compose $(COMPOSE_DEV) logs -f
 
 up-prod:
-	docker-compose -f docker-compose.prod.yml up -d
+	docker compose $(COMPOSE_PROD) up -d
 
 up-staging:
-	docker-compose -f docker-compose.staging.yml --env-file .env.staging up -d
+	docker compose $(COMPOSE_STAGING) --env-file .env.staging up -d
 
 down-staging:
-	docker-compose -f docker-compose.staging.yml down
+	docker compose $(COMPOSE_STAGING) down
 
 logs-staging:
-	docker-compose -f docker-compose.staging.yml logs -f
+	docker compose $(COMPOSE_STAGING) logs -f
 
 up-gray:
-	docker-compose -f docker-compose.gray.yml --env-file .env.gray up -d
+	docker compose $(COMPOSE_GRAY) --env-file .env.gray up -d
 
 down-gray:
-	docker-compose -f docker-compose.gray.yml down
+	docker compose $(COMPOSE_GRAY) down
 
 logs-gray:
-	docker-compose -f docker-compose.gray.yml logs -f
+	docker compose $(COMPOSE_GRAY) logs -f
 
 # ─── 开发 ───
 

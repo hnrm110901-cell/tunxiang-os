@@ -555,7 +555,8 @@ class ProcurementForecastService:
                 {"tid": tenant_id},
             )
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         ism.ingredient_id::text,
                         ism.supplier_id::text,
@@ -567,7 +568,8 @@ class ProcurementForecastService:
                       AND ism.ingredient_id = ANY(:ids::uuid[])
                       AND ism.is_primary = TRUE
                       AND ism.is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "ids": ingredient_ids,

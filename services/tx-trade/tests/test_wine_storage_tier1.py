@@ -61,7 +61,7 @@ class TestWineStorageBalanceTier1:
         核心验证：使用 balance = balance + :amount 原子SQL，而非 balance = :amount
         """
         deposits = [50000, 30000, 20000]  # 500元, 300元, 200元（分）
-        expected_final = sum(deposits)    # 1000元
+        expected_final = sum(deposits)  # 1000元
 
         # 模拟累加操作
         running_balance = 0
@@ -107,8 +107,8 @@ class TestWineStorageBalanceTier1:
         """
         mock_db = AsyncMock()
 
-        available_balance = 20000   # 200元（分）
-        consume_amount = 50000      # 500元（分）
+        available_balance = 20000  # 200元（分）
+        consume_amount = 50000  # 500元（分）
 
         # 验证：余额不足时应拒绝（由原子SQL的 WHERE balance >= amount 保证）
         can_consume = available_balance >= consume_amount
@@ -158,8 +158,8 @@ class TestBanquetDepositTier1:
         场景：宴会结账时，收银台和后台同时触发定金抵扣。
         审查报告：banquet_deposit_routes.py apply_deposit 已修复为 FOR UPDATE。
         """
-        total_deposit = 200000   # 2000元（分）
-        apply_amount = 200000    # 抵扣全部定金
+        total_deposit = 200000  # 2000元（分）
+        apply_amount = 200000  # 抵扣全部定金
 
         # 验证：两个并发请求中，第二个应因 FOR UPDATE 锁等待后发现余额已不足
         # 此为集成测试场景，单元测试仅验证逻辑

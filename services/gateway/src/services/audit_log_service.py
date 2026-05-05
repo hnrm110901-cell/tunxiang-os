@@ -186,7 +186,8 @@ class AuditLogService:
         row_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO audit_logs (
                     id, tenant_id, action, actor_id, actor_type,
                     resource_type, resource_id,
@@ -200,7 +201,8 @@ class AuditLogService:
                     :ip_address, :user_agent,
                     :severity, :extra::jsonb, :created_at
                 )
-            """),
+            """
+            ),
             {
                 "id": str(row_id),
                 "tenant_id": str(entry.tenant_id),
@@ -350,18 +352,20 @@ class AuditLogService:
 
         # 1. 登录失败 > 5次/小时，同一 actor
         fail_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT actor_id,
                        date_trunc('hour', created_at AT TIME ZONE 'Asia/Shanghai') AS hour_bucket,
                        COUNT(*) AS cnt
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 GROUP BY actor_id, hour_bucket
                 HAVING COUNT(*) > 5
                 ORDER BY cnt DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "action": AuditAction.LOGIN_FAILED.value,
@@ -382,15 +386,17 @@ class AuditLogService:
 
         # 2. CONSTRAINT_OVERRIDE（任意一次即告警）
         override_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, actor_id, actor_type, resource_type, resource_id,
                        created_at, extra
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "action": AuditAction.CONSTRAINT_OVERRIDE.value,
@@ -413,18 +419,20 @@ class AuditLogService:
 
         # 3. DATA_EXPORT > 3次/小时
         export_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT actor_id,
                        date_trunc('hour', created_at AT TIME ZONE 'Asia/Shanghai') AS hour_bucket,
                        COUNT(*) AS cnt
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                 GROUP BY actor_id, hour_bucket
                 HAVING COUNT(*) > 3
                 ORDER BY cnt DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "action": AuditAction.DATA_EXPORT.value,
@@ -445,15 +453,17 @@ class AuditLogService:
 
         # 4. 凌晨 2-5 点的 LOGIN 事件（按本地时区 Asia/Shanghai）
         night_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, actor_id, actor_type, ip_address, created_at
                 FROM audit_logs
                 WHERE tenant_id = :tenant_id
                   AND action = :action
-                  AND created_at >= NOW() - INTERVAL ':hours hours'
+                  AND created_at >= NOW() - make_interval(hours => :hours)
                   AND EXTRACT(HOUR FROM created_at AT TIME ZONE 'Asia/Shanghai') BETWEEN 2 AND 4
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "action": AuditAction.LOGIN.value,

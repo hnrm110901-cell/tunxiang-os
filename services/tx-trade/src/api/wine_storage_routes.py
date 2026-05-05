@@ -142,7 +142,8 @@ async def store_wine(
     record_id = uuid.uuid4()
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_records
                 (id, tenant_id, store_id, table_id, member_id,
                  bottle_code, wine_name, wine_brand, wine_spec,
@@ -157,7 +158,8 @@ async def store_wine(
                  :storage_date, :expiry_date, 'stored',
                  :storage_price, :notes, :created_by,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "id": str(record_id),
             "tid": tenant_id,
@@ -181,7 +183,8 @@ async def store_wine(
 
     # 记录 store_in 流水
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -192,7 +195,8 @@ async def store_wine(
                  :quantity, :price_at_trans, :table_id, NULL,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": str(record_id),
@@ -311,7 +315,8 @@ async def list_wine_storage(
     total = count_r.scalar()
 
     rows_r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, tenant_id, store_id, table_id, member_id,
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
@@ -322,7 +327,8 @@ async def list_wine_storage(
             WHERE {where_clause}
             ORDER BY created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {**params, "size": size, "offset": offset},
     )
     items = [_serialize_record(dict(r)) for r in rows_r.mappings().all()]
@@ -360,7 +366,8 @@ async def wine_storage_stats(
     params["warning_date"] = warning_date
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 COUNT(*) FILTER (WHERE status IN ('stored', 'partial_taken'))
                     AS active_count,
@@ -380,7 +387,8 @@ async def wine_storage_stats(
             FROM wine_storage_records
             WHERE tenant_id = :tid::UUID AND is_deleted = FALSE
             {store_filter}
-        """),
+        """
+        ),
         params,
     )
     row = dict(r.mappings().first())
@@ -406,7 +414,8 @@ async def list_wine_by_table(
 ):
     """查询指定台位的有效存酒记录，POS 开台时快速显示该台存酒。"""
     r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, store_id, table_id, member_id,
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
@@ -419,7 +428,8 @@ async def list_wine_by_table(
               AND status IN ('stored', 'partial_taken')
               AND is_deleted = FALSE
             ORDER BY created_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_id, "table_id": table_id},
     )
     items = [_serialize_record(dict(row)) for row in r.mappings().all()]
@@ -461,7 +471,8 @@ async def list_wine_by_member(
     total = count_r.scalar()
 
     rows_r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, tenant_id, store_id, table_id, member_id,
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
@@ -472,7 +483,8 @@ async def list_wine_by_member(
             WHERE {where_clause}
             ORDER BY created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {**params, "size": size, "offset": offset},
     )
     items = [_serialize_record(dict(r)) for r in rows_r.mappings().all()]
@@ -497,7 +509,8 @@ async def get_wine_storage_detail(
 ):
     """获取存酒主记录详情及全部操作流水（取酒/续存/转台/核销历史）。"""
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, store_id, table_id, member_id,
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
@@ -506,7 +519,8 @@ async def get_wine_storage_detail(
                    created_at, updated_at
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     row = row_r.mappings().first()
@@ -514,14 +528,16 @@ async def get_wine_storage_detail(
         raise HTTPException(status_code=404, detail="存酒记录不存在")
 
     trans_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, record_id, trans_type, quantity, price_at_trans,
                    table_id, order_id, operated_by, operated_at,
                    approved_by, notes, created_at
             FROM wine_storage_transactions
             WHERE record_id = :rid::UUID AND tenant_id = :tid::UUID
             ORDER BY created_at DESC
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     transactions = [_serialize_transaction(dict(t)) for t in trans_r.mappings().all()]
@@ -542,12 +558,14 @@ async def take_wine(
     """从指定存酒记录中取出酒水，更新剩余数量和状态，记录 take_out 流水。"""
     # 加 FOR UPDATE 锁防止并发超取
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, remaining_quantity, status, store_id, wine_name
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
             FOR UPDATE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     row = row_r.mappings().first()
@@ -568,18 +586,21 @@ async def take_wine(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE wine_storage_records
             SET remaining_quantity = :remaining,
                 status = :status,
                 updated_at = :now
             WHERE id = :rid::UUID
-        """),
+        """
+        ),
         {"remaining": new_remaining, "status": new_status, "now": now, "rid": record_id},
     )
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -590,7 +611,8 @@ async def take_wine(
                  :quantity, NULL, :table_id, :order_id,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": record_id,
@@ -637,11 +659,13 @@ async def extend_wine_storage(
 ):
     """延长存酒到期日，可选收取续存费用，记录 extend 流水。"""
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, store_id, wine_name, expiry_date
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     row = row_r.mappings().first()
@@ -657,13 +681,15 @@ async def extend_wine_storage(
     new_status = row["status"] if row["status"] != "expired" else "stored"
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE wine_storage_records
             SET expiry_date = :new_expiry_date,
                 status = :status,
                 updated_at = :now
             WHERE id = :rid::UUID
-        """),
+        """
+        ),
         {
             "new_expiry_date": body.new_expiry_date,
             "status": new_status,
@@ -673,7 +699,8 @@ async def extend_wine_storage(
     )
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -684,7 +711,8 @@ async def extend_wine_storage(
                  0, :fee, NULL, NULL,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": record_id,
@@ -733,11 +761,13 @@ async def transfer_wine(
 ):
     """将存酒记录关联台位从当前台位变更为目标台位，记录 transfer_out + transfer_in 流水。"""
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, store_id, wine_name, table_id, remaining_quantity
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     row = row_r.mappings().first()
@@ -754,18 +784,21 @@ async def transfer_wine(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE wine_storage_records
             SET table_id = :to_table_id,
                 updated_at = :now
             WHERE id = :rid::UUID
-        """),
+        """
+        ),
         {"to_table_id": body.to_table_id, "now": now, "rid": record_id},
     )
 
     # 记录 transfer_out 流水（原台位）
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -776,7 +809,8 @@ async def transfer_wine(
                  :quantity, NULL, :from_table_id, NULL,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": record_id,
@@ -791,7 +825,8 @@ async def transfer_wine(
 
     # 记录 transfer_in 流水（目标台位）
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -802,7 +837,8 @@ async def transfer_wine(
                  :quantity, NULL, :to_table_id, NULL,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": record_id,
@@ -847,11 +883,13 @@ async def write_off_wine(
 ):
     """核销存酒记录（过期处理/损耗/特殊情况），需要审批人确认，记录 write_off 流水。"""
     row_r = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, status, store_id, wine_name, remaining_quantity
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"rid": record_id, "tid": tenant_id},
     )
     row = row_r.mappings().first()
@@ -864,17 +902,20 @@ async def write_off_wine(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE wine_storage_records
             SET status = 'written_off',
                 updated_at = :now
             WHERE id = :rid::UUID
-        """),
+        """
+        ),
         {"now": now, "rid": record_id},
     )
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
                  quantity, price_at_trans, table_id, order_id,
@@ -885,7 +926,8 @@ async def write_off_wine(
                  :quantity, NULL, NULL, :order_id,
                  :operated_by, :now, :approved_by, :notes,
                  :now, :now)
-        """),
+        """
+        ),
         {
             "tid": tenant_id,
             "record_id": record_id,

@@ -214,7 +214,8 @@ def _find_active_bom(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT id, dish_id, version, yield_rate
             FROM bom_templates
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
@@ -222,7 +223,8 @@ def _find_active_bom(
               AND effective_date <= :now
               AND (expiry_date IS NULL OR expiry_date > :now)
             ORDER BY effective_date DESC LIMIT 1
-        """),
+        """
+            ),
             {"dish_id": dish_id, "tenant_id": tenant_id, "now": now},
         )
         row = result.mappings().first()
@@ -239,13 +241,15 @@ def _get_bom_items(bom_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dict]:
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT ingredient_id, standard_qty, unit, unit_cost_fen,
                    waste_factor, is_optional, item_action
             FROM bom_items
             WHERE bom_id = :bom_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE AND item_action != 'REMOVE'
-        """),
+        """
+            ),
             {"bom_id": bom_id, "tenant_id": tenant_id},
         )
         return [dict(row) for row in result.mappings().all()]
@@ -261,12 +265,14 @@ def _get_order_items(order_id: uuid.UUID, tenant_id: uuid.UUID, db) -> list[dict
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT dish_id, item_name, quantity, unit_price_fen, subtotal_fen
             FROM order_items
             WHERE order_id = :order_id AND tenant_id = :tenant_id
               AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"order_id": order_id, "tenant_id": tenant_id},
         )
         return [dict(row) for row in result.mappings().all()]
@@ -299,7 +305,8 @@ def _get_daily_sold_dishes(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name, SUM(oi.quantity) as quantity_sold
             FROM order_items oi
             JOIN orders o ON oi.order_id = o.id
@@ -311,7 +318,8 @@ def _get_daily_sold_dishes(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
-        """),
+        """
+            ),
             {"store_id": store_id, "tenant_id": tenant_id, "target_date": target_date},
         )
         return [dict(row) for row in result.mappings().all()]

@@ -296,7 +296,8 @@ class RFMUpdater:
         from sqlalchemy import text
         from sqlalchemy.exc import ProgrammingError
 
-        insert_sql = text("""
+        insert_sql = text(
+            """
             INSERT INTO rfm_daily_snapshots
                 (tenant_id, snapshot_date, s1_count, s2_count, s3_count,
                  s4_count, s5_count, total_updated, created_at)
@@ -310,7 +311,8 @@ class RFMUpdater:
                 s4_count     = EXCLUDED.s4_count,
                 s5_count     = EXCLUDED.s5_count,
                 total_updated = EXCLUDED.total_updated
-        """)
+        """
+        )
 
         try:
             await db.execute(

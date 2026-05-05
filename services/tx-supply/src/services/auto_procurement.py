@@ -270,7 +270,8 @@ class AutoProcurementService:
             # 查询收货记录中该供应商对该原料的历史数据
             # 注：实际表结构依赖receiving_records表的具体字段
             # 此处使用raw SQL保持灵活性
-            sql = text("""
+            sql = text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     SUM(CASE WHEN on_time = TRUE THEN 1 ELSE 0 END) AS on_time_count,
@@ -280,7 +281,8 @@ class AutoProcurementService:
                   AND ingredient_id = :ingredient_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
-            """)
+            """
+            )
             result = await db.execute(
                 sql,
                 {

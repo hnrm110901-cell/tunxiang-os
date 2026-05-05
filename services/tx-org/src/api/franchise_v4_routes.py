@@ -4,7 +4,7 @@
 数据源：franchisees（v060）/ franchise_contracts（v135）/ franchise_fees（v155）
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 from uuid import uuid4
 
@@ -232,7 +232,8 @@ async def list_fees(
 
         # 全局汇总统计（不受 franchisee_id/status 筛选影响）
         stats_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     status,
                     COUNT(*) AS cnt,
@@ -240,7 +241,8 @@ async def list_fees(
                 FROM franchise_fees
                 WHERE is_deleted = false
                 GROUP BY status
-            """)
+            """
+            )
         )
         stats: dict = {"overdue_count": 0, "overdue_amount_fen": 0, "pending_amount_fen": 0, "paid_ytd_fen": 0}
         for s in stats_result.fetchall():
@@ -301,7 +303,7 @@ async def mark_fee_paid(
 ):
     """标记费用已收缴"""
     log.info("franchise.fee.paid", fee_id=fee_id, tenant_id=x_tenant_id)
-    return {"ok": True, "data": {"fee_id": fee_id, "status": "paid", "paid_at": datetime.utcnow().isoformat()}}
+    return {"ok": True, "data": {"fee_id": fee_id, "status": "paid", "paid_at": datetime.now(timezone.utc).isoformat()}}
 
 
 @router.get("/stats")
@@ -315,7 +317,8 @@ async def franchise_stats(
 
         # 加盟商统计
         f_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'active') AS active_count,
@@ -323,19 +326,22 @@ async def franchise_stats(
                     COUNT(*) FILTER (WHERE status = 'terminated') AS terminated_count
                 FROM franchisees
                 WHERE is_deleted = false
-            """)
+            """
+            )
         )
         f_row = dict(f_result.fetchone()._mapping)
 
         # 费用统计
         fee_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE status = 'overdue') AS overdue_fee_count,
                     COALESCE(SUM(amount_fen) FILTER (WHERE status = 'overdue'), 0) AS overdue_fee_amount_fen
                 FROM franchise_fees
                 WHERE is_deleted = false
-            """)
+            """
+            )
         )
         fee_row = dict(fee_result.fetchone()._mapping)
 

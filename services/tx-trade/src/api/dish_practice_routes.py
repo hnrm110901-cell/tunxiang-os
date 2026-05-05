@@ -14,6 +14,8 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from ..services import dish_practice_service as svc
 
 logger = structlog.get_logger()
@@ -87,7 +89,7 @@ async def add_dish_practice(
         )
         return {"ok": True, "data": result}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.delete("/dishes/{dish_id}/practices/{practice_id}")

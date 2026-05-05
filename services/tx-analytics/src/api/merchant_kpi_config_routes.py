@@ -132,12 +132,14 @@ async def get_merchant_kpi_configs(
     db_configs: dict[str, dict[str, Any]] = {}
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT merchant_code, weights, notes, updated_at
             FROM merchant_kpi_weight_configs
             WHERE tenant_id = :tid::uuid
               AND (:mc IS NULL OR merchant_code = :mc)
-        """),
+        """
+            ),
             {"tid": tenant_id, "mc": merchant_code},
         )
         for row in r.mappings().all():
@@ -215,7 +217,8 @@ async def update_merchant_kpi_config(
     now = datetime.now(timezone.utc)
     try:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO merchant_kpi_weight_configs
                 (tenant_id, merchant_code, weights, notes, updated_at)
             VALUES
@@ -225,7 +228,8 @@ async def update_merchant_kpi_config(
                 weights    = EXCLUDED.weights,
                 notes      = EXCLUDED.notes,
                 updated_at = EXCLUDED.updated_at
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "mc": body.merchant_code,
@@ -278,10 +282,12 @@ async def get_store_kpi_score(
     weights = DEFAULT_MERCHANT_KPI_WEIGHTS.get(code, DEFAULT_MERCHANT_KPI_WEIGHTS["default"])
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT weights FROM merchant_kpi_weight_configs
             WHERE tenant_id = :tid::uuid AND merchant_code = :mc
-        """),
+        """
+            ),
             {"tid": tenant_id, "mc": code},
         )
         row = r.mappings().fetchone()

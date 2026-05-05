@@ -95,7 +95,8 @@ class GrowthProfileService:
         """获取客户增长画像"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, customer_id, repurchase_stage,
                        reactivation_priority, reactivation_reason,
                        service_repair_status, service_repair_case_id,
@@ -107,7 +108,8 @@ class GrowthProfileService:
                   AND customer_id = :cid
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id)},
         )
         row = result.fetchone()
@@ -141,7 +143,8 @@ class GrowthProfileService:
             raise ValueError(f"Invalid service_repair_status: {service_repair_status}")
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO customer_growth_profiles
                     (tenant_id, customer_id, repurchase_stage,
                      reactivation_priority, reactivation_reason,
@@ -171,7 +174,8 @@ class GrowthProfileService:
                           has_active_owned_benefit, growth_opt_out,
                           marketing_pause_until, last_order_at,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "customer_id": str(customer_id),
@@ -221,11 +225,13 @@ class GrowthProfileService:
 
         # 查当前阶段
         current = await db.execute(
-            text("""
+            text(
+                """
                 SELECT repurchase_stage
                 FROM customer_growth_profiles
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id)},
         )
         current_row = current.fetchone()
@@ -243,14 +249,16 @@ class GrowthProfileService:
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET repurchase_stage = :stage, updated_at = NOW()
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 RETURNING id, tenant_id, customer_id, repurchase_stage,
                           reactivation_priority, reactivation_reason,
                           service_repair_status, created_at, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id), "stage": stage},
         )
         row = result.fetchone()
@@ -297,7 +305,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET reactivation_priority = :priority,
                     reactivation_reason = :reason,
@@ -306,7 +315,8 @@ class GrowthProfileService:
                 RETURNING id, tenant_id, customer_id, repurchase_stage,
                           reactivation_priority, reactivation_reason,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": str(customer_id),
@@ -360,7 +370,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET service_repair_status = :status,
                     service_repair_case_id = :case_id,
@@ -368,7 +379,8 @@ class GrowthProfileService:
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 RETURNING id, tenant_id, customer_id, service_repair_status,
                           service_repair_case_id, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "cid": str(customer_id),
@@ -420,7 +432,8 @@ class GrowthProfileService:
 
         # 规则1: 45天未到店 → critical
         r45 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET reactivation_priority = 'critical',
                     reactivation_reason = 'silent_45d',
@@ -431,14 +444,16 @@ class GrowthProfileService:
                   AND last_order_at IS NOT NULL
                   AND last_order_at < NOW() - INTERVAL '45 days'
                   AND growth_opt_out = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         count_45d = r45.rowcount
 
         # 规则2: 30天未到店 → high (silent_30d)
         r30 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET reactivation_priority = 'high',
                     reactivation_reason = 'silent_30d',
@@ -450,14 +465,16 @@ class GrowthProfileService:
                   AND last_order_at < NOW() - INTERVAL '30 days'
                   AND last_order_at >= NOW() - INTERVAL '45 days'
                   AND growth_opt_out = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         count_30d = r30.rowcount
 
         # 规则3: 21天未到店 + has_active_owned_benefit → high (benefit_expiring)
         r21 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET reactivation_priority = 'high',
                     reactivation_reason = 'benefit_expiring',
@@ -470,14 +487,16 @@ class GrowthProfileService:
                   AND last_order_at >= NOW() - INTERVAL '30 days'
                   AND has_active_owned_benefit = true
                   AND growth_opt_out = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         count_21d = r21.rowcount
 
         # 规则4: 首单后7天未二访 → medium (no_second_visit)
         r7 = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE customer_growth_profiles
                 SET reactivation_priority = 'medium',
                     reactivation_reason = 'no_second_visit',
@@ -489,7 +508,8 @@ class GrowthProfileService:
                   AND last_order_at IS NOT NULL
                   AND last_order_at < NOW() - INTERVAL '7 days'
                   AND growth_opt_out = false
-            """),
+            """
+            ),
             {"tid": tenant_id},
         )
         count_7d = r7.rowcount
@@ -546,7 +566,8 @@ class GrowthProfileService:
 
         # 计算最后互动时间 = MAX(last_order_at, last_growth_touch_at, 最后打开触达时间)
         result = await db.execute(
-            text("""
+            text(
+                """
             WITH last_interaction AS (
                 SELECT
                     cgp.customer_id,
@@ -573,7 +594,8 @@ class GrowthProfileService:
             FROM last_interaction li
             WHERE cgp.customer_id = li.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.psych_distance_level
-        """)
+        """
+            )
         )
         rows = result.fetchall()
 
@@ -602,14 +624,16 @@ class GrowthProfileService:
 
         # 先算CLV百分位阈值
         percentiles = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 PERCENTILE_CONT(0.97) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p97,
                 PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p95,
                 PERCENTILE_CONT(0.90) WITHIN GROUP (ORDER BY c.total_order_amount_fen) AS p90
             FROM customers c
             WHERE c.is_deleted = FALSE AND c.total_order_count > 0
-        """)
+        """
+            )
         )
         p = percentiles.fetchone()
         if not p or p[0] is None:
@@ -618,7 +642,8 @@ class GrowthProfileService:
         p97, p95, p90 = int(p[0] or 0), int(p[1] or 0), int(p[2] or 0)
 
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 super_user_level = CASE
                     WHEN c.total_order_amount_fen >= :p97 AND c.total_order_count >= 24 THEN 'advocate'
@@ -630,7 +655,8 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.super_user_level
-        """),
+        """
+            ),
             {"p97": p97, "p95": p95, "p90": p90},
         )
 
@@ -660,7 +686,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 growth_milestone_stage = CASE
                     WHEN c.total_order_count >= 24 THEN 'legend'
@@ -674,7 +701,8 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.growth_milestone_stage
-        """)
+        """
+            )
         )
         rows = result.fetchall()
         dist: dict[str, int] = {}
@@ -703,7 +731,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 referral_scenario = CASE
                     WHEN cgp.super_user_level IN ('active', 'advocate') THEN 'super_referrer'
@@ -719,7 +748,8 @@ class GrowthProfileService:
             FROM customers c
             WHERE c.id = cgp.customer_id AND cgp.is_deleted = FALSE AND c.is_deleted = FALSE
             RETURNING cgp.customer_id, cgp.referral_scenario
-        """)
+        """
+            )
         )
         rows = result.fetchall()
         dist: dict[str, int] = {}
@@ -757,7 +787,8 @@ class GrowthProfileService:
         """同步储值卡余额到增长画像（从stored_value_cards表）"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 stored_value_balance_fen = COALESCE(svc.total_balance, 0),
                 updated_at = NOW()
@@ -769,7 +800,8 @@ class GrowthProfileService:
             ) svc
             WHERE cgp.customer_id = svc.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """)
+        """
+            )
         )
         count = len(result.fetchall())
         logger.info("batch_sync_stored_value_done", tenant_id=tenant_id, updated=count)
@@ -780,7 +812,8 @@ class GrowthProfileService:
         await self._set_tenant(db, tenant_id)
         # 简化方案：客单价>=50000分(500元)且状态paid的订单视为宴席
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 last_banquet_at = banquet.last_at,
                 last_banquet_store_id = banquet.last_store,
@@ -797,7 +830,8 @@ class GrowthProfileService:
             ) banquet
             WHERE cgp.customer_id = banquet.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """)
+        """
+            )
         )
         count = len(result.fetchall())
         logger.info("batch_sync_banquet_done", tenant_id=tenant_id, updated=count)
@@ -807,7 +841,8 @@ class GrowthProfileService:
         """同步渠道来源信息到增长画像（统计各渠道订单占比）"""
         await self._set_tenant(db, tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
             UPDATE customer_growth_profiles cgp SET
                 primary_channel = ch.primary_ch,
                 channel_order_count = ch.ch_count,
@@ -825,7 +860,8 @@ class GrowthProfileService:
             ) ch
             WHERE cgp.customer_id = ch.customer_id AND cgp.is_deleted = FALSE
             RETURNING cgp.customer_id
-        """)
+        """
+            )
         )
         count = len(result.fetchall())
         logger.info("batch_sync_channel_done", tenant_id=tenant_id, updated=count)

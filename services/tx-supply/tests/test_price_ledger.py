@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -54,9 +54,9 @@ def _build_db_with_call_log(
     db.add = MagicMock()
     call_log: list[tuple[str, dict]] = []
 
-    def _make_result(*, mappings_rows: list[dict] | None = None,
-                     scalar_value: Any = None,
-                     one: dict | None = None) -> MagicMock:
+    def _make_result(
+        *, mappings_rows: list[dict] | None = None, scalar_value: Any = None, one: dict | None = None
+    ) -> MagicMock:
         result = MagicMock()
         mp = MagicMock()
         mp.all = MagicMock(return_value=mappings_rows or [])
@@ -75,11 +75,7 @@ def _build_db_with_call_log(
             return _make_result()
 
         # 2) 幂等查重 SELECT supplier_price_history with source_doc_id filter
-        if (
-            "from supplier_price_history" in sql_lower
-            and "source_doc_id" in sql_lower
-            and "select id" in sql_lower
-        ):
+        if "from supplier_price_history" in sql_lower and "source_doc_id" in sql_lower and "select id" in sql_lower:
             return _make_result(one=duplicate_lookup_returns)
 
         # 3) INSERT supplier_price_history
@@ -99,10 +95,7 @@ def _build_db_with_call_log(
             return _make_result(scalar_value=baseline_avg)
 
         # 7) 预警 ack 查询
-        if (
-            "from price_alerts" in sql_lower
-            and "select id, status" in sql_lower
-        ):
+        if "from price_alerts" in sql_lower and "select id, status" in sql_lower:
             return _make_result(one=alert_lookup_row)
 
         # 8) UPDATE price_alerts
@@ -225,8 +218,7 @@ async def test_query_ledger_returns_filtered_by_ingredient_and_window():
     assert result["size"] == 20
 
     # 找到 SELECT items 的那次调用
-    select_calls = [c for c in calls if "from supplier_price_history" in c[0].lower()
-                    and "limit" in c[0].lower()]
+    select_calls = [c for c in calls if "from supplier_price_history" in c[0].lower() and "limit" in c[0].lower()]
     assert select_calls, "expected a SELECT items call"
     _, params = select_calls[-1]
     # 过滤参数正确传递
@@ -269,9 +261,7 @@ async def test_compute_trend_aggregates_by_week():
 @pytest.mark.asyncio
 async def test_compute_trend_rejects_invalid_bucket():
     db, _ = _build_db_with_call_log()
-    result = await svc.compute_trend(
-        tenant_id=TENANT_A, ingredient_id=INGREDIENT_ID, db=db, bucket="day"
-    )
+    result = await svc.compute_trend(tenant_id=TENANT_A, ingredient_id=INGREDIENT_ID, db=db, bucket="day")
     assert result["ok"] is False
     assert "week" in result["error"]
 

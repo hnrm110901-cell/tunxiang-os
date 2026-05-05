@@ -26,7 +26,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "payment_id": {"type": "string", "description": "支付单号", "required": True},
         },
         "endpoint": "POST /api/v1/pay/query",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": False,
     },
     "payment__daily_summary": {
@@ -37,7 +37,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "summary_date": {"type": "string", "description": "日期 YYYY-MM-DD（默认今天）", "required": False},
         },
         "endpoint": "GET /api/v1/pay/daily-summary",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": False,
     },
     "payment__list_channels": {
@@ -45,7 +45,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
         "description": "列出当前已注册的所有支付渠道及其支持的支付方式。用于诊断渠道配置问题。",
         "params": {},
         "endpoint": "GET /api/v1/pay/admin/channels",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": False,
     },
     "payment__list_pending_agent_payments": {
@@ -55,7 +55,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "agent_id": {"type": "string", "description": "筛选特定 Agent（可选）", "required": False},
         },
         "endpoint": "GET /api/v1/pay/agent/pending",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": False,
     },
     # ─── 准备工具（预授权，不扣款） ──────────────────────────
@@ -75,7 +75,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "reason": {"type": "string", "description": "Agent 发起支付的理由", "required": True},
         },
         "endpoint": "POST /api/v1/pay/agent/prepare",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": False,  # 准备阶段不需要人类确认
     },
     # ─── 执行工具（必须人类确认） ─────────────────────────────
@@ -88,7 +88,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "auth_type": {"type": "string", "description": "认证方式: biometric/password/sms_code", "required": True},
         },
         "endpoint": "POST /api/v1/pay/agent/confirm",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": True,
     },
     "payment__refund": {
@@ -100,7 +100,7 @@ PAYMENT_MCP_TOOLS: dict[str, dict] = {
             "reason": {"type": "string", "description": "退款原因", "required": True},
         },
         "endpoint": "POST /api/v1/pay/refund",
-        "service_url": "http://localhost:8013",
+        "service_url": "http://localhost:8016",
         "human_auth_required": True,
     },
 }

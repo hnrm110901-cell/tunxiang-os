@@ -119,9 +119,7 @@ class _DBOverride:
 
 @pytest_asyncio.fixture
 async def client():
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as ac:
         yield ac
 
 
@@ -184,11 +182,11 @@ class TestGetStoredValue:
         select_txn_empty = _exec_result_multi([])
 
         mock_db.execute.side_effect = [
-            MagicMock(),             # SET LOCAL app.tenant_id
-            select_no_row,           # SELECT stored_value_accounts → 不存在
-            MagicMock(),             # INSERT 新账户
-            MagicMock(),             # commit（账户创建）
-            select_txn_empty,        # SELECT stored_value_transactions
+            MagicMock(),  # SET LOCAL app.tenant_id
+            select_no_row,  # SELECT stored_value_accounts → 不存在
+            MagicMock(),  # INSERT 新账户
+            MagicMock(),  # commit（账户创建）
+            select_txn_empty,  # SELECT stored_value_transactions
         ]
 
         with _DBOverride(mock_db):
@@ -212,10 +210,10 @@ class TestRecharge:
         account = _make_account(balance=0)
 
         mock_db.execute.side_effect = [
-            MagicMock(),                         # SET LOCAL
-            _exec_result_with_row(account),      # SELECT account（已存在）
-            MagicMock(),                         # UPDATE balance
-            MagicMock(),                         # INSERT transaction
+            MagicMock(),  # SET LOCAL
+            _exec_result_with_row(account),  # SELECT account（已存在）
+            MagicMock(),  # UPDATE balance
+            MagicMock(),  # INSERT transaction
         ]
 
         body = {
@@ -392,7 +390,7 @@ class TestConsume:
         data = resp.json()
         assert data["ok"] is True
         assert data["data"]["success"] is False
-        assert data["data"]["insufficient_fen"] == 5_000   # 10_000 - 5_000
+        assert data["data"]["insufficient_fen"] == 5_000  # 10_000 - 5_000
 
     @pytest.mark.asyncio
     async def test_consume_exactly_balance(self, client: AsyncClient):
@@ -454,7 +452,7 @@ class TestRefund:
         orig_txn.__getitem__ = lambda self, k: {
             "id": txn_id,
             "account_id": account_id,
-            "amount_fen": -20_000,   # 消费是负数
+            "amount_fen": -20_000,  # 消费是负数
             "type": "consume",
         }[k]
 
@@ -477,11 +475,11 @@ class TestRefund:
         acc_result.mappings = MagicMock(return_value=acc_mapping)
 
         mock_db.execute.side_effect = [
-            MagicMock(),       # SET LOCAL
-            orig_result,       # SELECT stored_value_transactions
-            acc_result,        # SELECT stored_value_accounts
-            MagicMock(),       # UPDATE balance
-            MagicMock(),       # INSERT refund transaction
+            MagicMock(),  # SET LOCAL
+            orig_result,  # SELECT stored_value_transactions
+            acc_result,  # SELECT stored_value_accounts
+            MagicMock(),  # UPDATE balance
+            MagicMock(),  # INSERT refund transaction
         ]
 
         body = {
@@ -501,7 +499,7 @@ class TestRefund:
         data = resp.json()
         assert data["ok"] is True
         assert data["data"]["refunded_fen"] == 10_000
-        assert data["data"]["balance_after_fen"] == 40_000   # 30_000 + 10_000
+        assert data["data"]["balance_after_fen"] == 40_000  # 30_000 + 10_000
 
     @pytest.mark.asyncio
     async def test_refund_transaction_not_found(self, client: AsyncClient):
@@ -515,8 +513,8 @@ class TestRefund:
         no_row.mappings = MagicMock(return_value=no_row_mapping)
 
         mock_db.execute.side_effect = [
-            MagicMock(),   # SET LOCAL
-            no_row,        # SELECT transaction → 不存在
+            MagicMock(),  # SET LOCAL
+            no_row,  # SELECT transaction → 不存在
         ]
 
         body = {
@@ -545,7 +543,7 @@ class TestRefund:
         orig_txn.__getitem__ = lambda self, k: {
             "id": txn_id,
             "account_id": account_id,
-            "amount_fen": -5_000,   # 原消费 5_000
+            "amount_fen": -5_000,  # 原消费 5_000
             "type": "consume",
         }[k]
 
@@ -561,7 +559,7 @@ class TestRefund:
 
         body = {
             "transaction_id": txn_id,
-            "amount_fen": 10_000,   # 超过原消费 5_000
+            "amount_fen": 10_000,  # 超过原消费 5_000
             "reason": "超额退款测试",
             "operator_id": "op-001",
         }

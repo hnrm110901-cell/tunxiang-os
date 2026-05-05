@@ -104,11 +104,13 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_update_partner(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
-            FakeResult(),  # UPDATE
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
+                FakeResult(),  # UPDATE
+            ]
+        )
         result = await self.svc.update_partner(
             tenant_id=TENANT_ID,
             partner_id=PARTNER_ID,
@@ -119,10 +121,12 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_update_partner_not_found(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[]),  # SELECT empty
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[]),  # SELECT empty
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="partner_not_found"):
             await self.svc.update_partner(TENANT_ID, PARTNER_ID, {"partner_name": "x"}, db)
 
@@ -130,11 +134,13 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_activate_partner(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
-            FakeResult(),  # UPDATE
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
+                FakeResult(),  # UPDATE
+            ]
+        )
         result = await self.svc.activate_partner(TENANT_ID, PARTNER_ID, db)
         assert result["status"] == "active"
 
@@ -142,11 +148,13 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_suspend_partner(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": PARTNER_ID, "status": "active"}]),  # SELECT
-            FakeResult(),  # UPDATE
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": PARTNER_ID, "status": "active"}]),  # SELECT
+                FakeResult(),  # UPDATE
+            ]
+        )
         result = await self.svc.suspend_partner(TENANT_ID, PARTNER_ID, db)
         assert result["status"] == "suspended"
 
@@ -154,10 +162,12 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_suspend_non_active_fails(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": PARTNER_ID, "status": "pending"}]),  # SELECT
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="partner_not_active"):
             await self.svc.suspend_partner(TENANT_ID, PARTNER_ID, db)
 
@@ -165,10 +175,12 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_activate_terminated_fails(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"id": PARTNER_ID, "status": "terminated"}]),  # SELECT
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"id": PARTNER_ID, "status": "terminated"}]),  # SELECT
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="partner_terminated"):
             await self.svc.activate_partner(TENANT_ID, PARTNER_ID, db)
 
@@ -176,19 +188,27 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_exchange_points_out(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{  # SELECT partner
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_out": 1.5, "partner_name": "星巴克",
-            }]),
-            FakeResult(rows=[{"daily_exchange_limit": 1000}]),  # _check_daily_limit: partner
-            FakeResult(rows=[{"today_total": 100}]),  # _check_daily_limit: today sum
-            FakeResult(rows=[{"balance": 500}]),  # points balance
-            FakeResult(),  # INSERT points_ledger
-            FakeResult(),  # INSERT alliance_transactions
-            FakeResult(),  # UPDATE partner totals
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {  # SELECT partner
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_out": 1.5,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+                FakeResult(rows=[{"daily_exchange_limit": 1000}]),  # _check_daily_limit: partner
+                FakeResult(rows=[{"today_total": 100}]),  # _check_daily_limit: today sum
+                FakeResult(rows=[{"balance": 500}]),  # points balance
+                FakeResult(),  # INSERT points_ledger
+                FakeResult(),  # INSERT alliance_transactions
+                FakeResult(),  # UPDATE partner totals
+            ]
+        )
         result = await self.svc.exchange_points_out(
             tenant_id=TENANT_ID,
             customer_id=CUSTOMER_A,
@@ -205,18 +225,26 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_exchange_points_in(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{  # SELECT partner
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_in": 0.8, "partner_name": "星巴克",
-            }]),
-            FakeResult(rows=[{"daily_exchange_limit": 1000}]),  # _check_daily_limit: partner
-            FakeResult(rows=[{"today_total": 0}]),  # _check_daily_limit: today sum
-            FakeResult(),  # INSERT points_ledger
-            FakeResult(),  # INSERT alliance_transactions
-            FakeResult(),  # UPDATE partner totals
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {  # SELECT partner
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_in": 0.8,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+                FakeResult(rows=[{"daily_exchange_limit": 1000}]),  # _check_daily_limit: partner
+                FakeResult(rows=[{"today_total": 0}]),  # _check_daily_limit: today sum
+                FakeResult(),  # INSERT points_ledger
+                FakeResult(),  # INSERT alliance_transactions
+                FakeResult(),  # UPDATE partner totals
+            ]
+        )
         result = await self.svc.exchange_points_in(
             tenant_id=TENANT_ID,
             customer_id=CUSTOMER_A,
@@ -233,18 +261,30 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_daily_limit_exceeded(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{  # SELECT partner
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_out": 1.0, "partner_name": "星巴克",
-            }]),
-            FakeResult(rows=[{"daily_exchange_limit": 500}]),  # _check_daily_limit: partner
-            FakeResult(rows=[{"today_total": 450}]),  # already 450 today
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {  # SELECT partner
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_out": 1.0,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+                FakeResult(rows=[{"daily_exchange_limit": 500}]),  # _check_daily_limit: partner
+                FakeResult(rows=[{"today_total": 450}]),  # already 450 today
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="daily_limit_exceeded"):
             await self.svc.exchange_points_out(
-                TENANT_ID, CUSTOMER_A, PARTNER_ID, 100, db,
+                TENANT_ID,
+                CUSTOMER_A,
+                PARTNER_ID,
+                100,
+                db,
             )
 
     # ── 10. 兑换率计算 ──
@@ -252,21 +292,33 @@ class TestAllianceService:
     @pytest.mark.asyncio
     async def test_exchange_rate_calculation(self):
         """验证不同兑换率的转换结果"""
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_out": 2.5, "partner_name": "万豪酒店",
-            }]),
-            FakeResult(rows=[{"daily_exchange_limit": 10000}]),
-            FakeResult(rows=[{"today_total": 0}]),
-            FakeResult(rows=[{"balance": 1000}]),
-            FakeResult(),  # INSERT points_ledger
-            FakeResult(),  # INSERT alliance_transactions
-            FakeResult(),  # UPDATE partner totals
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_out": 2.5,
+                            "partner_name": "万豪酒店",
+                        }
+                    ]
+                ),
+                FakeResult(rows=[{"daily_exchange_limit": 10000}]),
+                FakeResult(rows=[{"today_total": 0}]),
+                FakeResult(rows=[{"balance": 1000}]),
+                FakeResult(),  # INSERT points_ledger
+                FakeResult(),  # INSERT alliance_transactions
+                FakeResult(),  # UPDATE partner totals
+            ]
+        )
         result = await self.svc.exchange_points_out(
-            TENANT_ID, CUSTOMER_A, PARTNER_ID, 300, db,
+            TENANT_ID,
+            CUSTOMER_A,
+            PARTNER_ID,
+            300,
+            db,
         )
         assert result["converted_points"] == 750  # 300 * 2.5
         assert result["exchange_rate"] == 2.5
@@ -275,59 +327,95 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_insufficient_points_rejected(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_out": 1.0, "partner_name": "星巴克",
-            }]),
-            FakeResult(rows=[{"daily_exchange_limit": 10000}]),
-            FakeResult(rows=[{"today_total": 0}]),
-            FakeResult(rows=[{"balance": 50}]),  # only 50 points
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_out": 1.0,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+                FakeResult(rows=[{"daily_exchange_limit": 10000}]),
+                FakeResult(rows=[{"today_total": 0}]),
+                FakeResult(rows=[{"balance": 50}]),  # only 50 points
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="insufficient_points"):
             await self.svc.exchange_points_out(
-                TENANT_ID, CUSTOMER_A, PARTNER_ID, 100, db,
+                TENANT_ID,
+                CUSTOMER_A,
+                PARTNER_ID,
+                100,
+                db,
             )
 
     # ── 12. 暂停伙伴拒绝兑换 ──
 
     @pytest.mark.asyncio
     async def test_suspended_partner_rejected(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{
-                "id": PARTNER_ID, "status": "suspended",
-                "exchange_rate_out": 1.0, "partner_name": "星巴克",
-            }]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {
+                            "id": PARTNER_ID,
+                            "status": "suspended",
+                            "exchange_rate_out": 1.0,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+            ]
+        )
         with pytest.raises(AllianceServiceError, match="partner_not_active"):
             await self.svc.exchange_points_out(
-                TENANT_ID, CUSTOMER_A, PARTNER_ID, 100, db,
+                TENANT_ID,
+                CUSTOMER_A,
+                PARTNER_ID,
+                100,
+                db,
             )
 
     # ── 查询 ──
 
     @pytest.mark.asyncio
     async def test_get_partner_list(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{"cnt": 2}]),  # COUNT
-            FakeResult(rows=[
-                {
-                    "id": PARTNER_ID, "tenant_id": TENANT_ID,
-                    "partner_name": "星巴克", "partner_type": "restaurant",
-                    "partner_brand_logo": None, "contact_name": "张三",
-                    "contact_phone": "13800138000", "contact_email": None,
-                    "exchange_rate_out": 1.5, "exchange_rate_in": 0.8,
-                    "daily_exchange_limit": 1000, "status": "active",
-                    "contract_start": None, "contract_end": None,
-                    "total_points_exchanged_out": 5000,
-                    "total_points_exchanged_in": 3000,
-                    "created_at": "2026-04-01", "updated_at": "2026-04-20",
-                },
-            ]),
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(rows=[{"cnt": 2}]),  # COUNT
+                FakeResult(
+                    rows=[
+                        {
+                            "id": PARTNER_ID,
+                            "tenant_id": TENANT_ID,
+                            "partner_name": "星巴克",
+                            "partner_type": "restaurant",
+                            "partner_brand_logo": None,
+                            "contact_name": "张三",
+                            "contact_phone": "13800138000",
+                            "contact_email": None,
+                            "exchange_rate_out": 1.5,
+                            "exchange_rate_in": 0.8,
+                            "daily_exchange_limit": 1000,
+                            "status": "active",
+                            "contract_start": None,
+                            "contract_end": None,
+                            "total_points_exchanged_out": 5000,
+                            "total_points_exchanged_in": 3000,
+                            "created_at": "2026-04-01",
+                            "updated_at": "2026-04-20",
+                        },
+                    ]
+                ),
+            ]
+        )
         result = await self.svc.get_partner_list(TENANT_ID, db, page=1, size=20)
         assert result["total"] == 2
         assert len(result["items"]) == 1
@@ -335,19 +423,25 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_get_alliance_dashboard(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{  # partner stats
-                "total_partners": 5,
-                "active_partners": 3,
-                "pending_partners": 1,
-                "suspended_partners": 1,
-                "total_points_out": 50000,
-                "total_points_in": 30000,
-            }]),
-            FakeResult(rows=[]),  # top partners
-            FakeResult(rows=[]),  # trend
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {  # partner stats
+                            "total_partners": 5,
+                            "active_partners": 3,
+                            "pending_partners": 1,
+                            "suspended_partners": 1,
+                            "total_points_out": 50000,
+                            "total_points_in": 30000,
+                        }
+                    ]
+                ),
+                FakeResult(rows=[]),  # top partners
+                FakeResult(rows=[]),  # trend
+            ]
+        )
         result = await self.svc.get_alliance_dashboard(TENANT_ID, db)
         assert result["total_partners"] == 5
         assert result["active_partners"] == 3
@@ -355,19 +449,37 @@ class TestAllianceService:
 
     @pytest.mark.asyncio
     async def test_exchange_for_coupon(self):
-        db = make_db([
-            FakeResult(),  # _set_tenant
-            FakeResult(rows=[{  # SELECT partner
-                "id": PARTNER_ID, "status": "active",
-                "exchange_rate_in": 1.0, "partner_name": "星巴克",
-            }]),
-            FakeResult(rows=[{  # SELECT coupon_template
-                "id": COUPON_TPL_ID, "name": "满100减20", "points_cost": 200,
-            }]),
-            FakeResult(),  # INSERT alliance_transactions
-        ])
+        db = make_db(
+            [
+                FakeResult(),  # _set_tenant
+                FakeResult(
+                    rows=[
+                        {  # SELECT partner
+                            "id": PARTNER_ID,
+                            "status": "active",
+                            "exchange_rate_in": 1.0,
+                            "partner_name": "星巴克",
+                        }
+                    ]
+                ),
+                FakeResult(
+                    rows=[
+                        {  # SELECT coupon_template
+                            "id": COUPON_TPL_ID,
+                            "name": "满100减20",
+                            "points_cost": 200,
+                        }
+                    ]
+                ),
+                FakeResult(),  # INSERT alliance_transactions
+            ]
+        )
         result = await self.svc.exchange_for_coupon(
-            TENANT_ID, CUSTOMER_A, PARTNER_ID, COUPON_TPL_ID, db,
+            TENANT_ID,
+            CUSTOMER_A,
+            PARTNER_ID,
+            COUPON_TPL_ID,
+            db,
         )
         assert result["coupon_name"] == "满100减20"
         assert result["points_cost"] == 200
@@ -383,9 +495,8 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_create_partner(self):
         """验证 POST /partners 路由创建合作伙伴"""
-        from unittest.mock import MagicMock
 
-        from api.alliance_routes import api_create_partner, CreatePartnerReq
+        from api.alliance_routes import CreatePartnerReq, api_create_partner
 
         body = CreatePartnerReq(
             partner_name="肯德基",
@@ -426,7 +537,7 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_exchange_points(self):
         """验证 POST /exchange 路由积分兑换"""
-        from api.alliance_routes import api_exchange_points, ExchangePointsReq
+        from api.alliance_routes import ExchangePointsReq, api_exchange_points
 
         body = ExchangePointsReq(
             customer_id=CUSTOMER_A,

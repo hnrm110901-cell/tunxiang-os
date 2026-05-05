@@ -12,6 +12,7 @@
   9. v279 迁移静态校验（status 枚举 + 唯一约束 + cache_read 字段 + RLS）
   10. ModelRouter 注册 cost_root_cause_analysis
 """
+
 from __future__ import annotations
 
 import json
@@ -41,12 +42,13 @@ from services.cost_root_cause_service import (  # noqa: E402
 # 1. CostSignalBundle
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _sample_bundle(cost_overrun_pct: float = 0.08) -> CostSignalBundle:
     return CostSignalBundle(
         store_id="00000000-0000-0000-0000-000000000001",
         store_name="徐记海鲜五一店",
         analysis_month=date(2026, 3, 1),
-        food_cost_fen=50000000,       # 50 万
+        food_cost_fen=50000000,  # 50 万
         food_cost_budget_fen=45000000,
         cost_overrun_pct=cost_overrun_pct,
         price_changes=[
@@ -61,7 +63,9 @@ def _sample_bundle(cost_overrun_pct: float = 0.08) -> CostSignalBundle:
         waste_events=[
             WasteEvent(
                 ingredient_name="剁椒鱼头",
-                quantity=2.5, unit="kg", loss_fen=580000,
+                quantity=2.5,
+                unit="kg",
+                loss_fen=580000,
                 reason="expired",
                 recorded_at=datetime(2026, 3, 15, 20, 0, tzinfo=timezone.utc),
             ),
@@ -70,7 +74,8 @@ def _sample_bundle(cost_overrun_pct: float = 0.08) -> CostSignalBundle:
             BOMDeviation(
                 dish_name="剁椒鱼头",
                 ingredient_name="剁椒",
-                standard_qty=0.15, actual_qty=0.22,
+                standard_qty=0.15,
+                actual_qty=0.22,
                 deviation_pct=0.467,
             ),
         ],
@@ -92,10 +97,15 @@ def test_signal_bundle_serializes_completely():
 
 def test_signal_bundle_filters_small_bom_deviations():
     b = _sample_bundle()
-    b.bom_deviations.append(BOMDeviation(
-        dish_name="清蒸鲈鱼", ingredient_name="鲈鱼",
-        standard_qty=1.0, actual_qty=1.02, deviation_pct=0.02,
-    ))
+    b.bom_deviations.append(
+        BOMDeviation(
+            dish_name="清蒸鲈鱼",
+            ingredient_name="鲈鱼",
+            standard_qty=1.0,
+            actual_qty=1.02,
+            deviation_pct=0.02,
+        )
+    )
     d = b.to_json_dict()
     # 新加的 2% 偏差应被过滤
     assert len(d["bom_deviations"]) == 1
@@ -103,11 +113,16 @@ def test_signal_bundle_filters_small_bom_deviations():
 
 def test_signal_bundle_groups_waste_by_reason():
     b = _sample_bundle()
-    b.waste_events.append(WasteEvent(
-        ingredient_name="豆芽", quantity=1.0, unit="kg", loss_fen=10000,
-        reason="prep_waste",
-        recorded_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
-    ))
+    b.waste_events.append(
+        WasteEvent(
+            ingredient_name="豆芽",
+            quantity=1.0,
+            unit="kg",
+            loss_fen=10000,
+            reason="prep_waste",
+            recorded_at=datetime(2026, 3, 20, tzinfo=timezone.utc),
+        )
+    )
     d = b.to_json_dict()
     reasons = d["waste_events_summary"]["by_reason"]
     assert "expired" in reasons and "prep_waste" in reasons
@@ -118,6 +133,7 @@ def test_signal_bundle_groups_waste_by_reason():
 # ──────────────────────────────────────────────────────────────────────
 # 2. CachedPromptBuilder
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_builder_request_structure():
     req = CachedPromptBuilder.build_request(signal_bundle=_sample_bundle())
@@ -158,6 +174,7 @@ def test_builder_user_message_includes_json():
 # 3. parse_sonnet_response
 # ──────────────────────────────────────────────────────────────────────
 
+
 def _mock_response(analysis_json: dict, usage: dict | None = None) -> dict:
     return {
         "content": [{"type": "text", "text": json.dumps(analysis_json, ensure_ascii=False)}],
@@ -170,14 +187,19 @@ def test_parse_response_valid_json():
         "analysis": "原料涨价主导",
         "ranked_causes": [
             {
-                "cause_type": "price_hike", "confidence": 0.8,
-                "evidence": "鲈鱼涨 24%", "impact_fen": 300000, "priority": "high",
+                "cause_type": "price_hike",
+                "confidence": 0.8,
+                "evidence": "鲈鱼涨 24%",
+                "impact_fen": 300000,
+                "priority": "high",
             },
         ],
         "remediation_actions": [
             {
-                "action": "切换备用供应商", "owner_role": "supply_chain",
-                "deadline_days": 14, "expected_savings_fen": 150000,
+                "action": "切换备用供应商",
+                "owner_role": "supply_chain",
+                "deadline_days": 14,
+                "expected_savings_fen": 150000,
             },
         ],
     }
@@ -201,9 +223,11 @@ def test_parse_response_valid_json():
 def test_parse_response_with_code_fence():
     """支持 ```json ... ``` 包裹"""
     inner = {
-        "analysis": "test", "ranked_causes": [],
-        "remediation_actions": [{"action": "collect", "owner_role": "store_manager",
-                                 "deadline_days": 7, "expected_savings_fen": 0}],
+        "analysis": "test",
+        "ranked_causes": [],
+        "remediation_actions": [
+            {"action": "collect", "owner_role": "store_manager", "deadline_days": 7, "expected_savings_fen": 0}
+        ],
     }
     wrapped = f"```json\n{json.dumps(inner)}\n```"
     response = {"content": [{"type": "text", "text": wrapped}], "usage": {}}
@@ -230,6 +254,7 @@ def test_parse_response_empty_content():
 # 4. Service trigger 阈值
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_should_trigger_below_5pct_returns_empty():
     """成本超支 < 5% → 不触发分析，返空结果"""
@@ -254,14 +279,13 @@ async def test_should_trigger_at_or_above_5pct():
 # 5. Fallback 规则引擎
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_fallback_ranks_price_hike_when_multiple_hikes():
     service = CostRootCauseService()
     b = _sample_bundle()
     b.price_changes = [
-        RawMaterialPriceChange(ingredient_name=f"食材{i}",
-                                old_price_fen=1000, new_price_fen=1100,
-                                change_pct=0.10)
+        RawMaterialPriceChange(ingredient_name=f"食材{i}", old_price_fen=1000, new_price_fen=1100, change_pct=0.10)
         for i in range(4)
     ]
     result = await service.analyze(b)
@@ -278,10 +302,14 @@ async def test_fallback_detects_waste_spike():
     b.bom_deviations = []
     # 浪费 = 10% 食材成本
     b.waste_events = [
-        WasteEvent(ingredient_name="食材x", quantity=1.0, unit="kg",
-                   loss_fen=5000000,  # 5 万 / 50 万 = 10%
-                   reason="expired",
-                   recorded_at=datetime(2026, 3, 10, tzinfo=timezone.utc)),
+        WasteEvent(
+            ingredient_name="食材x",
+            quantity=1.0,
+            unit="kg",
+            loss_fen=5000000,  # 5 万 / 50 万 = 10%
+            reason="expired",
+            recorded_at=datetime(2026, 3, 10, tzinfo=timezone.utc),
+        ),
     ]
     result = await service.analyze(b)
     types = [c.cause_type for c in result.ranked_causes]
@@ -305,6 +333,7 @@ async def test_fallback_returns_other_when_no_signals():
 # 6. invoker 接入（mock）
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_service_with_invoker_uses_sonnet_response():
     invoked = []
@@ -315,16 +344,29 @@ async def test_service_with_invoker_uses_sonnet_response():
             {
                 "analysis": "来自 Sonnet",
                 "ranked_causes": [
-                    {"cause_type": "supplier_switch", "confidence": 0.9,
-                     "evidence": "供应商切换", "impact_fen": 200000, "priority": "high"},
+                    {
+                        "cause_type": "supplier_switch",
+                        "confidence": 0.9,
+                        "evidence": "供应商切换",
+                        "impact_fen": 200000,
+                        "priority": "high",
+                    },
                 ],
                 "remediation_actions": [
-                    {"action": "回退供应商", "owner_role": "supply_chain",
-                     "deadline_days": 7, "expected_savings_fen": 180000},
+                    {
+                        "action": "回退供应商",
+                        "owner_role": "supply_chain",
+                        "deadline_days": 7,
+                        "expected_savings_fen": 180000,
+                    },
                 ],
             },
-            usage={"input_tokens": 500, "output_tokens": 300,
-                   "cache_read_input_tokens": 3000, "cache_creation_input_tokens": 0},
+            usage={
+                "input_tokens": 500,
+                "output_tokens": 300,
+                "cache_read_input_tokens": 3000,
+                "cache_creation_input_tokens": 0,
+            },
         )
 
     service = CostRootCauseService(sonnet_invoker=mock_sonnet)
@@ -360,6 +402,7 @@ async def test_service_invoker_failure_falls_back():
 # 7. cache_hit_rate 计算
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_cache_hit_rate_zero_when_no_cache():
     r = RootCauseAnalysisResult(input_tokens=1000, output_tokens=500)
     assert r.cache_hit_rate == 0.0
@@ -379,8 +422,10 @@ def test_cache_hit_rate_high():
 def test_cache_hit_rate_excludes_output():
     """output_tokens 不算 input，不影响 hit rate"""
     r = RootCauseAnalysisResult(
-        cache_read_tokens=4000, cache_creation_tokens=0,
-        input_tokens=1000, output_tokens=100000,
+        cache_read_tokens=4000,
+        cache_creation_tokens=0,
+        input_tokens=1000,
+        output_tokens=100000,
     )
     assert r.cache_hit_rate == pytest.approx(4000 / 5000, abs=0.001)
 
@@ -394,8 +439,15 @@ def test_cache_hit_target_constant():
 # ──────────────────────────────────────────────────────────────────────
 
 _MIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "..",
-    "shared", "db-migrations", "versions", "v279_cost_root_cause_analyses.py"
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "shared",
+    "db-migrations",
+    "versions",
+    "v279_cost_root_cause_analyses.py",
 )
 
 
@@ -409,13 +461,23 @@ def _read_mig() -> str:
 def test_v279_creates_table_with_required_columns():
     content = _read_mig()
     for col in (
-        "food_cost_fen", "food_cost_budget_fen", "cost_overrun_pct",
-        "signals_snapshot", "ranked_causes", "remediation_actions",
-        "sonnet_analysis", "model_id",
-        "cache_read_tokens", "cache_creation_tokens",
-        "input_tokens", "output_tokens",
-        "status", "reviewed_by", "reviewed_at",
-        "analysis_type", "analysis_month",
+        "food_cost_fen",
+        "food_cost_budget_fen",
+        "cost_overrun_pct",
+        "signals_snapshot",
+        "ranked_causes",
+        "remediation_actions",
+        "sonnet_analysis",
+        "model_id",
+        "cache_read_tokens",
+        "cache_creation_tokens",
+        "input_tokens",
+        "output_tokens",
+        "status",
+        "reviewed_by",
+        "reviewed_at",
+        "analysis_type",
+        "analysis_month",
     ):
         assert col in content, f"缺列 {col}"
 
@@ -453,10 +515,20 @@ def test_v279_down_revision_chains_to_v278():
 # 9. ModelRouter 注册
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_model_router_registers_d4_task_types():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "services", "tunxiang-api", "src", "shared", "core", "model_router.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "services",
+        "tunxiang-api",
+        "src",
+        "shared",
+        "core",
+        "model_router.py",
     )
     if not os.path.exists(path):
         pytest.skip("model_router.py 不存在")

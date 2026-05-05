@@ -3,10 +3,10 @@
 支持市场: MY(马来西亚), ID(印度尼西亚), VN(越南)
 数据源: 各市场本地节假日 + 菜系 + 食材 + 历史订单
 """
+
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
-from decimal import Decimal
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
@@ -100,7 +100,7 @@ class RegionalForecastingService:
             "base_market": base_forecast.get("market", "MY"),
             "base_forecast": base_forecast,
             "market_forecasts": market_forecasts,
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
         }
 
     @staticmethod
@@ -176,9 +176,7 @@ class RegionalForecastingService:
 
     # ── 跨市场菜系推荐 ────────────────────────────────────────────────────
 
-    def get_cuisine_recommendations(
-        self, market: str, season: Optional[str] = None
-    ) -> list[dict[str, Any]]:
+    def get_cuisine_recommendations(self, market: str, season: Optional[str] = None) -> list[dict[str, Any]]:
         """获取面向特定市场的菜系优化推荐。"""
         profiles = {
             "MY": [

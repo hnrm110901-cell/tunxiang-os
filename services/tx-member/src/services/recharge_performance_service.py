@@ -41,7 +41,8 @@ class RechargePerformanceService:
         """
         perf_id = str(uuid.uuid4())
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO recharge_performance (
                     tenant_id, id, store_id, employee_id,
                     period_date, period_type,
@@ -72,7 +73,8 @@ class RechargePerformanceService:
                     END,
                     updated_at = now()
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": perf_id,
@@ -111,7 +113,8 @@ class RechargePerformanceService:
     ) -> dict:
         """获取门店某日的储值绩效汇总"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(DISTINCT employee_id)                    AS active_employees,
                     COALESCE(SUM(total_recharge_count), 0)         AS total_count,
@@ -125,7 +128,8 @@ class RechargePerformanceService:
                   AND period_date = :period_date
                   AND period_type = 'daily'
                   AND is_deleted  = FALSE
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "period_date": period_date},
         )
         row = result.fetchone()
@@ -164,7 +168,8 @@ class RechargePerformanceService:
             end_date = date(year, month + 1, 1)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(DISTINCT employee_id)                    AS active_employees,
                     COALESCE(SUM(total_recharge_count), 0)         AS total_count,
@@ -179,7 +184,8 @@ class RechargePerformanceService:
                   AND period_date <  :end_date
                   AND period_type = 'daily'
                   AND is_deleted  = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -229,7 +235,8 @@ class RechargePerformanceService:
             sort_by = "total_recharge_amount_fen"
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     employee_id,
                     SUM(total_recharge_count)       AS total_count,
@@ -250,7 +257,8 @@ class RechargePerformanceService:
                 GROUP BY employee_id
                 ORDER BY {sort_by} DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -290,7 +298,8 @@ class RechargePerformanceService:
         # 1) 获取提成规则
         today = date.today()
         rule_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, rule_name, commission_type, commission_value, tiers
                 FROM recharge_commission_rules
                 WHERE tenant_id = :tenant_id
@@ -301,14 +310,16 @@ class RechargePerformanceService:
                   AND is_deleted = FALSE
                 ORDER BY store_id NULLS LAST
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "today": today},
         )
         rule = rule_result.fetchone()
 
         # 2) 获取员工绩效
         perf_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     SUM(total_recharge_count)       AS total_count,
                     SUM(total_recharge_amount_fen)  AS total_amount_fen
@@ -319,7 +330,8 @@ class RechargePerformanceService:
                   AND period_date BETWEEN :start_date AND :end_date
                   AND period_type = 'daily'
                   AND is_deleted  = FALSE
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -382,7 +394,8 @@ class RechargePerformanceService:
             effective_from = date.today()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO recharge_commission_rules (
                     tenant_id, id, store_id, rule_name,
                     commission_type, commission_value, tiers,
@@ -392,7 +405,8 @@ class RechargePerformanceService:
                     :commission_type, :commission_value, :tiers::JSONB,
                     :effective_from, :effective_until
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "id": rule_id,
@@ -435,7 +449,8 @@ class RechargePerformanceService:
         params["limit"] = size
         params["offset"] = offset
         items_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, rule_name, commission_type,
                        commission_value, is_active,
                        effective_from, effective_until, created_at
@@ -443,7 +458,8 @@ class RechargePerformanceService:
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = items_result.fetchall()
@@ -466,11 +482,13 @@ class RechargePerformanceService:
     async def delete_commission_rule(db: AsyncSession, tenant_id: str, rule_id: str) -> dict:
         """软删除提成规则"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE recharge_commission_rules
                 SET is_deleted = TRUE, updated_at = now()
                 WHERE tenant_id = :tenant_id AND id = :rule_id
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "rule_id": rule_id},
         )
         await db.commit()

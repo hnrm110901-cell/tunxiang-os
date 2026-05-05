@@ -59,9 +59,7 @@ def emitted() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def service(
-    repo: InMemoryInvitationRepository, emitted: list[dict[str, Any]]
-) -> ReservationInvitationService:
+def service(repo: InMemoryInvitationRepository, emitted: list[dict[str, Any]]) -> ReservationInvitationService:
     async def _fake_emit(**kwargs: Any) -> str:
         emitted.append(kwargs)
         return str(uuid.uuid4())
@@ -114,9 +112,7 @@ async def test_mark_sent_wechat_emits_invitation_sent(
         coupon_code="W100",
         coupon_value_fen=10000,
     )
-    await service.mark_sent(
-        invitation_id=record.invitation_id, tenant_id=TENANT_A
-    )
+    await service.mark_sent(invitation_id=record.invitation_id, tenant_id=TENANT_A)
 
     assert len(emitted) == 1
     ev = emitted[0]
@@ -142,9 +138,7 @@ async def test_mark_sent_call_channel_emits_confirm_call_sent(
         channel=InvitationChannel.CALL,
         payload={"call_script_id": "confirm_arrival_v1"},
     )
-    await service.mark_sent(
-        invitation_id=record.invitation_id, tenant_id=TENANT_A
-    )
+    await service.mark_sent(invitation_id=record.invitation_id, tenant_id=TENANT_A)
     assert len(emitted) == 1
     assert emitted[0]["event_type"] == R2ReservationEventType.CONFIRM_CALL_SENT
 
@@ -166,13 +160,9 @@ async def test_mark_confirmed_from_sent_emits_confirmed_event(
         reservation_id=reservation_id,
         channel=InvitationChannel.SMS,
     )
-    await service.mark_sent(
-        invitation_id=record.invitation_id, tenant_id=TENANT_A
-    )
+    await service.mark_sent(invitation_id=record.invitation_id, tenant_id=TENANT_A)
     emitted.clear()  # 清掉 INVITATION_SENT
-    await service.mark_confirmed(
-        invitation_id=record.invitation_id, tenant_id=TENANT_A
-    )
+    await service.mark_confirmed(invitation_id=record.invitation_id, tenant_id=TENANT_A)
     assert len(emitted) == 1
     ev = emitted[0]
     assert ev["event_type"] == R2ReservationEventType.CONFIRMED
@@ -191,9 +181,7 @@ async def test_invalid_transition_pending_to_confirmed_raises(
         channel=InvitationChannel.SMS,
     )
     with pytest.raises(InvalidInvitationTransitionError):
-        await service.mark_confirmed(
-            invitation_id=record.invitation_id, tenant_id=TENANT_A
-        )
+        await service.mark_confirmed(invitation_id=record.invitation_id, tenant_id=TENANT_A)
 
 
 @pytest.mark.asyncio
@@ -238,9 +226,7 @@ async def test_list_by_reservation_returns_all_channels(
         reservation_id=reservation_id,
         channel=InvitationChannel.WECHAT,
     )
-    items = await service.list_by_reservation(
-        tenant_id=TENANT_A, reservation_id=reservation_id
-    )
+    items = await service.list_by_reservation(tenant_id=TENANT_A, reservation_id=reservation_id)
     assert len(items) == 2
     channels = {i.channel for i in items}
     assert channels == {InvitationChannel.SMS, InvitationChannel.WECHAT}
@@ -269,9 +255,7 @@ async def test_rls_cross_tenant_invitation_isolation(
         await svc_b.get(invitation_id=record_a.invitation_id, tenant_id=TENANT_B)
 
     # B 租户 list 同一个 reservation_id → 返回空
-    items = await svc_b.list_by_reservation(
-        tenant_id=TENANT_B, reservation_id=reservation_id
-    )
+    items = await svc_b.list_by_reservation(tenant_id=TENANT_B, reservation_id=reservation_id)
     assert items == []
 
 

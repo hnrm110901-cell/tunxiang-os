@@ -418,7 +418,8 @@ class PatrolInspector:
 
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT platform,
                            SUM(total_mentions) as total,
                            SUM(negative_count) as negative,
@@ -428,7 +429,8 @@ class PatrolInspector:
                       AND stat_week >= (CURRENT_DATE - INTERVAL '28 days')::DATE
                     GROUP BY platform
                     ORDER BY negative DESC
-                """),
+                """
+                ),
                 {"tenant_id": tenant_id, "store_id": store_id},
             )
             rows = result.mappings().all()

@@ -108,7 +108,8 @@ async def edi_order_push(
         total_amount_fen = sum(int(item.qty * item.unit_price_fen) for item in body.items)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO edi_orders
                     (id, tenant_id, edi_no, po_id, supplier_id, supplier_name,
                      store_id, store_name, items, total_amount_fen,
@@ -117,7 +118,8 @@ async def edi_order_push(
                     (:id, :tenant_id, :edi_no, :po_id, :supplier_id, :supplier_name,
                      :store_id, :store_name, :items::jsonb, :total_amount_fen,
                      'pushed', NOW(), :notes)
-            """),
+            """
+            ),
             {
                 "id": edi_id,
                 "tenant_id": x_tenant_id,
@@ -136,12 +138,14 @@ async def edi_order_push(
 
         # 回读
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, edi_no, po_id, supplier_id, supplier_name,
                        store_id, store_name, items, total_amount_fen,
                        status, pushed_at, notes, created_at
                 FROM edi_orders WHERE id = :id
-            """),
+            """
+            ),
             {"id": edi_id},
         )
         row = dict(result.mappings().first())
@@ -174,11 +178,13 @@ async def edi_delivery_confirm(
     """供应商确认发货。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, edi_no, status, supplier_id
                 FROM edi_orders
                 WHERE id = :edi_order_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"edi_order_id": body.edi_order_id},
         )
         order = result.mappings().first()
@@ -220,12 +226,14 @@ async def edi_delivery_confirm(
         await db.commit()
 
         updated = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, edi_no, supplier_id, supplier_name, store_id, store_name,
                        items, total_amount_fen, status, pushed_at, shipped_at,
                        tracking_no, delivery_notes, updated_at
                 FROM edi_orders WHERE id = :edi_order_id
-            """),
+            """
+            ),
             {"edi_order_id": body.edi_order_id},
         )
         row = dict(updated.mappings().first())
@@ -256,11 +264,13 @@ async def edi_receive_confirm(
     """门店确认收货。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, edi_no, status, store_id
                 FROM edi_orders
                 WHERE id = :edi_order_id AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"edi_order_id": body.edi_order_id},
         )
         order = result.mappings().first()
@@ -297,12 +307,14 @@ async def edi_receive_confirm(
         await db.commit()
 
         updated = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, edi_no, supplier_id, supplier_name, store_id, store_name,
                        items, total_amount_fen, status, pushed_at, shipped_at,
                        received_at, tracking_no, receive_notes, updated_at
                 FROM edi_orders WHERE id = :edi_order_id
-            """),
+            """
+            ),
             {"edi_order_id": body.edi_order_id},
         )
         row = dict(updated.mappings().first())
@@ -352,7 +364,8 @@ async def edi_order_status(
         where_sql = " AND ".join(where_clauses)
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, edi_no, po_id, supplier_id, supplier_name,
                        store_id, store_name, items, total_amount_fen,
                        status, pushed_at, supplier_confirmed_at, shipped_at,
@@ -362,7 +375,8 @@ async def edi_order_status(
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = [dict(r) for r in result.mappings().all()]
@@ -375,13 +389,15 @@ async def edi_order_status(
 
         # 状态汇总
         summary_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT status, COUNT(*) AS cnt,
                        COALESCE(SUM(total_amount_fen), 0) AS amount_fen
                 FROM edi_orders
                 WHERE {where_sql}
                 GROUP BY status
-            """),
+            """
+            ),
             {k: v for k, v in params.items() if k not in ("limit", "offset")},
         )
         status_summary = [dict(r) for r in summary_result.mappings().all()]

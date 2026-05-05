@@ -18,7 +18,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import structlog
-from fastapi import APIRouter, Header, HTTPException, Path, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Path
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -100,12 +100,14 @@ async def create_store_template(
     template_id = uuid.uuid4()
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO store_config_templates
                 (id, tenant_id, name, description, source_store_id,
                  brand_id, business_type, config_snapshot, created_at)
             VALUES (:id, :tid, :name, :desc, :sid, :bid, :btype, :snap, :now)
-        """),
+        """
+        ),
         {
             "id": template_id,
             "tid": tenant_uuid,
@@ -145,13 +147,15 @@ async def list_store_templates(
     """列出当前租户所有门店配置模板"""
     tenant_uuid = uuid.UUID(x_tenant_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, source_store_id, brand_id,
                    business_type, config_snapshot, created_at, updated_at
             FROM store_config_templates
             WHERE tenant_id = :tid AND is_deleted = FALSE
             ORDER BY created_at DESC
-        """),
+        """
+        ),
         {"tid": tenant_uuid},
     )
     items = [
@@ -162,11 +166,7 @@ async def list_store_templates(
             "source_store_id": str(r.source_store_id),
             "brand_id": str(r.brand_id) if r.brand_id else None,
             "business_type": r.business_type,
-            "config_domains": (
-                list(r.config_snapshot.keys())
-                if isinstance(r.config_snapshot, dict)
-                else []
-            ),
+            "config_domains": (list(r.config_snapshot.keys()) if isinstance(r.config_snapshot, dict) else []),
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
         }
@@ -184,12 +184,14 @@ async def get_store_template(
     """获取模板完整配置快照"""
     tenant_uuid = uuid.UUID(x_tenant_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, source_store_id, brand_id,
                    business_type, config_snapshot, created_at, updated_at
             FROM store_config_templates
             WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"id": uuid.UUID(template_id), "tid": tenant_uuid},
     )
     r = result.fetchone()
@@ -205,8 +207,7 @@ async def get_store_template(
             "brand_id": str(r.brand_id) if r.brand_id else None,
             "business_type": r.business_type,
             "config_snapshot": (
-                r.config_snapshot if isinstance(r.config_snapshot, dict)
-                else json.loads(r.config_snapshot or "{}")
+                r.config_snapshot if isinstance(r.config_snapshot, dict) else json.loads(r.config_snapshot or "{}")
             ),
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "updated_at": r.updated_at.isoformat() if r.updated_at else None,
@@ -223,11 +224,13 @@ async def delete_store_template(
     """软删除模板"""
     tenant_uuid = uuid.UUID(x_tenant_id)
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE store_config_templates
             SET is_deleted = TRUE, updated_at = NOW()
             WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"id": uuid.UUID(template_id), "tid": tenant_uuid},
     )
     await db.commit()
@@ -262,11 +265,13 @@ async def apply_store_template(
 
     # 1. 读模板
     tmpl_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT config_snapshot, business_type, brand_id
             FROM store_config_templates
             WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"id": uuid.UUID(template_id), "tid": tenant_uuid},
     )
     tmpl = tmpl_result.fetchone()
@@ -274,9 +279,7 @@ async def apply_store_template(
         raise HTTPException(status_code=404, detail="模板不存在")
 
     snapshot = (
-        tmpl.config_snapshot
-        if isinstance(tmpl.config_snapshot, dict)
-        else json.loads(tmpl.config_snapshot or "{}")
+        tmpl.config_snapshot if isinstance(tmpl.config_snapshot, dict) else json.loads(tmpl.config_snapshot or "{}")
     )
 
     # 2. 创建门店
@@ -284,10 +287,12 @@ async def apply_store_template(
     store_code = f"S{uuid.uuid4().hex[:8].upper()}"
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO stores (id, tenant_id, store_name, store_code, address, brand_id, status)
             VALUES (:id, :tid, :name, :code, :addr, :bid, 'inactive')
-        """),
+        """
+        ),
         {
             "id": new_store_id,
             "tid": tenant_uuid,
@@ -299,9 +304,7 @@ async def apply_store_template(
     )
 
     # 3. 复制配置域
-    applied_domains = await _apply_config_snapshot(
-        db, tenant_uuid, new_store_id, snapshot, body
-    )
+    applied_domains = await _apply_config_snapshot(db, tenant_uuid, new_store_id, snapshot, body)
     await db.commit()
 
     logger.info(
@@ -401,12 +404,14 @@ async def _apply_config_snapshot(
     # tables
     for item in snapshot.get("tables", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO tables (id, store_id, table_no, area, floor, seats,
                                     min_consume_fen, sort_order, status, config)
                 VALUES (:id, :sid, :tno, :area, :floor, :seats,
                         :min_fen, :sort, 'free', :cfg::jsonb)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -425,10 +430,12 @@ async def _apply_config_snapshot(
     # production_depts
     for item in snapshot.get("production_depts", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO production_depts (id, store_id, dept_name, dept_code, sort_order)
                 VALUES (:id, :sid, :name, :code, :sort)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -443,11 +450,13 @@ async def _apply_config_snapshot(
     # receipt_templates
     for item in snapshot.get("receipt_templates", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO receipt_templates (id, store_id, template_type,
                     template_content, paper_width)
                 VALUES (:id, :sid, :type, :content, :width)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -462,11 +471,13 @@ async def _apply_config_snapshot(
     # attendance_rules — effective_from 重置为今天
     for item in snapshot.get("attendance_rules", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO attendance_rules (id, store_id, rule_name,
                     grace_minutes, deduction_rule, clock_method, effective_from)
                 VALUES (:id, :sid, :name, :grace, :deduct, :clock, CURRENT_DATE)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -482,11 +493,13 @@ async def _apply_config_snapshot(
     # shift_configs
     for item in snapshot.get("shift_configs", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO shift_configs (id, store_id, shift_name,
                     start_time, end_time, color)
                 VALUES (:id, :sid, :name, :start, :end, :color)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -502,11 +515,13 @@ async def _apply_config_snapshot(
     # dispatch_rules — target_printer_id 设为 NULL（每店打印机不同）
     for item in snapshot.get("dispatch_rules", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dispatch_rules (id, store_id, match_dish_id,
                     match_dish_category, match_channel, dept_id, priority)
                 VALUES (:id, :sid, :dish, :cat, :channel, :dept, :priority)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -523,10 +538,12 @@ async def _apply_config_snapshot(
     # store_push_configs
     for item in snapshot.get("store_push_configs", []):
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_push_configs (id, store_id, push_mode)
                 VALUES (:id, :sid, :mode)
-            """),
+            """
+            ),
             {
                 "id": uuid.uuid4(),
                 "sid": new_store_id,
@@ -542,7 +559,7 @@ async def _apply_config_snapshot(
 def _row_to_dict(row) -> Dict[str, Any]:
     """将 SQLAlchemy Row 转为 dict，排除内部字段"""
     result = {}
-    for key in row._mapping.keys():
+    for key in row._mapping:
         if key.startswith("_"):
             continue
         val = row._mapping[key]

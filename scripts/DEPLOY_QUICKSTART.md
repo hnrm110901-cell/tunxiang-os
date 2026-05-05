@@ -117,7 +117,7 @@ export ALERT_WEBHOOK="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=YOUR_
 make logs-staging
 
 # 查看特定服务日志
-docker-compose -f docker-compose.staging.yml logs stg-gateway --tail=50
+docker compose -f infra/compose/base.yml -f infra/compose/envs/staging.yml logs stg-gateway --tail=50
 
 # 监控告警日志
 tail -20 logs/monitor-alerts.log

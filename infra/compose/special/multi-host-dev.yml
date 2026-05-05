@@ -1,0 +1,155 @@
+# ============================================================
+# 屯象OS 同机联调端口偏移层 — multi-host-dev
+# ============================================================
+# ⚠️ **仅 dev / 联调使用，生产部署不要叠加** ⚠️
+#
+# 设计意图
+# --------
+# 生产场景下三个商户（czyz / zqx / sgc）各自在独立 VM/服务器
+# 部署，端口走默认 8000/5432/6379 等，docker-network 内部直连，
+# 外部访问由各 VM 的 nginx/反代自配 —— **不需要任何端口偏移**。
+#
+# 但开发者本地需要"同时拉起多家"做联调时，三套 docker compose
+# 会去抢同一台机器上的 8000/5432/6379，必然冲突。本文件是为这
+# 一**少数场景**单独提供的端口暴露层：
+#
+#   1. 把 base.yml 中所有"容器内默认端口"暴露成主机端口；
+#   2. 主机端口走 ${SERVICE_HOST_PORT:-默认} 全量变量，开发者通过
+#      `.env.<tenant>.dev.example` source 一组偏移即可。
+#
+# 用法
+# ----
+# 第一家（默认偏移 0，例如 czyz）：
+#   set -a && source .env.czyz.dev.example && set +a
+#   docker compose \
+#     -f infra/compose/base.yml \
+#     -f infra/compose/envs/dev.yml \
+#     -f infra/compose/tenants/czyz.yml \
+#     -f infra/compose/special/multi-host-dev.yml up -d
+#
+# 第二家（偏移 +100，例如 zqx）：
+#   set -a && source .env.zqx.dev.example && set +a
+#   docker compose \
+#     -f infra/compose/base.yml \
+#     -f infra/compose/envs/dev.yml \
+#     -f infra/compose/tenants/zqx.yml \
+#     -f infra/compose/special/multi-host-dev.yml up -d
+#
+# 第三家（偏移 +200，例如 sgc）：参考 .env.sgc.dev.example
+#
+# 注意
+# ----
+# - docker compose 的 ports 字段不直接支持算术（`+100` 那种），
+#   所以本层用全量变量名（如 GATEWAY_HOST_PORT）让 .env 直接给值。
+# - 只暴露开发者经常要从浏览器/curl 直接打的服务，剩下的服务（
+#   tx-* 业务服务）在 dev.yml 已自带 host 端口暴露，本层补上的是
+#   **覆盖偏移**（ports !override 替换 dev.yml 里的硬编码值）。
+# - 对应租户的 VITE_API_BASE_URL 也用变量化，让前端打到对的网关。
+# ============================================================
+
+services:
+  postgres:
+    ports: !override
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+
+  redis:
+    ports: !override
+      - "${REDIS_HOST_PORT:-6379}:6379"
+
+  gateway:
+    ports: !override
+      - "${GATEWAY_HOST_PORT:-8000}:8000"
+
+  tx-trade:
+    ports: !override
+      - "${TX_TRADE_HOST_PORT:-8001}:8001"
+
+  tx-menu:
+    ports: !override
+      - "${TX_MENU_HOST_PORT:-8002}:8002"
+
+  tx-member:
+    ports: !override
+      - "${TX_MEMBER_HOST_PORT:-8003}:8003"
+
+  tx-growth:
+    ports: !override
+      - "${TX_GROWTH_HOST_PORT:-8004}:8004"
+
+  tx-ops:
+    ports: !override
+      - "${TX_OPS_HOST_PORT:-8005}:8005"
+
+  tx-supply:
+    ports: !override
+      - "${TX_SUPPLY_HOST_PORT:-8006}:8006"
+
+  tx-finance:
+    ports: !override
+      - "${TX_FINANCE_HOST_PORT:-8007}:8007"
+
+  tx-agent:
+    ports: !override
+      - "${TX_AGENT_HOST_PORT:-8008}:8008"
+
+  tx-analytics:
+    ports: !override
+      - "${TX_ANALYTICS_HOST_PORT:-8009}:8009"
+
+  tx-brain:
+    ports: !override
+      - "${TX_BRAIN_HOST_PORT:-8010}:8010"
+
+  tx-intel:
+    ports: !override
+      - "${TX_INTEL_HOST_PORT:-8011}:8011"
+
+  tx-org:
+    ports: !override
+      - "${TX_ORG_HOST_PORT:-8012}:8012"
+
+  tunxiang-api:
+    ports: !override
+      - "${TUNXIANG_API_HOST_PORT:-8013}:8013"
+
+  tx-civic:
+    ports: !override
+      - "${TX_CIVIC_HOST_PORT:-8014}:8014"
+
+  tx-expense:
+    ports: !override
+      - "${TX_EXPENSE_HOST_PORT:-8015}:8015"
+
+  tx-pay:
+    ports: !override
+      - "${TX_PAY_HOST_PORT:-8016}:8016"
+
+  tx-devforge:
+    ports: !override
+      - "${TX_DEVFORGE_HOST_PORT:-8017}:8017"
+
+  mcp-server:
+    ports: !override
+      - "${MCP_SERVER_HOST_PORT:-8018}:8018"
+
+  tx-predict:
+    ports: !override
+      - "${TX_PREDICT_HOST_PORT:-8019}:8019"
+
+  web-admin:
+    ports: !override
+      - "${WEB_ADMIN_HOST_PORT:-5173}:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8000}
+
+  web-pos:
+    ports: !override
+      - "${WEB_POS_HOST_PORT:-5174}:5174"
+    environment:
+      VITE_API_BASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8000}
+
+  web-kds:
+    ports: !override
+      - "${WEB_KDS_HOST_PORT:-5175}:5175"
+    environment:
+      VITE_API_BASE_URL: http://localhost:${GATEWAY_HOST_PORT:-8000}

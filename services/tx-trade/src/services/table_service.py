@@ -7,7 +7,7 @@ Integrates context resolver and learning engine.
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -160,7 +160,8 @@ class TableCardService:
 
             # Fetch tables with optional active dining session guest_count
             result = await self.db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         t.id, t.table_no, t.area, t.seats, t.status,
                         t.config, t.updated_at,
@@ -178,7 +179,8 @@ class TableCardService:
                     WHERE {where_clause}
                     ORDER BY t.area, t.table_no
                     LIMIT :limit OFFSET :offset
-                """),
+                """
+                ),
                 {**params, "limit": filters.limit, "offset": filters.offset},
             )
             rows = result.mappings().all()
@@ -214,7 +216,7 @@ class TableCardService:
                 tables.append(card)
 
             # Derive meal period from current UTC hour (simple heuristic)
-            hour = datetime.utcnow().hour
+            hour = datetime.now(timezone.utc).hour
             if hour < 11:
                 meal_period = "breakfast"
             elif hour < 14:
@@ -263,14 +265,16 @@ class TableCardService:
         try:
             # Fetch table row
             table_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, table_no, area, seats, status, config, updated_at
                     FROM tables
                     WHERE id        = :table_id
                       AND store_id  = :store_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"table_id": table_id, "store_id": store_id, "tenant_id": tenant_id},
             )
             row = table_result.mappings().one_or_none()
@@ -293,7 +297,8 @@ class TableCardService:
 
             # Fetch current active dining session + aggregate order summary
             session_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         ds.id              AS session_id,
                         ds.guest_count,
@@ -313,7 +318,8 @@ class TableCardService:
                       AND ds.status NOT IN ('paid', 'clearing', 'disabled')
                     ORDER BY ds.opened_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"table_id": table_id, "tenant_id": tenant_id},
             )
             session_row = session_result.mappings().one_or_none()
@@ -365,7 +371,8 @@ class TableCardService:
         """
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE tables
                     SET status     = :new_status,
                         updated_at = NOW()
@@ -373,7 +380,8 @@ class TableCardService:
                       AND store_id  = :store_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "new_status": new_status,
                     "table_id": table_id,
@@ -417,14 +425,16 @@ class TableCardService:
         """
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT status, COUNT(*) AS cnt
                     FROM tables
                     WHERE store_id  = :store_id
                       AND is_active  = TRUE
                       AND is_deleted = FALSE
                     GROUP BY status
-                """),
+                """
+                ),
                 {"store_id": store_id},
             )
             rows = result.mappings().all()
@@ -510,7 +520,8 @@ class TableCardService:
         """
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT area, status, COUNT(*) AS cnt
                     FROM tables
                     WHERE store_id  = :store_id
@@ -518,7 +529,8 @@ class TableCardService:
                       AND is_deleted = FALSE
                     GROUP BY area, status
                     ORDER BY area, status
-                """),
+                """
+                ),
                 {"store_id": store_id},
             )
             rows = result.mappings().all()
@@ -577,7 +589,8 @@ class TableCardService:
         try:
             search_pattern = f"%{query}%"
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, table_no, area, seats, status, config, updated_at
                     FROM tables
                     WHERE store_id  = :store_id
@@ -590,7 +603,8 @@ class TableCardService:
                       )
                     ORDER BY area, table_no
                     LIMIT 50
-                """),
+                """
+                ),
                 {
                     "store_id": store_id,
                     "tenant_id": tenant_id,
@@ -649,7 +663,7 @@ class TableCardService:
                 import json
 
                 data = {
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
                     "store_id": store_id,
                     "statistics": response.summary.model_dump(),
                     "tables": [t.model_dump() for t in response.tables],

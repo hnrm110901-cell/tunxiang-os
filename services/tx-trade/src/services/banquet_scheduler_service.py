@@ -25,7 +25,8 @@ class BanquetSchedulerService:
         """生成/更新当日调度"""
         # 获取当日所有宴会
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT b.id, b.banquet_no, b.event_name, b.event_type, b.time_slot,
                        b.guest_count, b.table_count, b.venue_id, b.status,
                        bv.venue_name
@@ -34,7 +35,8 @@ class BanquetSchedulerService:
                 WHERE b.store_id = :sid AND b.event_date = :d AND b.tenant_id = :tid
                   AND b.status IN ('confirmed','preparing','ready','in_progress') AND b.is_deleted = FALSE
                 ORDER BY b.time_slot, b.created_at
-            """),
+            """
+            ),
             {"sid": store_id, "d": schedule_date, "tid": self.tenant_id},
         )
         banquets = rows.mappings().all()
@@ -70,11 +72,13 @@ class BanquetSchedulerService:
 
         # 厨房负载(从产能表获取)
         cap_rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT time_slot, current_load_dishes, available_capacity_dishes
                 FROM kitchen_capacity_slots
                 WHERE store_id = :sid AND slot_date = :d AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "d": schedule_date, "tid": self.tenant_id},
         )
         kitchen_load = {}
@@ -88,7 +92,8 @@ class BanquetSchedulerService:
         # Upsert
         schedule_id = str(uuid.uuid4())
         await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO banquet_day_schedules
                     (id, tenant_id, store_id, schedule_date, banquet_ids, banquet_count,
                      total_guests, total_tables, venue_allocation_json,
@@ -107,7 +112,8 @@ class BanquetSchedulerService:
                     kitchen_load_json = EXCLUDED.kitchen_load_json,
                     updated_at = NOW()
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "id": schedule_id,
                 "tid": self.tenant_id,
@@ -168,10 +174,12 @@ class BanquetSchedulerService:
         """确认调度"""
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_day_schedules SET status = 'confirmed', confirmed_by = :by, confirmed_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid AND status = 'planned' AND is_deleted = FALSE RETURNING id
-            """),
+            """
+            ),
             {"id": schedule_id, "tid": self.tenant_id, "by": confirmed_by, "now": now},
         )
         if not result.mappings().first():
@@ -244,13 +252,15 @@ class BanquetSchedulerService:
     async def list_schedules(self, store_id: str, date_from: date, date_to: date) -> list:
         """列出调度"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, schedule_date, banquet_count, total_guests, total_tables, status
                 FROM banquet_day_schedules
                 WHERE store_id = :sid AND tenant_id = :tid AND is_deleted = FALSE
                   AND schedule_date BETWEEN :df AND :dt
                 ORDER BY schedule_date
-            """),
+            """
+            ),
             {"sid": store_id, "tid": self.tenant_id, "df": date_from, "dt": date_to},
         )
         return [dict(r) for r in rows.mappings().all()]

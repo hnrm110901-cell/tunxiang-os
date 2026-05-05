@@ -111,7 +111,8 @@ async def list_coupons(
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id::TEXT            AS coupon_id,
                     name,
@@ -133,7 +134,8 @@ async def list_coupons(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = []
@@ -149,13 +151,15 @@ async def list_coupons(
 
         # Summary stats
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) FILTER (WHERE is_active = true AND is_deleted = false)  AS total_active,
                     COALESCE(SUM(claimed_count) FILTER (WHERE is_deleted = false), 0) AS total_issued
                 FROM coupons
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
-            """),
+            """
+            ),
         )
         summary_row = summary_result.mappings().first()
         summary = {
@@ -204,7 +208,8 @@ async def create_coupon(
         coupon_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO coupons (
                     id, tenant_id, name, coupon_type,
                     min_order_fen, cash_amount_fen, discount_rate,
@@ -218,7 +223,8 @@ async def create_coupon(
                     :applicable_scope, :applicable_ids::jsonb,
                     :description, true, :created_at, :created_at
                 )
-            """),
+            """
+            ),
             {
                 "id": coupon_id,
                 "tenant_id": str(tenant_id),
@@ -293,7 +299,8 @@ async def list_stored_value_plans(
         where_clause = " AND ".join(filters)
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id::TEXT                AS plan_id,
                     name,
@@ -312,19 +319,22 @@ async def list_stored_value_plans(
                 FROM stored_value_recharge_plans
                 WHERE {where_clause}
                 ORDER BY sort_order ASC, recharge_amount_fen ASC
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows_result.mappings()]
 
         # Summary totals
         summary_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS total_plans
                 FROM stored_value_recharge_plans
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
                   AND is_deleted = false
-            """),
+            """
+            ),
         )
         summary_row = summary_result.mappings().first()
         total_plans = summary_row["total_plans"] if summary_row else 0
@@ -390,7 +400,8 @@ async def list_gift_cards(
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     id::TEXT            AS card_id,
                     name,
@@ -406,7 +417,8 @@ async def list_gift_cards(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = []
@@ -452,7 +464,8 @@ async def get_points_config(
     try:
         # Fetch earn rules from points_rules
         earn_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     rule_name       AS action,
                     earn_type,
@@ -464,7 +477,8 @@ async def get_points_config(
                   AND is_active = true
                   AND is_deleted = false
                 ORDER BY earn_type
-            """),
+            """
+            ),
         )
         earn_rows = list(earn_result.mappings())
 
@@ -489,7 +503,8 @@ async def get_points_config(
 
         # Fetch tier multipliers from member_level_configs
         tier_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     level_name,
                     birthday_bonus_multiplier AS multiplier
@@ -498,19 +513,22 @@ async def get_points_config(
                   AND is_active = true
                   AND is_deleted = false
                 ORDER BY sort_order ASC
-            """),
+            """
+            ),
         )
         tier_rows = list(tier_result.mappings())
         tier_multiplier = [{"tier": r["level_name"], "multiplier": float(r["multiplier"])} for r in tier_rows]
 
         # Aggregate points balance stats
         stats_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(points), 0) AS total_points_balance
                 FROM member_points_balance
                 WHERE tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid
-            """),
+            """
+            ),
         )
         stats_row = stats_result.mappings().first()
         total_balance = int(stats_row["total_points_balance"]) if stats_row else 0

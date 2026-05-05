@@ -127,7 +127,8 @@ async def list_regions(
             count_result = await db.execute(text(f"SELECT COUNT(*) FROM regions r WHERE {where}"), params)
             total = count_result.scalar() or 0
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 r.id::text AS region_id,
                 r.parent_id::text AS parent_id,
@@ -157,7 +158,8 @@ async def list_regions(
             WHERE {where}
             ORDER BY r.level ASC, r.name ASC
             {"LIMIT :limit OFFSET :offset" if not tree else ""}
-        """)
+        """
+        )
         result = await db.execute(sql, params)
         flat_rows = []
         for row in result.fetchall():
@@ -196,7 +198,8 @@ async def get_region_detail(
     try:
         await _set_tenant(db, tenant_id)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 r.id::text AS region_id,
                 r.parent_id::text,
@@ -226,7 +229,8 @@ async def get_region_detail(
             WHERE r.id = :region_id
               AND r.tenant_id = :tenant_id
               AND r.is_active = TRUE
-        """)
+        """
+        )
         result = await db.execute(sql, {"region_id": region_id, "tenant_id": tenant_id})
         row = result.fetchone()
 
@@ -283,7 +287,8 @@ async def create_region(
     region_id = str(uuid.uuid4())
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO regions (
             id, tenant_id, parent_id, name, region_code,
             level, brand_id, manager_id, tax_rate,
@@ -294,7 +299,8 @@ async def create_region(
             :freight_template, TRUE, :now, :now
         )
         RETURNING id::text AS region_id, name, level
-    """)
+    """
+    )
 
     result = await db.execute(
         sql,
@@ -410,7 +416,8 @@ async def get_region_stores(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text AS store_id,
                     name AS store_name,
@@ -421,7 +428,8 @@ async def get_region_stores(
                 WHERE region_id = :rid AND is_deleted = FALSE
                 ORDER BY name ASC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"rid": region_id, "limit": size, "offset": (page - 1) * size},
         )
         items = []
@@ -472,7 +480,8 @@ async def get_region_performance(
             date_filter += " AND DATE(o.created_at) <= :date_to"
             params["date_to"] = date_to
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 s.id::text AS store_id,
                 s.name AS store_name,
@@ -488,7 +497,8 @@ async def get_region_performance(
             WHERE s.region_id = :rid AND s.is_deleted = FALSE
             GROUP BY s.id, s.name
             ORDER BY total_revenue_fen DESC
-        """)
+        """
+        )
         result = await db.execute(sql, params)
         store_stats = []
         total_revenue_fen = 0
@@ -548,11 +558,13 @@ async def update_region_tax_rate(
     region_name = row._mapping["name"]
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE regions
             SET tax_rate = :tax_rate, updated_at = :now
             WHERE id = :rid AND is_active = TRUE
-        """),
+        """
+        ),
         {
             "rid": region_id,
             "tax_rate": str(req.tax_rate),

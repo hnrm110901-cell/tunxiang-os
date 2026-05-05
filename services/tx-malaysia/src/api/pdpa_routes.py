@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.pdpa_service import PDPAService
 
@@ -51,7 +52,7 @@ class PDPARequestCreate(BaseModel):
     )
     request_data: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="请求附加数据（correction 需提供 corrections 字典: {\"corrections\": {\"field\": \"value\"}}）",
+        description='请求附加数据（correction 需提供 corrections 字典: {"corrections": {"field": "value"}}）',
     )
     notes: Optional[str] = Field(default=None, max_length=500, description="备注")
 
@@ -134,7 +135,7 @@ async def submit_pdpa_request(
         )
         return PDPARequestResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/request/{request_id}", response_model=PDPARequestResponse)
@@ -168,7 +169,7 @@ async def approve_pdpa_request(
         )
         return PDPARequestResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 class RejectRequest(BaseModel):
@@ -191,7 +192,7 @@ async def reject_pdpa_request(
         )
         return PDPARequestResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/requests")
@@ -215,7 +216,7 @@ async def list_pdpa_requests(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/consent", response_model=PDPAConsentResponse)
@@ -244,7 +245,7 @@ async def record_consent(
         )
         return PDPAConsentResponse(**result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/consent/{customer_id}")
@@ -258,7 +259,7 @@ async def get_consent_history(
         result = await service.get_consent_history(customer_id=customer_id)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/retention/report")
@@ -277,4 +278,4 @@ async def retention_report(
         result = await service.check_data_retention(retention_days=retention_days)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc

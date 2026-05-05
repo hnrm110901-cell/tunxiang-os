@@ -155,9 +155,7 @@ async def create_zone(
         )
         await db.flush()
     except IntegrityError as exc:
-        raise DuplicateCodeError(
-            f"zone_code={body.zone_code} 在 store {body.store_id} 已存在"
-        ) from exc
+        raise DuplicateCodeError(f"zone_code={body.zone_code} 在 store {body.store_id} 已存在") from exc
 
     logger.info(
         "warehouse_zone_created",
@@ -251,7 +249,7 @@ async def update_zone(
         text(
             f"""
             UPDATE warehouse_zones
-               SET {', '.join(sets)}
+               SET {", ".join(sets)}
              WHERE id = :id::uuid AND is_deleted = FALSE
             RETURNING id
             """
@@ -279,10 +277,7 @@ async def create_location(
 
     # 校验 zone 存在 + 同租户/门店
     zone_check = await db.execute(
-        text(
-            "SELECT store_id FROM warehouse_zones "
-            "WHERE id = :zone_id::uuid AND is_deleted = FALSE"
-        ),
+        text("SELECT store_id FROM warehouse_zones WHERE id = :zone_id::uuid AND is_deleted = FALSE"),
         {"zone_id": body.zone_id},
     )
     zone_row = zone_check.mappings().one_or_none()
@@ -290,8 +285,7 @@ async def create_location(
         raise ZoneNotFoundError(f"zone {body.zone_id} 不存在")
     if str(zone_row["store_id"]) != str(body.store_id):
         raise WarehouseLocationError(
-            f"zone {body.zone_id} 隶属门店 {zone_row['store_id']}, "
-            f"不可在门店 {body.store_id} 下创建库位"
+            f"zone {body.zone_id} 隶属门店 {zone_row['store_id']}, 不可在门店 {body.store_id} 下创建库位"
         )
 
     new_id = uuid.uuid4()
@@ -324,9 +318,7 @@ async def create_location(
         )
         await db.flush()
     except IntegrityError as exc:
-        raise DuplicateCodeError(
-            f"location_code={body.location_code} 在 store {body.store_id} 已存在"
-        ) from exc
+        raise DuplicateCodeError(f"location_code={body.location_code} 在 store {body.store_id} 已存在") from exc
 
     logger.info(
         "warehouse_location_created",
@@ -392,7 +384,7 @@ async def list_locations(
                    aisle, rack, shelf, abc_class, max_capacity_units, enabled,
                    created_at, updated_at
               FROM warehouse_locations
-             WHERE {' AND '.join(where_parts)}
+             WHERE {" AND ".join(where_parts)}
              ORDER BY location_code ASC
             """
         ),
@@ -572,8 +564,7 @@ async def auto_allocate_location(
             if allowed is not None:
                 if TemperatureType(primary_row["temperature_type"]) not in allowed:
                     raise TemperatureMismatchError(
-                        f"主库位温区 {primary_row['temperature_type']} 与食材类目 "
-                        f"{body.ingredient_category} 不兼容"
+                        f"主库位温区 {primary_row['temperature_type']} 与食材类目 {body.ingredient_category} 不兼容"
                     )
         candidate = _row_to_dict(primary_row)
 
@@ -581,14 +572,11 @@ async def auto_allocate_location(
     if candidate is None:
         if not body.ingredient_category:
             raise WarehouseLocationError(
-                f"食材 {body.ingredient_id} 无主库位绑定，"
-                f"且未提供 ingredient_category 无法自动匹配"
+                f"食材 {body.ingredient_id} 无主库位绑定，且未提供 ingredient_category 无法自动匹配"
             )
         allowed = CATEGORY_TO_TEMPERATURE_TYPES.get(body.ingredient_category)
         if not allowed:
-            raise TemperatureMismatchError(
-                f"未知食材类目 {body.ingredient_category}，无温区映射"
-            )
+            raise TemperatureMismatchError(f"未知食材类目 {body.ingredient_category}，无温区映射")
         allowed_values = [t.value for t in allowed]
 
         # ABC 排序：A=1, B=2, C=3, NULL=4
@@ -619,9 +607,7 @@ async def auto_allocate_location(
         )
         rows = result.mappings().all()
         if not rows:
-            raise LocationNotFoundError(
-                f"店 {body.store_id} 内无可用 {allowed_values} 温区库位"
-            )
+            raise LocationNotFoundError(f"店 {body.store_id} 内无可用 {allowed_values} 温区库位")
 
         # 容量过滤：max_capacity_units 为 NULL 视为无限
         for r in rows:
@@ -632,9 +618,7 @@ async def auto_allocate_location(
                 break
 
         if candidate is None:
-            raise LocationCapacityExceededError(
-                f"店 {body.store_id} 内 {allowed_values} 温区所有库位容量已满"
-            )
+            raise LocationCapacityExceededError(f"店 {body.store_id} 内 {allowed_values} 温区所有库位容量已满")
 
     # ── 3. 写入 inventory_by_location ──
     location_id = candidate["id"]
@@ -732,30 +716,22 @@ async def move_between_locations(
     src_row = src_result.mappings().one_or_none()
     if src_row is None:
         raise InsufficientInventoryError(
-            f"源库位 {body.from_location_id} 无 ingredient={body.ingredient_id} "
-            f"batch={batch_no} 库存"
+            f"源库位 {body.from_location_id} 无 ingredient={body.ingredient_id} batch={batch_no} 库存"
         )
     src_qty = Decimal(src_row["quantity"])
     if src_qty < body.quantity:
-        raise InsufficientInventoryError(
-            f"源库位库存 {src_qty} 不足以转移 {body.quantity}"
-        )
+        raise InsufficientInventoryError(f"源库位库存 {src_qty} 不足以转移 {body.quantity}")
 
     # ── 2. 目标库位 store_id 与源一致 ──
     tgt_loc_result = await db.execute(
-        text(
-            "SELECT store_id FROM warehouse_locations "
-            "WHERE id = :id::uuid AND is_deleted = FALSE"
-        ),
+        text("SELECT store_id FROM warehouse_locations WHERE id = :id::uuid AND is_deleted = FALSE"),
         {"id": body.to_location_id},
     )
     tgt_loc_row = tgt_loc_result.mappings().one_or_none()
     if tgt_loc_row is None:
         raise LocationNotFoundError(f"目标库位 {body.to_location_id} 不存在")
     if str(tgt_loc_row["store_id"]) != str(src_row["store_id"]):
-        raise WarehouseLocationError(
-            "源/目标库位不在同一门店，请使用门店间调拨"
-        )
+        raise WarehouseLocationError("源/目标库位不在同一门店，请使用门店间调拨")
 
     # ── 3. 扣减源 ──
     await db.execute(
@@ -877,7 +853,7 @@ async def query_inventory_by_location(
               FROM inventory_by_location ibl
               JOIN warehouse_locations l ON ibl.location_id = l.id
               JOIN warehouse_zones z ON l.zone_id = z.id
-             WHERE {' AND '.join(where)}
+             WHERE {" AND ".join(where)}
              ORDER BY z.zone_code, l.location_code, ibl.batch_no
             """
         ),
@@ -1014,9 +990,7 @@ async def suggest_abc_optimization(
         }
 
     # 排序
-    sorted_turnover = sorted(
-        turnover_rows, key=lambda r: r["turn_count"] or 0, reverse=True
-    )
+    sorted_turnover = sorted(turnover_rows, key=lambda r: r["turn_count"] or 0, reverse=True)
     n = len(sorted_turnover)
     a_cutoff = max(1, int(n * 0.2))
     b_cutoff = max(a_cutoff + 1, int(n * 0.5))
@@ -1058,9 +1032,7 @@ async def suggest_abc_optimization(
                     "current_abc": current_abc,
                     "suggested_abc": suggested,
                     "current_location_id": str(cur_row["loc_id"]) if cur_row else None,
-                    "current_location_code": cur_row["location_code"]
-                    if cur_row
-                    else None,
+                    "current_location_code": cur_row["location_code"] if cur_row else None,
                 }
             )
 

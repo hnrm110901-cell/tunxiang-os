@@ -28,14 +28,16 @@ async def compute_metrics(
     """计算今日生态健康指标."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.ecosystem_metrics
+        text(
+            """INSERT INTO forge.ecosystem_metrics
                 (tenant_id, metric_date, isv_active_rate, product_quality_score,
                  install_density, outcome_conversion_rate, token_efficiency,
                  developer_nps, tthw_minutes, ecosystem_gmv_fen, composite_score)
                 VALUES (:tid, CURRENT_DATE, 0, 0, 0, 0, 0, 0, 0, 0, 0)
                 ON CONFLICT (tenant_id, metric_date) DO UPDATE
                 SET updated_at = NOW()
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {"tid": x_tenant_id},
     )
     await db.commit()
@@ -54,10 +56,12 @@ async def get_metrics(
     """获取指标历史."""
     await _set_tenant(db, x_tenant_id)
     rows = await db.execute(
-        text("""SELECT * FROM forge.ecosystem_metrics
+        text(
+            """SELECT * FROM forge.ecosystem_metrics
                 WHERE tenant_id = :tid
                   AND metric_date >= CURRENT_DATE - :days * INTERVAL '1 day'
-                ORDER BY metric_date DESC"""),
+                ORDER BY metric_date DESC"""
+        ),
         {"tid": x_tenant_id, "days": days},
     )
     return {"items": [dict(r) for r in rows.mappings().all()]}
@@ -76,19 +80,23 @@ async def get_flywheel(
 
     # 最新指标
     current_row = await db.execute(
-        text("""SELECT * FROM forge.ecosystem_metrics
+        text(
+            """SELECT * FROM forge.ecosystem_metrics
                 WHERE tenant_id = :tid
-                ORDER BY metric_date DESC LIMIT 1"""),
+                ORDER BY metric_date DESC LIMIT 1"""
+        ),
         {"tid": x_tenant_id},
     )
     current = current_row.mappings().first()
 
     # 30天前指标
     prev_row = await db.execute(
-        text("""SELECT * FROM forge.ecosystem_metrics
+        text(
+            """SELECT * FROM forge.ecosystem_metrics
                 WHERE tenant_id = :tid
                   AND metric_date <= CURRENT_DATE - INTERVAL '30 days'
-                ORDER BY metric_date DESC LIMIT 1"""),
+                ORDER BY metric_date DESC LIMIT 1"""
+        ),
         {"tid": x_tenant_id},
     )
     previous = prev_row.mappings().first()

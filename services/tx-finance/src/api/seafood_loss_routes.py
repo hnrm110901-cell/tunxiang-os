@@ -106,7 +106,8 @@ async def record_seafood_loss(
 
     # 写入 cost_items 表
     result = await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO cost_items
             (tenant_id, store_id, cost_date, cost_type, reference_id,
              description, amount_fen, quantity, unit, unit_cost_fen)
@@ -116,7 +117,8 @@ async def record_seafood_loss(
              :dish_id::UUID,
              :description, :amount_fen, :quantity, :unit, :unit_cost_fen)
             RETURNING id
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -182,7 +184,8 @@ async def get_seafood_loss_records(
     offset = (page - 1) * size
 
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*)
             FROM cost_items
             WHERE tenant_id = :tenant_id::UUID
@@ -190,7 +193,8 @@ async def get_seafood_loss_records(
               AND cost_date = :cost_date
               AND cost_type = 'live_seafood_death'
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -200,7 +204,8 @@ async def get_seafood_loss_records(
     total = count_result.scalar()
 
     items_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 ci.id,
                 ci.cost_date,
@@ -221,7 +226,8 @@ async def get_seafood_loss_records(
               AND ci.is_deleted = FALSE
             ORDER BY ci.created_at DESC
             LIMIT :size OFFSET :offset
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -291,7 +297,8 @@ async def get_seafood_loss_analysis(
 
     # 每日损耗趋势
     daily_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 ci.cost_date,
                 SUM(ci.amount_fen) AS loss_fen,
@@ -304,7 +311,8 @@ async def get_seafood_loss_analysis(
               AND ci.is_deleted = FALSE
             GROUP BY ci.cost_date
             ORDER BY ci.cost_date ASC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -325,7 +333,8 @@ async def get_seafood_loss_analysis(
 
     # 菜品损耗 TOP10
     dish_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 ci.reference_id AS dish_id,
                 COALESCE(d.name, '未知菜品') AS dish_name,
@@ -343,7 +352,8 @@ async def get_seafood_loss_analysis(
             GROUP BY ci.reference_id, d.name, ci.unit
             ORDER BY total_loss_fen DESC
             LIMIT 10
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -369,7 +379,8 @@ async def get_seafood_loss_analysis(
 
     # 损耗占食材成本比率（从 daily_pnl 表关联）
     ratio_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 dp.pnl_date,
                 dp.food_cost_fen,
@@ -390,7 +401,8 @@ async def get_seafood_loss_analysis(
               AND dp.pnl_date BETWEEN :start_date AND :end_date
               AND dp.is_deleted = FALSE
             ORDER BY dp.pnl_date ASC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),

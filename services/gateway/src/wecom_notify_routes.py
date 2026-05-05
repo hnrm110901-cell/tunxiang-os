@@ -23,6 +23,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
+from shared.security.src.error_handler import safe_http_exception
+
 from .external_sdk import WecomAPIError, WecomConfig, WecomSDK
 from .response import ok
 
@@ -124,19 +126,13 @@ async def create_wecom_group(
         )
     except WecomAPIError as exc:
         log.error("wecom_create_group_api_error", errcode=exc.errcode, errmsg=exc.errmsg)
-        raise HTTPException(
-            status_code=400,
-            detail=f"企微 API 错误 {exc.errcode}: {exc.errmsg}",
-        ) from exc
+        raise safe_http_exception(400, "企微 API 调用失败", exc) from exc
     except httpx.HTTPStatusError as exc:
         log.error("wecom_create_group_http_error", status=exc.response.status_code)
-        raise HTTPException(
-            status_code=502,
-            detail=f"企微接口 HTTP {exc.response.status_code}",
-        ) from exc
+        raise safe_http_exception(502, "上游服务不可用", exc) from exc
     except httpx.RequestError as exc:
         log.error("wecom_create_group_request_error", error=str(exc))
-        raise HTTPException(status_code=503, detail=f"企微接口请求失败: {exc}") from exc
+        raise safe_http_exception(503, "企微接口请求失败", exc) from exc
 
     chatid: str = result.get("chatid", "")
     log.info("wecom_create_group_ok", chatid=chatid)
@@ -248,19 +244,13 @@ async def send_group_message(
         )
     except WecomAPIError as exc:
         log.error("wecom_send_group_message_api_error", errcode=exc.errcode, errmsg=exc.errmsg)
-        raise HTTPException(
-            status_code=400,
-            detail=f"企微 API 错误 {exc.errcode}: {exc.errmsg}",
-        ) from exc
+        raise safe_http_exception(400, "企微 API 调用失败", exc) from exc
     except httpx.HTTPStatusError as exc:
         log.error("wecom_send_group_message_http_error", status=exc.response.status_code)
-        raise HTTPException(
-            status_code=502,
-            detail=f"企微接口 HTTP {exc.response.status_code}",
-        ) from exc
+        raise safe_http_exception(502, "上游服务不可用", exc) from exc
     except httpx.RequestError as exc:
         log.error("wecom_send_group_message_request_error", error=str(exc))
-        raise HTTPException(status_code=503, detail=f"企微接口请求失败: {exc}") from exc
+        raise safe_http_exception(503, "企微接口请求失败", exc) from exc
 
     log.info("wecom_send_group_message_ok")
     return ok({"chatid": chatid, "msgtype": req.msgtype, "status": "sent"})
@@ -318,23 +308,17 @@ async def send_wecom_notify(
             await sdk.send_markdown(user_id=req.touser, content=content_md)
 
         else:
-            raise HTTPException(status_code=400, detail=f"不支持的消息类型: {req.msgtype}")
+            raise HTTPException(status_code=400, detail="不支持的消息类型")
 
     except WecomAPIError as exc:
         log.error("wecom_notify_api_error", errcode=exc.errcode, errmsg=exc.errmsg)
-        raise HTTPException(
-            status_code=400,
-            detail=f"企微 API 错误 {exc.errcode}: {exc.errmsg}",
-        ) from exc
+        raise safe_http_exception(400, "企微 API 调用失败", exc) from exc
     except httpx.HTTPStatusError as exc:
         log.error("wecom_notify_http_error", status=exc.response.status_code)
-        raise HTTPException(
-            status_code=502,
-            detail=f"企微接口 HTTP {exc.response.status_code}",
-        ) from exc
+        raise safe_http_exception(502, "上游服务不可用", exc) from exc
     except httpx.RequestError as exc:
         log.error("wecom_notify_request_error", error=str(exc))
-        raise HTTPException(status_code=503, detail=f"企微接口请求失败: {exc}") from exc
+        raise safe_http_exception(503, "企微接口请求失败", exc) from exc
 
     log.info("wecom_notify_sent_ok")
     return ok({"touser": req.touser, "msgtype": req.msgtype, "status": "sent"})

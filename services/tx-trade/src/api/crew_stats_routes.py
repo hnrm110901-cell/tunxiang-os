@@ -43,7 +43,11 @@ def _period_to_date_range(period: str) -> tuple[date, date]:
 
 
 async def _set_rls(db: AsyncSession, tenant_id: str) -> None:
-    await db.execute(text(f"SET LOCAL app.tenant_id = '{tenant_id}'"))
+    """PK.0 P0 SECURITY：用 set_config 参数化避免 X-Tenant-ID 注入。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
 
 # ---------- 路由 ----------
@@ -68,7 +72,8 @@ async def get_my_stats(
     try:
         await _set_rls(db, x_tenant_id)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 css.crew_id::text                       AS crew_id,
                 COALESCE(SUM(css.table_count), 0)       AS table_count,
@@ -83,7 +88,8 @@ async def get_my_stats(
               AND css.shift_date BETWEEN :start_date AND :end_date
               AND css.is_deleted = false
             GROUP BY css.crew_id
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -187,7 +193,8 @@ async def get_leaderboard(
     try:
         await _set_rls(db, x_tenant_id)
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 css.crew_id::text                       AS crew_id,
                 COALESCE(SUM(css.{order_col}), 0)       AS metric_value,
@@ -200,7 +207,8 @@ async def get_leaderboard(
             GROUP BY css.crew_id
             ORDER BY metric_value DESC
             LIMIT 50
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {
@@ -255,7 +263,8 @@ async def get_trend(
     try:
         await _set_rls(db, x_tenant_id)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 css.shift_date                          AS shift_date,
                 COALESCE(SUM(css.table_count), 0)       AS table_count,
@@ -268,7 +277,8 @@ async def get_trend(
               AND css.is_deleted = false
             GROUP BY css.shift_date
             ORDER BY css.shift_date
-        """)
+        """
+        )
         result = await db.execute(
             sql,
             {

@@ -67,13 +67,15 @@ class ReviewReplier:
 
         # 1. 读取评论
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, platform, rating, review_text, store_id
                 FROM order_reviews
                 WHERE id = :review_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"review_id": str(review_id), "tenant_id": str(tenant_id)},
         )
         review_row = result.fetchone()
@@ -110,7 +112,8 @@ class ReviewReplier:
         # 6. 写入review_auto_replies
         reply_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO review_auto_replies (
                     id, tenant_id, review_id, platform,
                     original_rating, original_text, generated_reply,
@@ -120,7 +123,8 @@ class ReviewReplier:
                     :original_rating, :original_text, :generated_reply,
                     :brand_voice_config::jsonb, :model_used, 'draft'
                 )
-            """),
+            """
+            ),
             {
                 "id": str(reply_id),
                 "tenant_id": str(tenant_id),
@@ -174,7 +178,8 @@ class ReviewReplier:
 
         now = datetime.now(tz=timezone.utc)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE review_auto_replies
                 SET status = 'approved',
                     approved_by = :approved_by,
@@ -185,7 +190,8 @@ class ReviewReplier:
                   AND status = 'draft'
                   AND is_deleted = false
                 RETURNING id, generated_reply
-            """),
+            """
+            ),
             {
                 "reply_id": str(reply_id),
                 "tenant_id": str(tenant_id),
@@ -225,13 +231,15 @@ class ReviewReplier:
 
         # 读取回复详情
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, platform, generated_reply, status
                 FROM review_auto_replies
                 WHERE id = :reply_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"reply_id": str(reply_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -250,14 +258,16 @@ class ReviewReplier:
             await self._post_to_platform(platform, str(row[2]), log)
 
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE review_auto_replies
                     SET status = 'posted',
                         posted_at = :posted_at,
                         updated_at = :updated_at
                     WHERE id = :reply_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "reply_id": str(reply_id),
                     "tenant_id": str(tenant_id),
@@ -272,14 +282,16 @@ class ReviewReplier:
 
         except RuntimeError as exc:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE review_auto_replies
                     SET status = 'failed',
                         failure_reason = :reason,
                         updated_at = :updated_at
                     WHERE id = :reply_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "reply_id": str(reply_id),
                     "tenant_id": str(tenant_id),
@@ -302,7 +314,8 @@ class ReviewReplier:
         """
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT config_value
                     FROM brand_strategy
                     WHERE tenant_id = :tenant_id
@@ -310,7 +323,8 @@ class ReviewReplier:
                       AND is_deleted = false
                     ORDER BY updated_at DESC
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_id)},
             )
             row = result.fetchone()
@@ -346,7 +360,8 @@ class ReviewReplier:
 
         # 查找需要回复的差评
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT r.id
                 FROM order_reviews r
                 LEFT JOIN review_auto_replies a
@@ -359,7 +374,8 @@ class ReviewReplier:
                   AND a.id IS NULL
                 ORDER BY r.created_at DESC
                 LIMIT 50
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "min_rating": min_rating},
         )
         rows = result.fetchall()
@@ -399,11 +415,13 @@ class ReviewReplier:
         """从tenants表获取品牌名称"""
         try:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT name FROM tenants
                     WHERE id = :tenant_id AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_id)},
             )
             row = result.fetchone()

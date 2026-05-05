@@ -37,9 +37,7 @@ class InvitationRepositoryBase(ABC):
     async def insert(self, record: InvitationRecord) -> InvitationRecord: ...
 
     @abstractmethod
-    async def get_by_id(
-        self, invitation_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[InvitationRecord]: ...
+    async def get_by_id(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[InvitationRecord]: ...
 
     @abstractmethod
     async def update(self, record: InvitationRecord) -> InvitationRecord: ...
@@ -76,9 +74,7 @@ class InMemoryInvitationRepository(InvitationRepositoryBase):
         self._rows[record.invitation_id] = record
         return record
 
-    async def get_by_id(
-        self, invitation_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[InvitationRecord]:
+    async def get_by_id(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[InvitationRecord]:
         row = self._rows.get(invitation_id)
         if row is None or row.tenant_id != tenant_id:
             return None
@@ -100,11 +96,7 @@ class InMemoryInvitationRepository(InvitationRepositoryBase):
         tenant_id: uuid.UUID,
         reservation_id: uuid.UUID,
     ) -> list[InvitationRecord]:
-        return [
-            r
-            for r in self._rows.values()
-            if r.tenant_id == tenant_id and r.reservation_id == reservation_id
-        ]
+        return [r for r in self._rows.values() if r.tenant_id == tenant_id and r.reservation_id == reservation_id]
 
     async def list_by_customer(
         self,
@@ -113,11 +105,7 @@ class InMemoryInvitationRepository(InvitationRepositoryBase):
         *,
         limit: int = 50,
     ) -> list[InvitationRecord]:
-        rows = [
-            r
-            for r in self._rows.values()
-            if r.tenant_id == tenant_id and r.customer_id == customer_id
-        ]
+        rows = [r for r in self._rows.values() if r.tenant_id == tenant_id and r.customer_id == customer_id]
         rows.sort(key=lambda r: r.created_at, reverse=True)
         return rows[:limit]
 
@@ -216,9 +204,7 @@ class PgInvitationRepository(InvitationRepositoryBase):
         )
         return record
 
-    async def get_by_id(
-        self, invitation_id: uuid.UUID, tenant_id: uuid.UUID
-    ) -> Optional[InvitationRecord]:
+    async def get_by_id(self, invitation_id: uuid.UUID, tenant_id: uuid.UUID) -> Optional[InvitationRecord]:
         row = await self._conn.fetchrow(_SELECT_BY_ID_SQL, invitation_id, tenant_id)
         if row is None:
             return None

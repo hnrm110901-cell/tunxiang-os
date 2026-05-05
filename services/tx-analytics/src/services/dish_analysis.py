@@ -612,7 +612,8 @@ def _query_dish_sales(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name, d.category_id,
                    COALESCE(SUM(oi.quantity), 0) AS sales_qty,
                    COALESCE(SUM(oi.subtotal_fen), 0) AS sales_amount_fen
@@ -626,7 +627,8 @@ def _query_dish_sales(
               AND o.is_deleted = FALSE
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name, d.category_id
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -662,7 +664,8 @@ def _query_return_data(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_id, d.dish_name,
                    COALESCE(SUM(oi.quantity), 0) AS total_qty,
                    COALESCE(SUM(CASE WHEN oi.return_flag = TRUE THEN oi.quantity ELSE 0 END), 0) AS return_qty
@@ -676,7 +679,8 @@ def _query_return_data(
               AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id, d.dish_name
             HAVING SUM(CASE WHEN oi.return_flag = TRUE THEN oi.quantity ELSE 0 END) > 0
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -711,7 +715,8 @@ def _query_return_reasons(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT COALESCE(oi.return_reason, '未说明') AS reason,
                    COUNT(*) AS count
             FROM order_items oi
@@ -724,7 +729,8 @@ def _query_return_reasons(
               AND oi.is_deleted = FALSE
             GROUP BY COALESCE(oi.return_reason, '未说明')
             ORDER BY count DESC
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -752,7 +758,8 @@ def _query_negative_reviews(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT r.dish_id, d.dish_name,
                    AVG(r.rating) AS avg_rating,
                    COUNT(*) FILTER (WHERE r.rating <= :min_rating) AS negative_count,
@@ -767,7 +774,8 @@ def _query_negative_reviews(
             GROUP BY r.dish_id, d.dish_name
             HAVING COUNT(*) FILTER (WHERE r.rating <= :min_rating) > 0
             ORDER BY negative_count DESC
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -805,7 +813,8 @@ def _query_stockout_records(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT s.dish_id, d.dish_name,
                    COUNT(*) AS stockout_count,
                    COUNT(DISTINCT DATE(s.stockout_at)) AS stockout_days,
@@ -818,7 +827,8 @@ def _query_stockout_records(
               AND s.is_deleted = FALSE
             GROUP BY s.dish_id, d.dish_name
             ORDER BY stockout_count DESC
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -853,7 +863,8 @@ def _query_new_dishes(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT d.id AS dish_id, d.dish_name, d.sell_start_date AS launch_date,
                    d.rating,
                    COALESCE(SUM(oi.quantity), 0) AS total_sales
@@ -866,7 +877,8 @@ def _query_new_dishes(
               AND d.is_available = TRUE AND d.is_deleted = FALSE
               AND d.sell_start_date >= :cutoff_date
             GROUP BY d.id, d.dish_name, d.sell_start_date, d.rating
-        """),
+        """
+            ),
             {
                 "store_id": store_id,
                 "tenant_id": tenant_id,
@@ -902,7 +914,8 @@ def _query_daily_sales_trend(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             SELECT DATE(o.order_time) AS sale_date,
                    COALESCE(SUM(oi.quantity), 0) AS daily_qty
             FROM order_items oi
@@ -916,7 +929,8 @@ def _query_daily_sales_trend(
               AND oi.is_deleted = FALSE
             GROUP BY DATE(o.order_time)
             ORDER BY sale_date
-        """),
+        """
+            ),
             {
                 "dish_id": dish_id,
                 "store_id": store_id,
@@ -945,7 +959,8 @@ def _query_repurchase_rate(
         from sqlalchemy import text
 
         result = db.execute(
-            text("""
+            text(
+                """
             WITH customer_orders AS (
                 SELECT o.customer_id, COUNT(DISTINCT o.id) AS order_count
                 FROM order_items oi
@@ -964,7 +979,8 @@ def _query_repurchase_rate(
                 COUNT(*) AS total_customers,
                 COUNT(*) FILTER (WHERE order_count >= 2) AS repeat_customers
             FROM customer_orders
-        """),
+        """
+            ),
             {
                 "dish_id": dish_id,
                 "store_id": store_id,

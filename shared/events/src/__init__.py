@@ -32,6 +32,8 @@ from .event_types import (
     ReviewEventType,
     SafetyEventType,
     SettlementEventType,
+    # R1 任务引擎（Sprint R1，task_dispatch_service 依赖）
+    TaskEventType,
     # 工具函数
     resolve_stream_key,
     resolve_stream_type,
@@ -67,6 +69,7 @@ __all__ = [
     "RecipeEventType",
     "KdsEventType",
     "AgentEventType",
+    "TaskEventType",
     "ALL_EVENT_ENUMS",
     "resolve_stream_key",
     "resolve_stream_type",

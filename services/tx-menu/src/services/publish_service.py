@@ -2,7 +2,7 @@
 
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from shared.events import MenuEventType, UniversalPublisher
@@ -41,7 +41,7 @@ def create_publish_plan(
         raise ValueError("target_store_ids 不能为空列表")
 
     plan_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     return {
         "plan_id": plan_id,
@@ -92,7 +92,7 @@ def execute_publish(
                 {
                     "dish_id": dish_id,
                     "status": "published",
-                    "published_at": datetime.utcnow().isoformat(),
+                    "published_at": datetime.now(timezone.utc).isoformat(),
                 }
             )
 
@@ -111,7 +111,7 @@ def execute_publish(
         "success_count": success_count,
         "fail_count": fail_count,
         "results": results,
-        "executed_at": datetime.utcnow().isoformat(),
+        "executed_at": datetime.now(timezone.utc).isoformat(),
     }
 
     if tenant_id and success_count > 0:
@@ -174,7 +174,7 @@ def create_price_adjustment(
         )
 
     adjustment_id = str(uuid.uuid4())
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
 
     return {
         "adjustment_id": adjustment_id,

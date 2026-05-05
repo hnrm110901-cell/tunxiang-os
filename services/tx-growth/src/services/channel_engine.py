@@ -73,13 +73,15 @@ class ChannelEngine:
         tid = uuid.UUID(tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, channel, max_daily_per_user, settings, is_enabled,
                        created_at, updated_at
                 FROM channel_configs
                 WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tid, "channel": channel_name},
         )
         row = result.fetchone()
@@ -136,7 +138,8 @@ class ChannelEngine:
         is_enabled = updates.get("is_enabled", True)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO channel_configs
                     (id, tenant_id, channel, max_daily_per_user, settings, is_enabled, created_at, updated_at)
                 VALUES
@@ -146,7 +149,8 @@ class ChannelEngine:
                     settings = EXCLUDED.settings,
                     is_enabled = EXCLUDED.is_enabled,
                     updated_at = EXCLUDED.updated_at
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "channel": channel_name,
@@ -218,11 +222,13 @@ class ChannelEngine:
         max_daily = self.CHANNELS[channel]["max_daily"]
         try:
             cfg_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT max_daily_per_user, is_enabled FROM channel_configs
                     WHERE tenant_id = :tid AND channel = :channel AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": tid, "channel": channel},
             )
             cfg = cfg_result.fetchone()
@@ -243,7 +249,8 @@ class ChannelEngine:
         sent_today = 0
         try:
             count_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) FROM message_send_logs
                     WHERE tenant_id = :tid
                       AND channel = :channel
@@ -251,7 +258,8 @@ class ChannelEngine:
                       AND sent_at::date = :today
                       AND status = 'sent'
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "channel": channel, "uid": recipient_id, "today": today},
             )
             sent_today = count_result.scalar() or 0
@@ -294,14 +302,16 @@ class ChannelEngine:
         log_id = uuid.uuid4()
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO message_send_logs
                     (id, tenant_id, channel, customer_id, external_user_id,
                      content_summary, offer_id, campaign_id, status, sent_at, created_at)
                 VALUES
                     (:id, :tid, :channel, :customer_id, :uid,
                      :content, :offer_id, :campaign_id, 'sent', :now, :now)
-            """),
+            """
+            ),
             {
                 "id": log_id,
                 "tid": tid,
@@ -375,7 +385,8 @@ class ChannelEngine:
 
         try:
             result = await db.execute(
-                text(f"""
+                text(
+                    f"""
                     SELECT
                         channel,
                         COUNT(*) AS total,
@@ -387,7 +398,8 @@ class ChannelEngine:
                     WHERE {where_clause}
                     GROUP BY channel
                     ORDER BY total DESC
-                """),
+                """
+                ),
                 params,
             )
             rows = result.fetchall()
@@ -558,11 +570,13 @@ class ChannelEngine:
                 result = resp.json()
                 # 记录发送日志
                 await db.execute(
-                    text("""
+                    text(
+                        """
                     INSERT INTO message_send_logs
                         (tenant_id, channel, external_user_id, content_summary, status, sent_at)
                     VALUES (:tid, 'wecom_group', :gid, :content, :status, NOW())
-                """),
+                """
+                    ),
                     {
                         "tid": tenant_id,
                         "gid": group_chat_id,
@@ -589,12 +603,14 @@ class ChannelEngine:
         """创建门店店长待办任务 -- 用于服务修复/高价值客户跟进"""
         _logger.info("create_store_task", store_id=store_id, task_type=task_type, tenant_id=tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO message_send_logs
                 (tenant_id, channel, external_user_id, content_summary, status, sent_at)
             VALUES (:tid, 'store_task', :store_id, :summary, 'pending', NOW())
             RETURNING id
-        """),
+        """
+            ),
             {
                 "tid": tenant_id,
                 "store_id": store_id,

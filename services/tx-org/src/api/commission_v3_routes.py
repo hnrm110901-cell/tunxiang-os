@@ -168,7 +168,8 @@ async def list_schemes(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, name, applicable_stores,
                        effective_date, expiry_date, description,
                        is_active, created_at, updated_at
@@ -179,7 +180,8 @@ async def list_schemes(
                        OR applicable_stores = '[]'::jsonb
                        OR applicable_stores @> to_jsonb(:store_id::text))
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "active": is_active,
@@ -205,13 +207,15 @@ async def create_scheme(
     try:
         await _set_rls(db, x_tenant_id)
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO commission_schemes
                     (id, tenant_id, name, applicable_stores,
                      effective_date, expiry_date, description, is_active)
                 VALUES (:id, :tid, :name, :stores::jsonb,
                         :eff_date, :exp_date, :desc, :active)
-            """),
+            """
+            ),
             {
                 "id": str(scheme_id),
                 "tid": x_tenant_id,
@@ -307,11 +311,13 @@ async def copy_scheme(
 
         # 查询原方案
         src_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT name, applicable_stores, effective_date, expiry_date, description
                 FROM commission_schemes
                 WHERE id = :sid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id},
         )
         src = src_row.fetchone()
@@ -323,13 +329,15 @@ async def copy_scheme(
         eff_date = body.effective_date or src.effective_date
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO commission_schemes
                     (id, tenant_id, name, applicable_stores,
                      effective_date, expiry_date, description, is_active)
                 VALUES (:id, :tid, :name, :stores::jsonb,
                         :eff_date, :exp_date, :desc, TRUE)
-            """),
+            """
+            ),
             {
                 "id": str(new_id),
                 "tid": x_tenant_id,
@@ -343,22 +351,26 @@ async def copy_scheme(
 
         # 复制原方案的全部规则
         rules_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT rule_type, params, amount_fen, description
                 FROM commission_rules
                 WHERE scheme_id = :sid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id},
         )
         rules = rules_rows.fetchall()
         for rule in rules:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO commission_rules
                         (id, tenant_id, scheme_id, rule_type, params, amount_fen, description)
                     VALUES (gen_random_uuid(), :tid, :scheme_id,
                             :rule_type, :params::jsonb, :amount_fen, :desc)
-                """),
+                """
+                ),
                 {
                     "tid": x_tenant_id,
                     "scheme_id": str(new_id),
@@ -396,11 +408,13 @@ async def deactivate_scheme(
     try:
         await _set_rls(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE commission_schemes
                 SET is_active = FALSE, updated_at = NOW()
                 WHERE id = :sid AND tenant_id = :tid
-            """),
+            """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id},
         )
         if result.rowcount == 0:
@@ -442,14 +456,16 @@ async def list_rules(
             raise _err("方案不存在或无权限", 404)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, scheme_id, rule_type, params, amount_fen, description,
                        created_at, updated_at
                 FROM commission_rules
                 WHERE scheme_id = :sid AND tenant_id = :tid
                   AND (:rule_type IS NULL OR rule_type = :rule_type)
                 ORDER BY rule_type, created_at
-            """),
+            """
+            ),
             {"sid": str(scheme_id), "tid": x_tenant_id, "rule_type": rule_type},
         )
         items = [_serialize_row(r) for r in rows]
@@ -483,11 +499,13 @@ async def create_rule(
             raise _err("方案不存在、已停用或无权限", 404)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO commission_rules
                     (id, tenant_id, scheme_id, rule_type, params, amount_fen, description)
                 VALUES (:id, :tid, :scheme_id, :rule_type, :params::jsonb, :amount_fen, :desc)
-            """),
+            """
+            ),
             {
                 "id": str(rule_id),
                 "tid": x_tenant_id,
@@ -532,7 +550,8 @@ async def calculate_commission(
 
         # 取该门店当前有效方案的所有规则
         rules_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT cr.id AS rule_id, cr.rule_type, cr.params, cr.amount_fen
                 FROM commission_rules cr
                 JOIN commission_schemes cs ON cs.id = cr.scheme_id
@@ -542,7 +561,8 @@ async def calculate_commission(
                        OR cs.applicable_stores @> to_jsonb(:store_id::text))
                   AND (cs.effective_date IS NULL OR cs.effective_date <= :end_date)
                   AND (cs.expiry_date IS NULL OR cs.expiry_date >= :start_date)
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "store_id": str(body.store_id),
@@ -566,7 +586,8 @@ async def calculate_commission(
                 min_qty = int(params.get("min_qty", 1))
                 if dish_id:
                     qty_row = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT COALESCE(SUM(quantity), 0) AS qty
                             FROM piecework_records
                             WHERE tenant_id   = :tid
@@ -574,7 +595,8 @@ async def calculate_commission(
                               AND employee_id = :employee_id
                               AND dish_id     = :dish_id
                               AND recorded_at::date BETWEEN :start_date AND :end_date
-                        """),
+                        """
+                        ),
                         {
                             "tid": x_tenant_id,
                             "store_id": str(body.store_id),
@@ -605,14 +627,16 @@ async def calculate_commission(
             elif rule_type == "revenue_tier":
                 # 营收阶梯：查员工期间销售额
                 rev_row = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COALESCE(SUM(pr.quantity * pr.unit_fee_fen), 0) AS revenue_fen
                         FROM piecework_records pr
                         WHERE pr.tenant_id   = :tid
                           AND pr.store_id    = :store_id
                           AND pr.employee_id = :employee_id
                           AND pr.recorded_at::date BETWEEN :start_date AND :end_date
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "store_id": str(body.store_id),
@@ -652,7 +676,8 @@ async def calculate_commission(
                 if target_table_type:
                     table_filter = "AND t.table_type = :table_type"
                 table_count_row = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT COUNT(ds.id) AS table_count
                         FROM dining_sessions ds
                         JOIN tables t ON t.id = ds.table_id
@@ -662,7 +687,8 @@ async def calculate_commission(
                           AND ds.opened_at::date BETWEEN :start_date AND :end_date
                           AND ds.status        = 'closed'
                           {table_filter}
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "store_id": str(body.store_id),
@@ -694,7 +720,8 @@ async def calculate_commission(
                 end_time_str = params.get("end_time", "23:59")
                 multiplier = float(params.get("multiplier", 1.0))
                 slot_count_row = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT COUNT(ds.id) AS slot_count
                         FROM dining_sessions ds
                         WHERE ds.tenant_id      = :tid
@@ -703,7 +730,8 @@ async def calculate_commission(
                           AND ds.opened_at::date BETWEEN :start_date AND :end_date
                           AND ds.opened_at::time BETWEEN :start_time::time AND :end_time::time
                           AND ds.status         = 'closed'
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "store_id": str(body.store_id),
@@ -760,7 +788,8 @@ async def commission_summary(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     cr.employee_id,
                     cr.store_id,
@@ -773,7 +802,8 @@ async def commission_summary(
                   AND (:store_id IS NULL OR cr.store_id = :store_id)
                 GROUP BY cr.employee_id, cr.store_id, cr.status
                 ORDER BY total_commission_fen DESC
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "year_month": year_month,
@@ -808,7 +838,8 @@ async def staff_commission_detail(
     try:
         await _set_rls(db, x_tenant_id)
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, store_id, year_month,
                        total_commission_fen, breakdown, status,
                        settled_at, created_at
@@ -817,7 +848,8 @@ async def staff_commission_detail(
                   AND employee_id = :employee_id
                   AND year_month  = :year_month
                 ORDER BY created_at DESC
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "employee_id": str(employee_id),
@@ -863,7 +895,8 @@ async def monthly_settle(
         # 查询月内所有员工+门店的计件汇总
         store_filter = "AND store_id = ANY(:store_ids::uuid[])" if body.store_ids else ""
         agg_rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     employee_id,
                     store_id,
@@ -873,7 +906,8 @@ async def monthly_settle(
                   AND recorded_at::date BETWEEN :start_date AND :end_date
                   {store_filter}
                 GROUP BY employee_id, store_id
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "start_date": start_date,
@@ -888,11 +922,13 @@ async def monthly_settle(
         employee_names: dict[str, str] = {}
         if employee_ids:
             name_rows = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, name FROM employees
                     WHERE tenant_id = :tid AND id = ANY(:ids::uuid[])
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "ids": employee_ids},
             )
             for nr in name_rows.fetchall():
@@ -914,7 +950,8 @@ async def monthly_settle(
 
             # UPSERT：已结算的不覆盖
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO commission_records
                         (id, tenant_id, employee_id, store_id, year_month,
                          total_commission_fen, breakdown, status, settled_at,
@@ -931,7 +968,8 @@ async def monthly_settle(
                         employee_name        = EXCLUDED.employee_name,
                         updated_at           = NOW()
                     WHERE commission_records.status <> 'settled'
-                """),
+                """
+                ),
                 {
                     "id": str(record_id),
                     "tid": x_tenant_id,
@@ -985,14 +1023,16 @@ async def monthly_report(
         await _set_rls(db, x_tenant_id)
 
         total_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS cnt,
                        COALESCE(SUM(total_commission_fen), 0) AS grand_total_fen
                 FROM commission_records
                 WHERE tenant_id  = :tid
                   AND year_month = :year_month
                   AND (:store_id IS NULL OR store_id = :store_id)
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "year_month": year_month,
@@ -1004,7 +1044,8 @@ async def monthly_report(
         grand_total_fen = int(agg.grand_total_fen or 0)
 
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, employee_id, store_id, year_month,
                        total_commission_fen, breakdown, status,
                        settled_at, created_at
@@ -1014,7 +1055,8 @@ async def monthly_report(
                   AND (:store_id IS NULL OR store_id = :store_id)
                 ORDER BY total_commission_fen DESC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "year_month": year_month,

@@ -16,17 +16,17 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import uuid4
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Path
+from fastapi import APIRouter, Depends, Header, Path
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 logger = structlog.get_logger(__name__)
 
@@ -69,10 +69,10 @@ class OnboardingStatusResponse(BaseModel):
 # ── 内部状态常量 ───────────────────────────────────────────────────
 
 ONBOARDING_STEPS: list[str] = [
-    "ssm_verification",       # SSM 企业注册验证
-    "subsidy_eligibility",    # 政府补贴资格检查
+    "ssm_verification",  # SSM 企业注册验证
+    "subsidy_eligibility",  # 政府补贴资格检查
     "einvoice_registration",  # MyInvois e-Invoice 注册
-    "complete",               # 入驻完成
+    "complete",  # 入驻完成
 ]
 
 ONBOARDING_STATUSES: list[str] = [
@@ -255,14 +255,16 @@ class SMEOnboardingService:
 
         try:
             row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         id, tenant_id, business_name, registration_number,
                         business_type, status, current_step, completed_steps,
                         details, created_at, updated_at
                     FROM sme_onboarding_records
                     WHERE id = :oid AND tenant_id = :tid AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"oid": onboarding_id, "tid": tenant_id},
             )
             record = row.mappings().fetchone()
@@ -271,9 +273,7 @@ class SMEOnboardingService:
             record = None
 
         if record is None:
-            raise ValueError(
-                f"Onboarding record not found: {onboarding_id}"
-            )
+            raise ValueError(f"Onboarding record not found: {onboarding_id}")
 
         return {
             "onboarding_id": str(record["id"]),
@@ -284,14 +284,8 @@ class SMEOnboardingService:
             "current_step": record["current_step"],
             "completed_steps": record["completed_steps"] or [],
             "details": record["details"] or {},
-            "created_at": (
-                record["created_at"].isoformat()
-                if record["created_at"] else None
-            ),
-            "updated_at": (
-                record["updated_at"].isoformat()
-                if record["updated_at"] else None
-            ),
+            "created_at": (record["created_at"].isoformat() if record["created_at"] else None),
+            "updated_at": (record["updated_at"].isoformat() if record["updated_at"] else None),
         }
 
     # ─── SSM 验证 ────────────────────────────────────────────────
@@ -326,7 +320,7 @@ class SMEOnboardingService:
             return {
                 "verified": False,
                 "message": f"Invalid SSM registration number format: "
-                           f"{registration_number}. Expected at least 8 characters.",
+                f"{registration_number}. Expected at least 8 characters.",
                 "registration_number": registration_number,
                 "business_name_matched": False,
             }
@@ -408,9 +402,7 @@ class SMEOnboardingService:
         return {
             "eligible": True,
             "programs": eligible_programs,
-            "message": (
-                f"Found {len(eligible_programs)} eligible subsidy programs."
-            ),
+            "message": (f"Found {len(eligible_programs)} eligible subsidy programs."),
         }
 
     # ─── e-Invoice 注册 ──────────────────────────────────────────
@@ -452,10 +444,7 @@ class SMEOnboardingService:
         return {
             "registered": True,
             "einvoice_id": einvoice_id,
-            "message": (
-                "Successfully registered for LHDN MyInvois e-Invoice. "
-                "You can now issue electronic invoices."
-            ),
+            "message": ("Successfully registered for LHDN MyInvois e-Invoice. You can now issue electronic invoices."),
         }
 
     # ─── 持久化 ──────────────────────────────────────────────────
@@ -485,7 +474,8 @@ class SMEOnboardingService:
         """
         try:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO sme_onboarding_records (
                         id, tenant_id, business_name, registration_number,
                         business_type, contact_email, contact_phone,
@@ -499,7 +489,8 @@ class SMEOnboardingService:
                         :status, :step, :completed, :details,
                         NOW(), NOW()
                     )
-                """),
+                """
+                ),
                 {
                     "oid": onboarding_id,
                     "tid": tenant_id,
@@ -552,7 +543,7 @@ async def start_onboarding(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/{onboarding_id}")
@@ -574,4 +565,4 @@ async def get_onboarding_status(
         )
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc

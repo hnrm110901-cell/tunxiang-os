@@ -31,12 +31,14 @@ async def create_listing(
     """创建联盟上架."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.alliance_listings
+        text(
+            """INSERT INTO forge.alliance_listings
                 (tenant_id, app_id, owner_tenant_id, sharing_mode,
                  shared_tenants, revenue_share_rate)
                 VALUES (:tid, :app_id, :tid, :sharing_mode,
                         :shared_tenants::jsonb, :revenue_share_rate)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -77,9 +79,11 @@ async def list_listings(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.alliance_listings
+        text(
+            f"""SELECT * FROM forge.alliance_listings
                 WHERE {where}
-                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -97,8 +101,10 @@ async def get_listing(
     """获取联盟详情."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""SELECT * FROM forge.alliance_listings
-                WHERE tenant_id = :tid AND listing_id = :listing_id"""),
+        text(
+            """SELECT * FROM forge.alliance_listings
+                WHERE tenant_id = :tid AND listing_id = :listing_id"""
+        ),
         {"tid": x_tenant_id, "listing_id": listing_id},
     )
     row = result.mappings().first()
@@ -120,8 +126,10 @@ async def install_alliance_app(
     await _set_tenant(db, x_tenant_id)
     # 查询 listing
     listing = await db.execute(
-        text("""SELECT * FROM forge.alliance_listings
-                WHERE listing_id = :listing_id AND is_active = true"""),
+        text(
+            """SELECT * FROM forge.alliance_listings
+                WHERE listing_id = :listing_id AND is_active = true"""
+        ),
         {"listing_id": listing_id},
     )
     listing_row = listing.mappings().first()
@@ -130,17 +138,21 @@ async def install_alliance_app(
 
     # 记录安装
     result = await db.execute(
-        text("""INSERT INTO forge.alliance_installs
+        text(
+            """INSERT INTO forge.alliance_installs
                 (tenant_id, listing_id, installed_tenant_id)
                 VALUES (:tid, :listing_id, :tid)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {"tid": x_tenant_id, "listing_id": listing_id},
     )
     # 更新安装计数
     await db.execute(
-        text("""UPDATE forge.alliance_listings
+        text(
+            """UPDATE forge.alliance_listings
                 SET install_count = install_count + 1
-                WHERE listing_id = :listing_id"""),
+                WHERE listing_id = :listing_id"""
+        ),
         {"listing_id": listing_id},
     )
     await db.commit()
@@ -167,9 +179,11 @@ async def alliance_revenue(
     where = " AND ".join(clauses)
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.alliance_revenue
+        text(
+            f"""SELECT * FROM forge.alliance_revenue
                 WHERE {where}
-                ORDER BY created_at DESC"""),
+                ORDER BY created_at DESC"""
+        ),
         params,
     )
     transactions = [dict(r) for r in rows.mappings().all()]

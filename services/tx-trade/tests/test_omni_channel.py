@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+
 from services.tx_trade.src.services.omni_channel_service import (
     OmniChannelError,
     OmniChannelService,
@@ -391,9 +392,7 @@ class TestAutoRejectOverdue:
         mock_order_1.created_at = overdue_time
 
         overdue_result = MagicMock()
-        overdue_result.scalars = MagicMock(
-            return_value=MagicMock(all=MagicMock(return_value=[mock_order_1]))
-        )
+        overdue_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[mock_order_1])))
         db.execute.return_value = overdue_result
 
         mock_cancel = AsyncMock(return_value={"code": "ok"})
@@ -421,9 +420,7 @@ class TestAutoRejectOverdue:
 
         # 模拟无超时订单
         empty_result = MagicMock()
-        empty_result.scalars = MagicMock(
-            return_value=MagicMock(all=MagicMock(return_value=[]))
-        )
+        empty_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))
         db.execute.return_value = empty_result
 
         result = await svc.auto_reject_overdue(
@@ -516,9 +513,7 @@ class TestTenantIsolation:
         mock_order.total_amount_fen = 5000
 
         result_mock = MagicMock()
-        result_mock.scalars = MagicMock(
-            return_value=MagicMock(all=MagicMock(return_value=[mock_order]))
-        )
+        result_mock.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[mock_order])))
         db.execute.return_value = result_mock
 
         orders = await svc.get_pending_orders(

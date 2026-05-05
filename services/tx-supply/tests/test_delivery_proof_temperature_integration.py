@@ -16,8 +16,9 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from services.tx_supply.src.services import delivery_proof_service as svc
 from sqlalchemy.exc import ProgrammingError
+
+from services.tx_supply.src.services import delivery_proof_service as svc
 
 TENANT_A = str(uuid.uuid4())
 DELIVERY_ID = str(uuid.uuid4())
@@ -56,16 +57,40 @@ def _build_complete_proof_db():
     signed_at = datetime.now(timezone.utc)
 
     receipt_row = (
-        receipt_id, uuid.UUID(DELIVERY_ID), store_id, "王店长", "STORE_MANAGER",
-        "13800138000", signed_at, "s3://tunxiang-supply/x/y.png",
-        None, None, {"model": "Sunmi T2"}, None, signed_at,
+        receipt_id,
+        uuid.UUID(DELIVERY_ID),
+        store_id,
+        "王店长",
+        "STORE_MANAGER",
+        "13800138000",
+        signed_at,
+        "s3://tunxiang-supply/x/y.png",
+        None,
+        None,
+        {"model": "Sunmi T2"},
+        None,
+        signed_at,
     )
 
     damage_row = (
-        damage_id, uuid.UUID(DELIVERY_ID), None, uuid.UUID(INGREDIENT_ID),
-        "B-1", "BROKEN", 2.5, 8800, 22000, "破损",
-        "MAJOR", uuid.UUID(USER_ID), signed_at,
-        "PENDING", None, None, None, None,
+        damage_id,
+        uuid.UUID(DELIVERY_ID),
+        None,
+        uuid.UUID(INGREDIENT_ID),
+        "B-1",
+        "BROKEN",
+        2.5,
+        8800,
+        22000,
+        "破损",
+        "MAJOR",
+        uuid.UUID(USER_ID),
+        signed_at,
+        "PENDING",
+        None,
+        None,
+        None,
+        None,
     )
 
     sql_log: list[str] = []
@@ -205,11 +230,13 @@ async def test_complete_proof_no_longer_queries_cold_chain() -> None:
     with patch.object(
         svc._temperature_service,
         "get_temperature_proof",
-        new=AsyncMock(return_value={
-            "summary": {"sample_count": 0},
-            "alerts": [],
-            "timeline_sampled": [],
-        }),
+        new=AsyncMock(
+            return_value={
+                "summary": {"sample_count": 0},
+                "alerts": [],
+                "timeline_sampled": [],
+            }
+        ),
     ):
         await svc.get_complete_proof(
             delivery_id=DELIVERY_ID,
@@ -218,9 +245,7 @@ async def test_complete_proof_no_longer_queries_cold_chain() -> None:
         )
 
     joined_sql = "\n".join(sql_log).lower()
-    assert "cold_chain_evidence" not in joined_sql, (
-        "旧路径残留：get_complete_proof 不应再查 cold_chain_evidence 表"
-    )
-    assert "information_schema.tables" not in joined_sql, (
-        "旧路径残留：get_complete_proof 不应再用 information_schema 探测温度表"
-    )
+    assert "cold_chain_evidence" not in joined_sql, "旧路径残留：get_complete_proof 不应再查 cold_chain_evidence 表"
+    assert (
+        "information_schema.tables" not in joined_sql
+    ), "旧路径残留：get_complete_proof 不应再用 information_schema 探测温度表"

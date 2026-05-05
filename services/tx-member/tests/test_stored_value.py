@@ -87,6 +87,7 @@ def _make_async_session(card=None, plan=None, txn=None):
 # 1. 充值：余额正确增加，生成充值流水记录
 # ──────────────────────────────────────────────────────────────────
 
+
 class TestRecharge:
     @pytest.mark.asyncio
     async def test_recharge_direct_increases_balance(self):
@@ -149,6 +150,7 @@ class TestRecharge:
 # ──────────────────────────────────────────────────────────────────
 # 2. 消费核销：余额扣减，不足时返回余额不足错误
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestConsume:
     @pytest.mark.asyncio
@@ -233,6 +235,7 @@ class TestConsume:
 # ──────────────────────────────────────────────────────────────────
 # 3. 并发安全：SELECT FOR UPDATE
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestConcurrencySafety:
     @pytest.mark.asyncio
@@ -352,6 +355,7 @@ class TestConcurrencySafety:
 # 4. 过期处理
 # ──────────────────────────────────────────────────────────────────
 
+
 class TestExpiryProcessing:
     @pytest.mark.asyncio
     async def test_process_expiry_freezes_expired_cards(self):
@@ -425,6 +429,7 @@ class TestExpiryProcessing:
 # ──────────────────────────────────────────────────────────────────
 # 5. 余额转赠
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestTransfer:
     @pytest.mark.asyncio
@@ -539,6 +544,7 @@ class TestTransfer:
 # 6. 退款：退款时余额恢复
 # ──────────────────────────────────────────────────────────────────
 
+
 class TestRefund:
     @pytest.mark.asyncio
     async def test_refund_restores_main_balance(self):
@@ -585,7 +591,9 @@ class TestRefund:
         from services.stored_value_service import StoredValueService
 
         card = _make_card(
-            balance_fen=7000, main_balance_fen=5000, gift_balance_fen=2000,
+            balance_fen=7000,
+            main_balance_fen=5000,
+            gift_balance_fen=2000,
             total_refunded_fen=0,
         )
         db = _make_async_session(card=card)
@@ -625,6 +633,7 @@ class TestRefund:
 # 7. 充值赠送：充100送20满赠逻辑
 # ──────────────────────────────────────────────────────────────────
 
+
 class TestRechargeGift:
     @pytest.mark.asyncio
     async def test_recharge_with_gift_adds_to_gift_balance(self):
@@ -632,7 +641,9 @@ class TestRechargeGift:
         from services.stored_value_service import StoredValueService
 
         card = _make_card(
-            balance_fen=0, main_balance_fen=0, gift_balance_fen=0,
+            balance_fen=0,
+            main_balance_fen=0,
+            gift_balance_fen=0,
             total_recharged_fen=0,
         )
         db = _make_async_session(card=card)
@@ -659,7 +670,7 @@ class TestRechargeGift:
             result = await svc.recharge_direct(
                 db=db,
                 card_id=CARD_ID_1,
-                amount_fen=10000,   # 充 100元
+                amount_fen=10000,  # 充 100元
                 gift_amount_fen=2000,  # 赠 20元
                 tenant_id=TENANT_A,
             )
@@ -691,6 +702,7 @@ class TestRechargeGift:
 # ──────────────────────────────────────────────────────────────────
 # 8. tenant_id 隔离
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestTenantIsolation:
     @pytest.mark.asyncio
@@ -768,6 +780,7 @@ class TestTenantIsolation:
 # ──────────────────────────────────────────────────────────────────
 # 9. 冻结 / 解冻（by card_id）
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
@@ -880,6 +893,7 @@ class TestFreezeUnfreezeById:
 # ──────────────────────────────────────────────────────────────────
 # 10. list_cards_by_customer
 # ──────────────────────────────────────────────────────────────────
+
 
 class TestListCardsByCustomer:
     @pytest.mark.asyncio

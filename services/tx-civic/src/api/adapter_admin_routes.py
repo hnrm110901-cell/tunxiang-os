@@ -47,12 +47,14 @@ async def list_supported_cities(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT city_code, city_name, province, adapter_name,
                        supported_domains, status, activated_at
                 FROM civic_city_adapters
                 ORDER BY province, city_name
-            """)
+            """
+            )
         )
         items = [dict(r._mapping) for r in rows]
         log.info("supported_cities_listed", count=len(items))
@@ -83,7 +85,8 @@ async def activate_city(
 
         activation_id = str(uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO civic_city_activations (
                     id, tenant_id, city_code, store_id,
                     adapter_id, platform_credentials, status, created_at
@@ -91,7 +94,8 @@ async def activate_city(
                     :id, :tid, :code, :sid,
                     :aid, :creds, 'activating', NOW()
                 )
-            """),
+            """
+            ),
             {
                 "id": activation_id,
                 "tid": x_tenant_id,
@@ -135,7 +139,8 @@ async def get_adapters_health(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ca.city_code,
                     ca.city_name,
@@ -149,7 +154,8 @@ async def get_adapters_health(
                 LEFT JOIN civic_city_activations act
                     ON ca.city_code = act.city_code AND act.tenant_id = :tid
                 ORDER BY ca.city_code
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         items = [dict(r._mapping) for r in rows]

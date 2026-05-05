@@ -428,8 +428,7 @@ class VoiceOrchestrator:
                 "order_modify",
                 [
                     re.compile(
-                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(改|换)(成|为)?\s*"
-                        r"(?P<flavor>[\u4e00-\u9fff]{2,})"
+                        r"(?P<dish_name>[\u4e00-\u9fff]{2,})\s*(改|换)(成|为)?\s*" r"(?P<flavor>[\u4e00-\u9fff]{2,})"
                     ),
                     re.compile(r"(改单|改菜|修改订单)"),
                 ],
@@ -466,8 +465,7 @@ class VoiceOrchestrator:
                 "query_inventory",
                 [
                     re.compile(
-                        r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*"
-                        r"(还有多少|还有吗|还有没有|库存|剩多少|还剩)"
+                        r"(?P<ingredient>[\u4e00-\u9fff]{2,})\s*" r"(还有多少|还有吗|还有没有|库存|剩多少|还剩)"
                     ),
                     re.compile(r"(库存|存货)\s*(查一下|查看|查询|怎么样|多少)"),
                     re.compile(r"(查一下|查看|查询)\s*(库存|存货)"),

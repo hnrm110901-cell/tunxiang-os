@@ -263,9 +263,7 @@ class ChannelCanonicalService:
         """
         # tenant_id 三方一致性由路由层校验，本层只确认 req.tenant_id 与 service 实例一致
         if str(req.tenant_id) != self._tenant_id:
-            raise ValueError(
-                f"req.tenant_id {req.tenant_id} != service tenant {self._tenant_id}"
-            )
+            raise ValueError(f"req.tenant_id {req.tenant_id} != service tenant {self._tenant_id}")
 
         # 业务一致性
         req.assert_amount_consistency()
@@ -355,9 +353,7 @@ class ChannelCanonicalService:
             size = 20
         if page < 1:
             page = 1
-        items, total = await self._repo.list_by_store(
-            store_id=store_id, page=page, size=size
-        )
+        items, total = await self._repo.list_by_store(store_id=store_id, page=page, size=size)
         return [CanonicalOrderRecord(**r) for r in items], total
 
     async def get(self, record_id: UUID | str) -> Optional[CanonicalOrderRecord]:

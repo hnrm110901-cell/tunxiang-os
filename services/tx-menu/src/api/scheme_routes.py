@@ -138,7 +138,8 @@ async def list_schemes(
         params["limit"] = size
         params["offset"] = (page - 1) * size
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT ms.id, ms.name, ms.description, ms.brand_id,
                        ms.status, ms.published_at, ms.created_by,
                        ms.created_at, ms.updated_at,
@@ -150,7 +151,8 @@ async def list_schemes(
                 {where}
                 ORDER BY ms.updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [
@@ -186,12 +188,14 @@ async def create_scheme(
     try:
         brand_uuid = uuid.UUID(req.brand_id) if req.brand_id else None
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_schemes
                   (tenant_id, brand_id, name, description, status, created_by)
                 VALUES (:tid, :brand_id, :name, :desc, 'draft', :created_by)
                 RETURNING id, name, description, brand_id, status, created_at
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "brand_id": brand_uuid,
@@ -237,12 +241,14 @@ async def get_scheme(
         _err(400, "无效的 scheme_id")
 
     scheme_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, brand_id, status,
                    published_at, created_by, created_at, updated_at
             FROM menu_schemes
             WHERE id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     row = scheme_res.fetchone()
@@ -250,14 +256,16 @@ async def get_scheme(
         _err(404, "方案不存在")
 
     items_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT msi.id, msi.dish_id, d.dish_name, d.price_fen AS default_price_fen,
                    d.image_url, msi.price_fen, msi.is_available, msi.sort_order, msi.notes
             FROM menu_scheme_items msi
             LEFT JOIN dishes d ON d.id = msi.dish_id
             WHERE msi.scheme_id = :sid AND msi.tenant_id = :tid
             ORDER BY msi.sort_order, d.dish_name
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     items = [
@@ -374,36 +382,42 @@ async def publish_scheme(
         _err(400, "方案内没有菜品，无法发布")
 
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE menu_schemes
             SET status = 'published', published_at = now(), updated_at = now()
             WHERE id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
 
     # ── 自动快照：将当前菜品列表写入 menu_plan_versions ──────────────────
     # 1) 查询当前方案的最大版本号
     ver_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(MAX(version_number), 0)
             FROM menu_plan_versions
             WHERE scheme_id = :sid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     next_version = (ver_row.scalar() or 0) + 1
 
     # 2) 查询方案所有菜品作为 snapshot
     snap_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT msi.id, msi.dish_id, d.dish_name, d.price_fen AS default_price_fen,
                    msi.price_fen, msi.is_available, msi.sort_order, msi.notes
             FROM menu_scheme_items msi
             LEFT JOIN dishes d ON d.id = msi.dish_id
             WHERE msi.scheme_id = :sid AND msi.tenant_id = :tid
             ORDER BY msi.sort_order, msi.id
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     snapshot = [
@@ -421,14 +435,16 @@ async def publish_scheme(
     ]
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO menu_plan_versions
               (id, tenant_id, scheme_id, version_number, change_summary,
                snapshot_json, published_by, created_at, is_deleted)
             VALUES
               (gen_random_uuid(), :tid, :sid, :ver, :summary,
                :snap::jsonb, :operator, now(), false)
-        """),
+        """
+        ),
         {
             "tid": tid,
             "sid": sid,
@@ -508,11 +524,13 @@ async def distribute_scheme(
 
     # 获取本方案当前最新版本号（用于 distribute_log）
     ver_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(MAX(version_number), NULL)
             FROM menu_plan_versions
             WHERE scheme_id = :sid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     current_version = ver_row.scalar()  # None 表示尚未有版本快照
@@ -526,13 +544,15 @@ async def distribute_scheme(
             log.warning("distribute.invalid_store_id", store_id=store_id_str)
             continue
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO store_scheme_assignments
                   (tenant_id, store_id, scheme_id, distributed_at, distributed_by)
                 VALUES (:tid, :store_id, :sid, now(), :operator)
                 ON CONFLICT (store_id, scheme_id)
                 DO UPDATE SET distributed_at = now(), distributed_by = :operator
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "store_id": store_uuid,
@@ -542,14 +562,16 @@ async def distribute_scheme(
         )
         # 写 distribute_log
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_distribute_log
                   (id, tenant_id, scheme_id, store_id, version_number,
                    status, error_message, distributed_by, distributed_at, is_deleted)
                 VALUES
                   (gen_random_uuid(), :tid, :sid, :store_id, :ver,
                    'success', NULL, :operator, now(), false)
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "sid": sid,
@@ -618,16 +640,19 @@ async def get_scheme_stores(
         _err(400, "无效的 scheme_id")
 
     count_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM store_scheme_assignments
             WHERE scheme_id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     total = count_res.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT ssa.store_id, ssa.distributed_at, ssa.distributed_by,
                    (SELECT COUNT(*) FROM store_menu_overrides smo
                     WHERE smo.store_id = ssa.store_id
@@ -637,7 +662,8 @@ async def get_scheme_stores(
             WHERE ssa.scheme_id = :sid AND ssa.tenant_id = :tid
             ORDER BY ssa.distributed_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid, "limit": size, "offset": (page - 1) * size},
     )
     items = [
@@ -689,7 +715,8 @@ async def set_scheme_items(
             log.warning("scheme_items.invalid_dish_id", dish_id=item.dish_id)
             continue
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_scheme_items
                   (tenant_id, scheme_id, dish_id, price_fen, is_available, sort_order, notes)
                 VALUES (:tid, :sid, :dish_id, :price_fen, :is_available, :sort_order, :notes)
@@ -699,7 +726,8 @@ async def set_scheme_items(
                   is_available = EXCLUDED.is_available,
                   sort_order   = EXCLUDED.sort_order,
                   notes        = EXCLUDED.notes
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "sid": sid,
@@ -755,12 +783,14 @@ async def get_store_menu(
             _err(400, "无效的 scheme_id")
     else:
         latest = await db.execute(
-            text("""
+            text(
+                """
                 SELECT scheme_id FROM store_scheme_assignments
                 WHERE store_id = :store_id AND tenant_id = :tid
                 ORDER BY distributed_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": store_uuid, "tid": tid},
         )
         row = latest.fetchone()
@@ -772,16 +802,19 @@ async def get_store_menu(
         sid = row[0]
 
     count_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM menu_scheme_items
             WHERE scheme_id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"sid": sid, "tid": tid},
     )
     total = count_res.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 msi.dish_id,
                 d.dish_name,
@@ -807,7 +840,8 @@ async def get_store_menu(
             WHERE msi.scheme_id = :sid AND msi.tenant_id = :tid
             ORDER BY msi.sort_order, d.dish_name
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "sid": sid,
             "tid": tid,
@@ -869,17 +903,20 @@ async def set_store_override(
 
     # 校验该门店已被下发该方案
     check = await db.execute(
-        text("""
+        text(
+            """
             SELECT 1 FROM store_scheme_assignments
             WHERE store_id = :store_id AND scheme_id = :sid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"store_id": store_uuid, "sid": scheme_uuid, "tid": tid},
     )
     if not check.fetchone():
         _err(400, "该门店尚未下发此方案，无法设置覆盖")
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO store_menu_overrides
               (tenant_id, store_id, dish_id, scheme_id, override_price_fen, override_available, updated_at)
             VALUES (:tid, :store_id, :dish_id, :sid, :price, :available, now())
@@ -888,7 +925,8 @@ async def set_store_override(
               override_price_fen = EXCLUDED.override_price_fen,
               override_available = EXCLUDED.override_available,
               updated_at         = now()
-        """),
+        """
+        ),
         {
             "tid": tid,
             "store_id": store_uuid,
@@ -935,13 +973,15 @@ async def delete_store_override(
         _err(400, f"UUID 格式错误: {exc}")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             DELETE FROM store_menu_overrides
             WHERE store_id = :store_id
               AND dish_id  = :dish_id
               AND scheme_id = :sid
               AND tenant_id = :tid
-        """),
+        """
+        ),
         {"store_id": store_uuid, "dish_id": dish_uuid, "sid": scheme_uuid, "tid": tid},
     )
     await db.commit()

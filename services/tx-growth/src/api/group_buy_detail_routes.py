@@ -86,14 +86,16 @@ async def get_campaign_detail(
 
         # ① 活动基础信息
         act_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, product_id, product_name,
                        original_price_fen, group_price_fen, group_size,
                        max_teams, time_limit_minutes, status,
                        start_time, end_time, team_count, success_count
                 FROM group_buy_activities
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": act_id, "tid": tid},
         )
         act = act_result.fetchone()
@@ -103,7 +105,8 @@ async def get_campaign_detail(
         # ② 进行中的团（forming 且未过期，最多取 10 个）
         now = datetime.now(timezone.utc)
         teams_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT t.id, t.target_size, t.current_size, t.expired_at,
                        t.created_at
                 FROM group_buy_teams t
@@ -114,19 +117,22 @@ async def get_campaign_detail(
                   AND t.is_deleted = false
                 ORDER BY t.created_at DESC
                 LIMIT 10
-            """),
+            """
+            ),
             {"tid": tid, "act_id": act_id, "now": now},
         )
         teams = []
         for t in teams_result.fetchall():
             # 获取团成员（只取 nickname 概要）
             members_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT customer_id, joined_at
                     FROM group_buy_members
                     WHERE tenant_id = :tid AND team_id = :team_id AND is_deleted = false
                     ORDER BY joined_at ASC
-                """),
+                """
+                ),
                 {"tid": tid, "team_id": t.id},
             )
             members = [
@@ -196,13 +202,15 @@ async def join_group(
 
         # ① 校验活动
         act_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, status, group_size, max_teams, team_count,
                        time_limit_minutes, end_time
                 FROM group_buy_activities
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
                 FOR UPDATE
-            """),
+            """
+            ),
             {"id": act_id, "tid": tid},
         )
         act = act_result.fetchone()
@@ -217,13 +225,15 @@ async def join_group(
             # ── 加入已有团 ──
             team_uuid = uuid.UUID(req.team_id)
             team_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, current_size, target_size, status, expired_at
                     FROM group_buy_teams
                     WHERE id = :team_id AND tenant_id = :tid
                       AND activity_id = :act_id AND is_deleted = false
                     FOR UPDATE
-                """),
+                """
+                ),
                 {"team_id": team_uuid, "tid": tid, "act_id": act_id},
             )
             team = team_result.fetchone()
@@ -238,11 +248,13 @@ async def join_group(
 
             # 幂等检查
             dup_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM group_buy_members
                     WHERE tenant_id = :tid AND team_id = :team_id AND customer_id = :cid
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tid, "team_id": team_uuid, "cid": cid},
             )
             if dup_result.fetchone():
@@ -262,14 +274,16 @@ async def join_group(
             expired_at = now + timedelta(minutes=act.time_limit_minutes)
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO group_buy_teams
                         (id, tenant_id, activity_id, initiator_id,
                          target_size, current_size, status, expired_at)
                     VALUES
                         (:id, :tid, :act_id, :cid,
                          :target, 1, 'forming', :expired_at)
-                """),
+                """
+                ),
                 {
                     "id": team_id_val,
                     "tid": tid,
@@ -282,11 +296,13 @@ async def join_group(
 
             # 递增活动 team_count
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE group_buy_activities
                     SET team_count = team_count + 1, updated_at = NOW()
                     WHERE id = :act_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"act_id": act_id, "tid": tid},
             )
 
@@ -296,23 +312,27 @@ async def join_group(
         # ② 写入成员记录
         member_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO group_buy_members
                     (id, tenant_id, team_id, customer_id, joined_at)
                 VALUES
                     (:id, :tid, :team_id, :cid, :now)
-            """),
+            """
+            ),
             {"id": member_id, "tid": tid, "team_id": team_id_val, "cid": cid, "now": now},
         )
 
         # ③ 若是加入已有团，递增 current_size
         if req.team_id:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE group_buy_teams
                     SET current_size = current_size + 1, updated_at = NOW()
                     WHERE id = :team_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"team_id": team_id_val, "tid": tid},
             )
 
@@ -321,20 +341,24 @@ async def join_group(
         if new_size >= target:
             team_status = "succeeded"
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE group_buy_teams
                     SET status = 'succeeded', succeeded_at = :now, updated_at = NOW()
                     WHERE id = :team_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"team_id": team_id_val, "tid": tid, "now": now},
             )
             # 递增活动 success_count
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE group_buy_activities
                     SET success_count = success_count + 1, updated_at = NOW()
                     WHERE id = :act_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"act_id": act_id, "tid": tid},
             )
 
@@ -397,7 +421,8 @@ async def get_my_orders(
         db_status = status_map.get(status, status)
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM group_buy_members m
                 JOIN group_buy_teams t ON t.id = m.team_id AND t.tenant_id = m.tenant_id
@@ -406,13 +431,15 @@ async def get_my_orders(
                   AND t.status = :status
                   AND m.is_deleted = false
                   AND t.is_deleted = false
-            """),
+            """
+            ),
             {"tid": tid, "cid": cid, "status": db_status},
         )
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT t.id AS team_id, t.activity_id, t.target_size, t.current_size,
                        t.status AS team_status, t.expired_at, t.succeeded_at,
                        a.name AS activity_name, a.group_price_fen, a.original_price_fen,
@@ -427,7 +454,8 @@ async def get_my_orders(
                   AND t.is_deleted = false
                 ORDER BY m.joined_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"tid": tid, "cid": cid, "status": db_status, "limit": size, "offset": offset},
         )
         rows = result.fetchall()

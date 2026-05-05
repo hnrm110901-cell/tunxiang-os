@@ -121,12 +121,14 @@ class GrowthIntelRelayService:
         try:
             # 查找已有接力记录
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM opportunity_relays
                     WHERE opportunity_id = :opp_id
                       AND is_deleted = false
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {"opp_id": opportunity_id},
             )
             existing_row = result.mappings().one_or_none()
@@ -168,7 +170,8 @@ class GrowthIntelRelayService:
             if existing_row:
                 # 更新已有记录
                 await session.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE opportunity_relays SET
                             campaign_draft_id = :campaign_draft_id,
                             campaign_type = :campaign_type,
@@ -177,7 +180,8 @@ class GrowthIntelRelayService:
                             status = 'draft_created',
                             updated_at = :now
                         WHERE relay_id = :relay_id
-                    """),
+                    """
+                    ),
                     {
                         "campaign_draft_id": campaign_draft_id,
                         "campaign_type": campaign_type,
@@ -192,7 +196,8 @@ class GrowthIntelRelayService:
                 import json
 
                 await session.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO opportunity_relays (
                             tenant_id, relay_id, opportunity_id, opportunity_type,
                             opportunity_title, opportunity_score, campaign_draft_id,
@@ -204,7 +209,8 @@ class GrowthIntelRelayService:
                             :campaign_type, :campaign_title, :suggested_actions::jsonb,
                             'draft_created', :now, :now
                         )
-                    """),
+                    """
+                    ),
                     {
                         "tenant_id": self._tenant_id,
                         "relay_id": relay_id,
@@ -264,12 +270,14 @@ class GrowthIntelRelayService:
         try:
             # 通过 pilot_id 在 campaign_draft_id 中匹配接力记录
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT relay_id FROM opportunity_relays
                     WHERE campaign_draft_id LIKE :pilot_pattern
                       AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"pilot_pattern": f"%{pilot_id}%"},
             )
             relay_row = result.mappings().one_or_none()
@@ -286,7 +294,8 @@ class GrowthIntelRelayService:
             now = datetime.now(timezone.utc)
 
             await session.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO pilot_feedbacks (
                         tenant_id, feedback_id, pilot_id, relay_id,
                         results, metrics, intel_model_updated, created_at
@@ -294,7 +303,8 @@ class GrowthIntelRelayService:
                         :tenant_id::uuid, :feedback_id, :pilot_id, :relay_id,
                         :results::jsonb, :metrics::jsonb, true, :now
                     )
-                """),
+                """
+                ),
                 {
                     "tenant_id": self._tenant_id,
                     "feedback_id": feedback_id,
@@ -309,11 +319,13 @@ class GrowthIntelRelayService:
             # 更新接力记录状态
             if relay_id != "unknown":
                 await session.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE opportunity_relays
                         SET status = 'completed', updated_at = :now
                         WHERE relay_id = :relay_id
-                    """),
+                    """
+                    ),
                     {"relay_id": relay_id, "now": now},
                 )
 
@@ -344,12 +356,14 @@ class GrowthIntelRelayService:
         session = await _get_session(self._tenant_id)
         try:
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM opportunity_relays
                     WHERE is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 500
-                """)
+                """
+                )
             )
             rows = result.mappings().all()
             return [await _row_to_relay(r) for r in rows]
@@ -364,12 +378,14 @@ class GrowthIntelRelayService:
         session = await _get_session(self._tenant_id)
         try:
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM opportunity_relays
                     WHERE status IN ('pending', 'draft_created', 'approved', 'executing')
                       AND is_deleted = false
                     ORDER BY created_at DESC
-                """)
+                """
+                )
             )
             rows = result.mappings().all()
             return [await _row_to_relay(r) for r in rows]
@@ -384,12 +400,14 @@ class GrowthIntelRelayService:
         session = await _get_session(self._tenant_id)
         try:
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT * FROM pilot_feedbacks
                     WHERE is_deleted = false
                     ORDER BY created_at DESC
                     LIMIT 500
-                """)
+                """
+                )
             )
             rows = result.mappings().all()
             return [await _row_to_feedback(r) for r in rows]
@@ -404,7 +422,8 @@ class GrowthIntelRelayService:
         session = await _get_session(self._tenant_id)
         try:
             result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*)                                              AS total_relays,
                         COUNT(*) FILTER (WHERE status IN (
@@ -413,7 +432,8 @@ class GrowthIntelRelayService:
                         COUNT(*) FILTER (WHERE status = 'rejected')           AS rejected_relays
                     FROM opportunity_relays
                     WHERE is_deleted = false
-                """)
+                """
+                )
             )
             row = result.mappings().one_or_none()
 
@@ -423,11 +443,13 @@ class GrowthIntelRelayService:
             fb_row = fb_result.mappings().one_or_none()
 
             by_status_result = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT status, COUNT(*) AS cnt
                     FROM opportunity_relays WHERE is_deleted = false
                     GROUP BY status
-                """)
+                """
+                )
             )
             by_status = {r["status"]: int(r["cnt"]) for r in by_status_result.mappings().all()}
 

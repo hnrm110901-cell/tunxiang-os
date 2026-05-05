@@ -27,6 +27,7 @@ from datetime import date, datetime, time, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
 from services.attendance_engine import (
     AttendanceEngine,
 )
@@ -42,9 +43,9 @@ from services.leave_service import (
 
 SCHEDULE = {
     "EMP001": {
-        "2026-03-31": "morning",   # 8:00 - 15:00
+        "2026-03-31": "morning",  # 8:00 - 15:00
         "2026-04-01": "morning",
-        "2026-04-02": "evening",   # 15:00 - 22:00
+        "2026-04-02": "evening",  # 15:00 - 22:00
     }
 }
 
@@ -386,9 +387,7 @@ class TestAttendanceRepositoryHelpers:
 
         clock_time = datetime(2026, 3, 31, 14, 30, tzinfo=timezone.utc)
         shift_end = time(15, 0)
-        status, diff, ot = _calculate_clock_out_status(
-            clock_time, shift_end, grace_minutes=5, overtime_min=30
-        )
+        status, diff, ot = _calculate_clock_out_status(clock_time, shift_end, grace_minutes=5, overtime_min=30)
         assert status == "early_leave"
         assert diff == -30
         assert ot == 0.0
@@ -399,9 +398,7 @@ class TestAttendanceRepositoryHelpers:
 
         clock_time = datetime(2026, 3, 31, 15, 45, tzinfo=timezone.utc)
         shift_end = time(15, 0)
-        status, diff, ot = _calculate_clock_out_status(
-            clock_time, shift_end, grace_minutes=5, overtime_min=30
-        )
+        status, diff, ot = _calculate_clock_out_status(clock_time, shift_end, grace_minutes=5, overtime_min=30)
         assert status == "overtime"
         assert diff == 45
         assert ot == pytest.approx(0.75, abs=0.01)
@@ -411,9 +408,7 @@ class TestAttendanceRepositoryHelpers:
         from api.attendance_routes import _calculate_clock_out_status
 
         clock_time = datetime(2026, 3, 31, 15, 0, tzinfo=timezone.utc)
-        status, diff, ot = _calculate_clock_out_status(
-            clock_time, None, grace_minutes=5, overtime_min=30
-        )
+        status, diff, ot = _calculate_clock_out_status(clock_time, None, grace_minutes=5, overtime_min=30)
         assert status == "unscheduled"
 
 

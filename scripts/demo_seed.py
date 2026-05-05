@@ -3,22 +3,46 @@
 为尝在一起、最黔线、尚宫厨三家商户生成差异化演示数据。
 使用：python scripts/demo_seed.py
 """
+
 import asyncio
 import os
 import random
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 TENANTS = [
     {
         "tenant_id": uuid.UUID("10000000-0000-0000-0000-000000000001"),
-        "name": "尝在一起", "brand_id": "brand_czyz", "cuisine": "湘菜",
-        "daily_orders": (100, 160), "avg_ticket_fen": (13000, 18000),
+        "name": "尝在一起",
+        "brand_id": "brand_czyz",
+        "cuisine": "湘菜",
+        "daily_orders": (100, 160),
+        "avg_ticket_fen": (13000, 18000),
         "stores": [
-            {"name": "尝在一起·文化城店", "code": "CZYZ-WH001", "city": "长沙", "district": "芙蓉区", "seats": 180, "area": 450},
-            {"name": "尝在一起·浏小鲜", "code": "CZYZ-LXX001", "city": "长沙", "district": "开福区", "seats": 120, "area": 300},
-            {"name": "尝在一起·永安店", "code": "CZYZ-YA001", "city": "长沙", "district": "天心区", "seats": 100, "area": 260},
+            {
+                "name": "尝在一起·文化城店",
+                "code": "CZYZ-WH001",
+                "city": "长沙",
+                "district": "芙蓉区",
+                "seats": 180,
+                "area": 450,
+            },
+            {
+                "name": "尝在一起·浏小鲜",
+                "code": "CZYZ-LXX001",
+                "city": "长沙",
+                "district": "开福区",
+                "seats": 120,
+                "area": 300,
+            },
+            {
+                "name": "尝在一起·永安店",
+                "code": "CZYZ-YA001",
+                "city": "长沙",
+                "district": "天心区",
+                "seats": 100,
+                "area": 260,
+            },
         ],
         "dishes": [
             {"name": "剁椒鱼头", "price": 8800, "cost": 3200, "cat": "招牌菜"},
@@ -45,10 +69,20 @@ TENANTS = [
     },
     {
         "tenant_id": uuid.UUID("10000000-0000-0000-0000-000000000002"),
-        "name": "最黔线", "brand_id": "brand_zqx", "cuisine": "贵州菜",
-        "daily_orders": (50, 80), "avg_ticket_fen": (4500, 6500),
+        "name": "最黔线",
+        "brand_id": "brand_zqx",
+        "cuisine": "贵州菜",
+        "daily_orders": (50, 80),
+        "avg_ticket_fen": (4500, 6500),
         "stores": [
-            {"name": "最黔线·五一广场店", "code": "ZQX-WY", "city": "长沙", "district": "天心区", "seats": 60, "area": 160},
+            {
+                "name": "最黔线·五一广场店",
+                "code": "ZQX-WY",
+                "city": "长沙",
+                "district": "天心区",
+                "seats": 60,
+                "area": 160,
+            },
             {"name": "最黔线·万达店", "code": "ZQX-WD", "city": "长沙", "district": "开福区", "seats": 50, "area": 130},
         ],
         "dishes": [
@@ -76,11 +110,28 @@ TENANTS = [
     },
     {
         "tenant_id": uuid.UUID("10000000-0000-0000-0000-000000000003"),
-        "name": "尚宫厨", "brand_id": "brand_sgc", "cuisine": "韩式料理",
-        "daily_orders": (40, 65), "avg_ticket_fen": (3500, 5500),
+        "name": "尚宫厨",
+        "brand_id": "brand_sgc",
+        "cuisine": "韩式料理",
+        "daily_orders": (40, 65),
+        "avg_ticket_fen": (3500, 5500),
         "stores": [
-            {"name": "尚宫厨·步行街店", "code": "SGC-BX", "city": "长沙", "district": "天心区", "seats": 45, "area": 120},
-            {"name": "尚宫厨·大学城店", "code": "SGC-DX", "city": "长沙", "district": "岳麓区", "seats": 40, "area": 100},
+            {
+                "name": "尚宫厨·步行街店",
+                "code": "SGC-BX",
+                "city": "长沙",
+                "district": "天心区",
+                "seats": 45,
+                "area": 120,
+            },
+            {
+                "name": "尚宫厨·大学城店",
+                "code": "SGC-DX",
+                "city": "长沙",
+                "district": "岳麓区",
+                "seats": 40,
+                "area": 100,
+            },
         ],
         "dishes": [
             {"name": "石锅拌饭", "price": 2800, "cost": 800, "cat": "招牌菜"},
@@ -148,6 +199,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://tunxiang:changeme
 async def seed_all() -> None:
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
     engine = create_async_engine(DATABASE_URL, echo=False)
     sf = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     print("=" * 60)
@@ -158,81 +210,182 @@ async def seed_all() -> None:
         print(f"\n商户: {tenant['name']} ({tid})")
         async with sf() as session:
             await session.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
-            for t in ["order_items","orders","ingredients","customers","dishes","dish_categories","stores"]:
-                await session.execute(text(f"DELETE FROM {t} WHERE tenant_id = :tid"), {"tid": str(tid)})
+            # 表名来自硬编码白名单；tenant_id 走 bind param
+            for t in ["order_items", "orders", "ingredients", "customers", "dishes", "dish_categories", "stores"]:
+                await session.execute(text(f"DELETE FROM {t} WHERE tenant_id = :tid"), {"tid": str(tid)})  # noqa: S608
             store_ids = []
             for s in tenant["stores"]:
                 sid = uuid.uuid5(uuid.NAMESPACE_URL, f"store:{tenant['brand_id']}:{s['code']}")
                 store_ids.append(sid)
-                await session.execute(text("INSERT INTO stores (id,tenant_id,store_name,store_code,city,district,seats,area_sqm,brand_id,status,store_type) VALUES (:id,:tid,:name,:code,:city,:district,:seats,:area,:brand,'active','physical') ON CONFLICT (id) DO NOTHING"),
-                    {"id":str(sid),"tid":str(tid),"name":s["name"],"code":s["code"],"city":s["city"],"district":s["district"],"seats":s["seats"],"area":s["area"],"brand":tenant["brand_id"]})
+                await session.execute(
+                    text(
+                        "INSERT INTO stores (id,tenant_id,store_name,store_code,city,district,seats,area_sqm,brand_id,status,store_type) VALUES (:id,:tid,:name,:code,:city,:district,:seats,:area,:brand,'active','physical') ON CONFLICT (id) DO NOTHING"
+                    ),
+                    {
+                        "id": str(sid),
+                        "tid": str(tid),
+                        "name": s["name"],
+                        "code": s["code"],
+                        "city": s["city"],
+                        "district": s["district"],
+                        "seats": s["seats"],
+                        "area": s["area"],
+                        "brand": tenant["brand_id"],
+                    },
+                )
             print(f"  门店: {len(store_ids)}")
             dish_map = []
-            for i,d in enumerate(tenant["dishes"]):
+            for i, d in enumerate(tenant["dishes"]):
                 did = uuid.uuid5(uuid.NAMESPACE_URL, f"dish:{tenant['brand_id']}:{d['name']}")
-                dish_map.append({"id":did,"name":d["name"],"price":d["price"],"cost":d["cost"]})
-                await session.execute(text("INSERT INTO dishes (id,tenant_id,dish_name,dish_code,price_fen,cost_fen,status,is_available,sort_order) VALUES (:id,:tid,:name,:code,:price,:cost,'active',true,:sort) ON CONFLICT (id) DO NOTHING"),
-                    {"id":str(did),"tid":str(tid),"name":d["name"],"code":f"D{i+1:03d}","price":d["price"],"cost":d["cost"],"sort":i})
+                dish_map.append({"id": did, "name": d["name"], "price": d["price"], "cost": d["cost"]})
+                await session.execute(
+                    text(
+                        "INSERT INTO dishes (id,tenant_id,dish_name,dish_code,price_fen,cost_fen,status,is_available,sort_order) VALUES (:id,:tid,:name,:code,:price,:cost,'active',true,:sort) ON CONFLICT (id) DO NOTHING"
+                    ),
+                    {
+                        "id": str(did),
+                        "tid": str(tid),
+                        "name": d["name"],
+                        "code": f"D{i + 1:03d}",
+                        "price": d["price"],
+                        "cost": d["cost"],
+                        "sort": i,
+                    },
+                )
             print(f"  菜品: {len(dish_map)}")
-            rfm_levels = ["S1"]*10+["S2"]*30+["S3"]*60+["S4"]*60+["S5"]*40
+            rfm_levels = ["S1"] * 10 + ["S2"] * 30 + ["S3"] * 60 + ["S4"] * 60 + ["S5"] * 40
             for i in range(200):
                 cid = uuid.uuid5(uuid.NAMESPACE_URL, f"customer:{tenant['brand_id']}:{i}")
                 surname = random.choice(SURNAMES)
-                gender = random.choice(["male","female"])
-                phone = f"1{random.choice(['38','39','58','59','86','87'])}{random.randint(10000000,99999999)}"
+                gender = random.choice(["male", "female"])
+                phone = f"1{random.choice(['38', '39', '58', '59', '86', '87'])}{random.randint(10000000, 99999999)}"
                 rfm = rfm_levels[i] if i < len(rfm_levels) else "S3"
-                visits = {"S1":random.randint(20,50),"S2":random.randint(8,20),"S3":random.randint(3,8),"S4":random.randint(1,3),"S5":random.randint(0,1)}[rfm]
+                visits = {
+                    "S1": random.randint(20, 50),
+                    "S2": random.randint(8, 20),
+                    "S3": random.randint(3, 8),
+                    "S4": random.randint(1, 3),
+                    "S5": random.randint(0, 1),
+                }[rfm]
                 total_fen = visits * random.randint(*tenant["avg_ticket_fen"])
-                await session.execute(text("INSERT INTO customers (id,tenant_id,primary_phone,display_name,gender,rfm_level,total_order_count,total_order_amount_fen,source) VALUES (:id,:tid,:phone,:name,:gender,:rfm,:visits,:total,'pinzhi') ON CONFLICT (id) DO NOTHING"),
-                    {"id":str(cid),"tid":str(tid),"phone":phone,"name":f"{surname}{'先生' if gender=='male' else '女士'}","gender":gender,"rfm":rfm,"visits":visits,"total":total_fen})
-            print(f"  会员: 200")
+                await session.execute(
+                    text(
+                        "INSERT INTO customers (id,tenant_id,primary_phone,display_name,gender,rfm_level,total_order_count,total_order_amount_fen,source) VALUES (:id,:tid,:phone,:name,:gender,:rfm,:visits,:total,'pinzhi') ON CONFLICT (id) DO NOTHING"
+                    ),
+                    {
+                        "id": str(cid),
+                        "tid": str(tid),
+                        "phone": phone,
+                        "name": f"{surname}{'先生' if gender == 'male' else '女士'}",
+                        "gender": gender,
+                        "rfm": rfm,
+                        "visits": visits,
+                        "total": total_fen,
+                    },
+                )
+            print("  会员: 200")
             ing_count = 0
             for store_id in store_ids:
                 for ing in INGREDIENT_TEMPLATES:
                     iid = uuid.uuid5(uuid.NAMESPACE_URL, f"ing:{tenant['brand_id']}:{store_id}:{ing['name']}")
-                    qty = max(0, ing["qty"]+random.randint(-10,20))
-                    status = "out_of_stock" if qty<=0 else ("low" if qty<=ing["min"] else "normal")
-                    await session.execute(text("INSERT INTO ingredients (id,tenant_id,store_id,ingredient_name,category,unit,current_quantity,min_quantity,status) VALUES (:id,:tid,:sid,:name,:cat,:unit,:qty,:min,:status) ON CONFLICT (id) DO NOTHING"),
-                        {"id":str(iid),"tid":str(tid),"sid":str(store_id),"name":ing["name"],"cat":ing["cat"],"unit":ing["unit"],"qty":qty,"min":ing["min"],"status":status})
+                    qty = max(0, ing["qty"] + random.randint(-10, 20))
+                    status = "out_of_stock" if qty <= 0 else ("low" if qty <= ing["min"] else "normal")
+                    await session.execute(
+                        text(
+                            "INSERT INTO ingredients (id,tenant_id,store_id,ingredient_name,category,unit,current_quantity,min_quantity,status) VALUES (:id,:tid,:sid,:name,:cat,:unit,:qty,:min,:status) ON CONFLICT (id) DO NOTHING"
+                        ),
+                        {
+                            "id": str(iid),
+                            "tid": str(tid),
+                            "sid": str(store_id),
+                            "name": ing["name"],
+                            "cat": ing["cat"],
+                            "unit": ing["unit"],
+                            "qty": qty,
+                            "min": ing["min"],
+                            "status": status,
+                        },
+                    )
                     ing_count += 1
             print(f"  食材: {ing_count}")
             now = datetime.now(timezone.utc)
             order_count = 0
             item_count = 0
-            for day_offset in range(30,0,-1):
+            for day_offset in range(30, 0, -1):
                 day = now - timedelta(days=day_offset)
                 is_weekend = day.weekday() >= 5
                 for store_id in store_ids:
-                    lo,hi = tenant["daily_orders"]
-                    dc = int(random.randint(lo,hi) * (1.2 if is_weekend else 1.0))
+                    lo, hi = tenant["daily_orders"]
+                    dc = int(random.randint(lo, hi) * (1.2 if is_weekend else 1.0))
                     for _ in range(dc):
                         r = random.random()
-                        hour = random.randint(11,13) if r<0.4 else (random.randint(17,20) if r<0.8 else random.choice([10,14,15,16,21]))
-                        otime = day.replace(hour=hour,minute=random.randint(0,59),second=random.randint(0,59))
+                        hour = (
+                            random.randint(11, 13)
+                            if r < 0.4
+                            else (random.randint(17, 20) if r < 0.8 else random.choice([10, 14, 15, 16, 21]))
+                        )
+                        otime = day.replace(hour=hour, minute=random.randint(0, 59), second=random.randint(0, 59))
                         oid = uuid.uuid4()
                         ono = f"TX{otime.strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
-                        selected = random.sample(dish_map, min(random.randint(2,5), len(dish_map)))
+                        selected = random.sample(dish_map, min(random.randint(2, 5), len(dish_map)))
                         items = []
                         subtotal = 0
                         for dish in selected:
-                            qty = random.choices([1,2,3],weights=[70,25,5])[0]
-                            sub = dish["price"]*qty
+                            qty = random.choices([1, 2, 3], weights=[70, 25, 5])[0]
+                            sub = dish["price"] * qty
                             subtotal += sub
-                            items.append({"did":dish["id"],"name":dish["name"],"qty":qty,"price":dish["price"],"sub":sub})
-                        discount = int(subtotal*random.uniform(0.05,0.15)) if random.random()<0.2 else 0
+                            items.append(
+                                {
+                                    "did": dish["id"],
+                                    "name": dish["name"],
+                                    "qty": qty,
+                                    "price": dish["price"],
+                                    "sub": sub,
+                                }
+                            )
+                        discount = int(subtotal * random.uniform(0.05, 0.15)) if random.random() < 0.2 else 0
                         final = subtotal - discount
-                        await session.execute(text("INSERT INTO orders (id,tenant_id,order_no,store_id,order_type,total_amount_fen,discount_amount_fen,final_amount_fen,status,guest_count,order_time,completed_at) VALUES (:id,:tid,:no,:sid,:type,:total,:disc,:final,'completed',:guests,:otime,:ctime)"),
-                            {"id":str(oid),"tid":str(tid),"no":ono,"sid":str(store_id),"type":random.choices(["dine_in","takeaway"],weights=[75,25])[0],"total":subtotal,"disc":discount,"final":final,"guests":random.randint(1,6),"otime":otime.isoformat(),"ctime":(otime+timedelta(minutes=random.randint(20,60))).isoformat()})
+                        await session.execute(
+                            text(
+                                "INSERT INTO orders (id,tenant_id,order_no,store_id,order_type,total_amount_fen,discount_amount_fen,final_amount_fen,status,guest_count,order_time,completed_at) VALUES (:id,:tid,:no,:sid,:type,:total,:disc,:final,'completed',:guests,:otime,:ctime)"
+                            ),
+                            {
+                                "id": str(oid),
+                                "tid": str(tid),
+                                "no": ono,
+                                "sid": str(store_id),
+                                "type": random.choices(["dine_in", "takeaway"], weights=[75, 25])[0],
+                                "total": subtotal,
+                                "disc": discount,
+                                "final": final,
+                                "guests": random.randint(1, 6),
+                                "otime": otime.isoformat(),
+                                "ctime": (otime + timedelta(minutes=random.randint(20, 60))).isoformat(),
+                            },
+                        )
                         for it in items:
-                            await session.execute(text("INSERT INTO order_items (id,tenant_id,order_id,dish_id,item_name,quantity,unit_price_fen,subtotal_fen) VALUES (:id,:tid,:oid,:did,:name,:qty,:price,:sub)"),
-                                {"id":str(uuid.uuid4()),"tid":str(tid),"oid":str(oid),"did":str(it["did"]),"name":it["name"],"qty":it["qty"],"price":it["price"],"sub":it["sub"]})
+                            await session.execute(
+                                text(
+                                    "INSERT INTO order_items (id,tenant_id,order_id,dish_id,item_name,quantity,unit_price_fen,subtotal_fen) VALUES (:id,:tid,:oid,:did,:name,:qty,:price,:sub)"
+                                ),
+                                {
+                                    "id": str(uuid.uuid4()),
+                                    "tid": str(tid),
+                                    "oid": str(oid),
+                                    "did": str(it["did"]),
+                                    "name": it["name"],
+                                    "qty": it["qty"],
+                                    "price": it["price"],
+                                    "sub": it["sub"],
+                                },
+                            )
                             item_count += 1
                         order_count += 1
             print(f"  订单: {order_count} 单, {item_count} 菜品明细")
             await session.commit()
             print(f"  ✓ {tenant['name']} 完成")
     await engine.dispose()
-    print(f"\n{'='*60}\n全部完成！\n{'='*60}")
+    print(f"\n{'=' * 60}\n全部完成！\n{'=' * 60}")
 
 
 if __name__ == "__main__":

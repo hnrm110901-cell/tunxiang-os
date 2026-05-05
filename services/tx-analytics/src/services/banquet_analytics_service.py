@@ -83,7 +83,8 @@ async def get_source_conversion(
     返回每个来源渠道的：线索数、跟进数、转化数、转化率、营收
     """
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(source_channel, 'other')               AS source_channel,
                 COUNT(*)                                         AS total_leads,
@@ -108,7 +109,8 @@ async def get_source_conversion(
               AND is_deleted  = false
             GROUP BY COALESCE(source_channel, 'other')
             ORDER BY converted_revenue_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -137,7 +139,8 @@ async def get_lead_conversion_by_salesperson(
 ) -> list[dict]:
     """按销售员统计商机转化漏斗"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 salesperson_id,
                 salesperson_name,
@@ -165,7 +168,8 @@ async def get_lead_conversion_by_salesperson(
               AND is_deleted  = false
             GROUP BY salesperson_id, salesperson_name
             ORDER BY converted_revenue_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -202,7 +206,8 @@ async def get_banquet_order_analysis(
         params["banquet_type"] = banquet_type
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 COALESCE(banquet_type, 'other')                  AS banquet_type,
                 COUNT(*)                                          AS order_count,
@@ -228,7 +233,8 @@ async def get_banquet_order_analysis(
               {type_filter}
             GROUP BY COALESCE(banquet_type, 'other')
             ORDER BY total_revenue_fen DESC
-        """),
+        """
+        ),
         params,
     )
     rows = [dict(r) for r in result.mappings()]
@@ -256,7 +262,8 @@ async def get_salesperson_ranking(
     order_clause = "total_revenue_fen DESC" if sort_by == "revenue" else "order_count DESC"
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 salesperson_id,
                 salesperson_name,
@@ -282,7 +289,8 @@ async def get_salesperson_ranking(
             GROUP BY salesperson_id, salesperson_name
             ORDER BY {order_clause}
             LIMIT :limit
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -313,7 +321,8 @@ async def get_lost_reason_analysis(
     """丢单原因分析 — TOP N 原因 + 总损失金额"""
     # 按原因分类统计
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 reason_category,
                 COUNT(*)                                          AS lost_count,
@@ -333,7 +342,8 @@ async def get_lost_reason_analysis(
             GROUP BY reason_category
             ORDER BY lost_count DESC
             LIMIT :top_n
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -346,7 +356,8 @@ async def get_lost_reason_analysis(
 
     # 竞品分析
     competitor_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 competitor_name,
                 COUNT(*)                                          AS lost_count,
@@ -362,7 +373,8 @@ async def get_lost_reason_analysis(
             GROUP BY competitor_name
             ORDER BY lost_count DESC
             LIMIT 10
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -401,7 +413,8 @@ async def get_banquet_revenue_trend(
         granularity = "day"
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT
                 DATE_TRUNC('{granularity}', event_date)::date    AS period,
                 COUNT(*)                                          AS order_count,
@@ -421,7 +434,8 @@ async def get_banquet_revenue_trend(
               AND is_deleted  = false
             GROUP BY DATE_TRUNC('{granularity}', event_date)
             ORDER BY period
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -452,7 +466,8 @@ async def get_banquet_dashboard(
 
     # 1) 订单总览
     overview_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*)                                          AS total_orders,
                 COALESCE(SUM(table_count), 0)                    AS total_tables,
@@ -474,7 +489,8 @@ async def get_banquet_dashboard(
               AND event_date >= :date_from
               AND event_date <  :date_to + INTERVAL '1 day'
               AND is_deleted  = false
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -500,7 +516,8 @@ async def get_banquet_dashboard(
 
     # 2) 商机漏斗
     funnel_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COUNT(*)                                          AS total_leads,
                 COUNT(*) FILTER (WHERE status IN
@@ -521,7 +538,8 @@ async def get_banquet_dashboard(
               AND created_at >= :date_from
               AND created_at <  :date_to + INTERVAL '1 day'
               AND is_deleted  = false
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -548,7 +566,8 @@ async def get_banquet_dashboard(
 
     # 4) 近期宴会（未来7天）
     upcoming_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 id, banquet_type, event_date, host_name,
                 table_count, guest_count, total_amount_fen,
@@ -561,7 +580,8 @@ async def get_banquet_dashboard(
               AND is_deleted  = false
             ORDER BY event_date
             LIMIT 10
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id},
     )
     upcoming = []
@@ -598,7 +618,8 @@ async def record_lost_reason(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO banquet_lost_reasons (
                 id, tenant_id, store_id, banquet_lead_id,
                 banquet_type, reason_category, reason_detail,
@@ -612,7 +633,8 @@ async def record_lost_reason(
                 :salesperson_id, :salesperson_name,
                 :recorded_by, :recorded_at, :created_at, :updated_at
             )
-        """),
+        """
+        ),
         {
             "id": record_id,
             "tenant_id": tenant_id,

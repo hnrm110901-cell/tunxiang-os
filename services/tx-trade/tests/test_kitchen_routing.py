@@ -24,6 +24,7 @@ import pytest
 
 # ─── 测试工具 ───
 
+
 def _uid() -> uuid.UUID:
     return uuid.uuid4()
 
@@ -36,17 +37,18 @@ TENANT_ID = str(uuid.uuid4())
 BRAND_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
 
-DEPT_COLD = str(uuid.uuid4())    # 凉菜档
-DEPT_HOT = str(uuid.uuid4())     # 热菜档
+DEPT_COLD = str(uuid.uuid4())  # 凉菜档
+DEPT_HOT = str(uuid.uuid4())  # 热菜档
 DEPT_NOODLE = str(uuid.uuid4())  # 面点档
 
-DISH_CUCUMBER = str(uuid.uuid4())   # 拍黄瓜（凉菜档）
-DISH_PORK = str(uuid.uuid4())       # 红烧肉（热菜档）
-DISH_NOODLE = str(uuid.uuid4())     # 刀削面（面点档）
-DISH_UNKNOWN = str(uuid.uuid4())    # 未配置档口的菜品
+DISH_CUCUMBER = str(uuid.uuid4())  # 拍黄瓜（凉菜档）
+DISH_PORK = str(uuid.uuid4())  # 红烧肉（热菜档）
+DISH_NOODLE = str(uuid.uuid4())  # 刀削面（面点档）
+DISH_UNKNOWN = str(uuid.uuid4())  # 未配置档口的菜品
 
 
 # ─── 出品部门 CRUD 测试 ───
+
 
 class TestProductionDeptCRUD:
     """出品部门配置管理测试"""
@@ -58,9 +60,11 @@ class TestProductionDeptCRUD:
 
         # 模拟 DB
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            scalar_one_or_none=MagicMock(return_value=None)  # 没有重复的 dept_code
-        ))
+        mock_db.execute = AsyncMock(
+            return_value=MagicMock(
+                scalar_one_or_none=MagicMock(return_value=None)  # 没有重复的 dept_code
+            )
+        )
         mock_db.flush = AsyncMock()
         mock_db.refresh = AsyncMock()
 
@@ -103,9 +107,7 @@ class TestProductionDeptCRUD:
         existing_dept.id = uuid.UUID(DEPT_COLD)
 
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            scalar_one_or_none=MagicMock(return_value=existing_dept)
-        ))
+        mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=existing_dept)))
 
         with pytest.raises(ValueError, match="已存在"):
             await create_production_dept(
@@ -166,6 +168,7 @@ class TestProductionDeptCRUD:
 
 # ─── 菜品-档口映射测试 ───
 
+
 class TestDishDeptMapping:
     """菜品-档口映射测试"""
 
@@ -181,7 +184,7 @@ class TestDishDeptMapping:
         # 第一次查档口（exists），第二次降级旧主档口（update），第三次查existing映射（None）
         execute_seq = [
             MagicMock(scalar_one_or_none=MagicMock(return_value=dept)),  # get_production_dept_by_id
-            MagicMock(),   # update is_primary=False for other mappings
+            MagicMock(),  # update is_primary=False for other mappings
             MagicMock(scalar_one_or_none=MagicMock(return_value=None)),  # 无已有映射
         ]
         mock_db.execute = AsyncMock(side_effect=execute_seq)
@@ -223,7 +226,7 @@ class TestDishDeptMapping:
         mock_db = AsyncMock()
         execute_seq = [
             MagicMock(scalar_one_or_none=MagicMock(return_value=dept)),
-            MagicMock(),   # update 降级旧主档口
+            MagicMock(),  # update 降级旧主档口
             MagicMock(scalar_one_or_none=MagicMock(return_value=existing_mapping)),
         ]
         mock_db.execute = AsyncMock(side_effect=execute_seq)
@@ -277,6 +280,7 @@ class TestDishDeptMapping:
 
 
 # ─── KDS 分单路由测试 ───
+
 
 class TestKdsDispatchRouting:
     """KDS 分单路由核心逻辑测试"""
@@ -344,24 +348,24 @@ class TestKdsDispatchRouting:
         # 5. Order 查询（桌号/单号）
 
         mapping_result = MagicMock()
-        mapping_result.all = MagicMock(return_value=[
-            (uuid.UUID(DISH_CUCUMBER), cold_dept_uuid),
-            (uuid.UUID(DISH_PORK), hot_dept_uuid),
-        ])
+        mapping_result.all = MagicMock(
+            return_value=[
+                (uuid.UUID(DISH_CUCUMBER), cold_dept_uuid),
+                (uuid.UUID(DISH_PORK), hot_dept_uuid),
+            ]
+        )
 
         dept_result = MagicMock()
-        dept_result.scalars = MagicMock(return_value=MagicMock(
-            all=MagicMock(return_value=[cold_dept, hot_dept])
-        ))
+        dept_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[cold_dept, hot_dept])))
 
         order_result = MagicMock()
         order_result.one_or_none = MagicMock(return_value=("A01", "ORDER-001"))
 
         execute_seq = [
-            mapping_result,       # DishDeptMapping query
-            dept_result,          # ProductionDept query
-            MagicMock(),          # OrderItem update x1
-            MagicMock(),          # OrderItem update x2
+            mapping_result,  # DishDeptMapping query
+            dept_result,  # ProductionDept query
+            MagicMock(),  # OrderItem update x1
+            MagicMock(),  # OrderItem update x2
         ]
         mock_db.execute = AsyncMock(side_effect=execute_seq)
         mock_db.flush = AsyncMock()
@@ -427,9 +431,7 @@ class TestKdsDispatchRouting:
         mapping_result.all = MagicMock(return_value=[])  # 无映射
 
         dept_result = MagicMock()
-        dept_result.scalars = MagicMock(return_value=MagicMock(
-            all=MagicMock(return_value=[cold_dept])
-        ))
+        dept_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[cold_dept])))
 
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(side_effect=[mapping_result, dept_result])
@@ -483,9 +485,7 @@ class TestKdsDispatchRouting:
         count_result.scalar = MagicMock(return_value=1)
 
         task_result = MagicMock()
-        task_result.scalars = MagicMock(return_value=MagicMock(
-            all=MagicMock(return_value=[task1])
-        ))
+        task_result.scalars = MagicMock(return_value=MagicMock(all=MagicMock(return_value=[task1])))
 
         mock_db = AsyncMock()
         mock_db.execute = AsyncMock(side_effect=[count_result, task_result])
@@ -505,6 +505,7 @@ class TestKdsDispatchRouting:
 
 # ─── KDS 设备识别测试 ───
 
+
 class TestKdsDeviceIdentification:
     """KDS设备自我识别测试"""
 
@@ -519,9 +520,7 @@ class TestKdsDeviceIdentification:
         dept.dept_name = "凉菜档"
 
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            scalar_one_or_none=MagicMock(return_value=dept)
-        ))
+        mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=dept)))
 
         result = await get_dept_by_kds_device_id("kds-cold-001", TENANT_ID, mock_db)
         assert result is not None
@@ -533,9 +532,7 @@ class TestKdsDeviceIdentification:
         from services.tx_trade.src.services.production_dept_service import get_dept_by_kds_device_id
 
         mock_db = AsyncMock()
-        mock_db.execute = AsyncMock(return_value=MagicMock(
-            scalar_one_or_none=MagicMock(return_value=None)
-        ))
+        mock_db.execute = AsyncMock(return_value=MagicMock(scalar_one_or_none=MagicMock(return_value=None)))
 
         result = await get_dept_by_kds_device_id("unknown-device", TENANT_ID, mock_db)
         assert result is None

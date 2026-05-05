@@ -120,11 +120,13 @@ class ForgeAutoReviewService:
     ) -> dict:
         # 加载应用信息
         app_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT app_id, app_name, category, description, permissions, status
                 FROM forge_apps
                 WHERE app_id = :aid AND is_deleted = false
-            """),
+            """
+            ),
             {"aid": app_id},
         )
         app_data = app_row.mappings().first()
@@ -134,12 +136,14 @@ class ForgeAutoReviewService:
 
         # 尝试加载审核模板
         tpl_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT template_id, template_name, auto_checks, human_checks, pass_threshold
                 FROM forge_review_templates
                 WHERE app_category = :cat AND is_deleted = false
                 ORDER BY created_at DESC LIMIT 1
-            """),
+            """
+            ),
             {"cat": app_data["category"]},
         )
         tpl = tpl_row.mappings().first()
@@ -161,7 +165,8 @@ class ForgeAutoReviewService:
         review_id = f"arev_{uuid4().hex[:12]}"
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_auto_reviews
                     (id, tenant_id, review_id, app_id, app_version_id,
                      auto_score, checks, ai_suggestions, human_required,
@@ -172,7 +177,8 @@ class ForgeAutoReviewService:
                      :auto_score, :checks::jsonb, :ai_suggestions::jsonb,
                      :human_required::jsonb, :auto_approved, :pass_threshold)
                 RETURNING review_id, app_id, auto_score, auto_approved, created_at
-            """),
+            """
+            ),
             {
                 "review_id": review_id,
                 "app_id": app_id,
@@ -189,10 +195,12 @@ class ForgeAutoReviewService:
         # 如果自动通过，更新应用状态
         if auto_approved:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE forge_apps SET status = 'published', updated_at = NOW()
                     WHERE app_id = :aid AND is_deleted = false
-                """),
+                """
+                ),
                 {"aid": app_id},
             )
             log.info("auto_review.auto_approved", review_id=review_id, app_id=app_id, score=auto_score)
@@ -213,13 +221,15 @@ class ForgeAutoReviewService:
     # ── 获取审核详情 ─────────────────────────────────────────
     async def get_auto_review(self, db: AsyncSession, review_id: str) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT review_id, app_id, app_version_id, auto_score,
                        checks, ai_suggestions, human_required,
                        auto_approved, pass_threshold, created_at
                 FROM forge_auto_reviews
                 WHERE review_id = :rid AND is_deleted = false
-            """),
+            """
+            ),
             {"rid": review_id},
         )
         row = result.mappings().first()
@@ -249,13 +259,15 @@ class ForgeAutoReviewService:
         total = total_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT review_id, app_id, auto_score, auto_approved, created_at
                 FROM forge_auto_reviews
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in rows.mappings().all()]
@@ -272,13 +284,15 @@ class ForgeAutoReviewService:
 
         where = " AND ".join(conditions)
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT template_id, template_name, app_category,
                        auto_checks, human_checks, pass_threshold, created_at
                 FROM forge_review_templates
                 WHERE {where}
                 ORDER BY app_category, template_name
-            """),
+            """
+            ),
             params,
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -300,7 +314,8 @@ class ForgeAutoReviewService:
         template_id = f"rtpl_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_review_templates
                     (id, tenant_id, template_id, app_category, template_name,
                      auto_checks, human_checks, pass_threshold)
@@ -309,7 +324,8 @@ class ForgeAutoReviewService:
                      :template_id, :app_category, :template_name,
                      :auto_checks::jsonb, :human_checks::jsonb, :pass_threshold)
                 RETURNING template_id, app_category, template_name, pass_threshold, created_at
-            """),
+            """
+            ),
             {
                 "template_id": template_id,
                 "app_category": app_category,

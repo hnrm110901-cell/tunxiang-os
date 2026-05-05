@@ -43,6 +43,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.approval_flow_engine import (
     VALID_BUSINESS_TYPES,
@@ -203,7 +204,7 @@ async def get_template(
     try:
         result = await _engine.get_template_with_nodes(template_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(result)
 
 
@@ -246,7 +247,7 @@ async def update_template(
     try:
         result = await _engine.get_template_with_nodes(template_id, tenant_id, db)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(result)
 
 
@@ -419,7 +420,7 @@ async def create_instance(
         )
         return _ok(instance)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/instances/my-pending")
@@ -615,7 +616,7 @@ async def approve_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/instances/{instance_id}/reject")
@@ -652,7 +653,7 @@ async def reject_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/instances/{instance_id}/cancel")
@@ -673,7 +674,7 @@ async def cancel_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 运维端点 ──────────────────────────────────────────────────────────────────

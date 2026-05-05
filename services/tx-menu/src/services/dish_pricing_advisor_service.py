@@ -10,15 +10,12 @@
 金额单位: 分(fen), int
 """
 
-import uuid
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
-from itertools import combinations
 from typing import Any, Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -103,7 +100,8 @@ def _margin_rate(price_fen: int, cost_fen: int) -> Decimal:
     if price_fen <= 0:
         return Decimal("0.00")
     return (Decimal(price_fen - cost_fen) / Decimal(price_fen) * 100).quantize(
-        Decimal("0.01"), rounding=ROUND_HALF_UP,
+        Decimal("0.01"),
+        rounding=ROUND_HALF_UP,
     )
 
 
@@ -216,7 +214,8 @@ async def generate_pricing_suggestions(
 
         # 写入DB
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_pricing_suggestions
                     (tenant_id, store_id, dish_id, suggestion_date,
                      current_price_fen, suggested_price_fen, suggestion_type,
@@ -226,7 +225,8 @@ async def generate_pricing_suggestions(
                      :current_price_fen, :suggested_price_fen, :suggestion_type,
                      :bcg_quadrant, :reason, :estimated_impact_fen, 'pending')
                 ON CONFLICT DO NOTHING
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -269,14 +269,16 @@ async def apply_suggestions(
 
     for sid in suggestion_ids:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, suggested_price_fen, suggestion_type, status
                 FROM dish_pricing_suggestions
                 WHERE id = :sid::uuid
                   AND tenant_id = :tenant_id::uuid
                   AND store_id = :store_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": sid, "tenant_id": tenant_id, "store_id": store_id},
         )
         suggestion = row.mappings().first()
@@ -293,12 +295,14 @@ async def apply_suggestions(
         # 有建议价格时更新菜品售价
         if suggestion["suggested_price_fen"] and suggestion["suggestion_type"] == "raise":
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dishes SET price_fen = :new_price, updated_at = NOW()
                     WHERE id = :dish_id::uuid
                       AND tenant_id = :tenant_id::uuid
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {
                     "new_price": suggestion["suggested_price_fen"],
                     "dish_id": str(suggestion["dish_id"]),
@@ -309,22 +313,26 @@ async def apply_suggestions(
         # 下架处理
         if suggestion["suggestion_type"] == "delist":
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dishes SET is_available = FALSE, updated_at = NOW()
                     WHERE id = :dish_id::uuid
                       AND tenant_id = :tenant_id::uuid
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"dish_id": str(suggestion["dish_id"]), "tenant_id": tenant_id},
             )
 
         # 更新建议状态
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_pricing_suggestions
                 SET status = 'applied', applied_at = NOW(), updated_at = NOW()
                 WHERE id = :sid::uuid AND tenant_id = :tenant_id::uuid
-            """),
+            """
+            ),
             {"sid": sid, "tenant_id": tenant_id},
         )
         applied += 1
@@ -368,37 +376,41 @@ async def get_suggestions(
     total = count_result.scalar_one()
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT dps.*, d.dish_name
             FROM dish_pricing_suggestions dps
             LEFT JOIN dishes d ON d.id = dps.dish_id AND d.tenant_id = dps.tenant_id
             {where_clause}
             ORDER BY dps.suggestion_date DESC, dps.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     rows = result.mappings().all()
 
     items = []
     for r in rows:
-        items.append({
-            "id": str(r["id"]),
-            "dish_id": str(r["dish_id"]),
-            "dish_name": r.get("dish_name", ""),
-            "suggestion_date": str(r["suggestion_date"]),
-            "current_price_fen": r["current_price_fen"],
-            "current_price_yuan": _fen_to_yuan(r["current_price_fen"]),
-            "suggested_price_fen": r["suggested_price_fen"],
-            "suggested_price_yuan": _fen_to_yuan(r["suggested_price_fen"]) if r["suggested_price_fen"] else None,
-            "suggestion_type": r["suggestion_type"],
-            "bcg_quadrant": r["bcg_quadrant"],
-            "reason": r["reason"],
-            "estimated_impact_fen": r["estimated_impact_fen"],
-            "estimated_impact_yuan": _fen_to_yuan(r["estimated_impact_fen"] or 0),
-            "status": r["status"],
-            "applied_at": str(r["applied_at"]) if r["applied_at"] else None,
-        })
+        items.append(
+            {
+                "id": str(r["id"]),
+                "dish_id": str(r["dish_id"]),
+                "dish_name": r.get("dish_name", ""),
+                "suggestion_date": str(r["suggestion_date"]),
+                "current_price_fen": r["current_price_fen"],
+                "current_price_yuan": _fen_to_yuan(r["current_price_fen"]),
+                "suggested_price_fen": r["suggested_price_fen"],
+                "suggested_price_yuan": _fen_to_yuan(r["suggested_price_fen"]) if r["suggested_price_fen"] else None,
+                "suggestion_type": r["suggestion_type"],
+                "bcg_quadrant": r["bcg_quadrant"],
+                "reason": r["reason"],
+                "estimated_impact_fen": r["estimated_impact_fen"],
+                "estimated_impact_yuan": _fen_to_yuan(r["estimated_impact_fen"] or 0),
+                "status": r["status"],
+                "applied_at": str(r["applied_at"]) if r["applied_at"] else None,
+            }
+        )
 
     return {"items": items, "total": total}
 
@@ -432,7 +444,8 @@ async def compute_table_profit(
 
     # 按桌型聚合
     result = await db.execute(
-        text("""
+        text(
+            """
             WITH table_orders AS (
                 SELECT
                     o.id AS order_id,
@@ -469,7 +482,8 @@ async def compute_table_profit(
             WHERE duration_hours > 0
             GROUP BY table_type, seat_count
             ORDER BY avg_profit_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -560,7 +574,8 @@ async def compute_category_mix(
     await _set_rls(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 COALESCE(dc.name, '其他') AS category_name,
                 SUM(oi.quantity * oi.unit_price_fen) AS revenue_fen,
@@ -578,7 +593,8 @@ async def compute_category_mix(
             WHERE oi.is_deleted = FALSE
             GROUP BY dc.name
             ORDER BY revenue_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -618,12 +634,14 @@ async def compute_category_mix(
 
             if abs(deviation) > _CATEGORY_DEVIATION_THRESHOLD:
                 direction = "偏高" if deviation > 0 else "偏低"
-                alerts.append({
-                    "category": cat_name,
-                    "message": f"{cat_name}营收占比{ratio:.0%}，{direction}于行业标准{benchmark:.0%}，偏差{abs(deviation):.0%}",
-                    "severity": "warning" if abs(deviation) <= 0.10 else "critical",
-                    "deviation_pct": round(deviation * 100, 1),
-                })
+                alerts.append(
+                    {
+                        "category": cat_name,
+                        "message": f"{cat_name}营收占比{ratio:.0%}，{direction}于行业标准{benchmark:.0%}，偏差{abs(deviation):.0%}",
+                        "severity": "warning" if abs(deviation) <= 0.10 else "critical",
+                        "deviation_pct": round(deviation * 100, 1),
+                    }
+                )
         else:
             entry["benchmark_pct"] = None
             entry["deviation_pct"] = None
@@ -637,12 +655,14 @@ async def compute_category_mix(
 
     # 酒水提醒
     if beverage_ratio < 0.15:
-        alerts.append({
-            "category": "酒水/饮品",
-            "message": f"酒水饮品占比仅{beverage_ratio:.0%}，低于15%。酒水是纯利润品类，建议加强服务员推荐话术和菜单露出",
-            "severity": "info",
-            "deviation_pct": round((beverage_ratio - 0.15) * 100, 1),
-        })
+        alerts.append(
+            {
+                "category": "酒水/饮品",
+                "message": f"酒水饮品占比仅{beverage_ratio:.0%}，低于15%。酒水是纯利润品类，建议加强服务员推荐话术和菜单露出",
+                "severity": "info",
+                "deviation_pct": round((beverage_ratio - 0.15) * 100, 1),
+            }
+        )
 
     # 健康度评分：偏差越大分越低（满分100）
     abnormal_count = sum(1 for c in categories if c.get("is_abnormal"))
@@ -694,7 +714,8 @@ async def compute_dish_co_occurrence(
 
     # 1. 计算每道菜的独立出现订单数
     dish_orders_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 oi.dish_id,
                 MAX(oi.dish_name) AS dish_name,
@@ -709,7 +730,8 @@ async def compute_dish_co_occurrence(
             WHERE oi.dish_id IS NOT NULL AND oi.is_deleted = FALSE
             GROUP BY oi.dish_id
             HAVING COUNT(DISTINCT oi.order_id) >= 2
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -727,7 +749,8 @@ async def compute_dish_co_occurrence(
 
     # 2. 计算共现对（DB侧高效计算）
     co_result = await db.execute(
-        text("""
+        text(
+            """
             WITH order_dishes AS (
                 SELECT DISTINCT oi.order_id, oi.dish_id
                 FROM order_items oi
@@ -749,7 +772,8 @@ async def compute_dish_co_occurrence(
             HAVING COUNT(DISTINCT a.order_id) >= :min_co_count
             ORDER BY co_count DESC
             LIMIT 200
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -785,7 +809,8 @@ async def compute_dish_co_occurrence(
 
         # 写入 dish_co_occurrence 表
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_co_occurrence
                     (tenant_id, store_id, dish_a_id, dish_b_id,
                      co_occurrence_count, correlation_score, period_start, period_end)
@@ -798,7 +823,8 @@ async def compute_dish_co_occurrence(
                     correlation_score = EXCLUDED.correlation_score,
                     period_end = EXCLUDED.period_end,
                     updated_at = NOW()
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -855,7 +881,8 @@ async def get_co_occurrence(
         params["dish_id"] = dish_id
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT dco.*,
                    da.dish_name AS dish_a_name,
                    db.dish_name AS dish_b_name
@@ -869,7 +896,8 @@ async def get_co_occurrence(
               {where_extra}
             ORDER BY dco.correlation_score DESC
             LIMIT :limit
-        """),
+        """
+        ),
         params,
     )
     rows = result.mappings().all()
@@ -916,7 +944,8 @@ async def compute_ingredient_price_impact(
 
     # 1. 食材价格变动：最近采购价 vs 上月均价
     price_changes_result = await db.execute(
-        text("""
+        text(
+            """
             WITH latest_price AS (
                 SELECT DISTINCT ON (ingredient_id)
                     ingredient_id,
@@ -953,7 +982,8 @@ async def compute_ingredient_price_impact(
             LEFT JOIN last_month_avg lma ON lma.ingredient_id = lp.ingredient_id
             ORDER BY ABS(lp.unit_price_fen - COALESCE(lma.avg_price_fen, lp.unit_price_fen)) DESC
             LIMIT 50
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     price_changes = price_changes_result.mappings().all()
@@ -999,7 +1029,8 @@ async def compute_ingredient_price_impact(
         ingredient_ids = list(changed_ingredients.keys())
         # 查BOM展开
         bom_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     bt.dish_id,
                     d.dish_name,
@@ -1017,7 +1048,8 @@ async def compute_ingredient_price_impact(
                 WHERE bi.ingredient_id = ANY(:ingredient_ids::uuid[])
                   AND bi.is_deleted = FALSE
                   AND bi.item_action != 'REMOVE'
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "ingredient_ids": ingredient_ids},
         )
         bom_rows = bom_result.mappings().all()
@@ -1047,11 +1079,13 @@ async def compute_ingredient_price_impact(
                     "affected_ingredients": [],
                 }
             dish_cost_delta[dish_id]["total_delta_fen"] += delta_fen
-            dish_cost_delta[dish_id]["affected_ingredients"].append({
-                "ingredient_name": ing_change["name"],
-                "change_pct": round(ing_change["change_rate"] * 100, 1),
-                "cost_delta_fen": delta_fen,
-            })
+            dish_cost_delta[dish_id]["affected_ingredients"].append(
+                {
+                    "ingredient_name": ing_change["name"],
+                    "change_pct": round(ing_change["change_rate"] * 100, 1),
+                    "cost_delta_fen": delta_fen,
+                }
+            )
 
         for dish_id, info in dish_cost_delta.items():
             price = info["price_fen"] or 0
@@ -1110,7 +1144,8 @@ async def _fetch_dish_bcg_data(
 ) -> list[dict[str, Any]]:
     """获取菜品BCG分类所需的销量+毛利数据"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 d.id AS dish_id,
                 d.dish_name,
@@ -1132,7 +1167,8 @@ async def _fetch_dish_bcg_data(
               AND d.is_deleted = FALSE
               AND d.is_available = TRUE
             GROUP BY d.id, d.dish_name, d.price_fen, d.cost_fen, dc.name
-        """),
+        """
+        ),
         {
             "tenant_id": tenant_id,
             "store_id": store_id,
@@ -1202,7 +1238,8 @@ async def _check_cost_change(
 ) -> float:
     """检查菜品BOM成本变动幅度（返回变动比例，如0.08表示上涨8%）"""
     result = await db.execute(
-        text("""
+        text(
+            """
             WITH current_cost AS (
                 SELECT COALESCE(SUM(
                     CAST(bi.standard_qty * (1 + COALESCE(bi.waste_factor, 0))
@@ -1216,7 +1253,8 @@ async def _check_cost_change(
                 WHERE bi.is_deleted = FALSE AND bi.item_action != 'REMOVE'
             )
             SELECT cost FROM current_cost
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "dish_id": dish_id},
     )
     current_cost = result.scalar_one_or_none() or 0
@@ -1225,10 +1263,12 @@ async def _check_cost_change(
 
     # 简化：假设上期成本 = dishes.cost_fen（BOM历史版本暂不追踪）
     dish_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT cost_fen FROM dishes
             WHERE id = :dish_id::uuid AND tenant_id = :tenant_id::uuid AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "dish_id": dish_id},
     )
     base_cost = dish_result.scalar_one_or_none() or current_cost
@@ -1271,24 +1311,24 @@ async def _assess_delist_impact(
             if not candidate or not partner:
                 continue
             if candidate.get("bcg_quadrant") == "dog" and partner.get("bcg_quadrant") in ("star", "cash_cow"):
-                estimated_sales_impact = int(
-                    partner.get("sales_qty", 0) * pair["correlation_score"] * 0.3
+                estimated_sales_impact = int(partner.get("sales_qty", 0) * pair["correlation_score"] * 0.3)
+                impact_list.append(
+                    {
+                        "delist_dish_id": candidate["dish_id"],
+                        "delist_dish_name": candidate.get("dish_name", ""),
+                        "delist_bcg": "dog",
+                        "impacted_dish_id": partner["dish_id"],
+                        "impacted_dish_name": partner.get("dish_name", ""),
+                        "impacted_bcg": partner.get("bcg_quadrant", ""),
+                        "co_occurrence_rate": pair["correlation_score"],
+                        "estimated_sales_loss_qty": estimated_sales_impact,
+                        "warning": (
+                            f"下架「{candidate.get('dish_name', '')}」可能导致"
+                            f"「{partner.get('dish_name', '')}」销量下降约{estimated_sales_impact}份/周期，"
+                            f"共现率{pair['correlation_score']:.0%}，建议谨慎评估"
+                        ),
+                    }
                 )
-                impact_list.append({
-                    "delist_dish_id": candidate["dish_id"],
-                    "delist_dish_name": candidate.get("dish_name", ""),
-                    "delist_bcg": "dog",
-                    "impacted_dish_id": partner["dish_id"],
-                    "impacted_dish_name": partner.get("dish_name", ""),
-                    "impacted_bcg": partner.get("bcg_quadrant", ""),
-                    "co_occurrence_rate": pair["correlation_score"],
-                    "estimated_sales_loss_qty": estimated_sales_impact,
-                    "warning": (
-                        f"下架「{candidate.get('dish_name', '')}」可能导致"
-                        f"「{partner.get('dish_name', '')}」销量下降约{estimated_sales_impact}份/周期，"
-                        f"共现率{pair['correlation_score']:.0%}，建议谨慎评估"
-                    ),
-                })
 
     return impact_list
 
@@ -1296,7 +1336,8 @@ async def _assess_delist_impact(
 async def _get_dish_bom_cost(db: AsyncSession, tenant_id: str, dish_id: str) -> int:
     """获取菜品当前BOM理论成本（分）"""
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(
                 CAST(bi.standard_qty * (1 + COALESCE(bi.waste_factor, 0))
                      * COALESCE(bi.unit_cost_fen, 0) AS INTEGER)
@@ -1307,7 +1348,8 @@ async def _get_dish_bom_cost(db: AsyncSession, tenant_id: str, dish_id: str) -> 
                 AND bt.tenant_id = :tenant_id::uuid
                 AND bt.is_active = TRUE AND bt.is_deleted = FALSE
             WHERE bi.is_deleted = FALSE AND bi.item_action != 'REMOVE'
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "dish_id": dish_id},
     )
     return result.scalar_one_or_none() or 0

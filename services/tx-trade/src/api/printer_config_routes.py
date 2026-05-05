@@ -31,8 +31,15 @@ def _get_tenant_id(request: Request) -> str:
 
 
 def _set_rls(db: AsyncSession, tenant_id: str):
-    """设置 RLS 上下文变量。"""
-    return db.execute(text(f"SET LOCAL app.tenant_id = '{tenant_id}'"))
+    """设置 RLS 上下文变量。
+
+    PK.0 P0 SECURITY 修复：原 f-string 拼接 X-Tenant-ID（用户可控）→ RLS 隔离逃逸风险。
+    改用 set_config(..., true) 参数化（与 shared/ontology/src/database.py:25 一致）。
+    """
+    return db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": tenant_id},
+    )
 
 
 # ─── Pydantic 模型 ────────────────────────────────────────────────────────────
@@ -172,13 +179,15 @@ async def list_printers(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
-    stmt = text("""
+    stmt = text(
+        """
         SELECT id, tenant_id, store_id, name, type, connection_type,
                address, is_active, paper_width, created_at, updated_at
         FROM printers
         WHERE tenant_id = :tenant_id AND store_id = :store_id
         ORDER BY created_at ASC
-    """)
+    """
+    )
     result = await db.execute(stmt, {"tenant_id": tid, "store_id": sid})
     rows = result.fetchall()
     return {"ok": True, "data": [_row_to_printer(r) for r in rows]}
@@ -201,14 +210,16 @@ async def create_printer(
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
     printer_id = uuid.uuid4()
-    stmt = text("""
+    stmt = text(
+        """
         INSERT INTO printers (id, tenant_id, store_id, name, type, connection_type,
                               address, is_active, paper_width)
         VALUES (:id, :tenant_id, :store_id, :name, :type, :connection_type,
                 :address, TRUE, :paper_width)
         RETURNING id, tenant_id, store_id, name, type, connection_type,
                   address, is_active, paper_width, created_at, updated_at
-    """)
+    """
+    )
     result = await db.execute(
         stmt,
         {
@@ -275,12 +286,14 @@ async def update_printer(
     updates["id"] = pid
     updates["tenant_id"] = tid
 
-    stmt = text(f"""
+    stmt = text(
+        f"""
         UPDATE printers SET {set_clause}, updated_at = NOW()
         WHERE id = :id AND tenant_id = :tenant_id
         RETURNING id, tenant_id, store_id, name, type, connection_type,
                   address, is_active, paper_width, created_at, updated_at
-    """)
+    """
+    )
     result = await db.execute(stmt, updates)
     await db.commit()
     row = result.fetchone()
@@ -305,11 +318,13 @@ async def deactivate_printer(
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE printers SET is_active = FALSE, updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
             RETURNING id
-        """),
+        """
+        ),
         {"id": pid, "tenant_id": tid},
     )
     await db.commit()
@@ -380,7 +395,8 @@ async def list_routes(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"UUID 格式错误: {exc}") from exc
 
-    stmt = text("""
+    stmt = text(
+        """
         SELECT r.id, r.tenant_id, r.store_id, r.printer_id,
                r.category_id, r.category_name, r.dish_tag,
                r.priority, r.is_default, r.created_at, r.updated_at,
@@ -389,7 +405,8 @@ async def list_routes(
         JOIN printers p ON p.id = r.printer_id
         WHERE r.tenant_id = :tenant_id AND r.store_id = :store_id
         ORDER BY r.priority DESC, r.created_at ASC
-    """)
+    """
+    )
     result = await db.execute(stmt, {"tenant_id": tid, "store_id": sid})
     rows = result.fetchall()
     return {"ok": True, "data": [_row_to_route(r) for r in rows]}
@@ -422,7 +439,8 @@ async def create_route(
         raise HTTPException(status_code=404, detail="打印机不存在或已停用")
 
     route_id = uuid.uuid4()
-    stmt = text("""
+    stmt = text(
+        """
         INSERT INTO printer_routes (id, tenant_id, store_id, printer_id,
                                     category_id, category_name, dish_tag,
                                     priority, is_default)
@@ -432,7 +450,8 @@ async def create_route(
         RETURNING id, tenant_id, store_id, printer_id,
                   category_id, category_name, dish_tag,
                   priority, is_default, created_at, updated_at
-    """)
+    """
+    )
     result = await db.execute(
         stmt,
         {
@@ -514,7 +533,8 @@ async def resolve_printer(
     # 1. category_id 精确匹配
     if cid is not None:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT r.printer_id, p.name, p.type, p.address, p.connection_type
                 FROM printer_routes r
                 JOIN printers p ON p.id = r.printer_id AND p.is_active = TRUE
@@ -522,7 +542,8 @@ async def resolve_printer(
                   AND r.category_id = :category_id
                 ORDER BY r.priority DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "category_id": cid},
         )
         row = result.fetchone()
@@ -540,7 +561,8 @@ async def resolve_printer(
     # 2. dish_tag 标签匹配
     if tags:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT r.printer_id, p.name, p.type, p.address, r.dish_tag
                 FROM printer_routes r
                 JOIN printers p ON p.id = r.printer_id AND p.is_active = TRUE
@@ -548,7 +570,8 @@ async def resolve_printer(
                   AND r.dish_tag = ANY(:tags)
                 ORDER BY r.priority DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": tid, "store_id": sid, "tags": tags},
         )
         row = result.fetchone()
@@ -566,7 +589,8 @@ async def resolve_printer(
 
     # 3. 兜底默认规则
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT r.printer_id, p.name, p.type
             FROM printer_routes r
             JOIN printers p ON p.id = r.printer_id AND p.is_active = TRUE
@@ -574,7 +598,8 @@ async def resolve_printer(
               AND r.is_default = TRUE
             ORDER BY r.priority DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tid, "store_id": sid},
     )
     row = result.fetchone()

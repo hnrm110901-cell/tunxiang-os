@@ -121,7 +121,8 @@ async def get_inspection_rankings(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     store_id,
                     AVG(overall_score)   AS avg_score,
@@ -135,7 +136,8 @@ async def get_inspection_rankings(
                   AND is_deleted = FALSE
                 GROUP BY store_id
                 ORDER BY avg_score DESC
-            """),
+            """
+            ),
             {
                 "start_date": start_date.isoformat(),
                 "end_date": end_date.isoformat(),
@@ -183,7 +185,8 @@ async def create_inspection(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO inspection_reports
                     (tenant_id, store_id, inspection_date, inspector_id,
                      overall_score, dimensions, photos, action_items, status)
@@ -196,7 +199,8 @@ async def create_inspection(
                           notes, ack_notes, status,
                           acknowledged_by, acknowledged_at,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {
                 "tenant_id": x_tenant_id,
                 "store_id": body.store_id,
@@ -276,7 +280,8 @@ async def list_inspections(
 
         list_params = {**params, "limit": size, "offset": offset}
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, store_id, inspection_date, inspector_id,
                        overall_score, dimensions, photos, action_items,
                        notes, ack_notes, status,
@@ -286,7 +291,8 @@ async def list_inspections(
                 WHERE {where_clause}
                 ORDER BY inspection_date DESC, created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             list_params,
         )
         items = [_serialize_row(r) for r in rows_result.mappings().all()]
@@ -312,7 +318,8 @@ async def get_inspection(
     try:
         await _set_tenant(db, x_tenant_id)
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, inspection_date, inspector_id,
                        overall_score, dimensions, photos, action_items,
                        notes, ack_notes, status,
@@ -320,7 +327,8 @@ async def get_inspection(
                        created_at, updated_at, is_deleted
                 FROM inspection_reports
                 WHERE id = :rid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"rid": report_id},
         )
         row = result.mappings().one_or_none()
@@ -359,7 +367,8 @@ async def submit_inspection(
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE inspection_reports
                 SET status     = 'submitted',
                     notes      = CASE
@@ -374,7 +383,8 @@ async def submit_inspection(
                           notes, ack_notes, status,
                           acknowledged_by, acknowledged_at,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {"rid": report_id, "final_notes": body.final_notes},
         )
         row = result.mappings().one()
@@ -414,7 +424,8 @@ async def acknowledge_inspection(
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE inspection_reports
                 SET status          = 'acknowledged',
                     acknowledged_by = :acknowledged_by,
@@ -431,7 +442,8 @@ async def acknowledge_inspection(
                           notes, ack_notes, status,
                           acknowledged_by, acknowledged_at,
                           created_at, updated_at, is_deleted
-            """),
+            """
+            ),
             {
                 "rid": report_id,
                 "acknowledged_by": body.acknowledged_by,

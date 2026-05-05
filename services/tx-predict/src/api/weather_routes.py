@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.weather_service import WeatherService
 
@@ -51,7 +52,7 @@ async def get_weather_forecast(
         forecast = await svc.get_7day_forecast(city, tenant_id, db)
     except (ValueError, KeyError) as exc:
         logger.warning("weather.forecast_error", city=city, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {
         "ok": True,
@@ -81,6 +82,6 @@ async def get_weather_impact(
         impact = await svc.analyze_weather_impact(city, tenant_id, db)
     except (ValueError, KeyError) as exc:
         logger.warning("weather.impact_error", city=city, error=str(exc))
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
     return {"ok": True, "data": impact}

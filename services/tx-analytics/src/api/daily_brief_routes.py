@@ -71,7 +71,8 @@ async def _fetch_revenue_metrics(
         end = start + timedelta(days=1)
         try:
             r = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COALESCE(SUM(total_amount), 0) AS revenue,
                     COUNT(*) AS order_count,
@@ -80,7 +81,8 @@ async def _fetch_revenue_metrics(
                 WHERE tenant_id = :tid AND store_id = :sid
                   AND status = 'completed'
                   AND created_at >= :start AND created_at < :end
-            """),
+            """
+                ),
                 {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
             )
             row = r.fetchone()
@@ -96,12 +98,14 @@ async def _fetch_revenue_metrics(
         if revenue > 0:
             try:
                 cr = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT COALESCE(SUM(amount), 0)
                     FROM cost_records
                     WHERE tenant_id = :tid AND store_id = :sid
                       AND recorded_at >= :start AND recorded_at < :end
-                """),
+                """
+                    ),
                     {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
                 )
                 cost = float(cr.scalar() or 0)
@@ -149,12 +153,14 @@ async def _fetch_anomaly_summary(
     try:
         # 退单数量
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) FROM orders
             WHERE tenant_id = :tid AND store_id = :sid
               AND status = 'refunded'
               AND created_at >= :start AND created_at < :end
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
         )
         refund_count = int(r.scalar() or 0)
@@ -163,11 +169,13 @@ async def _fetch_anomaly_summary(
 
         # 折扣异常（从 agent_decision_logs 获取）
         r2 = await db.execute(
-            text("""
+            text(
+                """
             SELECT COUNT(*) FROM agent_decision_logs
             WHERE tenant_id = :tid AND decision_type = 'discount_anomaly'
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
-        """),
+        """
+            ),
             {"tid": tenant_id, "d": target_date.isoformat()},
         )
         discount_anomaly = int(r2.scalar() or 0)
@@ -189,14 +197,16 @@ async def _fetch_agent_summary(
     """Agent 决策摘要：今日 Agent 做了什么"""
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT agent_id, action, reasoning, confidence, status
             FROM agent_decision_logs
             WHERE tenant_id = :tid
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :d
             ORDER BY created_at DESC
             LIMIT 10
-        """),
+        """
+            ),
             {"tid": tenant_id, "d": target_date.isoformat()},
         )
         rows = r.fetchall()
@@ -228,7 +238,8 @@ async def _fetch_dish_rankings(
     bottom5: list[dict[str, Any]] = []
     try:
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT oi.dish_name, SUM(oi.quantity) AS qty, SUM(oi.subtotal) AS revenue
             FROM order_items oi
             JOIN orders o ON o.id = oi.order_id AND o.tenant_id = oi.tenant_id
@@ -237,7 +248,8 @@ async def _fetch_dish_rankings(
               AND o.created_at >= :start AND o.created_at < :end
             GROUP BY oi.dish_name
             ORDER BY qty DESC
-        """),
+        """
+            ),
             {"tid": tenant_id, "sid": store_id, "start": start, "end": end},
         )
         rows = r.fetchall()
@@ -331,13 +343,15 @@ async def get_brief_history(
         params["limit"] = size
         params["offset"] = (page - 1) * size
         r = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id::text, store_id, brief_date, content_json, sent_at, created_at
             FROM daily_briefs
             {conditions}
             ORDER BY brief_date DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             params,
         )
         rows = r.fetchall()
@@ -369,10 +383,12 @@ async def get_group_brief(
     try:
         # 获取所有门店
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT id::text, name FROM stores
             WHERE tenant_id = :tid AND is_deleted = FALSE
-        """),
+        """
+            ),
             {"tid": x_tenant_id},
         )
         stores = r.fetchall()
@@ -446,10 +462,12 @@ async def configure_schedule(
     config_id = str(uuid.uuid4())
     try:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO daily_briefs (id, tenant_id, store_id, brief_date, content_json, created_at)
             VALUES (:id, :tid, :sid, CURRENT_DATE, :config, NOW())
-        """),
+        """
+            ),
             {
                 "id": config_id,
                 "tid": x_tenant_id,
@@ -507,12 +525,14 @@ async def get_store_daily_brief(
             import json
 
             await db.execute(
-                text("""
+                text(
+                    """
                 INSERT INTO daily_briefs (id, tenant_id, store_id, brief_date, content_json, created_at)
                 VALUES (:id, :tid, :sid, :d, :content, NOW())
                 ON CONFLICT (tenant_id, store_id, brief_date) DO UPDATE
                 SET content_json = :content, updated_at = NOW()
-            """),
+            """
+                ),
                 {
                     "id": str(uuid.uuid4()),
                     "tid": x_tenant_id,

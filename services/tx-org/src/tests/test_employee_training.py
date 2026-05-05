@@ -91,9 +91,14 @@ async def test_training_records_list():
     for record in MOCK_TRAINING_RECORDS:
         assert "training_type" in record, f"记录 {record.get('id')} 缺少 training_type"
         assert "passed" in record, f"记录 {record.get('id')} 缺少 passed"
-        assert record["training_type"] in ("onboarding", "food_safety", "service", "skills", "compliance", "other"), (
-            f"training_type 值不合法: {record['training_type']}"
-        )
+        assert record["training_type"] in (
+            "onboarding",
+            "food_safety",
+            "service",
+            "skills",
+            "compliance",
+            "other",
+        ), f"training_type 值不合法: {record['training_type']}"
 
 
 # ── Test 2: 即将到期证书 ─────────────────────────────────────────────────────
@@ -236,9 +241,13 @@ async def test_performance_stats():
     assert 0.0 <= needs_improvement_rate <= 100.0
 
     # 3. 评级分布结构正确
-    assert set(grade_dist.keys()) == {"A", "B", "C", "D", "E"}, (
-        f"grade_distribution 键应为 A/B/C/D/E，实际 {set(grade_dist.keys())}"
-    )
+    assert set(grade_dist.keys()) == {
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+    }, f"grade_distribution 键应为 A/B/C/D/E，实际 {set(grade_dist.keys())}"
     assert sum(grade_dist.values()) == len(all_scores), "各评级人数之和应等于总人数"
 
     # 4. 百分率合计不超过 100%（优秀率 + 待改进率 <= 总参与率100%）

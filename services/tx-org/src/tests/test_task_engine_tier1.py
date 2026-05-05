@@ -51,7 +51,7 @@ for _p in (_SRC_DIR, _ROOT):
 from repositories.task_repo import InMemoryTaskRepository  # noqa: E402
 from services.task_dispatch_service import TaskDispatchService  # noqa: E402
 
-from shared.events.src.event_types import TaskEventType  # noqa: E402
+from shared.events.src import TaskEventType  # noqa: E402
 from shared.ontology.src.extensions.tasks import TaskStatus, TaskType  # noqa: E402
 
 # ──────────────────────────────────────────────────────────────────────
@@ -483,19 +483,15 @@ async def test_list_tasks_filters(monkeypatch):
 @pytest.mark.anyio
 async def test_200_concurrent_dispatch_no_asyncio_lock(monkeypatch):
     """独立验证 P1-1：asyncio.Lock 移除后，200 并发派单依然：
-       - 不死锁
-       - 产出 200 个不同 task_id（每个都是新派的）
-       - 派单服务无 _locks / _lock_for 属性残留
+    - 不死锁
+    - 产出 200 个不同 task_id（每个都是新派的）
+    - 派单服务无 _locks / _lock_for 属性残留
     """
     service, emit_mock, repo = _make_service(monkeypatch)
 
     # 行为级断言：lock 相关属性已被彻底移除
-    assert not hasattr(service, "_locks"), (
-        "independent review P1-1: asyncio.Lock 大锁必须删除"
-    )
-    assert not hasattr(service, "_lock_for"), (
-        "independent review P1-1: _lock_for 工具方法必须删除"
-    )
+    assert not hasattr(service, "_locks"), "independent review P1-1: asyncio.Lock 大锁必须删除"
+    assert not hasattr(service, "_lock_for"), "independent review P1-1: _lock_for 工具方法必须删除"
 
     tenant_id = uuid4()
     base_due = _utcnow() + timedelta(hours=1)
@@ -515,9 +511,7 @@ async def test_200_concurrent_dispatch_no_asyncio_lock(monkeypatch):
         timeout=10.0,
     )
     assert len(results) == 200
-    assert len({t.task_id for t in results}) == 200, (
-        "200 笔派单应产出 200 个不同 task_id，无重复"
-    )
+    assert len({t.task_id for t in results}) == 200, "200 笔派单应产出 200 个不同 task_id，无重复"
 
 
 @pytest.mark.anyio
@@ -549,9 +543,7 @@ async def test_idempotent_dispatch_uses_db_unique_not_lock(monkeypatch):
         service.dispatch_task(**kwargs),
         service.dispatch_task(**kwargs),
     )
-    assert t1.task_id == t2.task_id, (
-        "独立验证 P1-1：同幂等键两次派单必须返回同一 task_id"
-    )
+    assert t1.task_id == t2.task_id, "独立验证 P1-1：同幂等键两次派单必须返回同一 task_id"
 
     # 仓库里只有 1 条
     rows = await service.list_tasks(tenant_id=tenant_id)
@@ -559,9 +551,7 @@ async def test_idempotent_dispatch_uses_db_unique_not_lock(monkeypatch):
 
     # 事件只发 1 次（第二次是幂等命中，不重发）
     await _drain_tasks()
-    assert emit_mock.await_count == 1, (
-        "独立验证 P1-1：幂等命中不应重复发射 DISPATCHED 事件"
-    )
+    assert emit_mock.await_count == 1, "独立验证 P1-1：幂等命中不应重复发射 DISPATCHED 事件"
 
 
 # ──────────────────────────────────────────────────────────────────────

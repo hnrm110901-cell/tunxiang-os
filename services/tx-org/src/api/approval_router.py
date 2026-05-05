@@ -30,6 +30,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.approval_workflow_engine import (
     VALID_BUSINESS_TYPES,
@@ -133,7 +134,7 @@ async def create_approval(
         )
         return _ok(instance)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("/approvals/pending-count")
@@ -336,7 +337,7 @@ async def approve_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/approvals/{instance_id}/reject")
@@ -358,7 +359,7 @@ async def reject_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/approvals/{instance_id}/cancel")
@@ -379,7 +380,7 @@ async def cancel_instance(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 # ── 模板管理端点（总部配置）────────────────────────────────────────────────────

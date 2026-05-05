@@ -107,7 +107,8 @@ async def list_rules(
     try:
         store_filter = "AND store_id = :store_id" if store_id else ""
         r = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 store_id::text,
                 cost_type,
@@ -122,7 +123,8 @@ async def list_rules(
               {store_filter}
             GROUP BY store_id, cost_type
             ORDER BY store_id, total_fen DESC
-        """),
+        """
+            ),
             {
                 "tid": str(tenant_id),
                 "days": days,
@@ -181,7 +183,8 @@ async def create_rule(
     now = datetime.now(tz=timezone.utc)
     try:
         await db.execute(
-            text("""
+            text(
+                """
             INSERT INTO cost_attribution_items
               (id, tenant_id, report_id, expense_application_id, store_id,
                attribution_date, cost_type, amount_fen, description,
@@ -190,7 +193,8 @@ async def create_rule(
               (:id, :tid, NULL, NULL, :store_id,
                :attr_date, :cost_type, :amount_fen, :description,
                :now, :now, false)
-        """),
+        """
+            ),
             {
                 "id": str(item_id),
                 "tid": str(tenant_id),
@@ -253,10 +257,12 @@ async def update_rule(
     try:
         # 验证归属
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT id FROM cost_attribution_items
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+            ),
             {"rid": str(rule_id), "tid": str(tenant_id)},
         )
         if not r.first():
@@ -284,23 +290,27 @@ async def update_rule(
             raise HTTPException(status_code=400, detail="没有可更新的字段")
 
         await db.execute(
-            text(f"""
+            text(
+                f"""
             UPDATE cost_attribution_items
             SET {", ".join(set_clauses)}
             WHERE id = :rid AND tenant_id = :tid
-        """),
+        """
+            ),
             params,
         )
         await db.commit()
 
         # 返回更新后的记录
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT id::text, tenant_id::text, store_id::text,
                    attribution_date, cost_type, amount_fen, description, updated_at
             FROM cost_attribution_items
             WHERE id = :rid AND tenant_id = :tid
-        """),
+        """
+            ),
             {"rid": str(rule_id), "tid": str(tenant_id)},
         )
         row = r.mappings().one()
@@ -428,7 +438,8 @@ async def list_results(
 
         # 日报列表 + 关联归集条目数
         r = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT
                 d.id::text,
                 d.store_id::text,
@@ -455,7 +466,8 @@ async def list_results(
             WHERE {where}
             ORDER BY d.report_date DESC, d.store_id
             LIMIT :limit OFFSET :offset
-        """),
+        """
+            ),
             params,
         )
         rows = r.mappings().all()
@@ -516,13 +528,15 @@ async def get_result_breakdown(
     try:
         # 验证日报归属并获取摘要
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT id::text, store_id::text, report_date,
                    total_revenue_fen, total_cost_fen, data_status,
                    food_cost_rate, labor_cost_rate, gross_margin_rate
             FROM daily_cost_reports
             WHERE id = :rid AND tenant_id = :tid AND is_deleted = false
-        """),
+        """
+            ),
             {"rid": str(result_id), "tid": str(tenant_id)},
         )
         report_row = r.mappings().first()
@@ -531,7 +545,8 @@ async def get_result_breakdown(
 
         # 归集明细（关联费控申请信息）
         r = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 c.id::text,
                 c.store_id::text,
@@ -552,7 +567,8 @@ async def get_result_breakdown(
               AND c.tenant_id = :tid
               AND c.is_deleted = false
             ORDER BY c.cost_type, c.amount_fen DESC
-        """),
+        """
+            ),
             {"rid": str(result_id), "tid": str(tenant_id)},
         )
         item_rows = r.mappings().all()

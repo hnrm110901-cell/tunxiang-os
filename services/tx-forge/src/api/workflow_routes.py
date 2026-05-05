@@ -31,12 +31,14 @@ async def create_workflow(
     """创建工作流."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.workflows
+        text(
+            """INSERT INTO forge.workflows
                 (tenant_id, workflow_name, description, creator_id,
                  steps, trigger, estimated_value_fen, status)
                 VALUES (:tid, :workflow_name, :description, :creator_id,
                         :steps::jsonb, :trigger::jsonb, :estimated_value_fen, 'draft')
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "workflow_name": body.workflow_name,
@@ -79,9 +81,11 @@ async def list_workflows(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.workflows
+        text(
+            f"""SELECT * FROM forge.workflows
                 WHERE {where}
-                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -99,8 +103,10 @@ async def get_workflow(
     """获取工作流详情."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""SELECT * FROM forge.workflows
-                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""),
+        text(
+            """SELECT * FROM forge.workflows
+                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""
+        ),
         {"tid": x_tenant_id, "workflow_id": workflow_id},
     )
     row = result.mappings().first()
@@ -123,8 +129,10 @@ async def start_workflow_run(
     await _set_tenant(db, x_tenant_id)
     # 获取工作流
     wf = await db.execute(
-        text("""SELECT * FROM forge.workflows
-                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""),
+        text(
+            """SELECT * FROM forge.workflows
+                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""
+        ),
         {"tid": x_tenant_id, "workflow_id": workflow_id},
     )
     wf_row = wf.mappings().first()
@@ -135,12 +143,14 @@ async def start_workflow_run(
     steps_total = len(steps) if isinstance(steps, list) else 0
 
     result = await db.execute(
-        text("""INSERT INTO forge.workflow_runs
+        text(
+            """INSERT INTO forge.workflow_runs
                 (tenant_id, workflow_id, store_id, trigger_type,
                  trigger_data, status, steps_total)
                 VALUES (:tid, :workflow_id, :store_id, :trigger_type,
                         :trigger_data::jsonb, 'running', :steps_total)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "workflow_id": workflow_id,
@@ -184,9 +194,11 @@ async def list_workflow_runs(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.workflow_runs
+        text(
+            f"""SELECT * FROM forge.workflow_runs
                 WHERE {where}
-                ORDER BY started_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY started_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -204,7 +216,8 @@ async def workflow_analytics(
     """工作流分析."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""SELECT
+        text(
+            """SELECT
                     COUNT(*) AS total_runs,
                     COUNT(*) FILTER (WHERE status = 'success') AS success_count,
                     COUNT(*) FILTER (WHERE status = 'failed') AS failed_count,
@@ -213,7 +226,8 @@ async def workflow_analytics(
                     SUM(total_tokens) AS total_tokens,
                     SUM(total_cost_fen) AS total_cost_fen
                 FROM forge.workflow_runs
-                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""),
+                WHERE tenant_id = :tid AND workflow_id = :workflow_id"""
+        ),
         {"tid": x_tenant_id, "workflow_id": workflow_id},
     )
     row = result.mappings().first()

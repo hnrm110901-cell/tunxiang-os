@@ -31,6 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from models.three_way_match import (
     Base as MatchBase,
 )
+
 from services.three_way_match_engine import (
     MatchResult,
     MatchStatus,
@@ -397,27 +398,33 @@ class TestThreeWayMatchIntegration:
         tenant_id = TENANT_A
 
         po_data = _make_po(
-            po_id, tenant_id, SUPPLIER_1,
+            po_id,
+            tenant_id,
+            SUPPLIER_1,
             items=[{"ingredient_name": "猪肉", "qty": 10.0, "unit_price_fen": 3000}],
             total_amount_fen=30000,
         )
         recv_data = _make_receiving(
-            uuid.uuid4(), po_id, tenant_id,
+            uuid.uuid4(),
+            po_id,
+            tenant_id,
             items=[{"ingredient_name": "猪肉", "received_qty": 10.0, "unit_price_fen": 3000}],
         )
         inv_data = _make_invoice(
-            uuid.uuid4(), po_id, tenant_id,
+            uuid.uuid4(),
+            po_id,
+            tenant_id,
             amount_fen=30000,
             items=[{"ingredient_name": "猪肉", "qty": 10.0, "unit_price_fen": 3000}],
         )
 
         mock_db = AsyncMock()
 
-        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), \
-             patch.object(engine, "_fetch_receiving_orders", return_value=[recv_data]), \
-             patch.object(engine, "_fetch_purchase_invoices", return_value=[inv_data]), \
-             patch.object(engine, "_save_match_result", return_value=None):
-
+        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), patch.object(
+            engine, "_fetch_receiving_orders", return_value=[recv_data]
+        ), patch.object(engine, "_fetch_purchase_invoices", return_value=[inv_data]), patch.object(
+            engine, "_save_match_result", return_value=None
+        ):
             result = await engine.match_purchase_order(
                 purchase_order_id=str(po_id),
                 tenant_id=str(tenant_id),
@@ -436,22 +443,26 @@ class TestThreeWayMatchIntegration:
         tenant_id = TENANT_A
 
         po_data = _make_po(
-            po_id, tenant_id, SUPPLIER_1,
+            po_id,
+            tenant_id,
+            SUPPLIER_1,
             items=[{"ingredient_name": "蔬菜", "qty": 20.0, "unit_price_fen": 500}],
             total_amount_fen=10000,
         )
         recv_data = _make_receiving(
-            uuid.uuid4(), po_id, tenant_id,
+            uuid.uuid4(),
+            po_id,
+            tenant_id,
             items=[{"ingredient_name": "蔬菜", "received_qty": 20.0, "unit_price_fen": 500}],
         )
 
         mock_db = AsyncMock()
 
-        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), \
-             patch.object(engine, "_fetch_receiving_orders", return_value=[recv_data]), \
-             patch.object(engine, "_fetch_purchase_invoices", return_value=[]), \
-             patch.object(engine, "_save_match_result", return_value=None):
-
+        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), patch.object(
+            engine, "_fetch_receiving_orders", return_value=[recv_data]
+        ), patch.object(engine, "_fetch_purchase_invoices", return_value=[]), patch.object(
+            engine, "_save_match_result", return_value=None
+        ):
             result = await engine.match_purchase_order(
                 purchase_order_id=str(po_id),
                 tenant_id=str(tenant_id),
@@ -506,11 +517,9 @@ class TestThreeWayMatchIntegration:
         ]
 
         mock_db = AsyncMock()
-        with patch.object(engine, "_fetch_pending_purchase_orders",
-                          return_value=[str(po_id_1), str(po_id_2)]), \
-             patch.object(engine, "match_purchase_order",
-                          side_effect=mock_results):
-
+        with patch.object(
+            engine, "_fetch_pending_purchase_orders", return_value=[str(po_id_1), str(po_id_2)]
+        ), patch.object(engine, "match_purchase_order", side_effect=mock_results):
             batch_result = await engine.batch_match(
                 tenant_id=str(TENANT_A),
                 db=mock_db,
@@ -529,7 +538,9 @@ class TestThreeWayMatchIntegration:
 
         # 采购单属于 TENANT_A，用 TENANT_B 查询
         po_data = _make_po(
-            po_id, TENANT_A, SUPPLIER_1,
+            po_id,
+            TENANT_A,
+            SUPPLIER_1,
             items=[{"ingredient_name": "食材", "qty": 1.0, "unit_price_fen": 1000}],
             total_amount_fen=1000,
         )
@@ -553,16 +564,22 @@ class TestThreeWayMatchIntegration:
         tenant_id = TENANT_A
 
         po_data = _make_po(
-            po_id, tenant_id, SUPPLIER_1,
+            po_id,
+            tenant_id,
+            SUPPLIER_1,
             items=[{"ingredient_name": "牛排", "qty": 10.0, "unit_price_fen": 15000}],
             total_amount_fen=150000,
         )
         recv_data = _make_receiving(
-            uuid.uuid4(), po_id, tenant_id,
+            uuid.uuid4(),
+            po_id,
+            tenant_id,
             items=[{"ingredient_name": "牛排", "received_qty": 10.0, "unit_price_fen": 15000}],
         )
         inv_data = _make_invoice(
-            uuid.uuid4(), po_id, tenant_id,
+            uuid.uuid4(),
+            po_id,
+            tenant_id,
             amount_fen=160000,  # 差10000分（100元） — 但差价率 >1%
             items=[{"ingredient_name": "牛排", "qty": 10.0, "unit_price_fen": 16000}],
         )
@@ -571,11 +588,11 @@ class TestThreeWayMatchIntegration:
         mock_model_router = AsyncMock()
         mock_model_router.complete = AsyncMock(return_value="建议：发票单价高于合同价，建议联系供应商确认。")
 
-        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), \
-             patch.object(engine, "_fetch_receiving_orders", return_value=[recv_data]), \
-             patch.object(engine, "_fetch_purchase_invoices", return_value=[inv_data]), \
-             patch.object(engine, "_save_match_result", return_value=None):
-
+        with patch.object(engine, "_fetch_purchase_order", return_value=po_data), patch.object(
+            engine, "_fetch_receiving_orders", return_value=[recv_data]
+        ), patch.object(engine, "_fetch_purchase_invoices", return_value=[inv_data]), patch.object(
+            engine, "_save_match_result", return_value=None
+        ):
             result = await engine.match_purchase_order(
                 purchase_order_id=str(po_id),
                 tenant_id=str(tenant_id),
@@ -593,11 +610,9 @@ class TestThreeWayMatchIntegration:
         mock_db = AsyncMock()
 
         # mock 3条小额差异记录，max_amount = 10000分（100元）
-        with patch.object(engine, "_fetch_small_variances",
-                          return_value=["id1", "id2", "id3"]), \
-             patch.object(engine, "_approve_variance",
-                          return_value=None):
-
+        with patch.object(engine, "_fetch_small_variances", return_value=["id1", "id2", "id3"]), patch.object(
+            engine, "_approve_variance", return_value=None
+        ):
             count = await engine.auto_approve_small_variances(
                 tenant_id=str(TENANT_A),
                 max_amount_fen=10000,

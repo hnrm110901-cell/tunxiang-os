@@ -17,6 +17,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+
 from services.tx_org.src.models.franchise import (
     Franchisee,
     FranchiseeStatus,
@@ -74,10 +75,10 @@ def make_settlement(
         franchisee_id=FRANCHISEE_ID,
         year=year,
         month=month,
-        revenue_fen=1_000_000_00,   # 100万元（分）
+        revenue_fen=1_000_000_00,  # 100万元（分）
         royalty_amount_fen=500_000,  # 5000元特许权金（分）
-        mgmt_fee_fen=200_000,        # 2000元管理费（分）
-        total_amount_fen=700_000,    # 合计7000元（分）
+        mgmt_fee_fen=200_000,  # 2000元管理费（分）
+        total_amount_fen=700_000,  # 合计7000元（分）
         status=status,
         due_date=due_date,
         paid_at=None,
@@ -88,6 +89,7 @@ def make_settlement(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 特许权金计算：比例模式
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestRoyaltyCalculationPercentage:
     """按营业额比例计算特许权金"""
@@ -155,6 +157,7 @@ class TestRoyaltyCalculationPercentage:
 #  2. 月结算单生成
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestGenerateMonthlySettlement:
     """月结算单生成逻辑"""
 
@@ -165,20 +168,16 @@ class TestGenerateMonthlySettlement:
         db = AsyncMock()
         # 模拟：无已有记录，营业额100万分，加盟商基础费率0.05
         db.fetch_one.side_effect = [
-            None,                              # _find_existing_settlement → 无已有记录
-            {"total_fen": 100_000_000},        # _sum_revenue → 100万（分）
+            None,  # _find_existing_settlement → 无已有记录
+            {"total_fen": 100_000_000},  # _sum_revenue → 100万（分）
         ]
-        db.fetch_all.return_value = [
-            {"store_id": str(uuid4())}
-        ]
+        db.fetch_all.return_value = [{"store_id": str(uuid4())}]
         db.execute.return_value = MagicMock(rowcount=1)
 
         franchisee = make_franchisee(royalty_rate=0.05, management_fee_fen=200_000)
         franchisee_id = str(franchisee.id)
 
-        with patch.object(
-            service, "_fetch_franchisee", return_value=franchisee
-        ):
+        with patch.object(service, "_fetch_franchisee", return_value=franchisee):
             settlement = await service.generate_monthly_settlement(
                 franchisee_id=franchisee_id,
                 year=2026,
@@ -200,23 +199,25 @@ class TestGenerateMonthlySettlement:
         existing_id = uuid4()
         # 模拟：已有当月结算单
         db.fetch_one.side_effect = [
-            {"id": str(existing_id), "status": "draft",
-             "year": 2026, "month": 2,
-             "revenue_fen": 100_000_000,
-             "royalty_amount_fen": 500_000,
-             "mgmt_fee_fen": 200_000,
-             "total_amount_fen": 700_000,
-             "due_date": date(2026, 3, 15),
-             "paid_at": None,
-             "payment_ref": None,
-             "franchisee_id": str(FRANCHISEE_ID),
-             "tenant_id": str(TENANT_ID)},
+            {
+                "id": str(existing_id),
+                "status": "draft",
+                "year": 2026,
+                "month": 2,
+                "revenue_fen": 100_000_000,
+                "royalty_amount_fen": 500_000,
+                "mgmt_fee_fen": 200_000,
+                "total_amount_fen": 700_000,
+                "due_date": date(2026, 3, 15),
+                "paid_at": None,
+                "payment_ref": None,
+                "franchisee_id": str(FRANCHISEE_ID),
+                "tenant_id": str(TENANT_ID),
+            },
         ]
 
         franchisee = make_franchisee()
-        with patch.object(
-            service, "_fetch_franchisee", return_value=franchisee
-        ):
+        with patch.object(service, "_fetch_franchisee", return_value=franchisee):
             settlement = await service.generate_monthly_settlement(
                 franchisee_id=str(FRANCHISEE_ID),
                 year=2026,
@@ -258,6 +259,7 @@ class TestGenerateMonthlySettlement:
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  3. 结算状态流转
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 
 class TestSettlementStatusTransition:
     """状态机：draft → sent → confirmed → paid"""
@@ -304,7 +306,8 @@ class TestSettlementStatusTransition:
         db.fetch_one.return_value = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.CONFIRMED,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -332,7 +335,8 @@ class TestSettlementStatusTransition:
         db.fetch_one.return_value = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.SENT,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -363,7 +367,8 @@ class TestSettlementStatusTransition:
         db.fetch_one.return_value = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.DRAFT,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -391,7 +396,8 @@ class TestSettlementStatusTransition:
         db.fetch_one.return_value = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.CONFIRMED,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -423,7 +429,8 @@ class TestSettlementStatusTransition:
         db.fetch_one.return_value = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.SENT,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -451,7 +458,8 @@ class TestSettlementStatusTransition:
         paid_row = {
             "id": str(SETTLEMENT_ID),
             "status": SettlementStatus.PAID,
-            "year": 2026, "month": 2,
+            "year": 2026,
+            "month": 2,
             "revenue_fen": 100_000_000,
             "royalty_amount_fen": 500_000,
             "mgmt_fee_fen": 200_000,
@@ -477,6 +485,7 @@ class TestSettlementStatusTransition:
 #  4. 逾期预警：超期15天触发
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestOverdueWarning:
     """逾期预警：超期15天的 confirmed 结算单"""
 
@@ -491,7 +500,8 @@ class TestOverdueWarning:
             {
                 "id": str(uuid4()),
                 "status": SettlementStatus.CONFIRMED,
-                "year": 2026, "month": 1,
+                "year": 2026,
+                "month": 1,
                 "revenue_fen": 100_000_000,
                 "royalty_amount_fen": 500_000,
                 "mgmt_fee_fen": 200_000,
@@ -551,6 +561,7 @@ class TestOverdueWarning:
 #  5. 加盟商对账报表
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestFranchiseeStatement:
     """加盟商对账报表（近12个月）"""
 
@@ -563,21 +574,23 @@ class TestFranchiseeStatement:
         # 模拟12个月的结算记录
         months_data = []
         for m in range(1, 13):
-            months_data.append({
-                "id": str(uuid4()),
-                "status": SettlementStatus.PAID,
-                "year": 2025,
-                "month": m,
-                "revenue_fen": 80_000_000 + m * 1_000_000,
-                "royalty_amount_fen": 400_000,
-                "mgmt_fee_fen": 200_000,
-                "total_amount_fen": 600_000,
-                "due_date": date(2025, m, 15) if m < 12 else date(2026, 1, 15),
-                "paid_at": datetime(2025, m, 10) if m < 12 else datetime(2026, 1, 8),
-                "payment_ref": f"PAY-2025-{m:02d}",
-                "franchisee_id": str(FRANCHISEE_ID),
-                "tenant_id": str(TENANT_ID),
-            })
+            months_data.append(
+                {
+                    "id": str(uuid4()),
+                    "status": SettlementStatus.PAID,
+                    "year": 2025,
+                    "month": m,
+                    "revenue_fen": 80_000_000 + m * 1_000_000,
+                    "royalty_amount_fen": 400_000,
+                    "mgmt_fee_fen": 200_000,
+                    "total_amount_fen": 600_000,
+                    "due_date": date(2025, m, 15) if m < 12 else date(2026, 1, 15),
+                    "paid_at": datetime(2025, m, 10) if m < 12 else datetime(2026, 1, 8),
+                    "payment_ref": f"PAY-2025-{m:02d}",
+                    "franchisee_id": str(FRANCHISEE_ID),
+                    "tenant_id": str(TENANT_ID),
+                }
+            )
         db.fetch_all.return_value = months_data
 
         statement = await service.get_franchisee_statement(
@@ -599,7 +612,8 @@ class TestFranchiseeStatement:
             {
                 "id": str(uuid4()),
                 "status": SettlementStatus.CONFIRMED,
-                "year": 2026, "month": 2,
+                "year": 2026,
+                "month": 2,
                 "revenue_fen": 100_000_000,
                 "royalty_amount_fen": 500_000,
                 "mgmt_fee_fen": 200_000,
@@ -643,7 +657,8 @@ class TestFranchiseeStatement:
             {
                 "id": str(uuid4()),
                 "status": SettlementStatus.CONFIRMED,  # 已确认但未付
-                "year": 2026, "month": 1,
+                "year": 2026,
+                "month": 1,
                 "revenue_fen": 100_000_000,
                 "royalty_amount_fen": 500_000,
                 "mgmt_fee_fen": 200_000,
@@ -657,7 +672,8 @@ class TestFranchiseeStatement:
             {
                 "id": str(uuid4()),
                 "status": SettlementStatus.SENT,  # 已发送未确认
-                "year": 2026, "month": 2,
+                "year": 2026,
+                "month": 2,
                 "revenue_fen": 90_000_000,
                 "royalty_amount_fen": 450_000,
                 "mgmt_fee_fen": 200_000,
@@ -671,7 +687,8 @@ class TestFranchiseeStatement:
             {
                 "id": str(uuid4()),
                 "status": SettlementStatus.PAID,  # 已付款不计入欠款
-                "year": 2025, "month": 12,
+                "year": 2025,
+                "month": 12,
                 "revenue_fen": 95_000_000,
                 "royalty_amount_fen": 475_000,
                 "mgmt_fee_fen": 200_000,
@@ -699,6 +716,7 @@ class TestFranchiseeStatement:
 #  6. 不可修改约束
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 class TestSettlementImmutability:
     """结算单发送后不可修改金额"""
 
@@ -711,9 +729,7 @@ class TestSettlementImmutability:
         ]
         for status in finalized_statuses:
             settlement = make_settlement(status=status)
-            assert settlement.is_finalized(), (
-                f"status={status} 应视为已锁定（is_finalized=True）"
-            )
+            assert settlement.is_finalized(), f"status={status} 应视为已锁定（is_finalized=True）"
 
     def test_draft_is_not_finalized(self):
         """draft 状态未锁定，可以修改"""

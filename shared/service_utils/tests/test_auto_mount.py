@@ -133,15 +133,20 @@ class TestAutoMount:
         assert "RuntimeError" in result.failed[0][1]
 
     def test_strict_raises_on_failure(self, tmp_path, monkeypatch):
-        """strict=True 时 import 失败抛异常"""
+        """strict=True 时 import 失败聚合抛 RouteMountError"""
+        from shared.service_utils.auto_mount import RouteMountError
+
         api_dir = tmp_path / "api"
         api_dir.mkdir()
         (api_dir / "__init__.py").write_text("")
-        (api_dir / "boom_routes.py").write_text("1/0\n")
+        # RuntimeError 在 except 列表中，会被聚合
+        (api_dir / "boom_routes.py").write_text(
+            "raise RuntimeError('boom')\n"
+        )
         monkeypatch.syspath_prepend(str(tmp_path))
 
         app = MagicMock()
-        with pytest.raises(ZeroDivisionError):
+        with pytest.raises(RouteMountError) as exc_info:
             auto_mount_routes(
                 app,
                 pkg=None,
@@ -149,6 +154,8 @@ class TestAutoMount:
                 modules=[("boom_routes", "router")],
                 strict=True,
             )
+        assert exc_info.value.failures[0][0] == "boom_routes"
+        assert "RuntimeError" in exc_info.value.failures[0][1]
 
     def test_failed_when_module_missing_router_attr(
         self, tmp_path, monkeypatch,
@@ -305,8 +312,10 @@ class TestBaseExceptionCapture:
         assert len(result.failed) == 1
         assert "KeyboardInterrupt" in result.failed[0][1]
 
-    def test_strict_still_raises_system_exit(self, tmp_path, monkeypatch):
-        """strict=True 时 SystemExit 应该重新抛出"""
+    def test_strict_aggregates_system_exit(self, tmp_path, monkeypatch):
+        """strict=True 时 SystemExit 被吞 + 聚合到 RouteMountError"""
+        from shared.service_utils.auto_mount import RouteMountError
+
         api_dir = tmp_path / "api"
         api_dir.mkdir()
         (api_dir / "__init__.py").write_text("")
@@ -316,12 +325,13 @@ class TestBaseExceptionCapture:
         monkeypatch.syspath_prepend(str(tmp_path))
 
         app = MagicMock()
-        with pytest.raises(SystemExit):
+        with pytest.raises(RouteMountError) as exc_info:
             auto_mount_routes(
                 app, pkg=None, api_dir=api_dir,
                 modules=[("exit_routes", "router")],
                 strict=True,
             )
+        assert "SystemExit" in exc_info.value.failures[0][1]
 
 
 class TestRouterTypeCheck:

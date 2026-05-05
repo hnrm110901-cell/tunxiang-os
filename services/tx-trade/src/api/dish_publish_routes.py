@@ -28,6 +28,7 @@
   GET  /api/v1/trade/delivery/publish/{dish_id}/tasks
     发布任务历史
 """
+
 from __future__ import annotations
 
 import logging
@@ -46,6 +47,7 @@ from shared.adapters.delivery_publish import (
 )
 from shared.adapters.delivery_publish.base import PublishError
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dish_publish_orchestrator import (
     DishPublishOrchestrator,
@@ -82,9 +84,7 @@ class DishSpecInput(BaseModel):
 
 
 class PlatformTargetInput(BaseModel):
-    platform: str = Field(
-        ..., description="meituan|eleme|douyin|xiaohongshu|wechat"
-    )
+    platform: str = Field(..., description="meituan|eleme|douyin|xiaohongshu|wechat")
     platform_shop_id: str = Field(..., min_length=1, max_length=100)
     brand_id: Optional[str] = None
     store_id: Optional[str] = None
@@ -128,7 +128,7 @@ async def publish_dish(
     try:
         spec = DishPublishSpec(**req.spec.model_dump())
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     targets = [
         PlatformTarget(
@@ -151,9 +151,7 @@ async def publish_dish(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dish_publish_failed")
-        raise HTTPException(
-            status_code=500, detail=f"发布失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"发布失败: {exc}") from exc
 
     succeeded = sum(1 for o in outcomes if o.result.ok)
     return {
@@ -189,7 +187,7 @@ async def update_dish_price(
             original_price_fen=req.original_price_fen,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return await _run_operation(
         db=db,
@@ -222,7 +220,7 @@ async def update_dish_stock(
             stock=req.stock,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return await _run_operation(
         db=db,
@@ -275,7 +273,7 @@ async def resume_dish(
             stock=req.stock,
         )
     except PublishError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     return await _run_operation(
         db=db,
         tenant_id=x_tenant_id,
@@ -320,7 +318,8 @@ async def get_dish_publish_status(
 
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, platform, platform_sku_id, platform_shop_id,
                        status, target_price_fen, published_price_fen,
                        original_price_fen, stock_target, stock_available,
@@ -331,15 +330,14 @@ async def get_dish_publish_status(
                   AND dish_id = CAST(:dish_id AS uuid)
                   AND is_deleted = false
                 ORDER BY platform
-            """),
+            """
+            ),
             {"tenant_id": x_tenant_id, "dish_id": dish_id},
         )
         registry = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("dish_publish_get_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -389,7 +387,8 @@ async def list_dish_publish(
 
         list_params = {**params, "limit": size, "offset": offset}
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, dish_id, platform, platform_sku_id, status,
                        target_price_fen, published_price_fen,
                        stock_target, stock_available,
@@ -398,15 +397,14 @@ async def list_dish_publish(
                 WHERE {where}
                 ORDER BY updated_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             list_params,
         )
         items = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("dish_publish_list_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -452,7 +450,8 @@ async def list_dish_publish_tasks(
 
     try:
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, platform, operation, status, attempts,
                        started_at, completed_at, error_message,
                        triggered_by, trigger_source, created_at
@@ -460,15 +459,14 @@ async def list_dish_publish_tasks(
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             params,
         )
         tasks = [dict(r) for r in rows.mappings()]
     except SQLAlchemyError as exc:
         logger.exception("dish_publish_tasks_failed")
-        raise HTTPException(
-            status_code=500, detail=f"查询失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"查询失败: {exc}") from exc
 
     return {
         "ok": True,
@@ -502,9 +500,7 @@ async def _run_operation(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("dish_publish_op_failed")
-        raise HTTPException(
-            status_code=500, detail=f"{operation.value} 失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"{operation.value} 失败: {exc}") from exc
 
     succeeded = sum(1 for o in outcomes if o.result.ok)
     return {
@@ -524,6 +520,4 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

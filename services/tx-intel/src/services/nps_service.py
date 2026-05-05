@@ -86,7 +86,8 @@ class NPSService:
         now = datetime.now(tz=timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO nps_surveys (
                     id, tenant_id, customer_id, store_id,
                     order_id, channel, sent_at
@@ -94,7 +95,8 @@ class NPSService:
                     :id, :tenant_id, :customer_id, :store_id,
                     :order_id, :channel, :sent_at
                 )
-            """),
+            """
+            ),
             {
                 "id": str(survey_id),
                 "tenant_id": str(tenant_id),
@@ -150,12 +152,14 @@ class NPSService:
 
         # 计算回复时间
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT sent_at FROM nps_surveys
                 WHERE id = :survey_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"survey_id": str(survey_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -166,7 +170,8 @@ class NPSService:
         response_time_sec = int((now - sent_at).total_seconds()) if sent_at else None
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE nps_surveys
                 SET nps_score = :nps_score,
                     feedback_text = :feedback_text,
@@ -177,7 +182,8 @@ class NPSService:
                 WHERE id = :survey_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "survey_id": str(survey_id),
                 "tenant_id": str(tenant_id),
@@ -243,7 +249,8 @@ class NPSService:
 
         # 总体统计
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     COUNT(*) AS total_sent,
                     COUNT(responded_at) AS total_responded,
@@ -257,7 +264,8 @@ class NPSService:
                   AND sent_at BETWEEN :start AND :end
                   AND is_deleted = false
                   {store_filter}
-            """),
+            """
+            ),
             params,
         )
         row = result.fetchone()
@@ -283,7 +291,8 @@ class NPSService:
 
         # 周趋势
         trend_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT
                     DATE_TRUNC('week', sent_at) AS week_start,
                     COUNT(responded_at) AS responded,
@@ -296,7 +305,8 @@ class NPSService:
                   {store_filter}
                 GROUP BY week_start
                 ORDER BY week_start
-            """),
+            """
+            ),
             params,
         )
         trend_rows = trend_result.fetchall()
@@ -349,7 +359,8 @@ class NPSService:
         period_start = (now - timedelta(days=days)).isoformat()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     store_id,
                     COUNT(*) AS total_sent,
@@ -363,7 +374,8 @@ class NPSService:
                   AND is_deleted = false
                 GROUP BY store_id
                 ORDER BY avg_score DESC
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "start": period_start,
@@ -409,7 +421,8 @@ class NPSService:
         period_start = (now - timedelta(days=days)).isoformat()
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     s.id, s.customer_id, s.store_id, s.order_id,
                     s.nps_score, s.feedback_text, s.tags,
@@ -422,7 +435,8 @@ class NPSService:
                   AND s.is_deleted = false
                 ORDER BY s.nps_score ASC, s.responded_at DESC
                 LIMIT 100
-            """),
+            """
+            ),
             {
                 "tenant_id": str(tenant_id),
                 "start": period_start,

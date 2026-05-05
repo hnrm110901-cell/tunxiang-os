@@ -173,9 +173,7 @@ def agent_factory(decision_logs):
         *,
         profile: Optional[CallerProfile] = None,
         lifecycle: Optional[CustomerLifecycleState] = None,
-        collision_rows: Optional[
-            list[tuple[uuid.UUID, SourceChannel, datetime]]
-        ] = None,
+        collision_rows: Optional[list[tuple[uuid.UUID, SourceChannel, datetime]]] = None,
         invitation_service: Optional[_FakeInvitationService] = None,
         whisper_text: Optional[str] = "未响铃 3 次",
         whisper_unavailable: bool = False,
@@ -187,9 +185,7 @@ def agent_factory(decision_logs):
         async def _lifecycle_fetcher(cid: uuid.UUID, tid: uuid.UUID):
             return lifecycle
 
-        async def _collision_fetcher(
-            cid: uuid.UUID, tdate: date, tid: uuid.UUID
-        ):
+        async def _collision_fetcher(cid: uuid.UUID, tdate: date, tid: uuid.UUID):
             return collision_rows or []
 
         async def _whisper(ref: str) -> Optional[str]:
@@ -417,9 +413,7 @@ async def test_send_invitation_atomic_rollback_on_partial_failure(
     # 返回空 invitations（回滚语义）
     assert result.data["result"]["invitations"] == []
     # sms 已写 SENT 事件但后被 mark_failed 回滚
-    sms_records = [
-        r for r in inv_svc._store.values() if r.channel == InvitationChannel.SMS
-    ]
+    sms_records = [r for r in inv_svc._store.values() if r.channel == InvitationChannel.SMS]
     assert len(sms_records) == 1
     assert sms_records[0].status == InvitationStatus.FAILED
 
@@ -479,9 +473,7 @@ async def test_confirm_arrival_rescheduled_writes_new_time(agent_factory):
 
 
 @pytest.mark.asyncio
-async def test_decision_log_written_for_every_action(
-    agent_factory, decision_logs
-):
+async def test_decision_log_written_for_every_action(agent_factory, decision_logs):
     """每次 execute 必写 AgentDecisionLog（reservation_concierge 5 actions 覆盖）。"""
     inv_svc = _FakeInvitationService()
     agent = agent_factory(

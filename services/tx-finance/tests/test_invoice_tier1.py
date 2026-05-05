@@ -75,6 +75,7 @@ class TestInvoiceGoldenTaxPhase4:
         """
         sys.path.insert(0, FINANCE_SRC)
         from models.invoice import Invoice
+
         from services.invoice_service import InvoiceService
 
         mock_invoice = MagicMock(spec=Invoice)
@@ -96,14 +97,15 @@ class TestInvoiceGoldenTaxPhase4:
         payload = svc._build_nuonuo_payload(mock_invoice, extra)
 
         required_fields = [
-            "orderNo", "invoiceDate", "buyerName",
-            "invoiceKind", "goodsWithTaxFlag", "invoiceDetailList",
+            "orderNo",
+            "invoiceDate",
+            "buyerName",
+            "invoiceKind",
+            "goodsWithTaxFlag",
+            "invoiceDetailList",
         ]
         for field in required_fields:
-            assert field in payload, (
-                f"发票 payload 缺少金税四期必填字段: {field}，"
-                f"这会导致诺诺API返回格式错误"
-            )
+            assert field in payload, f"发票 payload 缺少金税四期必填字段: {field}，" f"这会导致诺诺API返回格式错误"
 
     def test_tax_rate_is_string_format(self):
         """税率字段必须是字符串 '0.06'，而非浮点数 0.06
@@ -156,9 +158,7 @@ class TestInvoiceGoldenTaxPhase4:
 
         # 浮点数计算结果可能不精确
         # Decimal 计算结果精确
-        assert str(tax_decimal) == "533.3328", (
-            f"Decimal 税额计算结果: {tax_decimal}"
-        )
+        assert str(tax_decimal) == "533.3328", f"Decimal 税额计算结果: {tax_decimal}"
 
 
 class TestInvoiceIdempotencyTier1:
@@ -202,9 +202,7 @@ class TestInvoiceIdempotencyTier1:
 
         # 幂等逻辑验证：如果已有非 cancelled 的发票，不应创建新发票
         should_create_new = found.status in ("cancelled",)  # 只有作废的才允许重开
-        assert should_create_new is False, (
-            "已有 issued 状态发票时不应创建新发票（幂等保护）"
-        )
+        assert should_create_new is False, "已有 issued 状态发票时不应创建新发票（幂等保护）"
 
     @pytest.mark.asyncio
     async def test_nuonuo_api_failure_retryable_status(self):
@@ -232,15 +230,11 @@ class TestInvoiceIdempotencyTier1:
 
         # 验证：失败后发票状态应为 failed（可重试），不是 cancelled（不可重试）
         failed_invoice_status = "failed"
-        assert failed_invoice_status != "cancelled", (
-            "API 失败后发票应为 failed 状态（可重试），而非 cancelled"
-        )
+        assert failed_invoice_status != "cancelled", "API 失败后发票应为 failed 状态（可重试），而非 cancelled"
 
         # 验证：platform_request_id 被保留，下次重试时可查询状态
         platform_request_id = f"TX-{uuid.uuid4().hex[:16].upper()}"
-        assert platform_request_id.startswith("TX-"), (
-            "platform_request_id 应保留，方便重试时查询诺诺网状态"
-        )
+        assert platform_request_id.startswith("TX-"), "platform_request_id 应保留，方便重试时查询诺诺网状态"
 
     @pytest.mark.asyncio
     async def test_invoice_platform_request_id_unique(self):
@@ -257,9 +251,7 @@ class TestInvoiceIdempotencyTier1:
             request_id = f"TX-{uuid.uuid4().hex[:16].upper()}"
             ids.add(request_id)
             # 验证格式
-            assert re.match(r"^TX-[A-F0-9]{16}$", request_id), (
-                f"platform_request_id 格式不符合规范: {request_id}"
-            )
+            assert re.match(r"^TX-[A-F0-9]{16}$", request_id), f"platform_request_id 格式不符合规范: {request_id}"
 
         assert len(ids) == 100, "100次生成的 request_id 必须全部唯一"
 
@@ -330,8 +322,8 @@ class TestInvoiceValidationTier1:
             "91110000800047463J",  # 北京企业（含字母J）
         ]
         invalid_tax_numbers = [
-            "123456",              # 太短
-            "91430000XXXXXXXXX",   # 17位
+            "123456",  # 太短
+            "91430000XXXXXXXXX",  # 17位
         ]
 
         pattern = re.compile(r"^[0-9A-Z]{18}$")
@@ -348,6 +340,7 @@ class TestInvoiceValidationTier1:
         场景：发票作废后，客人误操作点击重打，系统应拒绝。
         """
         from models.invoice import Invoice
+
         from services.invoice_service import InvoiceService
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
@@ -405,7 +398,5 @@ class TestInvoiceTenantIsolation:
         invoices = result.scalars().all()
 
         for inv in invoices:
-            assert inv.tenant_id == tenant_a, (
-                f"发票查询返回了非本租户的发票，invoice_no={inv.invoice_no}"
-            )
+            assert inv.tenant_id == tenant_a, f"发票查询返回了非本租户的发票，invoice_no={inv.invoice_no}"
             assert inv.tenant_id != tenant_b

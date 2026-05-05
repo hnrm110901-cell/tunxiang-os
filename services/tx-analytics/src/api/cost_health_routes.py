@@ -23,6 +23,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.cost_health_engine import (
     CostHealthEngine,
@@ -104,7 +105,7 @@ async def get_store_cost_health(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         logger.error(
             "get_store_cost_health.internal_error",
@@ -157,7 +158,7 @@ async def get_group_cost_heatmap(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         logger.error(
             "get_group_cost_heatmap.internal_error",
@@ -222,7 +223,7 @@ async def get_brand_cost_benchmark(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         logger.error(
             "get_brand_cost_benchmark.internal_error",
@@ -283,7 +284,7 @@ async def get_cost_alerts(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         logger.error(
             "get_cost_alerts.internal_error",
@@ -407,7 +408,7 @@ async def get_cost_suggestions(
             error=str(exc),
             exc_info=True,
         )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:
         logger.error(
             "get_cost_suggestions.internal_error",

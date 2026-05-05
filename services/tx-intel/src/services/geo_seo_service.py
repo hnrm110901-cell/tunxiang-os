@@ -59,14 +59,16 @@ class GeoSEOService:
 
         # 读取门店基本信息
         store_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, address, phone, latitude, longitude
                 FROM stores
                 WHERE id = :store_id
                   AND tenant_id = :tid
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tid": str(tenant_id)},
         )
         store = store_row.mappings().first()
@@ -76,7 +78,8 @@ class GeoSEOService:
 
         # 读取菜品亮点（销量前5）
         menu_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT name, price_fen
                 FROM dishes
                 WHERE store_id = :store_id
@@ -84,7 +87,8 @@ class GeoSEOService:
                   AND is_deleted = FALSE
                 ORDER BY created_at DESC
                 LIMIT 5
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tid": str(tenant_id)},
         )
         menu_highlights = [{"name": r["name"], "price_fen": r["price_fen"]} for r in menu_row.mappings().all()]
@@ -138,7 +142,8 @@ class GeoSEOService:
             score = self.calculate_seo_score(profile_data)
 
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO geo_brand_profiles
                         (tenant_id, store_id, platform, structured_data,
                          store_name, address, phone, latitude, longitude,
@@ -159,7 +164,8 @@ class GeoSEOService:
                         menu_highlights = EXCLUDED.menu_highlights,
                         seo_score = EXCLUDED.seo_score,
                         updated_at = NOW()
-                """),
+                """
+                ),
                 {
                     "tid": str(tenant_id),
                     "store_id": str(store_id),
@@ -232,20 +238,23 @@ class GeoSEOService:
 
         # 获取当前最大check_round
         round_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(MAX(check_round), 0) AS max_round
                 FROM ai_citation_monitors
                 WHERE tenant_id = :tid
                   AND query = :query
                   AND platform = :platform
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "query": query, "platform": platform},
         )
         max_round = round_row.scalar() or 0
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO ai_citation_monitors
                     (tenant_id, query, platform, mention_found, mention_text,
                      mention_position, competitor_mentions, sentiment,
@@ -254,7 +263,8 @@ class GeoSEOService:
                     (:tid, :query, :platform, :found, :mtext,
                      :mpos, :competitors ::jsonb, :sentiment,
                      NOW(), :round)
-            """),
+            """
+            ),
             {
                 "tid": str(tenant_id),
                 "query": query,
@@ -302,13 +312,15 @@ class GeoSEOService:
 
         # 获取品牌信息（从已有档案推断）
         profile_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT store_name, address, cuisine_type
                 FROM geo_brand_profiles
                 WHERE tenant_id = :tid
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id)},
         )
         profile = profile_row.mappings().first()
@@ -367,7 +379,8 @@ class GeoSEOService:
 
         # 档案统计
         profile_stats = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_profiles,
                     COUNT(DISTINCT store_id) AS stores_with_profiles,
@@ -378,14 +391,16 @@ class GeoSEOService:
                 FROM geo_brand_profiles
                 WHERE tenant_id = :tid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": str(tenant_id)},
         )
         ps = profile_stats.mappings().first()
 
         # 按平台分解
         platform_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     platform,
                     COUNT(*) AS profile_count,
@@ -396,7 +411,8 @@ class GeoSEOService:
                   AND is_deleted = FALSE
                 GROUP BY platform
                 ORDER BY platform
-            """),
+            """
+            ),
             {"tid": str(tenant_id)},
         )
         platform_breakdown = [
@@ -411,14 +427,16 @@ class GeoSEOService:
 
         # 引用监测统计
         citation_stats = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_checks,
                     COUNT(*) FILTER (WHERE mention_found = TRUE) AS mentions_found
                 FROM ai_citation_monitors
                 WHERE tenant_id = :tid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"tid": str(tenant_id)},
         )
         cs = citation_stats.mappings().first()
@@ -462,7 +480,8 @@ class GeoSEOService:
 
         # 读取该门店的第一个档案（任意平台，内容相同）
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT store_name, address, phone, cuisine_type,
                        latitude, longitude, business_hours, menu_highlights,
                        seo_score
@@ -471,7 +490,8 @@ class GeoSEOService:
                   AND store_id = :store_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": str(tenant_id), "store_id": str(store_id)},
         )
         profile = row.mappings().first()

@@ -116,13 +116,9 @@ class DeviceRegistryService:
         if not store_id:
             raise ValueError("store_id is required")
         if device_kind not in ALLOWED_DEVICE_KINDS:
-            raise ValueError(
-                f"device_kind must be one of {sorted(ALLOWED_DEVICE_KINDS)}, got {device_kind!r}"
-            )
+            raise ValueError(f"device_kind must be one of {sorted(ALLOWED_DEVICE_KINDS)}, got {device_kind!r}")
         if health_status not in ALLOWED_HEALTH_STATUSES:
-            raise ValueError(
-                f"health_status must be one of {sorted(ALLOWED_HEALTH_STATUSES)}, got {health_status!r}"
-            )
+            raise ValueError(f"health_status must be one of {sorted(ALLOWED_HEALTH_STATUSES)}, got {health_status!r}")
         if buffer_backlog < 0:
             raise ValueError("buffer_backlog must be >= 0")
 

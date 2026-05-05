@@ -15,13 +15,14 @@
 
 熔断 sweep 设计为租户级同步调用；生产环境建议 cron 定时调用。
 """
+
 from __future__ import annotations
 
-import logging
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
+import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -29,6 +30,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.ab_experiment_service import (
     ABExperimentService,
@@ -38,7 +40,7 @@ from ..services.ab_experiment_service import (
     RecordEventInput,
 )
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 router = APIRouter(
     prefix="/api/v1/brain/ab",
     tags=["brain-ab-experiments"],
@@ -142,7 +144,7 @@ async def create_experiment(
             created_by=x_operator_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
@@ -150,9 +152,7 @@ async def create_experiment(
     except SQLAlchemyError as exc:
         await db.rollback()
         logger.exception("ab_create_experiment_failed")
-        raise HTTPException(
-            status_code=500, detail=f"创建失败: {exc}"
-        ) from exc
+        raise HTTPException(status_code=500, detail=f"创建失败: {exc}") from exc
 
     return {"ok": True, "data": result}
 
@@ -186,7 +186,8 @@ async def list_experiments(
 
         list_params = {**params, "limit": size, "offset": offset}
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, experiment_key, name, status, primary_metric,
                        traffic_percentage, started_at, ended_at,
                        circuit_breaker_tripped, created_at, updated_at
@@ -194,7 +195,8 @@ async def list_experiments(
                 WHERE {where}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             list_params,
         )
         items = [dict(r) for r in rows.mappings()]
@@ -219,12 +221,14 @@ async def get_experiment(
 
     try:
         exp_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM ab_experiments
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": experiment_id, "tenant_id": x_tenant_id},
         )
         exp = exp_row.mappings().first()
@@ -232,12 +236,14 @@ async def get_experiment(
             raise HTTPException(status_code=404, detail="实验不存在")
 
         arms_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM ab_experiment_arms
                 WHERE experiment_id = CAST(:id AS uuid)
                   AND is_deleted = false
                 ORDER BY is_control DESC, arm_key
-            """),
+            """
+            ),
             {"id": experiment_id},
         )
         arms = [dict(r) for r in arms_row.mappings()]
@@ -263,7 +269,7 @@ async def start_experiment(
     try:
         result = await service.start_experiment(experiment_id)
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"启动失败: {exc}") from exc
@@ -282,7 +288,7 @@ async def pause_experiment(
     try:
         result = await service.pause_experiment(experiment_id)
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"暂停失败: {exc}") from exc
@@ -303,10 +309,12 @@ async def terminate_experiment(
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
         result = await service.terminate_experiment(
-            experiment_id, reason=req.reason, winner_arm_id=req.winner_arm_id,
+            experiment_id,
+            reason=req.reason,
+            winner_arm_id=req.winner_arm_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise safe_http_exception(409, "操作冲突", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"终止失败: {exc}") from exc
@@ -325,10 +333,11 @@ async def experiment_significance(
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
         result = await service.evaluate_significance(
-            experiment_id, use_bayesian=use_bayesian,
+            experiment_id,
+            use_bayesian=use_bayesian,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail=f"评估失败: {exc}") from exc
     return {"ok": True, "data": result}
@@ -349,7 +358,7 @@ async def assign(
             entity_id=req.entity_id,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"分配失败: {exc}") from exc
@@ -386,14 +395,15 @@ async def record_event(
             idempotency_key=req.idempotency_key,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     service = ABExperimentService(db, tenant_id=x_tenant_id)
     try:
         result = await service.record_event(
-            experiment_key=req.experiment_key, inp=inp,
+            experiment_key=req.experiment_key,
+            inp=inp,
         )
     except DisputeValidationError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         raise HTTPException(status_code=500, detail=f"记录失败: {exc}") from exc
@@ -434,7 +444,8 @@ async def arm_stats(
     _parse_uuid(arm_id, "arm_id")
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT arm_key, name, is_control, traffic_weight,
                        exposure_count, conversion_count, revenue_sum_fen,
                        numeric_metric_sum, last_stats_refreshed_at
@@ -442,7 +453,8 @@ async def arm_stats(
                 WHERE id = CAST(:id AS uuid)
                   AND tenant_id = CAST(:tenant_id AS uuid)
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"id": arm_id, "tenant_id": x_tenant_id},
         )
         arm = row.mappings().first()
@@ -454,9 +466,7 @@ async def arm_stats(
     data = dict(arm)
     exposure = int(data.get("exposure_count") or 0)
     conversion = int(data.get("conversion_count") or 0)
-    data["conversion_rate"] = (
-        conversion / exposure if exposure > 0 else 0.0
-    )
+    data["conversion_rate"] = conversion / exposure if exposure > 0 else 0.0
     return {"ok": True, "data": data}
 
 
@@ -467,6 +477,4 @@ def _parse_uuid(value: str, field_name: str) -> UUID:
     try:
         return UUID(value)
     except (ValueError, TypeError) as exc:
-        raise HTTPException(
-            status_code=400, detail=f"{field_name} 非法 UUID: {value!r}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"{field_name} 非法 UUID: {value!r}") from exc

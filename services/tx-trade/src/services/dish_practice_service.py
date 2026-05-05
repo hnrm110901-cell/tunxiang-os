@@ -188,7 +188,8 @@ async def get_dish_practices(
         conditions += " AND is_temporary = false"
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, dish_id, practice_name, practice_group,
                    additional_price_fen, is_default, sort_order,
                    is_temporary, practice_type, max_quantity,
@@ -196,7 +197,8 @@ async def get_dish_practices(
             FROM dish_practices
             WHERE {conditions}
             ORDER BY practice_group, sort_order, created_at
-        """),
+        """
+        ),
         {"tid": tenant_id, "did": dish_id},
     )
     rows = result.mappings().all()
@@ -262,7 +264,8 @@ async def add_dish_practice(
     is_temporary = practice_type == "temporary" or practice.get("is_temporary", False)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO dish_practices
               (id, tenant_id, dish_id, practice_name, practice_group,
                additional_price_fen, is_default, sort_order,
@@ -271,7 +274,8 @@ async def add_dish_practice(
               (:id::uuid, :tid::uuid, :did::uuid, :name, :grp,
                :price, :is_def, :sort,
                :is_tmp, :ptype, :max_qty)
-        """),
+        """
+        ),
         {
             "id": str(practice_id),
             "tid": tenant_id,
@@ -331,7 +335,8 @@ async def get_practice_templates(
     template_dish_id = "00000000-0000-0000-0000-000000000000"
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, practice_name, practice_group,
                    additional_price_fen, is_default, sort_order,
                    is_temporary, practice_type, max_quantity
@@ -340,7 +345,8 @@ async def get_practice_templates(
               AND dish_id = :did::uuid
               AND is_deleted = false
             ORDER BY practice_group, sort_order
-        """),
+        """
+        ),
         {"tid": tenant_id, "did": template_dish_id},
     )
     rows = result.mappings().all()
@@ -439,12 +445,14 @@ async def seed_default_templates(
 
     # 检查是否已初始化
     existing = await db.execute(
-        text("""
+        text(
+            """
             SELECT count(*) FROM dish_practices
             WHERE tenant_id = :tid::uuid
               AND dish_id = :did::uuid
               AND is_deleted = false
-        """),
+        """
+        ),
         {"tid": tenant_id, "did": template_dish_id},
     )
     count = existing.scalar() or 0
@@ -458,7 +466,8 @@ async def seed_default_templates(
         practice_id = uuid.uuid4()
         is_temporary = tpl.get("practice_type") == "temporary"
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_practices
                   (id, tenant_id, dish_id, practice_name, practice_group,
                    additional_price_fen, is_default, sort_order,
@@ -467,7 +476,8 @@ async def seed_default_templates(
                   (:id::uuid, :tid::uuid, :did::uuid, :name, :grp,
                    :price, :is_def, :sort,
                    :is_tmp, :ptype, :max_qty)
-            """),
+            """
+            ),
             {
                 "id": str(practice_id),
                 "tid": tenant_id,

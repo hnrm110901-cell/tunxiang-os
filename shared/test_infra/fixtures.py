@@ -36,7 +36,8 @@ async def toxiproxy() -> AsyncIterator[ToxiproxyClient]:
 
             pytest.skip(
                 f"toxiproxy unreachable at {TOXIPROXY_URL} — "
-                "启动: docker compose -f infra/docker/docker-compose.toxiproxy.yml up -d"
+                "启动: docker compose -f infra/compose/base.yml "
+                "-f infra/compose/envs/dev.yml -f infra/compose/special/toxiproxy.yml up -d toxiproxy"
             )
         try:
             yield client

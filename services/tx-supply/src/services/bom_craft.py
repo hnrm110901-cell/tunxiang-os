@@ -61,7 +61,8 @@ async def create_craft_card(
     now = datetime.now(timezone.utc)
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO craft_cards (
                 id, tenant_id, dish_id,
                 total_duration_seconds, is_deleted,
@@ -71,7 +72,8 @@ async def create_craft_card(
                 :total_duration, false,
                 :now, :now
             )
-        """),
+        """
+        ),
         {
             "id": card_id,
             "tenant_id": tenant_uuid,
@@ -85,7 +87,8 @@ async def create_craft_card(
     for step in steps:
         step_id = uuid.uuid4()
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO craft_card_steps (
                     id, tenant_id, card_id, seq, name,
                     duration_seconds, temperature, tool, notes,
@@ -95,7 +98,8 @@ async def create_craft_card(
                     :duration_seconds, :temperature, :tool, :notes,
                     false, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": step_id,
                 "tenant_id": tenant_uuid,
@@ -167,11 +171,13 @@ async def set_dept_routing(
 
     # 软删除旧路由
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE dept_routings
             SET is_deleted = true, updated_at = :now
             WHERE dish_id = :dish_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"dish_id": dish_uuid, "tenant_id": tenant_uuid, "now": now},
     )
 
@@ -181,7 +187,8 @@ async def set_dept_routing(
         dept_uuid = uuid.UUID(route["dept_id"])
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dept_routings (
                     id, tenant_id, dish_id, dept_id,
                     seq, process_name, estimated_seconds,
@@ -191,7 +198,8 @@ async def set_dept_routing(
                     :seq, :process_name, :estimated_seconds,
                     false, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": route_id,
                 "tenant_id": tenant_uuid,
@@ -257,11 +265,13 @@ async def set_substitute_rules(
 
     # 软删除旧替代规则
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE substitute_rules
             SET is_deleted = true, updated_at = :now
             WHERE ingredient_id = :ingredient_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {"ingredient_id": ingredient_uuid, "tenant_id": tenant_uuid, "now": now},
     )
 
@@ -271,7 +281,8 @@ async def set_substitute_rules(
         sub_uuid = uuid.UUID(sub["substitute_id"])
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO substitute_rules (
                     id, tenant_id, ingredient_id, substitute_id,
                     ratio, priority, conditions,
@@ -281,7 +292,8 @@ async def set_substitute_rules(
                     :ratio, :priority, :conditions,
                     false, :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tenant_id": tenant_uuid,
@@ -346,11 +358,13 @@ async def manage_bom_version(
 
     # 查询当前状态
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, dish_id, version, status
             FROM bom_templates
             WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-        """),
+        """
+        ),
         {"id": template_uuid, "tenant_id": tenant_uuid},
     )
     row = result.mappings().first()
@@ -393,11 +407,13 @@ async def manage_bom_version(
         update_params["operator_id"] = operator_id
 
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE bom_templates
             SET status = :status, updated_at = :now{extra_set}
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         update_params,
     )
 

@@ -25,27 +25,30 @@
 - Sonnet validate 是"红/黄/绿灯"而非直接否决：high risk 店长必须二审
 - **≤ 15% 调价幅度**与 CLAUDE.md §9"客户体验"隐含的价格稳定性吻合
 """
+
 from __future__ import annotations
 
-import logging
 import math
 import uuid
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Optional
 
-logger = logging.getLogger(__name__)
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 # 硬约束
-MARGIN_FLOOR = 0.15          # 毛利底线 15%（CLAUDE.md §9）
+MARGIN_FLOOR = 0.15  # 毛利底线 15%（CLAUDE.md §9）
 MAX_PRICE_CHANGE_PCT = 0.15  # 单次调价幅度上限 ±15%
 MIN_ELASTICITY_DATA_POINTS = 14  # 至少 14 天数据才算弹性
-DEFAULT_PRIOR_ELASTICITY = -1.0   # 无数据时的先验弹性
+DEFAULT_PRIOR_ELASTICITY = -1.0  # 无数据时的先验弹性
 
 
 @dataclass
 class PricingObservation:
     """单次价格-销量观测"""
+
     day: date
     price_fen: int
     quantity_sold: int
@@ -54,15 +57,17 @@ class PricingObservation:
 @dataclass
 class ElasticityEstimate:
     """弹性估算结果"""
+
     elasticity: float
-    confidence: float          # 0-1，log-log R²
-    source: str                # log_log / coreml / prior / insufficient
+    confidence: float  # 0-1，log-log R²
+    source: str  # log_log / coreml / prior / insufficient
     data_points: int
 
 
 @dataclass
 class PricingSuggestion:
     """单菜品定价建议"""
+
     dish_id: str
     dish_name: str
     current_price_fen: int
@@ -117,9 +122,7 @@ def estimate_elasticity_log_log(
 
     # R² 作 confidence
     ss_total = sum((y - mean_y) ** 2 for y in ys)
-    ss_residual = sum(
-        (ys[i] - (slope * xs[i] + mean_y - slope * mean_x)) ** 2 for i in range(n)
-    )
+    ss_residual = sum((ys[i] - (slope * xs[i] + mean_y - slope * mean_x)) ** 2 for i in range(n))
     r2 = 1 - ss_residual / ss_total if ss_total > 0 else 0.0
     conf = max(0.2, min(0.9, r2))
 
@@ -188,7 +191,7 @@ def expected_qty_delta(
     price_ratio = new_price_fen / current_price_fen
     if price_ratio <= 0:
         return 0
-    qty_ratio = price_ratio ** elasticity
+    qty_ratio = price_ratio**elasticity
     new_qty = int(current_daily_qty * qty_ratio)
     return new_qty - current_daily_qty
 
@@ -243,13 +246,8 @@ class DishDynamicPricingService:
         margin_delta = new_daily_margin - current_daily_margin
 
         # 4. 硬约束校验
-        suggested_margin_rate = (
-            (optimal - cost_fen) / optimal if optimal > 0 else 0.0
-        )
-        current_margin_rate = (
-            (current_price_fen - cost_fen) / current_price_fen
-            if current_price_fen > 0 else 0.0
-        )
+        suggested_margin_rate = (optimal - cost_fen) / optimal if optimal > 0 else 0.0
+        current_margin_rate = (current_price_fen - cost_fen) / current_price_fen if current_price_fen > 0 else 0.0
         change_pct = (optimal - current_price_fen) / current_price_fen if current_price_fen > 0 else 0.0
 
         constraint_check = {
@@ -301,7 +299,7 @@ class DishDynamicPricingService:
                 response = await self.sonnet_invoker(prompt, "claude-sonnet-4-6")
                 return self._parse_sonnet_response(response, suggestion)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("sonnet_validate_failed error=%s", exc)
+                logger.warning("sonnet_validate_failed", error=str(exc))
                 # 降级到规则
 
         # Fallback：基于规则判定
@@ -324,7 +322,8 @@ class DishDynamicPricingService:
 
     @staticmethod
     def _parse_sonnet_response(
-        response: str, suggestion: PricingSuggestion,
+        response: str,
+        suggestion: PricingSuggestion,
     ) -> tuple[str, str]:
         lines = [l.strip() for l in response.strip().split("\n") if l.strip()]
         risk = "low"
@@ -380,6 +379,7 @@ class DishDynamicPricingService:
 # DB 持久化
 # ──────────────────────────────────────────────────────────────────────
 
+
 async def save_suggestion_to_db(
     db: Any,
     *,
@@ -393,7 +393,9 @@ async def save_suggestion_to_db(
     from sqlalchemy import text
 
     record_id = str(uuid.uuid4())
-    await db.execute(text("""
+    await db.execute(
+        text(
+            """
         INSERT INTO dish_pricing_suggestions (
             id, tenant_id, store_id, dish_id, dish_name,
             current_price_fen, suggested_price_fen, current_cost_fen,
@@ -417,27 +419,30 @@ async def save_suggestion_to_db(
             :sonnet_analysis, :sonnet_risk_level,
             'plan'
         )
-    """), {
-        "id": record_id,
-        "tenant_id": tenant_id,
-        "store_id": store_id,
-        "dish_id": suggestion.dish_id,
-        "dish_name": suggestion.dish_name,
-        "current_price_fen": suggestion.current_price_fen,
-        "suggested_price_fen": suggestion.suggested_price_fen,
-        "current_cost_fen": suggestion.current_cost_fen,
-        "current_margin_rate": suggestion.current_margin_rate,
-        "suggested_margin_rate": suggestion.suggested_margin_rate,
-        "price_change_pct": suggestion.price_change_pct,
-        "elasticity": suggestion.elasticity.elasticity,
-        "elasticity_confidence": suggestion.elasticity.confidence,
-        "elasticity_source": suggestion.elasticity.source,
-        "qty_delta": suggestion.expected_daily_qty_delta,
-        "margin_delta": suggestion.expected_daily_margin_delta_fen,
-        "constraint_check": json.dumps(suggestion.constraint_check, ensure_ascii=False),
-        "sonnet_analysis": suggestion.sonnet_analysis,
-        "sonnet_risk_level": suggestion.sonnet_risk_level,
-    })
+    """
+        ),
+        {
+            "id": record_id,
+            "tenant_id": tenant_id,
+            "store_id": store_id,
+            "dish_id": suggestion.dish_id,
+            "dish_name": suggestion.dish_name,
+            "current_price_fen": suggestion.current_price_fen,
+            "suggested_price_fen": suggestion.suggested_price_fen,
+            "current_cost_fen": suggestion.current_cost_fen,
+            "current_margin_rate": suggestion.current_margin_rate,
+            "suggested_margin_rate": suggestion.suggested_margin_rate,
+            "price_change_pct": suggestion.price_change_pct,
+            "elasticity": suggestion.elasticity.elasticity,
+            "elasticity_confidence": suggestion.elasticity.confidence,
+            "elasticity_source": suggestion.elasticity.source,
+            "qty_delta": suggestion.expected_daily_qty_delta,
+            "margin_delta": suggestion.expected_daily_margin_delta_fen,
+            "constraint_check": json.dumps(suggestion.constraint_check, ensure_ascii=False),
+            "sonnet_analysis": suggestion.sonnet_analysis,
+            "sonnet_risk_level": suggestion.sonnet_risk_level,
+        },
+    )
     await db.commit()
     return record_id
 
@@ -477,20 +482,25 @@ async def transition_status(
 
     from_placeholders = ", ".join(f"'{s}'" for s in from_states)
 
-    result = await db.execute(text(f"""
+    result = await db.execute(
+        text(
+            f"""
         UPDATE dish_pricing_suggestions
-        SET {', '.join(set_clauses)}
+        SET {", ".join(set_clauses)}
         WHERE id = CAST(:id AS uuid)
           AND tenant_id = CAST(:tenant_id AS uuid)
           AND status IN ({from_placeholders})
           AND is_deleted = false
         RETURNING id
-    """), {
-        "id": suggestion_id,
-        "tenant_id": tenant_id,
-        "new_status": new_status,
-        "op": operator_id,
-    })
+    """
+        ),
+        {
+            "id": suggestion_id,
+            "tenant_id": tenant_id,
+            "new_status": new_status,
+            "op": operator_id,
+        },
+    )
     row = result.first()
     await db.commit()
     return row is not None

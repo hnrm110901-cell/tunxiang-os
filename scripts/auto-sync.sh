@@ -6,14 +6,14 @@
 # 同步逻辑：
 #   - 有新 commit  → 拉取
 #   - db-migrations 变更 → alembic upgrade head
-#   - services/shared/infra/docker 变更 → rebuild + docker compose up -d
+#   - services/shared/infra/compose 变更 → rebuild + docker compose up -d
 # ─────────────────────────────────────────────────────────────
 set -euo pipefail
 
 LOG=/opt/tunxiang-os/logs/auto-sync.log
 REPO=/opt/tunxiang-os
-COMPOSE_DIR="$REPO/infra/docker"
-COMPOSE_FILE="docker-compose.prod.yml"
+# P0.5 后 compose 收敛到 infra/compose/，prod 用 base + envs/prod.yml
+COMPOSE_ARGS=(-f "$REPO/infra/compose/base.yml" -f "$REPO/infra/compose/envs/prod.yml")
 DB_URL="postgresql://tunxiang:Lichun849299@localhost:5432/tunxiang_os"
 
 mkdir -p "$REPO/logs"
@@ -46,12 +46,11 @@ if echo "$CHANGED" | grep -q "db-migrations/versions"; then
 fi
 
 # ── 重建镜像并滚动重启所有微服务 ─────────────────────────────
-if echo "$CHANGED" | grep -qE "^(services|shared|infra/docker)/"; then
+if echo "$CHANGED" | grep -qE "^(services|shared|infra/(docker|compose))/"; then
   echo "$(date '+%F %T') REBUILDING DOCKER IMAGES" >> "$LOG"
-  cd "$COMPOSE_DIR"
-  docker compose -f "$COMPOSE_FILE" build >> "$LOG" 2>&1
-  echo "$(date '+%F %T') RESTARTING SERVICES" >> "$LOG"
-  docker compose -f "$COMPOSE_FILE" up -d >> "$LOG" 2>&1
   cd "$REPO"
+  docker compose "${COMPOSE_ARGS[@]}" build >> "$LOG" 2>&1
+  echo "$(date '+%F %T') RESTARTING SERVICES" >> "$LOG"
+  docker compose "${COMPOSE_ARGS[@]}" up -d >> "$LOG" 2>&1
   echo "$(date '+%F %T') DEPLOY DONE" >> "$LOG"
 fi

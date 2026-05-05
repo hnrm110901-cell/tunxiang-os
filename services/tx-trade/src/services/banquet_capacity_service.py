@@ -37,12 +37,14 @@ class BanquetCapacityService:
         for s in DEFAULT_SLOTS:
             sid = str(uuid.uuid4())
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO kitchen_capacity_slots
                         (id, tenant_id, store_id, slot_date, time_slot, start_time, end_time)
                     VALUES (:id, :tid, :sid, :d, :slot, :st, :et)
                     ON CONFLICT DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": sid,
                     "tid": self.tenant_id,
@@ -60,11 +62,13 @@ class BanquetCapacityService:
     async def check_capacity(self, store_id: str, slot_date: date, time_slot: str, required_dishes: int) -> dict:
         """检查产能是否充足"""
         row = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM kitchen_capacity_slots
                 WHERE store_id = :sid AND slot_date = :d AND time_slot = :slot
                   AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "slot": time_slot, "tid": self.tenant_id},
         )
         slot = row.mappings().first()
@@ -88,7 +92,8 @@ class BanquetCapacityService:
     ) -> dict:
         """分配产能"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE kitchen_capacity_slots
                 SET current_load_dishes = current_load_dishes + :dishes,
                     current_banquet_count = current_banquet_count + 1,
@@ -96,7 +101,8 @@ class BanquetCapacityService:
                 WHERE store_id = :sid AND slot_date = :d AND time_slot = :slot
                   AND tenant_id = :tid AND is_deleted = FALSE
                 RETURNING current_load_dishes, available_capacity_dishes, max_concurrent_banquets, current_banquet_count
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "slot": time_slot, "tid": self.tenant_id, "dishes": dish_count},
         )
         row = result.mappings().first()
@@ -113,13 +119,15 @@ class BanquetCapacityService:
         for ct in conflicts:
             cid = str(uuid.uuid4())
             await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO banquet_capacity_conflicts
                         (id, tenant_id, store_id, conflict_date, time_slot, conflict_type,
                          severity, description, affected_banquet_ids, status)
                     VALUES (:id, :tid, :sid, :d, :slot, :ctype,
                         'critical', :desc, :bids::jsonb, 'open')
-                """),
+                """
+                ),
                 {
                     "id": cid,
                     "tid": self.tenant_id,
@@ -138,14 +146,16 @@ class BanquetCapacityService:
     async def release_capacity(self, store_id: str, slot_date: date, time_slot: str, dish_count: int) -> dict:
         """释放产能"""
         await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE kitchen_capacity_slots
                 SET current_load_dishes = GREATEST(0, current_load_dishes - :dishes),
                     current_banquet_count = GREATEST(0, current_banquet_count - 1),
                     updated_at = NOW()
                 WHERE store_id = :sid AND slot_date = :d AND time_slot = :slot
                   AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "slot": time_slot, "tid": self.tenant_id, "dishes": dish_count},
         )
         await self.db.flush()
@@ -154,11 +164,13 @@ class BanquetCapacityService:
     async def detect_conflicts(self, store_id: str, slot_date: date) -> list:
         """检测所有时段冲突"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM kitchen_capacity_slots
                 WHERE store_id = :sid AND slot_date = :d AND tenant_id = :tid AND is_deleted = FALSE
                 ORDER BY start_time
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "tid": self.tenant_id},
         )
         conflicts = []
@@ -188,11 +200,13 @@ class BanquetCapacityService:
     async def get_daily_overview(self, store_id: str, slot_date: date) -> dict:
         """日产能概览"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM kitchen_capacity_slots
                 WHERE store_id = :sid AND slot_date = :d AND tenant_id = :tid AND is_deleted = FALSE
                 ORDER BY start_time
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "tid": self.tenant_id},
         )
         slots = []
@@ -235,12 +249,14 @@ class BanquetCapacityService:
     async def suggest_staff_requirement(self, store_id: str, slot_date: date) -> dict:
         """基于当日宴会建议排班人数"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) AS banquet_count, SUM(table_count) AS total_tables, SUM(guest_count) AS total_guests
                 FROM banquets
                 WHERE store_id = :sid AND event_date = :d AND tenant_id = :tid
                   AND status IN ('confirmed','preparing','ready') AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"sid": store_id, "d": slot_date, "tid": self.tenant_id},
         )
         r = rows.mappings().first()
@@ -267,12 +283,14 @@ class BanquetCapacityService:
         """解决冲突"""
         now = datetime.now(timezone.utc)
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE banquet_capacity_conflicts
                 SET status = 'resolved', resolution = :res, resolved_by = :by, resolved_at = :now, updated_at = :now
                 WHERE id = :id AND tenant_id = :tid AND status IN ('open','acknowledged') AND is_deleted = FALSE
                 RETURNING id
-            """),
+            """
+            ),
             {"id": conflict_id, "tid": self.tenant_id, "res": resolution, "by": resolved_by, "now": now},
         )
         if not result.mappings().first():

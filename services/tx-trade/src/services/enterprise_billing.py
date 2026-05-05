@@ -49,7 +49,8 @@ class EnterpriseBillingService:
 
         # 幂等：已存在则返回现有账单
         existing = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, bill_no, enterprise_id::text,
                        enterprise_name, month, total_amount_fen, paid_amount_fen,
                        outstanding_fen, order_count, status, issued_at, paid_at,
@@ -58,7 +59,8 @@ class EnterpriseBillingService:
                 WHERE tenant_id = :tid::uuid
                   AND enterprise_id = :eid::uuid
                   AND month = :month
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id, "month": month},
         )
         existing_row = existing.mappings().fetchone()
@@ -67,14 +69,16 @@ class EnterpriseBillingService:
 
         # 汇总当月签单记录（status 不限，取已授权的签单）
         signs_result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, order_id::text, signer_name, amount_fen, created_at
                 FROM enterprise_sign_records
                 WHERE tenant_id = :tid::uuid
                   AND enterprise_id = :eid::uuid
                   AND TO_CHAR(created_at AT TIME ZONE 'Asia/Shanghai', 'YYYY-MM') = :month
                 ORDER BY created_at
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id, "month": month},
         )
         month_signs = [dict(row) for row in signs_result.mappings().all()]
@@ -101,7 +105,8 @@ class EnterpriseBillingService:
 
         try:
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO enterprise_bills
                         (tenant_id, bill_no, enterprise_id, enterprise_name,
                          month, total_amount_fen, paid_amount_fen, outstanding_fen,
@@ -114,7 +119,8 @@ class EnterpriseBillingService:
                               enterprise_name, month, total_amount_fen, paid_amount_fen,
                               outstanding_fen, order_count, status, issued_at, paid_at,
                               line_items, created_at, updated_at
-                """),
+                """
+                ),
                 {
                     "tid": self.tenant_id,
                     "bill_no": bill_no,
@@ -147,14 +153,16 @@ class EnterpriseBillingService:
     async def _get_bill_row(self, bill_id: str) -> dict:
         """查询账单行，不存在或非本租户时抛 ValueError。"""
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, tenant_id::text, bill_no, enterprise_id::text,
                        enterprise_name, month, total_amount_fen, paid_amount_fen,
                        outstanding_fen, order_count, status, issued_at, paid_at,
                        line_items, created_at, updated_at
                 FROM enterprise_bills
                 WHERE id = :bid::uuid AND tenant_id = :tid::uuid
-            """),
+            """
+            ),
             {"bid": bill_id, "tid": self.tenant_id},
         )
         row = result.mappings().fetchone()
@@ -191,7 +199,8 @@ class EnterpriseBillingService:
 
         try:
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE enterprise_bills
                     SET paid_amount_fen = :paid,
                         outstanding_fen = :outstanding,
@@ -200,7 +209,8 @@ class EnterpriseBillingService:
                         paid_at         = CASE WHEN :status = 'paid' THEN NOW() ELSE paid_at END,
                         updated_at      = NOW()
                     WHERE id = :bid::uuid AND tenant_id = :tid::uuid
-                """),
+                """
+                ),
                 {
                     "paid": new_paid,
                     "outstanding": new_outstanding,
@@ -212,12 +222,14 @@ class EnterpriseBillingService:
             )
             # 释放企业已用额度
             await self.db.execute(
-                text("""
+                text(
+                    """
                     UPDATE enterprise_accounts
                     SET used_fen   = GREATEST(0, used_fen - :pay_amount),
                         updated_at = NOW()
                     WHERE id = :eid::uuid AND tenant_id = :tid::uuid
-                """),
+                """
+                ),
                 {
                     "pay_amount": pay_amount,
                     "eid": bill["enterprise_id"],
@@ -256,14 +268,16 @@ class EnterpriseBillingService:
         enterprise = await self._account_svc.get_enterprise(enterprise_id)
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, bill_no, month, total_amount_fen, paid_amount_fen,
                        outstanding_fen, status, order_count, issued_at, line_items
                 FROM enterprise_bills
                 WHERE tenant_id = :tid::uuid
                   AND enterprise_id = :eid::uuid
                   AND month = :month
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id, "month": month},
         )
         target_bill = result.mappings().fetchone()
@@ -317,7 +331,8 @@ class EnterpriseBillingService:
         await self._account_svc.get_enterprise(enterprise_id)  # 校验存在
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id::text, bill_no, month, total_amount_fen, paid_amount_fen,
                        outstanding_fen, status, order_count, issued_at, updated_at
                 FROM enterprise_bills
@@ -325,7 +340,8 @@ class EnterpriseBillingService:
                   AND enterprise_id = :eid::uuid
                   AND status IN ('issued', 'partial_paid', 'overdue')
                 ORDER BY issued_at
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id},
         )
         bills = [dict(row) for row in result.mappings().all()]
@@ -345,12 +361,14 @@ class EnterpriseBillingService:
 
         # 签单汇总
         signs_r = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(amount_fen), 0)::bigint AS total_sign_amount_fen,
                        COUNT(*)::int AS sign_count
                 FROM enterprise_sign_records
                 WHERE tenant_id = :tid::uuid AND enterprise_id = :eid::uuid
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id},
         )
         signs_row = signs_r.mappings().fetchone()
@@ -360,7 +378,8 @@ class EnterpriseBillingService:
 
         # 账单汇总
         bills_r = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)::int                                              AS total_bills,
                        COUNT(*) FILTER (WHERE status = 'paid')::int              AS paid_bills,
                        COUNT(*) FILTER (WHERE status = 'overdue')::int           AS overdue_bills,
@@ -370,7 +389,8 @@ class EnterpriseBillingService:
                        COUNT(DISTINCT month)::int                                AS monthly_count
                 FROM enterprise_bills
                 WHERE tenant_id = :tid::uuid AND enterprise_id = :eid::uuid
-            """),
+            """
+            ),
             {"tid": self.tenant_id, "eid": enterprise_id},
         )
         bills_row = bills_r.mappings().fetchone()

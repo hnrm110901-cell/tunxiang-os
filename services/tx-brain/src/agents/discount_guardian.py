@@ -181,7 +181,8 @@ class DiscountGuardianAgent:
                     params["store_id"] = store_id
 
                 result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             store_id,
                             stat_date,
@@ -198,7 +199,8 @@ class DiscountGuardianAgent:
                         {store_clause}
                         ORDER BY stat_date DESC
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     params,
                 )
                 row = result.mappings().one_or_none()

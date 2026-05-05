@@ -148,7 +148,8 @@ async def update_reservation_status(
                 try:
                     # 查询预订详情（桌台ID、guest_count、waiter_id）
                     bk = await db.execute(
-                        _text("""
+                        _text(
+                            """
                             SELECT r.store_id, r.guest_count, r.waiter_id,
                                    t.id AS table_id, t.zone_id
                             FROM reservations r
@@ -157,7 +158,8 @@ async def update_reservation_status(
                                                AND t.tenant_id = :tid
                             WHERE r.id        = :rid
                               AND r.tenant_id = :tid
-                        """),
+                        """
+                        ),
                         {"rid": reservation_id, "tid": tenant_id},
                     )
                     bk_row = bk.mappings().one_or_none()

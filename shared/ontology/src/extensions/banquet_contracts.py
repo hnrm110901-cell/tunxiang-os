@@ -95,14 +95,10 @@ class BanquetContract(BaseModel):
         description="对应 banquet_leads.lead_id（跨服务弱耦合，不加 FK）",
     )
     customer_id: UUID = Field(..., description="客户ID")
-    sales_employee_id: UUID | None = Field(
-        default=None, description="跟进销售员工ID"
-    )
+    sales_employee_id: UUID | None = Field(default=None, description="跟进销售员工ID")
     banquet_type: BanquetType = Field(..., description="宴会类型（复用 R1 枚举）")
     tables: int = Field(default=0, ge=0, description="桌数")
-    total_amount_fen: int = Field(
-        default=0, ge=0, description="合同总金额（分/整数）"
-    )
+    total_amount_fen: int = Field(default=0, ge=0, description="合同总金额（分/整数）")
     deposit_fen: int = Field(
         default=0,
         ge=0,
@@ -119,14 +115,9 @@ class BanquetContract(BaseModel):
     )
     approval_chain: list[dict[str, Any]] = Field(
         default_factory=list,
-        description=(
-            "审批链快照："
-            "[{role, approver_id, required_threshold_fen, decided_action?, decided_at?}]"
-        ),
+        description=("审批链快照：[{role, approver_id, required_threshold_fen, decided_action?, decided_at?}]"),
     )
-    scheduled_date: date | None = Field(
-        default=None, description="预定宴会日期"
-    )
+    scheduled_date: date | None = Field(default=None, description="预定宴会日期")
     signed_at: datetime | None = Field(
         default=None,
         description="签约时间（status=signed 时必填）",
@@ -140,12 +131,8 @@ class BanquetContract(BaseModel):
         max_length=200,
         description="作废原因（status=cancelled 时必填）",
     )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="扩展元数据 JSON"
-    )
-    created_by: UUID | None = Field(
-        default=None, description="创建人员工ID"
-    )
+    metadata: dict[str, Any] = Field(default_factory=dict, description="扩展元数据 JSON")
+    created_by: UUID | None = Field(default=None, description="创建人员工ID")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="最后更新时间")
 
@@ -170,23 +157,13 @@ class BanquetContractCreateRequest(BaseModel):
     store_id: UUID | None = Field(default=None, description="门店ID")
     lead_id: UUID = Field(..., description="关联商机ID")
     customer_id: UUID = Field(..., description="客户ID")
-    sales_employee_id: UUID | None = Field(
-        default=None, description="销售员工ID"
-    )
+    sales_employee_id: UUID | None = Field(default=None, description="销售员工ID")
     banquet_type: BanquetType = Field(..., description="宴会类型")
     tables: int = Field(default=0, ge=0, description="桌数")
-    total_amount_fen: int = Field(
-        ..., ge=0, description="合同总金额（分）"
-    )
-    deposit_fen: int = Field(
-        default=0, ge=0, description="订金（分）"
-    )
-    scheduled_date: date | None = Field(
-        default=None, description="预定宴会日期"
-    )
-    metadata: dict[str, Any] = Field(
-        default_factory=dict, description="扩展元数据"
-    )
+    total_amount_fen: int = Field(..., ge=0, description="合同总金额（分）")
+    deposit_fen: int = Field(default=0, ge=0, description="订金（分）")
+    scheduled_date: date | None = Field(default=None, description="预定宴会日期")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="扩展元数据")
 
     @model_validator(mode="after")
     def _validate_deposit(self) -> "BanquetContractCreateRequest":
@@ -212,19 +189,12 @@ class BanquetEOTicket(BaseModel):
         description="所属合同ID（FK → banquet_contracts.contract_id，CASCADE）",
     )
     department: EODepartment = Field(..., description="部门")
-    assignee_employee_id: UUID | None = Field(
-        default=None, description="部门内责任人"
-    )
+    assignee_employee_id: UUID | None = Field(default=None, description="部门内责任人")
     content: dict[str, Any] = Field(
         default_factory=dict,
-        description=(
-            "部门专用内容 JSON："
-            "kitchen 菜单 / hall 订台 / purchase 物料 / finance 账单 / marketing 物料"
-        ),
+        description=("部门专用内容 JSON：kitchen 菜单 / hall 订台 / purchase 物料 / finance 账单 / marketing 物料"),
     )
-    status: EOTicketStatus = Field(
-        default=EOTicketStatus.PENDING, description="工单状态"
-    )
+    status: EOTicketStatus = Field(default=EOTicketStatus.PENDING, description="工单状态")
     dispatched_at: datetime | None = Field(
         default=None,
         description="分发时间（status=dispatched 时必填）",
@@ -233,23 +203,15 @@ class BanquetEOTicket(BaseModel):
         default=None,
         description="完成时间（status=completed 时必填）",
     )
-    reminder_sent_at: datetime | None = Field(
-        default=None, description="最近一次提醒推送时间"
-    )
+    reminder_sent_at: datetime | None = Field(default=None, description="最近一次提醒推送时间")
     created_at: datetime = Field(..., description="创建时间")
     updated_at: datetime = Field(..., description="最后更新时间")
 
     @model_validator(mode="after")
     def _validate_status(self) -> "BanquetEOTicket":
-        if (
-            self.status == EOTicketStatus.DISPATCHED
-            and not self.dispatched_at
-        ):
+        if self.status == EOTicketStatus.DISPATCHED and not self.dispatched_at:
             raise ValueError("status=dispatched 时 dispatched_at 必填")
-        if (
-            self.status == EOTicketStatus.COMPLETED
-            and not self.completed_at
-        ):
+        if self.status == EOTicketStatus.COMPLETED and not self.completed_at:
             raise ValueError("status=completed 时 completed_at 必填")
         return self
 
@@ -295,9 +257,7 @@ class BanquetApprovalLog(BaseModel):
         max_length=500,
         description="审批备注（action=reject 时必填）",
     )
-    source_event_id: UUID | None = Field(
-        default=None, description="触发事件ID（可选）"
-    )
+    source_event_id: UUID | None = Field(default=None, description="触发事件ID（可选）")
     created_at: datetime = Field(..., description="创建时间")
 
     @model_validator(mode="after")
@@ -315,9 +275,7 @@ class BanquetApprovalRouteRequest(BaseModel):
     approver_id: UUID = Field(..., description="审批人")
     role: ApprovalRole = Field(..., description="审批角色")
     action: ApprovalAction = Field(..., description="approve/reject")
-    notes: str | None = Field(
-        default=None, max_length=500, description="审批备注"
-    )
+    notes: str | None = Field(default=None, max_length=500, description="审批备注")
 
     @model_validator(mode="after")
     def _validate_reject(self) -> "BanquetApprovalRouteRequest":

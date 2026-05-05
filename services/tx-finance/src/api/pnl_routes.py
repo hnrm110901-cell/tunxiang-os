@@ -120,7 +120,8 @@ async def get_daily_pnl(
 
     # 先查 daily_pnl 表
     existing = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 gross_revenue_fen, dine_in_revenue_fen, takeaway_revenue_fen,
                 banquet_revenue_fen, discount_amount_fen, net_revenue_fen,
@@ -135,7 +136,8 @@ async def get_daily_pnl(
               AND store_id = :store_id::UUID
               AND pnl_date = :pnl_date
               AND is_deleted = FALSE
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -187,7 +189,8 @@ async def get_pnl_trend(
     start_date = end_date - timedelta(days=days - 1)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 pnl_date,
                 net_revenue_fen,
@@ -205,7 +208,8 @@ async def get_pnl_trend(
               AND pnl_date BETWEEN :start_date AND :end_date
               AND is_deleted = FALSE
             ORDER BY pnl_date ASC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "store_id": str(sid),
@@ -264,7 +268,8 @@ async def get_multi_store_pnl(
     biz_date = _parse_date_param(pnl_date)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 dp.store_id,
                 dp.net_revenue_fen,
@@ -283,7 +288,8 @@ async def get_multi_store_pnl(
               AND dp.pnl_date = :pnl_date
               AND dp.is_deleted = FALSE
             ORDER BY dp.net_revenue_fen DESC
-        """),
+        """
+        ),
         {
             "tenant_id": str(tid),
             "pnl_date": biz_date.isoformat(),

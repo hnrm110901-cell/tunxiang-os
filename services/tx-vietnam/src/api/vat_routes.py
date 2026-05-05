@@ -10,12 +10,13 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-
 from tx_vietnam.src.services.vat_service import (
     VATCategory,
     VATError,
     VATService,
 )
+
+from shared.security.src.error_handler import safe_http_exception
 
 router = APIRouter(prefix="/api/v1/vat", tags=["vietnam-vat"])
 
@@ -67,8 +68,7 @@ async def calculate_vat(body: dict[str, Any]) -> dict:
     except ValueError as exc:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid VAT category: {category_str}. Must be one of: "
-                   f"{[c.value for c in VATCategory]}",
+            detail=f"Invalid VAT category: {category_str}. Must be one of: {[c.value for c in VATCategory]}",
         ) from exc
 
     try:
@@ -77,7 +77,7 @@ async def calculate_vat(body: dict[str, Any]) -> dict:
         rates = VATService.get_rates()
         rate_info = rates.get(category.value, {})
     except VATError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {
         **OK_RESPONSE,
@@ -141,7 +141,7 @@ async def calculate_invoice_vat(body: dict[str, Any]) -> dict:
     try:
         result = VATService.calculate_invoice_vat(items)
     except VATError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
     return {**OK_RESPONSE, "data": result}
 

@@ -75,7 +75,8 @@ class PayrollEngine:
         按 (store_id, employee_role, effective_from 最新) 取薪资方案。
         若 store 级找不到，退而取品牌级（store_id IS NULL）。
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 id, salary_type,
                 base_salary_fen, hourly_rate_fen,
@@ -94,7 +95,8 @@ class PayrollEngine:
                 (store_id = :store_id) DESC,   -- 门店级优先
                 effective_from DESC
             LIMIT 1
-        """)
+        """
+        )
         row = (
             (
                 await db.execute(
@@ -131,7 +133,8 @@ class PayrollEngine:
           - 平均服务评分
           - 加班小时（暂不从此表读取，交给调用方传入）
         """
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 COUNT(DISTINCT perf_date)            AS attendance_days,
                 SUM(orders_handled)                  AS total_orders,
@@ -146,7 +149,8 @@ class PayrollEngine:
               AND employee_id = :employee_id
               AND perf_date >= :period_start
               AND perf_date <= :period_end
-        """)
+        """
+        )
         period_start, period_end = self._period_dates(year, month)
         row = (
             (
@@ -439,7 +443,8 @@ class PayrollEngine:
         snapshot: dict[str, Any],
     ) -> str:
         """UPSERT payroll_records，返回 record_id（UUID str）"""
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO payroll_records (
                 tenant_id, store_id, employee_id,
                 pay_period_start, pay_period_end,
@@ -470,7 +475,8 @@ class PayrollEngine:
                 updated_at        = now()
             WHERE payroll_records.status = 'draft'
             RETURNING id
-        """)
+        """
+        )
         import json
 
         result = await db.execute(
@@ -497,14 +503,16 @@ class PayrollEngine:
         if not row:
             # 已存在且非 draft 状态，查询返回现有 id
             lookup = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM payroll_records
                     WHERE tenant_id = :tenant_id
                       AND employee_id = :employee_id
                       AND pay_period_start = :period_start
                       AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "employee_id": employee_id,
@@ -527,11 +535,13 @@ class PayrollEngine:
         """先删除旧明细（若 draft 状态），再批量插入新明细"""
         # 删除旧明细
         await db.execute(
-            text("""
+            text(
+                """
                 DELETE FROM payroll_line_items
                 WHERE record_id = :record_id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"record_id": record_id, "tenant_id": tenant_id},
         )
 
@@ -551,14 +561,16 @@ class PayrollEngine:
 
         for item in items_to_insert:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO payroll_line_items
                         (tenant_id, record_id, item_type, item_name,
                          amount_fen, quantity, unit_price_fen, notes)
                     VALUES
                         (:tenant_id, :record_id, :item_type, :item_name,
                          :amount_fen, :quantity, :unit_price_fen, :notes)
-                """),
+                """
+                ),
                 {
                     "tenant_id": tenant_id,
                     "record_id": record_id,
@@ -801,14 +813,16 @@ class PayrollEngine:
 
         # 取当月有绩效记录的员工列表
         employees_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT employee_id, role
                 FROM employee_daily_performance
                 WHERE tenant_id  = :tenant_id
                   AND store_id   = :store_id
                   AND perf_date >= :period_start
                   AND perf_date <= :period_end
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "store_id": store_id,
@@ -863,7 +877,8 @@ class PayrollEngine:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE payroll_records
                 SET status      = 'approved',
                     approved_by = :approved_by,
@@ -874,7 +889,8 @@ class PayrollEngine:
                   AND status    = 'draft'
                   AND is_deleted = false
                 RETURNING id, status, approved_by, approved_at
-            """),
+            """
+            ),
             {
                 "record_id": record_id,
                 "tenant_id": tenant_id,
@@ -919,7 +935,8 @@ class PayrollEngine:
         period_start, period_end = self._period_dates(year, month)
 
         # 当月汇总
-        curr_sql = text("""
+        curr_sql = text(
+            """
             SELECT
                 COUNT(*)                        AS headcount,
                 SUM(gross_pay_fen)              AS total_gross_fen,
@@ -936,7 +953,8 @@ class PayrollEngine:
               AND pay_period_start = :period_start
               AND status         != 'voided'
               AND is_deleted      = false
-        """)
+        """
+        )
         curr_row = (
             (
                 await db.execute(
@@ -959,7 +977,8 @@ class PayrollEngine:
             prev_year, prev_month = year, month - 1
         prev_period_start, _ = self._period_dates(prev_year, prev_month)
 
-        prev_sql = text("""
+        prev_sql = text(
+            """
             SELECT
                 COUNT(*)           AS headcount,
                 SUM(gross_pay_fen) AS total_gross_fen,
@@ -970,7 +989,8 @@ class PayrollEngine:
               AND pay_period_start  = :period_start
               AND status          != 'voided'
               AND is_deleted       = false
-        """)
+        """
+        )
         prev_row = (
             (
                 await db.execute(

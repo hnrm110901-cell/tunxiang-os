@@ -139,7 +139,8 @@ async def create_split_order(
     try:
         # 写分账主表
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO split_payment_orders (
                     id, tenant_id, order_id, total_fen, channel,
                     merchant_order_id, split_status, split_count
@@ -147,7 +148,8 @@ async def create_split_order(
                     :id, :tenant_id, :order_id, :total_fen, :channel,
                     :merchant_order_id, 'splitting', :split_count
                 )
-            """),
+            """
+            ),
             {
                 "id": str(split_order_id),
                 "tenant_id": str(tenant_id),
@@ -164,7 +166,8 @@ async def create_split_order(
             idem_key = _make_idempotency_key(str(split_order_id), receiver.receiver_id)
             record_id = uuid.uuid4()
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO split_payment_records (
                         id, split_order_id, tenant_id, receiver_type, receiver_id,
                         amount_fen, channel_sub_merchant_id, split_result, idempotency_key
@@ -173,7 +176,8 @@ async def create_split_order(
                         :amount_fen, :channel_sub_merchant_id, 'pending', :idempotency_key
                     )
                     ON CONFLICT (idempotency_key) DO NOTHING
-                """),
+                """
+                ),
                 {
                     "id": str(record_id),
                     "split_order_id": str(split_order_id),
@@ -270,10 +274,12 @@ async def get_split_order(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM split_payment_orders
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": str(split_order_id), "tenant_id": str(tenant_id)},
         )
         row = result.fetchone()
@@ -321,7 +327,8 @@ async def receive_async_notify(
         # 更新对应 receiver 的分账结果
         if body.receiver_id:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE split_payment_records
                     SET split_result = :split_result,
                         async_notify_id = :notify_id,
@@ -329,7 +336,8 @@ async def receive_async_notify(
                     WHERE split_order_id = :split_order_id
                       AND receiver_id = :receiver_id
                       AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "split_result": body.split_result,
                     "notify_id": body.notify_id,
@@ -341,23 +349,27 @@ async def receive_async_notify(
 
         # 检查是否所有明细均已完成，若是则更新主单状态
         pending_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*) FROM split_payment_records
                 WHERE split_order_id = :split_order_id
                   AND split_result = 'pending'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"split_order_id": str(split_order_id)},
         )
         pending_count = pending_result.scalar_one()
 
         if pending_count == 0:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE split_payment_orders
                     SET split_status = 'completed', updated_at = NOW()
                     WHERE id = :id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"id": str(split_order_id), "tenant_id": str(tenant_id)},
             )
 
@@ -387,13 +399,15 @@ async def list_split_records(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM split_payment_records
                 WHERE split_order_id = :split_order_id
                   AND tenant_id = :tenant_id
                   AND is_deleted = false
                 ORDER BY created_at ASC
-            """),
+            """
+            ),
             {"split_order_id": str(split_order_id), "tenant_id": str(tenant_id)},
         )
         rows = [dict(r._mapping) for r in result]
@@ -416,10 +430,12 @@ async def create_adjustment(
     # 先查原始记录，获取 original_amount_fen
     try:
         orig_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, amount_fen FROM split_payment_records
                 WHERE id = :id AND tenant_id = :tenant_id AND is_deleted = false
-            """),
+            """
+            ),
             {"id": str(body.split_record_id), "tenant_id": str(tenant_id)},
         )
         orig_row = orig_result.fetchone()
@@ -436,7 +452,8 @@ async def create_adjustment(
     try:
         # 写调账日志
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO split_adjustment_logs (
                     id, tenant_id, split_record_id, reason,
                     original_amount_fen, adjusted_amount_fen, adjusted_by
@@ -444,7 +461,8 @@ async def create_adjustment(
                     :id, :tenant_id, :split_record_id, :reason,
                     :original_amount_fen, :adjusted_amount_fen, :adjusted_by
                 )
-            """),
+            """
+            ),
             {
                 "id": str(adjustment_id),
                 "tenant_id": str(tenant_id),
@@ -458,11 +476,13 @@ async def create_adjustment(
 
         # 更新分账明细金额
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE split_payment_records
                 SET amount_fen = :adjusted_amount_fen, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "adjusted_amount_fen": body.adjusted_amount_fen,
                 "id": str(body.split_record_id),
@@ -513,12 +533,14 @@ async def list_adjustments(
         total = count_result.scalar_one()
 
         rows_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM split_adjustment_logs
                 WHERE tenant_id = :tenant_id
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "limit": size, "offset": offset},
         )
         rows = [dict(r._mapping) for r in rows_result]

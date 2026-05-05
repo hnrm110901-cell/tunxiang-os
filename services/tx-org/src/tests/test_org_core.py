@@ -1,16 +1,18 @@
 """组织核心路由测试 — test_org_core.py
 
 覆盖两个端点最多且无测试的路由文件：
-  1. franchise_router.py     (13 端点) — FranchiseService 封装层
+  1. franchise_router.py     — V2 残留端点（GET/POST /franchisees 已迁出至 v5）
   2. franchise_mgmt_routes.py (15 端点) — 直接 SQL + get_db 依赖
 
-测试矩阵（每文件 5 个，共 10 个）：
-  franchise_router：
-    [1] GET  /franchisees              — 正常列表查询
-    [2] POST /franchisees              — 正常创建
-    [3] GET  /franchisees/{id}         — 404 场景
+测试矩阵（franchise_router 部分已随 2026-05-04 路由冲突裁决精简）：
+  franchise_router（保留端点）：
+    [3] GET  /franchisees/{id}         — 404 场景（service 返回 None）
     [4] POST /royalty/generate-batch   — service 抛 ValueError → 400
-    [5] GET  /franchisees              — 缺少 X-Tenant-ID → 400
+
+  已删除测试：
+    [1] GET  /franchisees              → 端点已迁至 franchise_v5_routes.py
+    [2] POST /franchisees              → 端点已迁至 franchise_v5_routes.py
+    [5] GET  /franchisees 缺 tenant    → 同上
 
   franchise_mgmt_routes：
     [6]  GET  /franchisees              — 正常列表（含分页）
@@ -212,45 +214,8 @@ def _override_db(mock_session: AsyncMock):
 # ══════════════════════════════════════════════════════════════════════════════
 
 
-@pytest.mark.anyio
-async def test_franchise_router_list_franchisees_ok():
-    """[1] GET /api/v1/franchise/franchisees — 正常列表返回 ok=True。"""
-    fake_result = {"items": [{"id": "f1", "franchisee_name": "加盟商A"}], "total": 1}
-
-    with patch.object(_FakeService, "list_franchisees", new=AsyncMock(return_value=fake_result)):
-        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
-            resp = await ac.get(
-                "/api/v1/franchise/franchisees",
-                headers=HEADERS,
-            )
-
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["ok"] is True
-    assert body["data"]["total"] == 1
-
-
-@pytest.mark.anyio
-async def test_franchise_router_create_franchisee_ok():
-    """[2] POST /api/v1/franchise/franchisees — 正常创建返回 201。"""
-    fake_obj = MagicMock()
-    fake_obj.to_dict.return_value = {"id": "new-f1", "franchisee_name": "新加盟商"}
-
-    with patch.object(_FakeService, "create_franchisee", new=AsyncMock(return_value=fake_obj)):
-        async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
-            resp = await ac.post(
-                "/api/v1/franchise/franchisees",
-                headers=HEADERS,
-                json={
-                    "franchisee_name": "新加盟商",
-                    "royalty_rate": 0.05,
-                },
-            )
-
-    assert resp.status_code == 201
-    body = resp.json()
-    assert body["ok"] is True
-    assert body["data"]["id"] == "new-f1"
+# [1][2] 已删除：GET/POST /franchisees 端点已迁至 franchise_v5_routes.py
+# 新契约的端到端测试见 test_franchise_routing_authority.py
 
 
 @pytest.mark.anyio
@@ -288,10 +253,14 @@ async def test_franchise_router_generate_batch_value_error():
 
 
 @pytest.mark.anyio
-async def test_franchise_router_missing_tenant_header():
-    """[5] GET /api/v1/franchise/franchisees — 缺少 X-Tenant-ID → 400。"""
+async def test_franchise_router_missing_tenant_header_on_detail():
+    """[5'] GET /api/v1/franchise/franchisees/{id} — 缺少 X-Tenant-ID → 400。
+
+    原 [5] 测的是 GET /franchisees（已迁出），改为测剩下的详情端点。
+    """
     async with AsyncClient(transport=ASGITransport(app=app_router), base_url="http://test") as ac:
-        resp = await ac.get("/api/v1/franchise/franchisees")  # 故意不带 header
+        # 故意不带 X-Tenant-ID
+        resp = await ac.get(f"/api/v1/franchise/franchisees/{uuid4()}")
 
     assert resp.status_code == 400
     assert "X-Tenant-ID" in resp.json()["detail"]

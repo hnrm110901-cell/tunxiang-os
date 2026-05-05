@@ -171,25 +171,29 @@ class CustomerServiceAgent:
 
                 if store_id:
                     result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT tenant_id, store_id, total_mentions, positive_rate,
                                    negative_rate, top_complaints, unresolved_count
                             FROM mv_public_opinion
                             WHERE tenant_id = :tid
                               AND store_id = :sid
                             LIMIT 1
-                        """),
+                        """
+                        ),
                         {"tid": tenant_id, "sid": store_id},
                     )
                 else:
                     result = await db.execute(
-                        text("""
+                        text(
+                            """
                             SELECT tenant_id, store_id, total_mentions, positive_rate,
                                    negative_rate, top_complaints, unresolved_count
                             FROM mv_public_opinion
                             WHERE tenant_id = :tid
                             LIMIT 1
-                        """),
+                        """
+                        ),
                         {"tid": tenant_id},
                     )
 

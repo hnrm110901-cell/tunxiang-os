@@ -721,14 +721,16 @@ class MemoryEvolutionService:
                 params["memory_type"] = memory_type
 
             where_clause = " AND ".join(conditions)
-            sql = text(f"""
+            sql = text(
+                f"""
                 SELECT id,
                        1 - (embedding <=> :query_embedding::vector) AS similarity
                 FROM agent_memories
                 WHERE {where_clause}
                 ORDER BY similarity DESC
                 LIMIT 1
-            """)
+            """
+            )
             result = await self.db.execute(sql, params)
             row = result.mappings().first()
 

@@ -11,7 +11,7 @@
 from __future__ import annotations
 
 import enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 from sqlalchemy import select
@@ -83,9 +83,7 @@ class SSTService:
           - "exempt"    → EXEMPT    (0%)
           - NULL 或未知  → STANDARD (6%)
         """
-        result = await self.db.execute(
-            select(Dish.sst_category).where(Dish.id == dish_id)
-        )
+        result = await self.db.execute(select(Dish.sst_category).where(Dish.id == dish_id))
         row = result.fetchone()
         if row is None:
             return SSTCategory.STANDARD

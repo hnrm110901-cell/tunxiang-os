@@ -35,6 +35,7 @@ from shared.ontology.src.extensions.banquet_leads import (
     LeadStage,
     SourceChannel,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..repositories.banquet_lead_repo import (
     BanquetLeadRepositoryBase,
@@ -67,17 +68,13 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
 
 
 def _require_tenant(request: Request) -> uuid.UUID:
-    raw = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    raw = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not raw:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     try:
         return uuid.UUID(str(raw))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid X-Tenant-ID: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid X-Tenant-ID: {exc}") from exc
 
 
 def _optional_store_id(request: Request) -> Optional[uuid.UUID]:
@@ -117,12 +114,8 @@ def get_service(
 class CreateLeadReq(BaseModel):
     customer_id: uuid.UUID = Field(..., description="客户ID（Golden Customer）")
     banquet_type: BanquetType = Field(..., description="宴会类型")
-    source_channel: SourceChannel = Field(
-        default=SourceChannel.BOOKING_DESK, description="渠道来源"
-    )
-    sales_employee_id: Optional[uuid.UUID] = Field(
-        default=None, description="跟进销售员工ID"
-    )
+    source_channel: SourceChannel = Field(default=SourceChannel.BOOKING_DESK, description="渠道来源")
+    sales_employee_id: Optional[uuid.UUID] = Field(default=None, description="跟进销售员工ID")
     estimated_amount_fen: int = Field(default=0, ge=0, description="预估金额（分）")
     estimated_tables: int = Field(default=0, ge=0, description="预估桌数")
     scheduled_date: Optional[_date] = Field(default=None, description="预计宴会日期")
@@ -131,9 +124,7 @@ class CreateLeadReq(BaseModel):
 
 class TransitionReq(BaseModel):
     next_stage: LeadStage = Field(..., description="目标阶段")
-    operator_id: Optional[uuid.UUID] = Field(
-        default=None, description="操作人员工ID（审计）"
-    )
+    operator_id: Optional[uuid.UUID] = Field(default=None, description="操作人员工ID（审计）")
     invalidation_reason: Optional[str] = Field(
         default=None, max_length=200, description="失效原因（next_stage=invalid 时必填）"
     )
@@ -192,7 +183,7 @@ async def transition(
             invalidation_reason=payload.invalidation_reason,
         )
     except BanquetLeadNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (InvalidStageTransitionError, InvalidationReasonMissingError) as exc:
         return _err(str(exc), code=exc.code)
     except BanquetLeadError as exc:
@@ -216,7 +207,7 @@ async def convert(
             tenant_id=tenant_id,
         )
     except BanquetLeadNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except (
         InvalidStageTransitionError,
         ReservationIdMissingError,
@@ -284,9 +275,7 @@ def _parse_iso(v: str, field: str) -> datetime:
     try:
         dt = datetime.fromisoformat(v)
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid {field}: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid {field}: {exc}") from exc
     return dt
 
 

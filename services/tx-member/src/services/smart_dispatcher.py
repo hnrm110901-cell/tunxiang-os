@@ -84,12 +84,14 @@ async def get_member_level(customer_id: str, tenant_id: str, db: AsyncSession) -
     await _set_tenant(db, tenant_id)
 
     result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(MAX(level_rank), 0) AS max_rank
             FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND status = 'active' AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     row = result.mappings().first()
@@ -530,12 +532,14 @@ async def get_personalized_home(
     # 获取年度消费用于计算升级进度
     await _set_tenant(db, tenant_id)
     spend_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(balance_fen), 0) AS total_spend_fen
             FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND status = 'active' AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     spend_row = spend_result.mappings().first()
@@ -580,12 +584,14 @@ async def check_upgrade_opportunity(
 
     await _set_tenant(db, tenant_id)
     spend_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COALESCE(SUM(growth_value), 0) AS total_growth
             FROM member_cards
             WHERE customer_id = :cid AND tenant_id = :tid
               AND status = 'active' AND is_deleted = false
-        """),
+        """
+        ),
         {"cid": customer_id, "tid": tenant_id},
     )
     spend_row = spend_result.mappings().first()

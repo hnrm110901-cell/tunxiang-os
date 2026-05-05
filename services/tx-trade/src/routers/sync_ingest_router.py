@@ -2,7 +2,8 @@
 
 端点：
   POST /api/v1/sync/ingest  — 接收边缘推送的 ChangeRecord 变更，验证并应用到云端 PG
-  GET  /api/v1/sync/changes — 返回云端自 since 后的变更列表（供边缘拉取）
+  GET  /api/v1/sync/changes — 返回云端自 since 后的变更列表（供边缘拉取，旧契约）
+  GET  /api/v1/sync/pull    — SyncToken (ts+seq) 双键增量拉取（v147 events 表，新契约）
 
 设计原则：
   - 多租户：所有操作通过 X-Tenant-ID 隔离，强制 tenant_id 过滤
@@ -88,6 +89,35 @@ class ChangesResponse(BaseModel):
     total: int
     page: int
     size: int
+
+
+class PullEventOut(BaseModel):
+    """v147 events 表事件（边缘 SyncToken 消费契约）
+
+    字段命名与 edge.SyncToken.filter_unseen 对齐：
+      - seq: events.sequence_num（BIGINT）
+      - ts:  events.recorded_at（ISO 8601）
+      - 其他字段透传，供边缘业务投影器消费
+    """
+
+    seq: int
+    ts: str
+    event_id: str
+    event_type: str
+    stream_id: str
+    stream_type: str
+    store_id: Optional[str] = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class PullResponse(BaseModel):
+    items: List[PullEventOut]
+    count: int
+    max_seq: int
+    # PJ.1: event_id 作为复合游标第三键，消除 (ts, seq) 重复时的数据丢失
+    # v147 events.event_id 是 UUID PK 全局唯一，永远可作为最终 tiebreaker
+    max_event_id: str = "00000000-0000-0000-0000-000000000000"
 
 
 # ─── 依赖：获取租户 ID ────────────────────────────────────────────────────
@@ -244,7 +274,8 @@ async def get_cloud_changes(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT change_id, table_name, record_id, operation,
                        data, tenant_id, changed_at
                 FROM sync_cloud_changelog
@@ -252,7 +283,8 @@ async def get_cloud_changes(
                   AND changed_at > :since
                 ORDER BY changed_at ASC
                 LIMIT :size OFFSET :offset
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "since": since_dt,
@@ -323,6 +355,183 @@ async def get_cloud_changes(
     return {"ok": True, "data": response.model_dump()}
 
 
+@router.get(
+    "/pull",
+    summary="SyncToken 双键增量拉取（v147 events 表）",
+    description=(
+        "边缘 Mac mini 通过 (since_ts, since_seq) 复合游标增量拉取云端事件。\n\n"
+        "- 数据源：v147 `events` 表（Event Sourcing）\n"
+        "- 游标语义：返回 (recorded_at > since_ts) OR (recorded_at = since_ts AND sequence_num > since_seq)\n"
+        "- 同租户 + 同门店强制过滤；store_id 为空只返回租户级事件\n"
+        "- LIMIT 500（边缘按 max_seq/last_ts 持久化 SyncToken，下一轮续传）"
+    ),
+)
+async def pull_events(
+    store_id: str = Query(description="门店 ID（UUID）"),
+    since_ts: str = Query(
+        default="1970-01-01T00:00:00+00:00",
+        description="ISO 8601 时间戳，复合游标的时间分量",
+    ),
+    since_seq: int = Query(
+        default=0,
+        ge=0,
+        description="复合游标的序列号分量，用于同 ts 内事件的 tiebreaker",
+    ),
+    since_id: str = Query(
+        default="00000000-0000-0000-0000-000000000000",
+        description=(
+            "复合游标的 event_id 分量（PJ.1 三键 tiebreaker）— 旧客户端缺省走零 UUID 即可，"
+            "events.event_id 是 UUID PK 全局唯一，最终消除 (ts, seq) 重复时的数据丢失"
+        ),
+    ),
+    limit: int = Query(default=500, ge=1, le=500),
+    tenant_id: str = Depends(_require_tenant),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    try:
+        since_dt = datetime.fromisoformat(since_ts)
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=timezone.utc)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid 'since_ts' timestamp: {exc}",
+        )
+
+    try:
+        # PJ.1: 三键 tiebreaker (recorded_at, sequence_num, event_id)
+        # 旧二元组 cursor 兼容：since_id 缺省零 UUID，配合 event_id > zero UUID
+        # 等价于"任意 event_id"，行为退化为原二键比较
+        result = await db.execute(
+            text(
+                """
+                SELECT event_id, sequence_num, recorded_at,
+                       event_type, stream_id, stream_type,
+                       store_id, payload, metadata
+                FROM events
+                WHERE tenant_id = :tenant_id
+                  AND store_id = :store_id
+                  AND (
+                    recorded_at > :since_ts
+                    OR (recorded_at = :since_ts AND sequence_num > :since_seq)
+                    OR (
+                      recorded_at = :since_ts
+                      AND sequence_num = :since_seq
+                      AND event_id > CAST(:since_id AS UUID)
+                    )
+                  )
+                ORDER BY recorded_at ASC, sequence_num ASC, event_id ASC
+                LIMIT :limit
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "store_id": store_id,
+                "since_ts": since_dt,
+                "since_seq": since_seq,
+                "since_id": since_id,
+                "limit": limit,
+            },
+        )
+        keys = list(result.keys())
+        rows = result.all()
+    except OperationalError as exc:
+        # PJ.1: 收窄 OperationalError 兜底范围 — 只接 "events does not exist"，
+        # 其他 OperationalError（连接断/磁盘满/lock timeout/无权限等）必须 raise，
+        # 否则客户端拿到空响应误判同步完成 → 静默丢失大批事件
+        err_msg = str(exc.orig) if exc.orig is not None else str(exc)
+        if "events" not in err_msg or "does not exist" not in err_msg:
+            logger.error(
+                "sync_ingest.pull_operational_error_propagated",
+                error=err_msg,
+                exc_info=True,
+            )
+            raise
+        logger.warning(
+            "sync_ingest.events_table_missing",
+            msg="events table not found, returning empty list",
+        )
+        return {
+            "ok": True,
+            "data": PullResponse(
+                items=[],
+                count=0,
+                max_seq=since_seq,
+                max_event_id=since_id,
+            ).model_dump(),
+        }
+    except SQLAlchemyError as exc:
+        logger.error(
+            "sync_ingest.pull_db_error",
+            error=str(exc),
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Database error")
+
+    items: List[PullEventOut] = []
+    max_seq = since_seq
+    max_event_id = since_id
+    for row in rows:
+        d = dict(zip(keys, row))
+        seq_val = int(d.get("sequence_num", 0))
+        if seq_val > max_seq:
+            max_seq = seq_val
+
+        recorded_at = d["recorded_at"]
+        ts_str = recorded_at.isoformat() if isinstance(recorded_at, datetime) else str(recorded_at)
+
+        payload = d.get("payload") or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except (json.JSONDecodeError, ValueError):
+                payload = {}
+        meta = d.get("metadata") or {}
+        if isinstance(meta, str):
+            try:
+                meta = json.loads(meta)
+            except (json.JSONDecodeError, ValueError):
+                meta = {}
+
+        eid = str(d["event_id"])
+        # 行已按 (recorded_at, sequence_num, event_id) 排序，最后一行就是最大 cursor
+        max_event_id = eid
+
+        items.append(
+            PullEventOut(
+                seq=seq_val,
+                ts=ts_str,
+                event_id=eid,
+                event_type=str(d["event_type"]),
+                stream_id=str(d["stream_id"]),
+                stream_type=str(d["stream_type"]),
+                store_id=str(d["store_id"]) if d.get("store_id") else None,
+                payload=payload,
+                metadata=meta,
+            )
+        )
+
+    response = PullResponse(
+        items=items,
+        count=len(items),
+        max_seq=max_seq,
+        max_event_id=max_event_id,
+    )
+
+    logger.info(
+        "sync_ingest.pull_done",
+        tenant_id=tenant_id,
+        store_id=store_id,
+        since_ts=since_ts,
+        since_seq=since_seq,
+        since_id=since_id,
+        returned=len(items),
+        max_seq=max_seq,
+        max_event_id=max_event_id,
+    )
+    return {"ok": True, "data": response.model_dump()}
+
+
 # ─── 内部辅助函数 ─────────────────────────────────────────────────────────
 
 
@@ -330,11 +539,13 @@ async def _check_already_processed(db: AsyncSession, change_id: str) -> bool:
     """检查 change_id 是否已写入 sync_ingested_log（幂等去重）"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM sync_ingested_log
                 WHERE change_id = :change_id
                 LIMIT 1
-            """),
+            """
+            ),
             {"change_id": change_id},
         )
         return result.one_or_none() is not None
@@ -407,13 +618,15 @@ async def _apply_soft_delete(
 ) -> None:
     """软删除：设置 is_deleted=TRUE"""
     await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE "{change.table_name}"
             SET is_deleted = TRUE,
                 updated_at = :updated_at
             WHERE id = :id
               AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         {
             "id": change.record_id,
             "tenant_id": change.tenant_id,
@@ -430,7 +643,8 @@ async def _log_ingested(
     """记录已处理的 change_id 到 sync_ingested_log（幂等去重 + 审计）"""
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 CREATE TABLE IF NOT EXISTS sync_ingested_log (
                     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                     change_id   TEXT UNIQUE NOT NULL,
@@ -440,16 +654,19 @@ async def _log_ingested(
                     operation   TEXT NOT NULL,
                     ingested_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
                 )
-            """)
+            """
+            )
         )
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO sync_ingested_log
                     (change_id, table_name, record_id, tenant_id, operation, ingested_at)
                 VALUES
                     (:change_id, :table_name, :record_id, :tenant_id, :operation, NOW())
                 ON CONFLICT (change_id) DO NOTHING
-            """),
+            """
+            ),
             {
                 "change_id": change.change_id,
                 "table_name": change.table_name,

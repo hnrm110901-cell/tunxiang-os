@@ -419,7 +419,8 @@ class FinanceAuditAgent(SkillAgent):
 
             # 查询实际营收
             rev_row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COALESCE(SUM(final_amount_fen), 0) as revenue_fen,
                     COUNT(*) as order_count
@@ -429,14 +430,16 @@ class FinanceAuditAgent(SkillAgent):
                   AND status = 'completed'
                   AND created_at >= :date_from::date
                   AND created_at < :date_to::date + INTERVAL '1 day'
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
             )
             rev = dict(rev_row.mappings().first() or {})
 
             # 查询成本（从BOM计算，如无BOM则用营收*行业均值估算）
             cost_row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT COALESCE(SUM(oi.quantity * COALESCE(d.cost_price_fen, oi.unit_price_fen * 0.35)), 0) as cost_fen
                 FROM order_items oi
                 JOIN orders o ON oi.order_id = o.id
@@ -446,7 +449,8 @@ class FinanceAuditAgent(SkillAgent):
                   AND o.status = 'completed'
                   AND o.created_at >= :date_from::date
                   AND o.created_at < :date_to::date + INTERVAL '1 day'
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id, "date_from": date_from, "date_to": date_to},
             )
             cost = dict(cost_row.mappings().first() or {})
@@ -532,7 +536,8 @@ class FinanceAuditAgent(SkillAgent):
                 date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
             rows = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     p.method,
                     COUNT(*) as txn_count,
@@ -545,7 +550,8 @@ class FinanceAuditAgent(SkillAgent):
                   AND (:store_id::UUID IS NULL OR o.store_id = :store_id::UUID)
                   AND DATE(p.created_at) = :date::date
                 GROUP BY p.method
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id, "date": date},
             )
 
@@ -606,14 +612,16 @@ class FinanceAuditAgent(SkillAgent):
 
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT COALESCE(SUM(final_amount_fen), 0) as daily_revenue
                 FROM orders
                 WHERE tenant_id = :tenant_id
                   AND (:store_id::UUID IS NULL OR store_id = :store_id::UUID)
                   AND status = 'completed'
                   AND DATE(completed_at) = :today::date
-            """),
+            """
+                ),
                 {"tenant_id": self.tenant_id, "store_id": store_id, "today": today},
             )
             r = dict(row.mappings().first() or {})
@@ -733,7 +741,8 @@ class FinanceAuditAgent(SkillAgent):
             from sqlalchemy import text
 
             row = await self._db.execute(
-                text("""
+                text(
+                    """
                 SELECT
                     COUNT(*) as order_count,
                     COALESCE(SUM(final_amount_fen), 0) as revenue_fen,
@@ -749,7 +758,8 @@ class FinanceAuditAgent(SkillAgent):
                        OR (:shift_type = 'day' AND EXTRACT(HOUR FROM completed_at) BETWEEN 6 AND 17)
                        OR (:shift_type = 'night' AND (EXTRACT(HOUR FROM completed_at) >= 18
                                                        OR EXTRACT(HOUR FROM completed_at) < 6)))
-            """),
+            """
+                ),
                 {
                     "tenant_id": self.tenant_id,
                     "store_id": store_id,
@@ -1236,7 +1246,8 @@ class FinanceAuditAgent(SkillAgent):
             )
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
             SELECT
                 status, total_orders, total_revenue_fen,
                 cash_declared_fen, pos_system_fen, gap_fen,
@@ -1247,7 +1258,8 @@ class FinanceAuditAgent(SkillAgent):
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id::UUID
               AND stat_date = :stat_date
-        """),
+        """
+            ),
             {
                 "tenant_id": self.tenant_id,
                 "store_id": store_id,
@@ -1324,7 +1336,8 @@ class FinanceAuditAgent(SkillAgent):
             )
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
             SELECT
                 brand_id, revenue_fen, cost_fen, gross_profit_fen,
                 gross_margin, order_count, avg_ticket_fen,
@@ -1334,7 +1347,8 @@ class FinanceAuditAgent(SkillAgent):
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id::UUID
               AND stat_date = :stat_date
-        """),
+        """
+            ),
             {
                 "tenant_id": self.tenant_id,
                 "store_id": store_id,

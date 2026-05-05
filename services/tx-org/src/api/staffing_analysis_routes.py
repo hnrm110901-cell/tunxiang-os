@@ -76,7 +76,8 @@ async def _generate_snapshot_for_store(
     templates = (
         (
             await db.execute(
-                text("""
+                text(
+                    """
             SELECT id::text AS template_id, position, shift,
                    COALESCE(recommended_count, min_count, 0) AS required_count,
                    min_skill_level
@@ -86,7 +87,8 @@ async def _generate_snapshot_for_store(
               AND is_active = TRUE
               AND is_deleted = FALSE
             ORDER BY position, shift
-        """),
+        """
+                ),
                 {"tid": tenant_id, "stype": store_type},
             )
         )
@@ -110,14 +112,16 @@ async def _generate_snapshot_for_store(
         actual_row = (
             (
                 await db.execute(
-                    text("""
+                    text(
+                        """
                 SELECT COUNT(*)::int AS cnt
                 FROM employees
                 WHERE tenant_id = :tid
                   AND store_id = :sid
                   AND position = :pos
                   AND is_deleted = FALSE
-            """),
+            """
+                    ),
                     {"tid": tenant_id, "sid": store_id, "pos": position},
                 )
             )
@@ -134,7 +138,8 @@ async def _generate_snapshot_for_store(
             qualified_row = (
                 (
                     await db.execute(
-                        text("""
+                        text(
+                            """
                     SELECT COUNT(*)::int AS cnt
                     FROM employees
                     WHERE tenant_id = :tid
@@ -142,7 +147,8 @@ async def _generate_snapshot_for_store(
                       AND position = :pos
                       AND is_deleted = FALSE
                       AND COALESCE((meta->>'skill_level')::int, 0) >= :min_level
-                """),
+                """
+                        ),
                         {"tid": tenant_id, "sid": store_id, "pos": position, "min_level": min_skill},
                     )
                 )
@@ -164,7 +170,8 @@ async def _generate_snapshot_for_store(
         # 6. Insert snapshot record
         snap_id = str(uuid4())
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO staffing_snapshots
                     (id, tenant_id, store_id, template_id, position, shift,
                      snapshot_date, required_count, actual_count, gap,
@@ -175,7 +182,8 @@ async def _generate_snapshot_for_store(
                      :snap_date, :required, :actual, :gap,
                      :skill_detail, :impact,
                      :now, :now, FALSE)
-            """),
+            """
+            ),
             {
                 "id": snap_id,
                 "tid": tenant_id,
@@ -279,7 +287,8 @@ async def staffing_compare(
 
     snap_date = snapshot_date or date.today()
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             ss.position,
             ss.shift,
@@ -294,7 +303,8 @@ async def staffing_compare(
           AND ss.snapshot_date = :snap_date
           AND ss.is_deleted = FALSE
         ORDER BY ss.position, ss.shift
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -370,7 +380,8 @@ async def gap_ranking(
 
     snap_date = snapshot_date or date.today()
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             ss.store_id::text,
             s.store_name,
@@ -385,7 +396,8 @@ async def gap_ranking(
         GROUP BY ss.store_id, s.store_name
         ORDER BY total_gap ASC
         LIMIT :lim
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -436,7 +448,8 @@ async def staffing_trend(
     ed = end_date or date.today()
     sd = start_date or (ed - timedelta(days=30))
 
-    sql = text("""
+    sql = text(
+        """
         SELECT
             snapshot_date,
             SUM(required_count)::int AS total_required,
@@ -449,7 +462,8 @@ async def staffing_trend(
           AND is_deleted = FALSE
         GROUP BY snapshot_date
         ORDER BY snapshot_date
-    """)
+    """
+    )
     rows = (
         (
             await db.execute(
@@ -511,12 +525,14 @@ async def skill_gaps(
 
     where = " AND ".join(conditions)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT position, shift, skill_gap_detail
         FROM staffing_snapshots
         WHERE {where}
         ORDER BY position, shift
-    """)
+    """
+    )
     rows = (await db.execute(sql, params)).mappings().all()
 
     # Aggregate by position
@@ -574,7 +590,8 @@ async def impact_analysis(
 
     where = " AND ".join(conditions)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             ss.store_id::text,
             s.store_name,
@@ -586,7 +603,8 @@ async def impact_analysis(
         JOIN stores s ON s.id = ss.store_id AND s.tenant_id = ss.tenant_id
         WHERE {where}
         ORDER BY ss.impact_score DESC
-    """)
+    """
+    )
     rows = (await db.execute(sql, params)).mappings().all()
 
     items = []

@@ -17,6 +17,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import pytest
+
 from services.auto_procurement import AutoProcurementService, ProcurementRecommendation
 from services.demand_forecast import DemandForecastService
 
@@ -80,8 +81,8 @@ class TestDailyConsumption:
             days=7,
             tenant_id="tenant_001",
             db=None,
-            _mock_total_usage=0.0,          # 无直接出库记录
-            _mock_bom_daily=2.14,           # BOM反推: 300/7 * 0.05
+            _mock_total_usage=0.0,  # 无直接出库记录
+            _mock_bom_daily=2.14,  # BOM反推: 300/7 * 0.05
         )
         assert result == pytest.approx(2.14)
 
@@ -152,9 +153,9 @@ class TestSupplierSelection:
         suppliers = [
             {
                 "supplier_id": "sup_A",
-                "on_time_rate": 0.95,   # 准期率 95%
-                "quality_rate": 0.90,   # 质量合格率 90%
-                "price_score": 0.70,    # 价格竞争力 70%
+                "on_time_rate": 0.95,  # 准期率 95%
+                "quality_rate": 0.90,  # 质量合格率 90%
+                "price_score": 0.70,  # 价格竞争力 70%
             },
             {
                 "supplier_id": "sup_B",
@@ -264,20 +265,20 @@ class TestGenerateRecommendations:
             {
                 "ingredient_id": "ing_001",
                 "ingredient_name": "鲈鱼",
-                "current_qty": 5.0,      # 库存仅5kg
+                "current_qty": 5.0,  # 库存仅5kg
                 "unit": "kg",
                 "unit_price_fen": 3500,
-                "_mock_daily": 10.0,     # 日均10kg -> urgent
+                "_mock_daily": 10.0,  # 日均10kg -> urgent
                 "_mock_supplier": {"supplier_id": "sup_A", "supplier_name": "渔港"},
                 "reorder_cycle_days": 2,
             },
             {
                 "ingredient_id": "ing_002",
                 "ingredient_name": "大米",
-                "current_qty": 100.0,    # 库存100kg
+                "current_qty": 100.0,  # 库存100kg
                 "unit": "kg",
                 "unit_price_fen": 300,
-                "_mock_daily": 5.0,      # 日均5kg -> 100/5=20天，不urgent
+                "_mock_daily": 5.0,  # 日均5kg -> 100/5=20天，不urgent
                 "_mock_supplier": {"supplier_id": "sup_B", "supplier_name": "粮油商"},
                 "reorder_cycle_days": 3,
             },
@@ -308,7 +309,7 @@ class TestGenerateRecommendations:
                 "current_qty": 20.0,
                 "unit": "kg",
                 "unit_price_fen": 500,
-                "_mock_daily": 5.0,      # 20/5=4天，不urgent，但需要补货
+                "_mock_daily": 5.0,  # 20/5=4天，不urgent，但需要补货
                 "_mock_supplier": {"supplier_id": "sup_X", "supplier_name": "供应商X"},
                 "reorder_cycle_days": 2,
             },
@@ -318,7 +319,7 @@ class TestGenerateRecommendations:
                 "current_qty": 3.0,
                 "unit": "kg",
                 "unit_price_fen": 1000,
-                "_mock_daily": 5.0,      # 3/5=0.6天，urgent
+                "_mock_daily": 5.0,  # 3/5=0.6天，urgent
                 "_mock_supplier": {"supplier_id": "sup_Y", "supplier_name": "供应商Y"},
                 "reorder_cycle_days": 2,
             },

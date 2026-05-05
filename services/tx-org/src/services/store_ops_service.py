@@ -101,14 +101,16 @@ async def _query_store_info(
     tenant_id: str,
     store_id: str,
 ) -> Dict[str, Any]:
-    sql = text("""
+    sql = text(
+        """
         SELECT id, store_name
         FROM stores
         WHERE id = CAST(:store_id AS uuid)
           AND tenant_id = CAST(:tid AS uuid)
           AND is_deleted = FALSE
         LIMIT 1
-    """)
+    """
+    )
     result = await db.execute(sql, {"store_id": store_id, "tid": tenant_id})
     row = result.mappings().first()
     if not row:
@@ -124,34 +126,41 @@ async def _query_headcount(
 ) -> Dict[str, Any]:
     """查排班数、实到、缺勤、请假、迟到。"""
     # 应排班人数
-    scheduled_sql = text("""
+    scheduled_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS cnt
         FROM unified_schedules
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = CAST(:store_id AS uuid)
           AND schedule_date = :d
           AND status = 'scheduled'
-    """)
+    """
+    )
     # 实到（打卡正常或迟到）
-    clocked_in_sql = text("""
+    clocked_in_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS cnt
         FROM daily_attendance
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND date = :d
           AND status IN ('normal', 'late', 'early_leave', 'overtime')
-    """)
+    """
+    )
     # 缺勤
-    absent_sql = text("""
+    absent_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS cnt
         FROM daily_attendance
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND date = :d
           AND status = 'absent'
-    """)
+    """
+    )
     # 请假
-    on_leave_sql = text("""
+    on_leave_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS cnt
         FROM leave_requests
         WHERE tenant_id = CAST(:tid AS uuid)
@@ -159,16 +168,19 @@ async def _query_headcount(
           AND status = 'approved'
           AND start_date <= :d
           AND end_date >= :d
-    """)
+    """
+    )
     # 迟到
-    late_sql = text("""
+    late_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS cnt
         FROM daily_attendance
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND date = :d
           AND status = 'late'
-    """)
+    """
+    )
 
     params = {"tid": tenant_id, "store_id": store_id, "d": d}
     r_sched, r_in, r_abs, r_leave, r_late = await asyncio.gather(
@@ -195,7 +207,8 @@ async def _query_positions(
     d: date,
 ) -> List[Dict[str, Any]]:
     """按岗位统计应到/实到/缺口。"""
-    sql = text("""
+    sql = text(
+        """
         WITH required AS (
             SELECT position, COUNT(DISTINCT employee_id) AS required_cnt
             FROM unified_schedules
@@ -228,7 +241,8 @@ async def _query_positions(
         FROM required r
         LEFT JOIN actual a ON a.position = r.position
         ORDER BY r.position
-    """)
+    """
+    )
     result = await db.execute(sql, {"tid": tenant_id, "store_id": store_id, "d": d})
     rows = result.mappings().all()
     out: List[Dict[str, Any]] = []
@@ -253,7 +267,8 @@ async def _query_gaps(
     d: date,
 ) -> List[Dict[str, Any]]:
     """查当前未填补缺口。"""
-    sql = text("""
+    sql = text(
+        """
         SELECT sg.id, sg.position, sg.urgency, sg.status,
                st.name AS shift_name, st.start_time, st.end_time
         FROM shift_gaps sg
@@ -264,7 +279,8 @@ async def _query_gaps(
           AND sg.schedule_date = :d
           AND sg.status = 'open'
         ORDER BY sg.urgency DESC, sg.created_at
-    """)
+    """
+    )
     result = await db.execute(sql, {"tid": tenant_id, "store_id": store_id, "d": d})
     rows = result.mappings().all()
     return [
@@ -287,30 +303,38 @@ async def _query_pending_actions(
     d: date,
 ) -> Dict[str, int]:
     """查待处理事项数量。"""
-    pending_leaves_sql = text("""
+    pending_leaves_sql = text(
+        """
         SELECT COUNT(*) FROM leave_requests
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND status = 'pending'
-    """)
-    pending_swaps_sql = text("""
+    """
+    )
+    pending_swaps_sql = text(
+        """
         SELECT COUNT(*) FROM crew_shift_swaps
         WHERE tenant_id = CAST(:tid AS uuid)
           AND status = 'pending'
-    """)
-    anomalies_sql = text("""
+    """
+    )
+    anomalies_sql = text(
+        """
         SELECT COUNT(*) FROM daily_attendance
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND date = :d
           AND status IN ('absent', 'late', 'early_leave', 'missing_clock_out')
-    """)
-    alerts_sql = text("""
+    """
+    )
+    alerts_sql = text(
+        """
         SELECT COUNT(*) FROM compliance_alerts
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = CAST(:store_id AS uuid)
           AND status = 'open'
-    """)
+    """
+    )
 
     params = {"tid": tenant_id, "store_id": store_id, "d": d}
 
@@ -348,7 +372,8 @@ async def _query_labor_cost(
 ) -> Dict[str, Any]:
     """今日预估人工成本 + 本月累计。"""
     # 今日：按出勤员工的日薪标准估算
-    today_sql = text("""
+    today_sql = text(
+        """
         SELECT COALESCE(SUM(e.daily_wage_standard_fen), 0) AS today_fen
         FROM daily_attendance da
         INNER JOIN employees e
@@ -358,10 +383,12 @@ async def _query_labor_cost(
           AND da.store_id = :store_id
           AND da.date = :d
           AND da.status IN ('normal', 'late', 'early_leave', 'overtime')
-    """)
+    """
+    )
     # 本月累计
     month_start = d.replace(day=1)
-    month_sql = text("""
+    month_sql = text(
+        """
         SELECT COALESCE(SUM(e.daily_wage_standard_fen), 0) AS month_fen
         FROM daily_attendance da
         INNER JOIN employees e
@@ -372,7 +399,8 @@ async def _query_labor_cost(
           AND da.date >= :month_start
           AND da.date <= :d
           AND da.status IN ('normal', 'late', 'early_leave', 'overtime')
-    """)
+    """
+    )
 
     params = {"tid": tenant_id, "store_id": store_id, "d": d, "month_start": month_start}
     r_today, r_month = await asyncio.gather(
@@ -394,7 +422,8 @@ async def _query_timeline(
     d: date,
 ) -> List[Dict[str, str]]:
     """今日事件时间线（打卡+请假，最近50条）。"""
-    sql = text("""
+    sql = text(
+        """
         (
             SELECT clock_in_time AS event_time,
                    CASE status
@@ -427,7 +456,8 @@ async def _query_timeline(
         )
         ORDER BY event_time ASC
         LIMIT 50
-    """)
+    """
+    )
     result = await db.execute(sql, {"tid": tenant_id, "store_id": store_id, "d": d})
     rows = result.mappings().all()
     return [
@@ -454,7 +484,8 @@ async def get_position_detail(
     await _set_tenant(db, tenant_id)
     d = target_date or _today()
 
-    sql = text("""
+    sql = text(
+        """
         SELECT us.id AS schedule_id,
                us.employee_id,
                e.emp_name,
@@ -477,7 +508,8 @@ async def get_position_detail(
           AND us.schedule_date = :d
           AND us.status = 'scheduled'
         ORDER BY us.position, us.start_time
-    """)
+    """
+    )
     result = await db.execute(sql, {"tid": tenant_id, "store_id": store_id, "d": d})
     rows = result.mappings().all()
     return [
@@ -511,7 +543,8 @@ async def get_anomalies(
     await _set_tenant(db, tenant_id)
     d = target_date or _today()
 
-    sql = text("""
+    sql = text(
+        """
         SELECT da.id,
                da.employee_id,
                e.emp_name,
@@ -531,7 +564,8 @@ async def get_anomalies(
           AND da.date = :d
           AND da.status IN ('late', 'absent', 'early_leave', 'missing_clock_out')
         ORDER BY da.clock_in_time NULLS LAST
-    """)
+    """
+    )
     result = await db.execute(sql, {"tid": tenant_id, "store_id": store_id, "d": d})
     rows = result.mappings().all()
     return [
@@ -565,7 +599,8 @@ async def get_fill_suggestions(
     await _set_tenant(db, tenant_id)
 
     # 查询缺口详情
-    gap_sql = text("""
+    gap_sql = text(
+        """
         SELECT sg.id, sg.store_id, sg.schedule_date, sg.position,
                sg.shift_template_id, sg.urgency,
                st.start_time, st.end_time
@@ -574,7 +609,8 @@ async def get_fill_suggestions(
             ON st.id = sg.shift_template_id AND st.tenant_id = sg.tenant_id
         WHERE sg.id = CAST(:gap_id AS uuid)
           AND sg.tenant_id = CAST(:tid AS uuid)
-    """)
+    """
+    )
     gap_result = await db.execute(gap_sql, {"gap_id": gap_id, "tid": tenant_id})
     gap_row = gap_result.mappings().first()
     if not gap_row:
@@ -694,7 +730,8 @@ async def _action_acknowledge_late(
     note: Optional[str],
 ) -> Dict[str, Any]:
     """确认迟到（添加备注，不改变状态）。"""
-    sql = text("""
+    sql = text(
+        """
         UPDATE daily_attendance
         SET remark = COALESCE(remark, '') || :note_append,
             updated_at = NOW()
@@ -702,7 +739,8 @@ async def _action_acknowledge_late(
           AND tenant_id = CAST(:tid AS uuid)
           AND status = 'late'
         RETURNING id, employee_id, status
-    """)
+    """
+    )
     note_append = f"\n[店长确认] {note or ''} (by {operator_id})"
     result = await db.execute(
         sql,
@@ -727,7 +765,8 @@ async def _action_mark_absent(
     note: Optional[str],
 ) -> Dict[str, Any]:
     """手动标记旷工。"""
-    sql = text("""
+    sql = text(
+        """
         UPDATE daily_attendance
         SET status = 'absent',
             remark = COALESCE(remark, '') || :note_append,
@@ -736,7 +775,8 @@ async def _action_mark_absent(
           AND tenant_id = CAST(:tid AS uuid)
           AND status IN ('pending', 'missing_clock_out')
         RETURNING id, employee_id
-    """)
+    """
+    )
     note_append = f"\n[手动标记旷工] {note or ''} (by {operator_id})"
     result = await db.execute(
         sql,
@@ -774,7 +814,8 @@ async def _action_approve_leave(
     note: Optional[str],
 ) -> Dict[str, Any]:
     """快速审批请假。"""
-    sql = text("""
+    sql = text(
+        """
         UPDATE leave_requests
         SET status = 'approved',
             approved_by = :operator_id,
@@ -784,7 +825,8 @@ async def _action_approve_leave(
           AND tenant_id = CAST(:tid AS uuid)
           AND status = 'pending'
         RETURNING id, employee_id, leave_type, start_date, end_date
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -857,7 +899,8 @@ async def get_weekly_summary(
     week_start = today - timedelta(days=today.weekday())
     week_end = week_start + timedelta(days=6)
 
-    sql = text("""
+    sql = text(
+        """
         WITH daily_stats AS (
             SELECT da.date,
                    COUNT(DISTINCT da.employee_id) AS attendance_cnt,
@@ -896,7 +939,8 @@ async def get_weekly_summary(
         LEFT JOIN daily_stats dst ON dst.date = ds.schedule_date
         LEFT JOIN daily_scheduled dsc ON dsc.schedule_date = ds.schedule_date
         ORDER BY ds.schedule_date
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {
@@ -969,7 +1013,8 @@ async def get_labor_metrics(
         month_end = date(year_int, month_int + 1, 1) - timedelta(days=1)
 
     # 出勤统计
-    attendance_sql = text("""
+    attendance_sql = text(
+        """
         SELECT COUNT(DISTINCT employee_id) AS total_employees,
                COUNT(*) AS total_records,
                COUNT(*) FILTER (WHERE status IN ('normal', 'late', 'early_leave', 'overtime'))
@@ -982,27 +1027,32 @@ async def get_labor_metrics(
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND date BETWEEN :month_start AND :month_end
-    """)
+    """
+    )
 
     # 排班总数
-    scheduled_sql = text("""
+    scheduled_sql = text(
+        """
         SELECT COUNT(*) AS total_scheduled
         FROM unified_schedules
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = CAST(:store_id AS uuid)
           AND schedule_date BETWEEN :month_start AND :month_end
           AND status = 'scheduled'
-    """)
+    """
+    )
 
     # 人工成本（从 payroll_batches）
-    cost_sql = text("""
+    cost_sql = text(
+        """
         SELECT COALESCE(SUM(total_labor_cost_fen), 0) AS labor_cost_fen
         FROM payroll_batches
         WHERE tenant_id = CAST(:tid AS uuid)
           AND store_id = :store_id
           AND month = :month
           AND status IN ('approved', 'paid')
-    """)
+    """
+    )
 
     params = {
         "tid": tenant_id,

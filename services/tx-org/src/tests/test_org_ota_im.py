@@ -26,7 +26,7 @@ from __future__ import annotations
 import os
 import sys
 import types
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -254,7 +254,7 @@ async def test_ota_create_version_missing_tenant():
 @pytest.mark.anyio
 async def test_ota_list_versions_ok():
     """[5] GET /versions — 正常版本列表（含分页）。"""
-    now_str = datetime.utcnow().isoformat()
+    now_str = datetime.now(timezone.utc).isoformat()
     version_row = {
         "id": uuid4(),
         "target_type": "android_pos",

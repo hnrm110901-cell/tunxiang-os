@@ -79,7 +79,8 @@ class TrendScannerService:
 
             try:
                 await self._db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO market_trend_signals (
                             id, tenant_id, signal_type, keyword, category,
                             trend_score, trend_direction, source, region,
@@ -89,7 +90,8 @@ class TrendScannerService:
                             :trend_score, :trend_direction, 'douyin', :region,
                             :period_start, :period_end, :raw_data::jsonb
                         )
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": str(tenant_id),
@@ -154,14 +156,16 @@ class TrendScannerService:
 
             # 从近7天自有门店点评中提取食材相关关键词
             result = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT content FROM review_intel
                     WHERE tenant_id = :tenant_id
                       AND is_own_store = TRUE
                       AND review_date >= :since
                     ORDER BY review_date DESC
                     LIMIT 200
-                """),
+                """
+                ),
                 {"tenant_id": str(tenant_id), "since": period_start.isoformat()},
             )
             rows = result.fetchall()
@@ -182,7 +186,8 @@ class TrendScannerService:
 
             try:
                 await self._db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO market_trend_signals (
                             id, tenant_id, signal_type, keyword, category,
                             trend_score, trend_direction, source, region,
@@ -192,7 +197,8 @@ class TrendScannerService:
                             :trend_score, :trend_direction, 'aggregated', :region,
                             :period_start, :period_end, :raw_data::jsonb
                         )
-                    """),
+                    """
+                    ),
                     {
                         "id": str(uuid.uuid4()),
                         "tenant_id": str(tenant_id),

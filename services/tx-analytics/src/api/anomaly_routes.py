@@ -45,7 +45,8 @@ async def get_today_anomalies(
     try:
         # 从 agent_decision_logs 中提取今日 anomaly 类型决策
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT id::text, agent_id, action, confidence, reasoning,
                    output_action, status, created_at
             FROM agent_decision_logs
@@ -54,7 +55,8 @@ async def get_today_anomalies(
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = CURRENT_DATE
             ORDER BY confidence DESC, created_at DESC
             LIMIT 50
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id},
         )
         rows = result.fetchall()
@@ -105,11 +107,13 @@ async def mark_handling(
 ) -> dict:
     try:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE agent_decision_logs
             SET status = 'handling', updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+            ),
             {"id": anomaly_id, "tenant_id": x_tenant_id},
         )
         await db.commit()
@@ -126,11 +130,13 @@ async def mark_resolved(
 ) -> dict:
     try:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE agent_decision_logs
             SET status = 'resolved', updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+            ),
             {"id": anomaly_id, "tenant_id": x_tenant_id},
         )
         await db.commit()

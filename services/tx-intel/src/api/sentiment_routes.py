@@ -201,7 +201,8 @@ async def _query_dashboard(
 
     # compliance_alerts：按 severity 统计（critical/warning → negative；info → neutral）
     r_alerts = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 severity,
                 COUNT(*) AS cnt
@@ -210,7 +211,8 @@ async def _query_dashboard(
               AND store_id = :store_id
               AND created_at BETWEEN :start AND :end
             GROUP BY severity
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     alert_rows = r_alerts.fetchall()
@@ -225,14 +227,16 @@ async def _query_dashboard(
 
     # orders：近N天订单量（用作评价总量代理，实际评价表尚未接入）
     r_orders = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) AS total, COALESCE(SUM(total_fen), 0) AS revenue
             FROM orders
             WHERE tenant_id = :tenant_id
               AND store_id = :store_id
               AND status = 'completed'
               AND created_at BETWEEN :start AND :end
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     order_row = r_orders.fetchone()
@@ -250,7 +254,8 @@ async def _query_dashboard(
 
     # 最近几周趋势（按周分组）
     r_trend = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 DATE_TRUNC('week', created_at) AS week_start,
                 COUNT(*) FILTER (WHERE severity IN ('critical','warning')) AS neg,
@@ -261,7 +266,8 @@ async def _query_dashboard(
               AND created_at BETWEEN :start AND :end
             GROUP BY week_start
             ORDER BY week_start
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "store_id": store_id, "start": period_start, "end": now.isoformat()},
     )
     trend_rows = r_trend.fetchall()
@@ -318,7 +324,8 @@ async def _query_alerts(
         severity_filter = "AND severity IN ('critical', 'warning')"
 
     r = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, store_id, severity, status, title, description, created_at
             FROM compliance_alerts
             WHERE tenant_id = :tenant_id
@@ -329,7 +336,8 @@ async def _query_alerts(
                 CASE severity WHEN 'critical' THEN 0 WHEN 'warning' THEN 1 ELSE 2 END,
                 created_at DESC
             LIMIT 100
-        """),
+        """
+        ),
         params,
     )
     rows = r.fetchall()

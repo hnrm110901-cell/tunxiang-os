@@ -11,7 +11,7 @@ DB金额单位：分(int)  — 无需转换
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -92,7 +92,7 @@ def pinzhi_order_to_db(
     order_time = _parse_datetime(raw_order.get("openTime"))
     completed_at = _parse_datetime(raw_order.get("payTime"))
     if order_time is None:
-        order_time = datetime.utcnow()
+        order_time = datetime.now(timezone.utc)
 
     # 类型
     order_source = _safe_int(raw_order.get("orderSource"), 1)

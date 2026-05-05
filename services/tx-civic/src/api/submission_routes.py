@@ -137,7 +137,8 @@ async def get_submission_stats(
     await _set_tenant(db, x_tenant_id)
     try:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     domain,
                     status,
@@ -146,7 +147,8 @@ async def get_submission_stats(
                 WHERE tenant_id = :tid
                 GROUP BY domain, status
                 ORDER BY domain, status
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         raw = [dict(r._mapping) for r in rows]
@@ -165,14 +167,16 @@ async def get_submission_stats(
 
         # Recent 24h success rate
         recent = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE status = 'success') AS success
                 FROM civic_submissions
                 WHERE tenant_id = :tid
                     AND created_at >= NOW() - INTERVAL '24 hours'
-            """),
+            """
+            ),
             {"tid": x_tenant_id},
         )
         recent_row = recent.fetchone()
@@ -211,7 +215,8 @@ async def batch_submit(
         for record_id in body.record_ids:
             sid = str(uuid4())
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO civic_submissions (
                         id, tenant_id, store_id, domain, record_id,
                         record_count, status, created_at
@@ -219,7 +224,8 @@ async def batch_submit(
                         :id, :tid, :sid, :domain, :rid,
                         1, 'pending', NOW()
                     )
-                """),
+                """
+                ),
                 {
                     "id": sid,
                     "tid": x_tenant_id,

@@ -57,20 +57,21 @@ jobs:
           # 本工作流只需 pytest + 标准库
           pip install --quiet pytest pytest-asyncio
 
-      - name: 运行 Go/No-Go（--skip-tests --json）
+      - name: 运行 Go/No-Go（--json）
         id: check
         run: |
-          # --skip-tests 跳过 Tier 1 子进程（由 tier1-gate.yml 专门跑）
+          # 不再使用 --skip-tests：让 §1 Tier 1 真实执行（或失败时为 NO_GO），
+          # 否则 PR 上 §1 永远是 SKIPPED，门禁判定会被绕过（issue D7）。
           # --json 结构化输出供后续解析
           set +e
-          python scripts/demo_go_no_go.py --skip-tests --json > /tmp/go-no-go.json
+          python scripts/demo_go_no_go.py --json > /tmp/go-no-go.json
           EXIT=$?
           set -e
 
           echo "exit_code=$EXIT" >> $GITHUB_OUTPUT
 
           # 打印人类可读版本
-          python scripts/demo_go_no_go.py --skip-tests
+          python scripts/demo_go_no_go.py
 
           # JSON 摘要
           python - <<'PY'
@@ -100,6 +101,10 @@ jobs:
           # 只 fail "本 PR 应该修复"的 NO_GO（scripts/docs/scorecards 类）
           # 跳过环境依赖失败（DB/k6/nightly log 缺失走 SKIPPED 不影响）
           #
+          # 例外（issue D7）：§1 Tier 1（checkpoint_id=1）无论是 NO_GO 还是
+          # SKIPPED 都视为 fail —— 防止 PR 上因任何原因（如 --skip-tests
+          # 或环境缺失）静默漏掉 Tier 1 验收。
+          #
           # --strict（manual dispatch 勾选时）：任何 NO_GO 即 fail
           python - <<'PY'
           import json, sys, os
@@ -109,12 +114,15 @@ jobs:
 
           # PR / push 默认：只 block 这些 checkpoint（本 PR 可控）
           BLOCKING_IDS = {
-              1,   # Tier 1 测试（本工作流 --skip-tests 时转 SKIPPED，不会 block）
+              1,   # Tier 1 测试（NO_GO 或 SKIPPED 都 block，见下方 Tier 1 special-case）
               5,   # 收银员签字
               6,   # 3 商户 scorecard
               8,   # demo-reset.sh
               10,  # 演示话术
           }
+          # §1 Tier 1 special-case：SKIPPED 也 block（issue D7）
+          TIER1_BLOCK_ON_SKIPPED = {1}
+
           # Strict 模式：全部 block（CI dispatch 手动触发）
           strict = (os.environ.get("INPUT_STRICT", "false").lower() == "true")
           if strict:
@@ -122,17 +130,25 @@ jobs:
 
           failed = []
           for c in checks:
-              if c["status"] != "NO_GO":
+              cid = c["checkpoint_id"]
+              status = c["status"]
+              if cid not in BLOCKING_IDS:
                   continue
-              if c["checkpoint_id"] in BLOCKING_IDS:
+              # Tier 1：NO_GO 或 SKIPPED 都触发 fail
+              if cid in TIER1_BLOCK_ON_SKIPPED:
+                  if status in ("NO_GO", "SKIPPED"):
+                      failed.append(c)
+                  continue
+              # 其它 checkpoint：仅 NO_GO 触发 fail（保持原行为）
+              if status == "NO_GO":
                   failed.append(c)
 
           if failed:
-              print("❌ Blocking NO_GO checkpoints:", file=sys.stderr)
+              print("❌ Blocking checkpoints:", file=sys.stderr)
               for c in failed:
-                  print(f"  §{c['checkpoint_id']} {c['name']}: {c['details']}", file=sys.stderr)
+                  print(f"  §{c['checkpoint_id']} [{c['status']}] {c['name']}: {c['details']}", file=sys.stderr)
               sys.exit(1)
-          print("✅ 所有可控 checkpoint 通过（SKIPPED 不 block PR）")
+          print("✅ 所有可控 checkpoint 通过（§1 Tier 1 必须 GO/WARNING；其它 SKIPPED 不 block PR）")
           PY
         env:
           INPUT_STRICT: ${{ inputs.strict }}
@@ -157,7 +173,8 @@ jobs:
               ``,
               `**汇总**: ✅ GO × ${data.summary.GO} · ❌ NO_GO × ${data.summary.NO_GO} · ⚠️ WARNING × ${data.summary.WARNING} · ⏭️ SKIPPED × ${data.summary.SKIPPED}`,
               ``,
-              `> PR 模式：SKIPPED 不 block（环境依赖缺 DB/k6/nightly log 走此路径）`,
+              `> PR 模式：SKIPPED 默认不 block，**例外**：§1 Tier 1（NO_GO 或 SKIPPED 都 block，issue D7）`,
+              `> 其它 checkpoint（5/6/8/10）仅 NO_GO 时 block；环境依赖缺 DB/k6/nightly log 走 SKIPPED`,
               `> Week 8 前：在 DEMO 环境手动触发 \`workflow_dispatch\` + \`strict\` 全面 block`,
             ].join('\n');
 

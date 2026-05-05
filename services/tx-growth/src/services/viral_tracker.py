@@ -79,12 +79,14 @@ class ViralTracker:
         depth = 0
         if parent_chain_id:
             parent_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT depth FROM viral_invite_chains
                     WHERE id = :parent_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = false
-                """),
+                """
+                ),
                 {"parent_id": str(parent_chain_id), "tenant_id": str(tenant_id)},
             )
             parent_row = parent_result.fetchone()
@@ -94,7 +96,8 @@ class ViralTracker:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO viral_invite_chains (
                     id, tenant_id, ugc_id, campaign_id,
                     sharer_customer_id, share_channel, share_link_code,
@@ -106,7 +109,8 @@ class ViralTracker:
                     :depth, :parent_chain_id,
                     :now, :now
                 )
-            """),
+            """
+            ),
             {
                 "id": str(chain_id),
                 "tenant_id": str(tenant_id),
@@ -155,7 +159,8 @@ class ViralTracker:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE viral_invite_chains
                 SET clicked_at = COALESCE(clicked_at, :now),
                     viewer_customer_id = COALESCE(viewer_customer_id, :viewer_id),
@@ -163,7 +168,8 @@ class ViralTracker:
                 WHERE share_link_code = :code
                   AND is_deleted = false
                 RETURNING id, tenant_id, sharer_customer_id
-            """),
+            """
+            ),
             {
                 "code": share_link_code,
                 "viewer_id": str(viewer_customer_id) if viewer_customer_id else None,
@@ -209,7 +215,8 @@ class ViralTracker:
         now = datetime.now(timezone.utc)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE viral_invite_chains
                 SET converted_order_id = :order_id,
                     converted_revenue_fen = :revenue_fen,
@@ -219,7 +226,8 @@ class ViralTracker:
                 WHERE share_link_code = :code
                   AND is_deleted = false
                 RETURNING id, tenant_id, sharer_customer_id
-            """),
+            """
+            ),
             {
                 "code": share_link_code,
                 "order_id": str(order_id),
@@ -264,7 +272,8 @@ class ViralTracker:
             [{chain_id, sharer, viewer, depth, clicked, converted, children: [...]}]
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, sharer_customer_id, viewer_customer_id,
                        share_channel, share_link_code, depth,
                        parent_chain_id, clicked_at, converted_at,
@@ -274,7 +283,8 @@ class ViralTracker:
                   AND ugc_id = :ugc_id
                   AND is_deleted = false
                 ORDER BY depth ASC, created_at ASC
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "ugc_id": str(ugc_id)},
         )
         rows = result.fetchall()
@@ -327,7 +337,8 @@ class ViralTracker:
         since = datetime.now(timezone.utc) - timedelta(days=days)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total_shares,
                     COUNT(clicked_at) AS total_clicks,
@@ -338,7 +349,8 @@ class ViralTracker:
                 WHERE tenant_id = :tenant_id
                   AND created_at >= :since
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "since": since},
         )
         row = result.fetchone()
@@ -379,7 +391,8 @@ class ViralTracker:
               total_conversions, total_revenue_fen}]
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     sharer_customer_id,
                     COUNT(*) AS total_shares,
@@ -392,7 +405,8 @@ class ViralTracker:
                 GROUP BY sharer_customer_id
                 ORDER BY total_conversions DESC, total_revenue_fen DESC
                 LIMIT :limit
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "limit": limit},
         )
         rows = result.fetchall()

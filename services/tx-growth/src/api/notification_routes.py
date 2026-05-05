@@ -110,11 +110,13 @@ async def send_campaign_notification(
 
         # 校验活动是否存在（active 状态才允许发送）
         campaign_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, name, status FROM campaigns
                 WHERE id = :cid AND tenant_id = :tid AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"cid": campaign_id, "tid": tid},
         )
         campaign = campaign_result.fetchone()
@@ -132,7 +134,8 @@ async def send_campaign_notification(
         total = len(req.target_customer_ids)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO notification_tasks
                     (id, tenant_id, campaign_id, channel,
                      message_template, target_customer_ids,
@@ -143,7 +146,8 @@ async def send_campaign_notification(
                      :tmpl, :targets::jsonb,
                      'pending', :total, 0, 0,
                      :now, :now)
-            """),
+            """
+            ),
             {
                 "id": task_id,
                 "tid": tid,
@@ -192,7 +196,8 @@ async def send_campaign_notification(
                     {"tid": x_tenant_id},
                 )
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO hub_notifications (
                             id, tenant_id, store_ids, notification_type,
                             title, content, priority, status, created_at, updated_at
@@ -200,7 +205,8 @@ async def send_campaign_notification(
                             :id, :tenant_id, :store_ids::jsonb, :notification_type,
                             :title, :content, 'normal', 'pending', :now, :now
                         )
-                    """),
+                    """
+                    ),
                     {
                         "id": task_id,
                         "tenant_id": tenant_uuid,
@@ -278,7 +284,8 @@ async def list_notification_tasks(
         total = count_result.scalar() or 0
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, campaign_id, channel, status,
                        total_count, sent_count, failed_count,
                        message_template, created_at, updated_at
@@ -286,7 +293,8 @@ async def list_notification_tasks(
                 WHERE {where_clause}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()

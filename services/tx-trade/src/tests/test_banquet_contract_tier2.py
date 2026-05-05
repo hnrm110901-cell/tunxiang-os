@@ -62,9 +62,7 @@ def emitted() -> list[dict[str, Any]]:
 
 
 @pytest.fixture
-def service(
-    repo: InMemoryBanquetContractRepository, emitted: list[dict[str, Any]]
-) -> BanquetContractService:
+def service(repo: InMemoryBanquetContractRepository, emitted: list[dict[str, Any]]) -> BanquetContractService:
     async def _fake_emit(**kwargs: Any) -> str:
         emitted.append(kwargs)
         return str(uuid.uuid4())
@@ -532,9 +530,7 @@ class TestScheduleUniqueLock:
             store_id=STORE_ID,
         )
 
-        await service.mark_signed(
-            contract_id=c1.contract_id, tenant_id=TENANT_A, signer_id=uuid.uuid4()
-        )
+        await service.mark_signed(contract_id=c1.contract_id, tenant_id=TENANT_A, signer_id=uuid.uuid4())
 
         with pytest.raises(ScheduleAlreadyLockedError):
             await service.mark_signed(

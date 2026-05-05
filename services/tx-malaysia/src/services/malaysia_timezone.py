@@ -26,7 +26,7 @@ migration only — do not use them in real-time transaction paths.
 from __future__ import annotations
 
 from datetime import datetime, time, timedelta, timezone, tzinfo
-from typing import Optional
+from typing import Any, Optional
 
 import structlog
 
@@ -122,10 +122,7 @@ def to_myt(utc_dt: datetime) -> datetime:
         ValueError: If utc_dt is naive (no timezone info).
     """
     if utc_dt.tzinfo is None:
-        raise ValueError(
-            "Naive datetime provided. Supply a timezone-aware datetime "
-            "or use utcfromtimestamp()."
-        )
+        raise ValueError("Naive datetime provided. Supply a timezone-aware datetime or use utcfromtimestamp().")
     return utc_dt.astimezone(MYT)
 
 

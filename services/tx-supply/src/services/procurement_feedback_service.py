@@ -14,11 +14,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
-from typing import Any, Optional
+from datetime import date, timedelta
+from typing import Any
 
 import structlog
-from sqlalchemy import func, text
+from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -119,7 +119,8 @@ class ProcurementFeedbackService:
 
         feedback_id = str(uuid.uuid4())
 
-        sql = text("""
+        sql = text(
+            """
             INSERT INTO procurement_feedback_logs (
                 id, tenant_id, store_id, ingredient_id, feedback_date,
                 recommended_qty, actual_purchased_qty, actual_consumed_qty,
@@ -133,7 +134,8 @@ class ProcurementFeedbackService:
                 :correction_factor
             )
             RETURNING id, feedback_date, deviation_pct, correction_factor
-        """)
+        """
+        )
 
         result = await db.execute(
             sql,
@@ -217,7 +219,8 @@ class ProcurementFeedbackService:
 
         since_date = date.today() - timedelta(days=lookback_days)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT deviation_pct
             FROM procurement_feedback_logs
             WHERE tenant_id = :tenant_id
@@ -227,7 +230,8 @@ class ProcurementFeedbackService:
               AND is_deleted = FALSE
               AND deviation_pct IS NOT NULL
             ORDER BY feedback_date ASC, created_at ASC
-        """)
+        """
+        )
 
         try:
             result = await db.execute(
@@ -308,7 +312,8 @@ class ProcurementFeedbackService:
 
         since_date = date.today() - timedelta(days=period_days)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT
                 ingredient_id,
                 recommended_qty,
@@ -324,7 +329,8 @@ class ProcurementFeedbackService:
               AND actual_consumed_qty > 0
               AND recommended_qty > 0
             ORDER BY feedback_date ASC
-        """)
+        """
+        )
 
         result = await db.execute(
             sql,
@@ -393,12 +399,14 @@ class ProcurementFeedbackService:
         worst_ingredients: list[dict[str, Any]] = []
         for stats in ingredient_stats.values():
             ing_mape = stats["total_ape"] / stats["count"]
-            worst_ingredients.append({
-                "ingredient_id": stats["ingredient_id"],
-                "mape": round(ing_mape, 2),
-                "avg_deviation_pct": round(stats["total_deviation"] / stats["count"], 2),
-                "data_points": stats["count"],
-            })
+            worst_ingredients.append(
+                {
+                    "ingredient_id": stats["ingredient_id"],
+                    "mape": round(ing_mape, 2),
+                    "avg_deviation_pct": round(stats["total_deviation"] / stats["count"], 2),
+                    "data_points": stats["count"],
+                }
+            )
         worst_ingredients.sort(key=lambda x: x["mape"], reverse=True)
 
         result_data = {
@@ -409,8 +417,8 @@ class ProcurementFeedbackService:
             "accuracy_pct": round(accuracy_pct, 2),
             "avg_deviation_pct": round(avg_deviation, 2),
             "deviation_distribution": {
-                "accurate_count": accurate_count,       # |dev| < 5%
-                "over_predict_count": over_predict_count,   # dev < -5%
+                "accurate_count": accurate_count,  # |dev| < 5%
+                "over_predict_count": over_predict_count,  # dev < -5%
                 "under_predict_count": under_predict_count,  # dev > 5%
             },
             "worst_ingredients": worst_ingredients[:5],
@@ -460,7 +468,8 @@ class ProcurementFeedbackService:
         await self._set_tenant(db, tenant_id)
 
         # 按原料汇总
-        sql_by_ingredient = text("""
+        sql_by_ingredient = text(
+            """
             SELECT
                 pfl.ingredient_id,
                 i.name AS ingredient_name,
@@ -478,7 +487,8 @@ class ProcurementFeedbackService:
               AND pfl.is_deleted = FALSE
             GROUP BY pfl.ingredient_id, i.name
             ORDER BY COUNT(*) DESC
-        """)
+        """
+        )
 
         result = await db.execute(
             sql_by_ingredient,
@@ -492,7 +502,8 @@ class ProcurementFeedbackService:
         ingredient_rows = result.fetchall()
 
         # 天气分布
-        sql_weather = text("""
+        sql_weather = text(
+            """
             SELECT
                 COALESCE(weather_condition, 'unknown') AS weather,
                 COUNT(*) AS count,
@@ -505,7 +516,8 @@ class ProcurementFeedbackService:
               AND deviation_pct IS NOT NULL
             GROUP BY weather_condition
             ORDER BY COUNT(*) DESC
-        """)
+        """
+        )
 
         weather_result = await db.execute(
             sql_weather,
@@ -519,7 +531,8 @@ class ProcurementFeedbackService:
         weather_rows = weather_result.fetchall()
 
         # 节假日 vs 工作日
-        sql_holiday = text("""
+        sql_holiday = text(
+            """
             SELECT
                 is_holiday,
                 COUNT(*) AS count,
@@ -532,7 +545,8 @@ class ProcurementFeedbackService:
               AND is_deleted = FALSE
               AND deviation_pct IS NOT NULL
             GROUP BY is_holiday
-        """)
+        """
+        )
 
         holiday_result = await db.execute(
             sql_holiday,

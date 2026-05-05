@@ -116,7 +116,8 @@ async def mentorship_statistics(
     where = " AND ".join(conditions)
 
     # Overall stats
-    overall_sql = text(f"""
+    overall_sql = text(
+        f"""
         SELECT
             COUNT(*)::int                                              AS total,
             COUNT(*) FILTER (WHERE status = 'active')::int             AS active_count,
@@ -126,11 +127,13 @@ async def mentorship_statistics(
             COALESCE(AVG(mentee_pass_rate) FILTER (WHERE mentee_pass_rate IS NOT NULL), 0) AS avg_pass_rate
         FROM mentorship_relations
         WHERE {where}
-    """)
+    """
+    )
     overall = (await db.execute(overall_sql, params)).mappings().first()
 
     # By store
-    store_sql = text(f"""
+    store_sql = text(
+        f"""
         SELECT
             store_id::text,
             COUNT(*)::int                                              AS total,
@@ -142,7 +145,8 @@ async def mentorship_statistics(
         WHERE {where}
         GROUP BY store_id
         ORDER BY total DESC
-    """)
+    """
+    )
     store_rows = (await db.execute(store_sql, params)).mappings().all()
 
     return _ok(
@@ -183,7 +187,8 @@ async def mentorship_leaderboard(
     # Sort metric
     metric_col = "avg_mentor_score" if sort_by == "mentor_score" else "avg_pass_rate"
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             mentor_id::text,
             COUNT(*) FILTER (WHERE status = 'completed')::int AS completed_count,
@@ -196,7 +201,8 @@ async def mentorship_leaderboard(
         HAVING COUNT(*) FILTER (WHERE status = 'completed') > 0
         ORDER BY {metric_col} DESC, completed_count DESC
         LIMIT :lmt
-    """)
+    """
+    )
     rows = (await db.execute(sql, {"tid": tenant_id, "lmt": limit})).mappings().all()
 
     items = [
@@ -255,13 +261,15 @@ async def list_mentorships(
     params["limit"] = size
     params["offset"] = offset
 
-    data_sql = text(f"""
+    data_sql = text(
+        f"""
         SELECT {_SELECT_COLS}
         FROM mentorship_relations
         WHERE {where}
         ORDER BY created_at DESC
         LIMIT :limit OFFSET :offset
-    """)
+    """
+    )
     rows = (await db.execute(data_sql, params)).mappings().all()
 
     items = [_row_to_dict(r) for r in rows]
@@ -285,13 +293,15 @@ async def create_mentorship(
         raise HTTPException(status_code=400, detail="Mentor and mentee cannot be the same person")
 
     # Rule 2: mentee cannot have 2 active mentorships at the same time
-    active_sql = text("""
+    active_sql = text(
+        """
         SELECT id FROM mentorship_relations
         WHERE tenant_id = :tid
           AND mentee_id = :mentee_id
           AND status = 'active'
           AND is_deleted = FALSE
-    """)
+    """
+    )
     active = (
         await db.execute(
             active_sql,
@@ -310,7 +320,8 @@ async def create_mentorship(
     new_id = str(uuid4())
     now = datetime.now(timezone.utc)
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO mentorship_relations
             (id, tenant_id, mentor_id, mentee_id, store_id,
              start_date, end_date, status, mentor_score, mentee_pass_rate,
@@ -320,7 +331,8 @@ async def create_mentorship(
              :start_date, NULL, 'active', NULL, NULL,
              :notes, FALSE, :now, :now)
         RETURNING id::text AS mentorship_id
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -365,11 +377,13 @@ async def get_mentorship(
     tenant_id = _get_tenant_id(request)
     await _set_tenant(db, tenant_id)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT {_SELECT_COLS}
         FROM mentorship_relations
         WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
-    """)
+    """
+    )
     row = (await db.execute(sql, {"id": mentorship_id, "tid": tenant_id})).mappings().first()
     if not row:
         raise HTTPException(status_code=404, detail="Mentorship not found")
@@ -399,12 +413,14 @@ async def update_mentorship(
     set_clauses = [f"{k} = :{k}" for k in fields]
     set_sql = ", ".join(set_clauses)
 
-    sql = text(f"""
+    sql = text(
+        f"""
         UPDATE mentorship_relations
         SET {set_sql}
         WHERE id = :id AND tenant_id = :tid AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
-    """)
+    """
+    )
     params = {**fields, "id": mentorship_id, "tid": tenant_id}
     result = (await db.execute(sql, params)).mappings().first()
 
@@ -433,7 +449,8 @@ async def complete_mentorship(
     now = datetime.now(timezone.utc)
     today = date.today()
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE mentorship_relations
         SET status = 'completed',
             end_date = :end_date,
@@ -443,7 +460,8 @@ async def complete_mentorship(
             updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -494,7 +512,8 @@ async def terminate_mentorship(
     now = datetime.now(timezone.utc)
     today = date.today()
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE mentorship_relations
         SET status = 'terminated',
             end_date = :end_date,
@@ -502,7 +521,8 @@ async def terminate_mentorship(
             updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
-    """)
+    """
+    )
     result = (
         (
             await db.execute(
@@ -542,12 +562,14 @@ async def delete_mentorship(
     await _set_tenant(db, tenant_id)
 
     now = datetime.now(timezone.utc)
-    sql = text("""
+    sql = text(
+        """
         UPDATE mentorship_relations
         SET is_deleted = TRUE, updated_at = :now
         WHERE id = :id AND tenant_id = :tid AND status = 'active' AND is_deleted = FALSE
         RETURNING id::text AS mentorship_id
-    """)
+    """
+    )
     result = (await db.execute(sql, {"id": mentorship_id, "tid": tenant_id, "now": now})).mappings().first()
 
     if not result:

@@ -3,6 +3,7 @@
 FCT业财税、预算、现金流、月报、成本分析、P&L、凭证生成
 """
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -25,6 +26,7 @@ from .api.finance import router as finance_router
 from .api.finance_cost_routes import router as finance_cost_router
 from .api.finance_pl_routes import router as finance_pl_router
 from .api.fund_settlement_routes import router as fund_settlement_router
+from .api.invoice_ocr_routes import router as invoice_ocr_router
 from .api.payment_reconciliation_routes import router as payment_reconciliation_router
 from .api.payroll_routes import router as payroll_router
 from .api.pl_routes import router as pl_router
@@ -36,11 +38,10 @@ from .api.seafood_loss_routes import router as seafood_loss_router
 from .api.settlement_routes import router as settlement_router
 from .api.split_payment_routes import router as split_payment_router
 from .api.split_routes import router as split_router
+from .api.stored_value_settlement_routes import router as stored_value_settlement_router
 from .api.vat_ledger_routes import router as vat_ledger_router
 from .api.vat_routes import router as vat_router
-from .api.stored_value_settlement_routes import router as stored_value_settlement_router
 from .api.wine_storage_routes import router as wine_storage_router
-from .api.invoice_ocr_routes import router as invoice_ocr_router
 
 
 @asynccontextmanager
@@ -62,7 +63,7 @@ Instrumentator().instrument(app).expose(app)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -132,8 +133,8 @@ _sprint_d4_mount = auto_mount_routes(
     pkg=__package__,
     api_dir=_Path(__file__).parent / "api",
     modules=[
-        ("cost_root_cause_routes", "router"),    # D4a #85
-        ("budget_forecast_routes", "router"),     # D4c #88
+        ("cost_root_cause_routes", "router"),  # D4a #85
+        ("budget_forecast_routes", "router"),  # D4c #88
     ],
 )
 validate_result(_sprint_d4_mount)

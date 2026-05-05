@@ -26,6 +26,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+
 from services.tx_supply.src.services import delivery_proof_service as svc
 from services.tx_supply.src.services.delivery_proof_service import (
     DeliveryProofError,
@@ -43,9 +44,7 @@ INGREDIENT_ID = str(uuid.uuid4())
 USER_ID = str(uuid.uuid4())
 
 # 1x1 透明 PNG（67 字节）
-TINY_PNG_B64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
-)
+TINY_PNG_B64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
 TINY_PNG_DATA_URL = f"data:image/png;base64,{TINY_PNG_B64}"
 
 
@@ -92,9 +91,7 @@ def _isolated_upload_dir(monkeypatch, tmp_path: Path) -> Path:
 
 class TestSubmitSignature:
     @pytest.mark.asyncio
-    async def test_submit_signature_creates_receipt(
-        self, monkeypatch, tmp_path: Path
-    ) -> None:
+    async def test_submit_signature_creates_receipt(self, monkeypatch, tmp_path: Path) -> None:
         _isolated_upload_dir(monkeypatch, tmp_path)
         store_uuid = uuid.uuid4()
 
@@ -145,9 +142,7 @@ class TestSubmitSignature:
         assert len(files) == 1
 
     @pytest.mark.asyncio
-    async def test_submit_signature_rejects_invalid_base64(
-        self, monkeypatch, tmp_path: Path
-    ) -> None:
+    async def test_submit_signature_rejects_invalid_base64(self, monkeypatch, tmp_path: Path) -> None:
         _isolated_upload_dir(monkeypatch, tmp_path)
 
         async def execute(stmt, params=None):
@@ -186,9 +181,7 @@ class TestSubmitSignature:
             )
 
     @pytest.mark.asyncio
-    async def test_submit_signature_idempotent_per_delivery(
-        self, monkeypatch, tmp_path: Path
-    ) -> None:
+    async def test_submit_signature_idempotent_per_delivery(self, monkeypatch, tmp_path: Path) -> None:
         _isolated_upload_dir(monkeypatch, tmp_path)
         existing_receipt_id = uuid.uuid4()
 
@@ -284,9 +277,7 @@ class TestRecordDamage:
 
 class TestAttachFile:
     @pytest.mark.asyncio
-    async def test_attach_file_to_damage(
-        self, monkeypatch, tmp_path: Path
-    ) -> None:
+    async def test_attach_file_to_damage(self, monkeypatch, tmp_path: Path) -> None:
         _isolated_upload_dir(monkeypatch, tmp_path)
         damage_id = str(uuid.uuid4())
 
@@ -337,23 +328,56 @@ class TestGetCompleteProof:
 
         # 模拟 receipt 行
         receipt_row = (
-            receipt_id, uuid.UUID(DELIVERY_ID), store_id, "王店长", "STORE_MANAGER",
-            "13800138000", signed_at, "s3://tunxiang-supply/x/y.png",
-            None, None, {"model": "Sunmi T2"}, None, signed_at,
+            receipt_id,
+            uuid.UUID(DELIVERY_ID),
+            store_id,
+            "王店长",
+            "STORE_MANAGER",
+            "13800138000",
+            signed_at,
+            "s3://tunxiang-supply/x/y.png",
+            None,
+            None,
+            {"model": "Sunmi T2"},
+            None,
+            signed_at,
         )
 
         damage_row = (
-            damage_id, uuid.UUID(DELIVERY_ID), None, uuid.UUID(INGREDIENT_ID),
-            "B-1", "BROKEN", Decimal("2.5"), 8800, 22000, "破损",
-            "MAJOR", uuid.UUID(USER_ID), signed_at,
-            "PENDING", None, None, None, None,
+            damage_id,
+            uuid.UUID(DELIVERY_ID),
+            None,
+            uuid.UUID(INGREDIENT_ID),
+            "B-1",
+            "BROKEN",
+            Decimal("2.5"),
+            8800,
+            22000,
+            "破损",
+            "MAJOR",
+            uuid.UUID(USER_ID),
+            signed_at,
+            "PENDING",
+            None,
+            None,
+            None,
+            None,
         )
 
         attachment_row = (
-            uuid.uuid4(), "DAMAGE", damage_id,
+            uuid.uuid4(),
+            "DAMAGE",
+            damage_id,
             "s3://tunxiang-supply/x/photo.jpg",
-            "image/jpeg", 12345, "photo.jpg", None, signed_at,
-            None, None, uuid.UUID(USER_ID), signed_at,
+            "image/jpeg",
+            12345,
+            "photo.jpg",
+            None,
+            signed_at,
+            None,
+            None,
+            uuid.UUID(USER_ID),
+            signed_at,
         )
 
         call_log: list[str] = []
@@ -379,14 +403,17 @@ class TestGetCompleteProof:
         # information_schema 探测 cold_chain_evidence 路径。
         # 此处用 patch.object mock 出"无温度数据"场景。
         from unittest.mock import patch as _patch
+
         with _patch.object(
             svc._temperature_service,
             "get_temperature_proof",
-            new=AsyncMock(return_value={
-                "summary": {"sample_count": 0},
-                "alerts": [],
-                "timeline_sampled": [],
-            }),
+            new=AsyncMock(
+                return_value={
+                    "summary": {"sample_count": 0},
+                    "alerts": [],
+                    "timeline_sampled": [],
+                }
+            ),
         ):
             proof = await svc.get_complete_proof(
                 delivery_id=DELIVERY_ID,
@@ -424,10 +451,19 @@ class TestResolveDamage:
             if "SELECT delivery_id, resolution_status" in sql:
                 # 当前状态 PENDING
                 return _result(
-                    rows=[(
-                        delivery_uuid, "PENDING", "BROKEN", Decimal("2.5"),
-                        8800, 22000, "MAJOR", uuid.UUID(INGREDIENT_ID), "B-1",
-                    )]
+                    rows=[
+                        (
+                            delivery_uuid,
+                            "PENDING",
+                            "BROKEN",
+                            Decimal("2.5"),
+                            8800,
+                            22000,
+                            "MAJOR",
+                            uuid.UUID(INGREDIENT_ID),
+                            "B-1",
+                        )
+                    ]
                 )
             if "UPDATE delivery_damage_records" in sql:
                 return _result()
@@ -495,10 +531,19 @@ class TestResolveDamage:
             if "SELECT delivery_id, resolution_status" in sql:
                 # 已是终态
                 return _result(
-                    rows=[(
-                        uuid.UUID(DELIVERY_ID), "RETURNED", "BROKEN", Decimal("1"),
-                        100, 100, "MINOR", None, None,
-                    )]
+                    rows=[
+                        (
+                            uuid.UUID(DELIVERY_ID),
+                            "RETURNED",
+                            "BROKEN",
+                            Decimal("1"),
+                            100,
+                            100,
+                            "MINOR",
+                            None,
+                            None,
+                        )
+                    ]
                 )
             return _result()
 
@@ -552,9 +597,7 @@ class TestCrossTenantIsolation:
 
 class TestSignatureSizeLimit:
     @pytest.mark.asyncio
-    async def test_signature_size_limit_enforced(
-        self, monkeypatch, tmp_path: Path
-    ) -> None:
+    async def test_signature_size_limit_enforced(self, monkeypatch, tmp_path: Path) -> None:
         _isolated_upload_dir(monkeypatch, tmp_path)
 
         async def execute(stmt, params=None):

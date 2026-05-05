@@ -197,7 +197,8 @@ class DiscountAuditService:
 
         where_clause = " AND ".join(conditions)
 
-        sql = text(f"""
+        sql = text(
+            f"""
             SELECT
                 operator_id,
                 operator_name,
@@ -209,7 +210,8 @@ class DiscountAuditService:
             WHERE {where_clause}
             GROUP BY operator_id, operator_name
             ORDER BY high_risk_count DESC
-        """)
+        """
+        )
 
         try:
             result = await self.db.execute(sql, params)

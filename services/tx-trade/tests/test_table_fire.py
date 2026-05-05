@@ -16,6 +16,7 @@ import pytest
 
 # ─── 工具函数 ───
 
+
 def make_uuid() -> str:
     return str(uuid.uuid4())
 
@@ -25,11 +26,12 @@ TENANT_B = make_uuid()
 STORE_ID = make_uuid()
 ORDER_ID = make_uuid()
 
-HOT_DEPT_ID = make_uuid()   # 热菜档
+HOT_DEPT_ID = make_uuid()  # 热菜档
 COLD_DEPT_ID = make_uuid()  # 凉菜档
 
 
 # ─── Fixture: Mock DB ───
+
 
 @pytest.fixture
 def mock_db():
@@ -40,6 +42,7 @@ def mock_db():
 # ═════════════════════════════════════════════════════════
 # 场景1: 热菜档(8min) + 凉菜档(3min) → 凉菜延迟5分钟开始
 # ═════════════════════════════════════════════════════════
+
 
 class TestTableFireCoordinator:
     """TableFireCoordinator 核心协调逻辑测试"""
@@ -84,9 +87,7 @@ class TestTableFireCoordinator:
         # 凉菜档应延迟 480 - 180 - 30(buffer) = 270 秒
         cold_delay = plan.dept_delays.get(COLD_DEPT_ID, 0)
         expected_delay = 480 - 180 - 30  # bottleneck - duration - buffer
-        assert cold_delay == expected_delay, (
-            f"凉菜档延迟应为{expected_delay}秒，实际={cold_delay}"
-        )
+        assert cold_delay == expected_delay, f"凉菜档延迟应为{expected_delay}秒，实际={cold_delay}"
 
     @pytest.mark.asyncio
     async def test_target_completion_is_bottleneck_time(self, mock_db):
@@ -123,14 +124,15 @@ class TestTableFireCoordinator:
         min_target = before + timedelta(seconds=600)
         max_target = after + timedelta(seconds=600)
 
-        assert min_target <= plan.target_completion <= max_target, (
-            f"target_completion={plan.target_completion} 不在预期范围内"
-        )
+        assert (
+            min_target <= plan.target_completion <= max_target
+        ), f"target_completion={plan.target_completion} 不在预期范围内"
 
 
 # ═════════════════════════════════════════════════════════
 # 场景2: 所有档口完成 → ExpoStation 亮起"可传菜"
 # ═════════════════════════════════════════════════════════
+
 
 class TestNotifyDeptReady:
     """notify_dept_ready 档口完成通知测试"""
@@ -165,16 +167,12 @@ class TestNotifyDeptReady:
             side_effect=mock_push_ws,
         ):
             # 热菜档完成
-            result1 = await coordinator.notify_dept_ready(
-                plan=plan, dept_id=HOT_DEPT_ID, db=mock_db
-            )
+            result1 = await coordinator.notify_dept_ready(plan=plan, dept_id=HOT_DEPT_ID, db=mock_db)
             assert result1["all_ready"] is False
             assert len(ws_calls) == 0
 
             # 凉菜档完成
-            result2 = await coordinator.notify_dept_ready(
-                plan=plan, dept_id=COLD_DEPT_ID, db=mock_db
-            )
+            result2 = await coordinator.notify_dept_ready(plan=plan, dept_id=COLD_DEPT_ID, db=mock_db)
             assert result2["all_ready"] is True
             assert len(ws_calls) == 1
             assert ws_calls[0]["event"] == "table_ready"
@@ -207,9 +205,7 @@ class TestNotifyDeptReady:
             "src.services.table_production_plan.push_table_ready_ws",
             side_effect=mock_push_ws,
         ):
-            result = await coordinator.notify_dept_ready(
-                plan=plan, dept_id=HOT_DEPT_ID, db=mock_db
-            )
+            result = await coordinator.notify_dept_ready(plan=plan, dept_id=HOT_DEPT_ID, db=mock_db)
 
         assert result["all_ready"] is False
         assert len(ws_calls) == 0
@@ -218,6 +214,7 @@ class TestNotifyDeptReady:
 # ═════════════════════════════════════════════════════════
 # 场景3: 单档口订单不走协调（无需等待）
 # ═════════════════════════════════════════════════════════
+
 
 class TestSingleDeptNoCoordination:
     """单档口订单跳过协调逻辑"""
@@ -274,6 +271,7 @@ class TestSingleDeptNoCoordination:
 # ═════════════════════════════════════════════════════════
 # 场景4: 催菜会缩短协调等待时间
 # ═════════════════════════════════════════════════════════
+
 
 class TestUrgentReducesDelay:
     """催菜（urgent=True）缩短慢档口预计时间，连带减少等待"""
@@ -334,14 +332,15 @@ class TestUrgentReducesDelay:
         urgent_cold_delay = plan_urgent.dept_delays.get(COLD_DEPT_ID, 0)
 
         # 催菜后，热菜档预计时间缩短 → 凉菜档等待时间应更短（或为0）
-        assert urgent_cold_delay <= normal_cold_delay, (
-            f"催菜后凉菜等待应缩短：normal={normal_cold_delay}, urgent={urgent_cold_delay}"
-        )
+        assert (
+            urgent_cold_delay <= normal_cold_delay
+        ), f"催菜后凉菜等待应缩短：normal={normal_cold_delay}, urgent={urgent_cold_delay}"
 
 
 # ═════════════════════════════════════════════════════════
 # 场景5: tenant_id 隔离测试
 # ═════════════════════════════════════════════════════════
+
 
 class TestTenantIsolation:
     """不同租户的计划互不可见"""
@@ -407,14 +406,13 @@ class TestTenantIsolation:
             db=mock_db,
         )
 
-        assert str(plan.tenant_id) == TENANT_B, (
-            f"计划的tenant_id应为{TENANT_B}，实际={plan.tenant_id}"
-        )
+        assert str(plan.tenant_id) == TENANT_B, f"计划的tenant_id应为{TENANT_B}，实际={plan.tenant_id}"
 
 
 # ═════════════════════════════════════════════════════════
 # ExpoTicket 结构验证
 # ═════════════════════════════════════════════════════════
+
 
 class TestExpoTicketStructure:
     """ExpoStation 票据数据结构测试"""

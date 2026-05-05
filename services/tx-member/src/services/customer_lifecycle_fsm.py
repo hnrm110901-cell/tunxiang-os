@@ -193,11 +193,7 @@ class CustomerLifecycleFSM:
         current = await self.repo.get_for_update(cid)
 
         # 幂等短路：trigger_event_id 相同
-        if (
-            trig is not None
-            and current is not None
-            and current.last_transition_event_id == trig
-        ):
+        if trig is not None and current is not None and current.last_transition_event_id == trig:
             logger.info(
                 "lifecycle_transition_idempotent_skip",
                 tenant_id=str(self.tenant_id),
@@ -207,9 +203,7 @@ class CustomerLifecycleFSM:
             )
             return current
 
-        previous_state: CustomerLifecycleState | None = (
-            current.state if current is not None else None
-        )
+        previous_state: CustomerLifecycleState | None = current.state if current is not None else None
 
         # since_ts：真实迁移时取 now；状态未变时保留旧 since_ts
         if current is not None and current.state == target_state:
@@ -226,9 +220,9 @@ class CustomerLifecycleFSM:
         )
 
         # 发事件：只在真实状态变化时发（previous != current）
-        is_real_transition = (
-            current is None and target_state != CustomerLifecycleState.NO_ORDER
-        ) or (current is not None and current.state != target_state)
+        is_real_transition = (current is None and target_state != CustomerLifecycleState.NO_ORDER) or (
+            current is not None and current.state != target_state
+        )
 
         if is_real_transition:
             payload: dict[str, Any] = {

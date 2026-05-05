@@ -1,3 +1,260 @@
+## 2026-05-05 10:30  P2.5 Phase 2 收尾 + Tier 1 基线扩展（含 review P0 修补 + ClashX 7890 救场推送）
+
+### 本次会话目标
+`/loop` 自驱动 P2.5 Phase 2 异常泄漏归一 + Tier 1 基线扩展 8 → 46 文件。
+后接 strict-code-reviewer 审查发现 2 P0：tier1 runner 假阳 + approval f-string 泄漏。
+
+### 完成状态
+- [x] PR #166 rebase + force-push（解 CONFLICTING）— 1 commit 干净 replay
+- [x] PR #171 Tier 1 47 文件 baseline + pipefail 修 + DEPS 加 pyyaml/aiosqlite/asyncpg → 真实 44/46 绿
+- [x] PR #172 batch3 — 4 服务 56 文件 289 处 detail=str() 归一
+- [x] PR #174 batch4 — 12 服务 45 文件 184 处归一 + review 修 codemod re.DOTALL + approval f-string 泄漏 + rebase 解冲突
+- [x] PR #175 docs/progress 同步（含 review 修补 + ClashX 救场记录）
+- [x] codemod 修 bug：顶层 import + DOTALL multi-line（之前 26 处多行漏匹配）
+
+### 关键决策
+- **代理切换救场** — `reclaude:53896` 间歇性 502 持续整个会话；发现 `ClashX:7890` 备用
+  端口仍工作，5 分支批量推送一次成功；之前所有 fail 是 reclaude 单一代理问题
+- **strict-code-reviewer 揭露假阳** — tier1 runner `tail -5` 在默认 bash 中管道退出码取
+  最后命令（tail 永 0），导致 pytest 失败被吞，46/46 报绿全是骗局；加 `set -o pipefail`
+  后真实 42/46，DEPS 补全后 44/46，剩 2 真坏需独立修
+- **codemod re.DOTALL 必要性** — 单行正则跳过 26 处多行 `raise HTTPException(\n  ...,\n  detail=str(e),\n)`；
+  实测多行 detail 多为静态字符串非 str(var) 故不影响历史替换数；但 approval_workflow:401
+  f-string 泄漏 `inst['status']` 是真泄漏，手工修
+- **避让并发 PK 工作分支** — sec/pk23-finance-supply-baseline 同时段在 tx-finance/tx-supply
+  做 text(f) baseline 守门；P2.5 batch4 跳过这两服务避免 rebase 冲突
+
+### 累积成果（6 PR）
+- P2.5 Phase 2 归一 **744+ 处**跨 17 服务（tx-trade/analytics/member/agent/malaysia/expense/
+  growth/predict/brain/gateway/menu/vietnam/indonesia/ops/org/supply/finance）
+- Tier 1 真实基线 44/46（识破 46/46 假阳）
+- 修 2 P0 + 1 codemod 多行 bug
+
+### 下一步
+- 6 PR admin merge 后清点真实残余
+- 修 Tier 1 真坏 2 文件：test_saga_buffer disk mock 路径硬编码 / test_invoice_tier1 patch `services.invoice_service` 模块路径错
+- PI.2 — 73 历史 alembic head 收敛（独立 sprint）
+
+### 已知风险
+- ClashX:7890 也可能间歇失败；需要建立代理 fallback 自动切换机制
+- 744+ 处自动替换语义抽查未做（仅 ast.parse round-trip 通过）；建议下轮选 5-10 个高密度文件人工核对
+- saga_buffer / invoice_tier1 真坏 5 个用例反向暴露 Tier 1 测试质量 — 下一轮要查全部 47
+  文件是否还有更多 silent fail（被 tail/pipefail 双重掩盖到现在才暴露）
+
+---
+
+## 2026-05-05 09:50  PK 系列收官 — RLS 真注入修 + Tier 1 域 text(f) baseline 守门 5 PR
+
+### 本次会话目标
+PJ 系列 7 PR 收尾后，reviewer 在 tx-trade f-string 安全审计中发现 3 处真 RLS 注入；
+紧急修 + 全仓 SET LOCAL :tid 加固 + Tier 1 域 text(f) baseline 守门一并落地。
+
+### 完成状态
+- [x] PK.0 紧急修 3 处 RLS tenant_id SQL 注入 (#168 → `b0e8fdd8`) [P0/SECURITY]
+- [x] PK.0.1 全仓 89 处 SET LOCAL :tid → set_config 加固 (#169 → `fa7e345a`) [SECURITY]
+- [x] PK.1 tx-trade 域 text(f) baseline=139 守门 (#170 → `df0f52d3`) [Tier1]
+- [x] PK.2+3 tx-finance + tx-supply baseline=59/78 守门 (#173 → `985e007a`) [Tier1]
+- [x] PK.2-fix scanner blind spot 修 + 校准 PK.1 baseline (含 #173)
+- [x] PK.2-fix++ text(<sql_var>) 第二维 baseline 守门 (含 #173)
+
+### 关键决策
+- **PK.0 真注入紧急性** — `_set_rls(tenant_id)` f-string 拼接的 tenant_id 来自 X-Tenant-ID
+  header（用户可控），任何复用此模板的新 router 都会复制注入面 → P0，0 容忍立即修
+- **PK.0.1 SET LOCAL :tid 不可靠的根本原因** — PG SET 是 utility statement，不走 PARSE/BIND；
+  SQLAlchemy + asyncpg 行为不可 100% 确定（驱动版本依赖）。统一改 PG 原生
+  `SELECT set_config(name, value, is_local)` — 走标准 PREPARE+BIND，等价 SET LOCAL（is_local=true）
+- **方法论 pivot：codemod → baseline gate** — 全仓 ~298 处 text(f) 多数是项目内白名单
+  conditions list / set_clauses 拼接，零真注入面；ROI 极低噪音改动改套精确 baseline
+  双向锁定（> baseline fail 防新增 / < baseline fail 迫使下调显式 review 清理范围）
+- **strict-code-reviewer 救场** — 抓出 scanner 用 `splitlines()` 逐行扫漏 60%+ 真实命中
+  （多行 `text(\n  f"""...""")` 完全看不见），漏扫导致老 baseline 33/21/23 是错误子集。
+  同 PR 修 scanner（findall 整 body）+ 同步校准为 139/59/78 + 把 3 函数 parametrize
+- **全量审计完成** — reviewer 5 大问题全部修，Suggestion #6（text(sql/stmt) 变量间接面）
+  也加进去，3 域 × 2 维度 = 6 baseline 双层守门
+- **gh api PUT fallback 全程稳定** — git push 502 雪崩 + canonical clone 外部反复切分支，
+  全程走 PUT /contents 单文件推 + admin merge
+
+### 下一步
+- PI.2 — 73 历史 alembic head 分批收敛（独立 sprint 立项）
+- PJ.2 — staging PG 实跑 CONCURRENTLY 验证（需 staging 访问）
+- PE.2 — 与首批客户对账校验阶梯费率（需客户协作）
+
+### 已知风险
+- baseline 锁定的 ~302 处历史 text(f) + text(<sql_var>) 命中**已审计为零真注入面**
+  （都是项目内 literal conditions / set_clauses 拼接），不强制清理；但任何新引入会被 fail
+- text(f) baseline 在新增动态 SQL helper 时会触发 fail — reviewer 必须明确判定改 :param
+  + bindparams 模式 OR 上调 baseline（后者要写注释说明 + 列入下一轮 codemod 候选）
+- `set_config('app.tenant_id', :tid, true)` 在事务回滚时 GUC 自然回滚（PG 文档保证），
+  但跨 connection pool 复用时务必每次 set_config（已验证 PG.4 backfill / async session 模式）
+---
+
+## 2026-05-05 00:00  PJ 系列后续修复 — 6 PR admin merge 收口
+
+### 本次会话目标
+上一轮 7 PR (PG/PI/P2.2) 合并后 CodeRabbit post-merge 发现 6 处真 P1。
+按"超级开发智能体团队"模式启动并行修复 + 主线协调 admin merge。
+
+### 完成状态
+- [x] PJ.1 sync/pull 三键 cursor + OperationalError 收窄 (#162 → `807f287d`)
+- [x] PJ.2 v396 索引改 CONCURRENTLY 生产零阻塞 (#159 → `952574c4`)
+- [x] PJ.3 PG.2 codemod 残留 tzinfo 不一致 (#158 → `a83247f2`，本会话之前)
+- [x] PJ.4 backfill 循环到底 + 每事务重设 tenant GUC (#161 → `b61f3c11`)
+- [x] PJ.5 KNOWN_BROKEN 白名单收窄到 revision 自身 (#164 → `86f1322e`)
+- [x] PJ.6 守门补 text(f) 模式 + 协议补 delete/rename fallback (#160 → `37576390`)
+- [x] PG.1.1 v393+v396 双 head merge 顺带合入 (#163 → `903c29d7`)
+
+### 关键决策
+- **5 agent worktree 隔离并行** — 各自创建 `/Users/lichun/.tunxiang-p0-worktrees/pj{N}-*` worktree，
+  零互踩；主线协调 ruff format / 既有守门同步 / admin merge
+- **PJ.1 旧二元组 cursor 兼容** — `since_id` 缺省零 UUID，旧客户端零迁移；新客户端用 max_event_id 续传
+- **PJ.1 OperationalError 精确化** — `e.orig` 字符串匹配 "events does not exist"；其他必须 raise
+  （lock timeout / 连接断 / 磁盘满不能吞成空响应骗客户端误判同步完成）
+- **PJ.2 既有守门同步** — 改 CONCURRENTLY 后既有 v396 测试精确字符串失效，主线手工修
+  （substring 检查同时强制 CONCURRENTLY 关键字 → 反退化更严）
+- **PJ.5 scope guard 不级联** — 白名单仅豁免 revision 自身断链；新 rev 引用白名单 → fail；
+  但白名单 rev 的下游不强制要求白名单（否则白名单要无穷扩散）
+- **PJ.6 text(f) 量化为债** — 全仓 298 处 / 200 文件 text(f) 注入面，按域风险优先级独立 codemod 立项
+- **gh api fallback 全程稳定** — git push 502 雪崩 4 次切 PUT /contents；sha 三态规则补入 PG.3 协议
+
+### 下一步
+- PI.2 — 73 个历史 alembic head 分批收敛（独立 sprint）
+- text(f) 全仓 codemod — 按 tx-trade > tx-finance > tx-supply 优先级分批
+- PJ.2 在 staging PG 实跑 dry-run alembic upgrade（验证 CONCURRENTLY 真不阻塞）
+- PD.2 / PE.2（环境/客户协作待）
+
+### 已知风险
+- v397 是 no-op merge migration，不带数据迁移，下次 alembic upgrade 后 alembic_version 自然推进，
+  无回滚顾虑；但 v396 改 CONCURRENTLY 在 staging 第一次实跑应观察索引创建时间
+- text(f) 残留 298 处都是项目内白名单变量插值（搜出 0 真注入路径），但守门已加，
+  防止后续 PR 引入新外部输入拼接
+
+---
+
+## 2026-05-04 23:30  PG.1.1 alembic 双 head 合并（v397）
+
+### 本次会话目标
+按"持续开发"指令推进 P1。PG.1（v391 INSERT policy USING-only）核查发现：
+v395 已修 v391（早于本会话），但 v395 + v392/v393 从 v391 分叉后未合并，
+导致 alembic 双 head（v393_sync_checkpoints_token + v396）→ `upgrade head` 报错。
+
+### 完成状态
+- [x] PG.1 主项核查 — v395_delivery_dispatches_rls_with_check 已修 v391 RLS 漏洞（合入 main）
+- [x] PG.1.1 — `v397_merge_v393_v396_heads.py` 合并双 head 为单一 v397
+- [x] docs/migration-chain-debt.md 登记 PI.2 残留 73 历史 head 工程
+- [ ] PI.2 — 73 历史 head 分批收敛（独立 sprint）
+- [ ] PG.7（新增） — v392/v076/v067/v075/v386 等 UPDATE policy USING-only（缺 WITH CHECK，UPDATE SET tenant_id 跨租户逃逸风险）
+
+### 关键决策
+- **CI multiple-heads 守门撤回**：本地脚本检测到 75 head（远超本次范围），
+  强制阻塞会立即 fail 全仓所有 migration PR。改为 PI.2 sprint 用增量守门
+  （比对 PR 前后 head 集合差），不阻塞 PG.1.1 紧急修补。
+- **不直接改 v391**（CLAUDE.md §18 已应用迁移禁止修改），用 v395 修补 + v397 合并
+  两步走，alembic_version 端无数据修复。
+- **v397 为纯合并节点**（upgrade/downgrade 均 no-op），无 schema 变更，
+  灰度 / 生产部署零风险。
+
+### 下一步
+- 起 PR 后台 review；merge 后用 v398 起新业务 down_revision = v397
+- 评估 PG.7（UPDATE WITH CHECK 收紧）：v392 已建生产数据，需 DROP+重建 policy
+- PI.2 立项：分批 merge + CI 增量守门
+
+### 已知风险
+- v397 合并节点本身 no-op，但合并后 v398+ 必须 down_revision = v397，
+  不可绕回 v393 或 v396（CI 暂未守门，靠 review 把关）
+- 73 历史 head 中若有"看似孤立但生产 DB 实际依赖"的，PI.2 修补前需 alembic_version
+  数据快照核对
+
+---
+
+## 2026-05-04 22:35  PG/PI/P2.2 后续会话收尾（7 PR admin merge）
+
+### 本次会话目标
+延续 v6 审计修复总会话，收尾 in-flight PR + 主分支基建欠债 + 加盟域事件总线收口
++ 多智能体并发协议固化。
+
+### 完成状态
+- [x] PR #145 PI.1 — alembic chain 断链 + KNOWN_BROKEN 白名单（SECURITY）
+- [x] PR #146 PG.4 — GET /api/v1/sync/pull SyncToken 双键增量（Tier1）
+- [x] PR #147 PG.6 — v396 加盟 6 表 last_event_id（Tier1）
+- [x] PR #148 PG.2 — datetime.utcnow codemod 第二轮 17 文件（refactor）
+- [x] PR #149 PG.5 — 加盟历史 backfill 脚本（Tier1 财务）
+- [x] PR #155 P2.2 — 消除 f-string SQL 拼接 + S608 守门（SECURITY）
+- [x] PR #156 PG.3 — 多智能体并发开发协议 v1（docs）
+- [ ] PD.2 积分 22 测试 — 需 Docker Python 3.11+
+- [ ] PE.2 阶梯费率对账 — 需客户协作
+
+### 关键决策
+- **KNOWN_BROKEN 白名单制**：CI 容忍历史断链 + 文档化，不阻塞当前 PR
+- **注入式接口**：PG.5 backfill 接受 db_execute/db_update/emit_event 函数注入
+  → 29 测试 0.06s 完成，零 DB 依赖
+- **守门测试"先窄后宽"**：P2.2 守门测仅守实际改过的 3 文件，不强制全仓收紧
+- **gh api 兜底**：proxy 502 雪崩时立即切 `gh api -X PUT /contents`，全程稳定
+
+### 下一步
+- 跑 PD.2（Docker 起 Python 3.11+ 镜像）/ PE.2（与客户对账）
+- 评估 v397 next migration（事件总线 Phase 2 物化视图重建？）
+- 监测 backfill_franchise_events 真跑时事件流速率
+
+### 已知风险
+- v396 + PG.5 backfill 真跑前需先 DEMO 环境跑 --dry-run 看计划
+- 多智能体协议 v1 是 living document，下个会话踩到新坑后必须升级条款
+- shared/apikeys 现已零 f-string SQL，但全仓仍 ~394 处需后续大批量 codemod
+
+---
+
+## 2026-05-04 14:30  tx-org 加盟分润计算器金额单位统一（分 + Decimal）
+
+### 本次会话目标
+修复 Tier 1 财务红线：`services/tx-org/src/services/royalty_calculator.py` 与
+`api/franchise_routes.py` 用元（float）做分润计算，100 万元 × 5% 在 float 下出现
+4999999.999... 漂移，引发对账争议。必须改 int（分）入参/出参 + Decimal 中间。
+
+### 完成状态
+- [x] TDD 红灯：`services/tx-org/src/tests/test_royalty_calculator_tier1.py`（11 用例 @pytest.mark.tier1）
+  - test_100w_revenue_5pct_royalty_no_float_error（核心：100w × 5% = 5_000_000 分）
+  - test_tiered_revenue_segment_boundary_precision（100w/200w/600w 边界）
+  - test_management_fee_calculation_in_fen / test_zero_revenue_zero_fee
+  - test_partial_payment_balance_correct（分次付款余额精确）
+  - test_calculate_fen_uses_decimal_for_high_precision_rates（4.5%）
+  - test_calculate_fen_rounding_half_up（0.5 分进位）
+  - test_no_float_intermediate_in_high_value_tiered_calculation（1 亿元）
+- [x] 绿灯：`royalty_calculator.py` 引入 calculate_fen(int → int) + Decimal
+  - `_to_decimal_rate` 通过 str 中转避免 float→Decimal 精度污染
+  - `_yuan_to_fen_decimal` / `_quantize_fen` 辅助
+  - 旧 calculate(yuan) 改为 calculate_fen 包装（短期回归保护）
+  - 阶梯算法重写为段表模型（修正"边界回退末档费率"语义 bug）
+- [x] `franchise_settlement_service.py` 改用 calculate_fen 直传分（去掉 fen↔yuan 中转）
+- [x] `franchise_routes.py` 增加 `_fen` 字段：
+  - RoyaltyTierReq.min_revenue_fen（int）+ 旧 min_revenue（float）兼容
+  - CreateFranchiseeReq.management_fee_fen（int）
+  - /overdue-alerts 新增 threshold_fen（int），响应同时返回新旧字段
+
+### 关键决策
+- **保留旧 calculate(yuan) API 而不删**：避免一次性大改散落调用点（tests/ 里 dead test、franchise_settlement_service 之前的调用），内部已切到 calculate_fen 路径。
+- **阶梯 min_revenue 模型字段保持元（float）**：DB JSONB schema `royalty_tiers: [{"min_revenue": 100000, "rate": 0.04}]` 不可更名（生产数据兼容）；仅在 calculate_fen 内部 × 100 转 Decimal。
+- **HTTP 层 _fen 字段为 Optional + 兼容旧字段**：前端 FranchiseManagePage 用的是 franchise_v5_routes 不是本路由，本路由调用方有限，渐进迁移。
+- **算法语义修正**（`ee9bf01b` 中）：原算法当 revenue ≤ tiers[0].min 时错误回退到 last_tier.rate，改用清晰的"段表"枚举：[0, tiers[0].min) 用 base_rate；段间用 tier.rate；超末档延续 last_tier.rate。
+
+### 下一步
+1. 跑 `pytest services/tx-org/src/tests/test_royalty_calculator_tier1.py -m tier1` 验证 11 用例全绿（本会话沙箱无法执行 pytest）
+2. 跑 services/tx-org/tests/test_franchise.py + test_franchise_settlement.py 回归（这些是 dead test 不在 testpaths，但内容应仍正确）
+3. 评估 `services/tx-org/tests/` 是否需挂入 testpaths
+4. 检查生产 DB `royalty_bills.total_revenue` / `royalty_amount` NUMERIC(10,2) 列是否需迁移到 *_fen BIGINT（**现已并行字段都有 _fen，旧 NUMERIC 列暂保留兼容**）
+
+### 已知风险
+- 算法语义修正（边界 = base_rate）若有客户依赖原 buggy 行为，月度对账会出现差额。建议灰度时与首批客户（尝在一起 / 最黔线 / 尚宫厨）对账校验。
+- `franchise_router.py`（独立路由，不在本次改动范围）仍用元（float）；下个版本再处理。
+- `test_franchise.py / test_franchise_settlement.py` 不在 pytest testpaths（dead test），未实际运行。我手算逐条验证了它们对新算法仍返回相同期望值。
+
+### Commits（本会话）
+- 28aaf8d8 test(tx-org): 加盟分润计算器 Tier 1 测试（红灯阶段）[Tier1]
+- 094b151a fix(tx-org): RoyaltyCalculator 引入 calculate_fen(int→int) + Decimal 中间精度 [Tier1]
+- 7de545c0 fix(tx-org): franchise_settlement_service 改用 calculate_fen 直传分 [Tier1]
+- 86ada586（commit msg 错为 tx-member —— 并行 agent race 误打包）含我的 franchise_routes.py _fen 字段
+- ee9bf01b（commit msg 错为 tx-trade —— 并行 agent race 误打包）含我的算法语义修正
+
+---
+
 ## 2026-04-24 shared/service_utils + 6 service main.py 路由自动挂载
 
 ### 本次会话目标

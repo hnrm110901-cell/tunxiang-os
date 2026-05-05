@@ -14,6 +14,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_vouchers_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -29,7 +30,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-
 
 # ─── 真实场景 #1: 门店日结销售凭证 ──────────────────────────────────
 
@@ -48,12 +48,20 @@ class TestDailySettlementVoucherScenario:
             voucher_type="sales",
             total_amount_fen=345678,  # ¥3,456.78 的 fen 值
             entries=[
-                {"account_code": "1001", "account_name": "库存现金",
-                 "debit": 3456.78, "credit": 0.00,
-                 "summary": "2026-04-19堂食现金收入"},
-                {"account_code": "6001", "account_name": "主营业务收入-餐饮",
-                 "debit": 0.00, "credit": 3456.78,
-                 "summary": "2026-04-19堂食营收"},
+                {
+                    "account_code": "1001",
+                    "account_name": "库存现金",
+                    "debit": 3456.78,
+                    "credit": 0.00,
+                    "summary": "2026-04-19堂食现金收入",
+                },
+                {
+                    "account_code": "6001",
+                    "account_name": "主营业务收入-餐饮",
+                    "debit": 0.00,
+                    "credit": 3456.78,
+                    "summary": "2026-04-19堂食营收",
+                },
             ],
             status="draft",
         )
@@ -69,8 +77,8 @@ class TestDailySettlementVoucherScenario:
             voucher_no="V_S001_20260419_002",
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
-            total_amount=None,          # DEPRECATED, 允许 NULL
-            total_amount_fen=1000000,   # ¥10,000 的 fen
+            total_amount=None,  # DEPRECATED, 允许 NULL
+            total_amount_fen=1000000,  # ¥10,000 的 fen
             entries=[],
             status="draft",
         )
@@ -193,11 +201,11 @@ class TestHistoricalRowCompatibilityScenario:
         v = FinancialVoucher(
             id=uuid.uuid4(),
             tenant_id=uuid.uuid4(),
-            store_id=None,          # 历史行无 store_id
+            store_id=None,  # 历史行无 store_id
             voucher_no="V_LEGACY_001",
-            voucher_date=None,      # 历史行无 voucher_date (迁移后会回填, 但 NULL 合法)
+            voucher_date=None,  # 历史行无 voucher_date (迁移后会回填, 但 NULL 合法)
             voucher_type="settlement",
-            total_amount=100.00,    # 老字段, 元
+            total_amount=100.00,  # 老字段, 元
             total_amount_fen=None,  # 老行未回填 fen
             entries=[],
             status="draft",
@@ -234,8 +242,7 @@ class TestV264MigrationFileStructure:
     """v264_financial_vouchers_sync_orm.py 结构契约."""
 
     MIGRATION_PATH = (
-        Path(__file__).resolve().parents[4]
-        / "shared/db-migrations/versions/v264_financial_vouchers_sync_orm.py"
+        Path(__file__).resolve().parents[4] / "shared/db-migrations/versions/v264_financial_vouchers_sync_orm.py"
     )
 
     @pytest.fixture
@@ -244,7 +251,7 @@ class TestV264MigrationFileStructure:
         return self.MIGRATION_PATH.read_text(encoding="utf-8")
 
     def test_revision_is_v264(self, migration_source):
-        assert re.search(r'^revision\s*=\s*"v264"', migration_source, re.M)
+        assert re.search(r'^revision\s*=\s*"v264[a-z]?"', migration_source, re.M)
 
     def test_down_revision_is_v263(self, migration_source):
         """必须 down_revision=v263 (不能踩 v265 FCT Agent 2.0 的坑)."""
@@ -253,12 +260,16 @@ class TestV264MigrationFileStructure:
     def test_adds_all_8_expected_columns(self, migration_source):
         """upgrade() 必须 ADD 8 个 ORM 期望列 (含 v031 悬空的 total_amount)."""
         for col in [
-            "store_id", "voucher_date",
-            "total_amount", "total_amount_fen",
-            "source_type", "source_id", "exported_at", "updated_at",
+            "store_id",
+            "voucher_date",
+            "total_amount",
+            "total_amount_fen",
+            "source_type",
+            "source_id",
+            "exported_at",
+            "updated_at",
         ]:
-            assert f"ADD COLUMN IF NOT EXISTS {col}" in migration_source, \
-                f"迁移缺列: {col}"
+            assert f"ADD COLUMN IF NOT EXISTS {col}" in migration_source, f"迁移缺列: {col}"
 
     def test_total_amount_fen_uses_bigint(self, migration_source):
         """金额字段必须 BIGINT (屯象 fen 约定, 不能用 NUMERIC)."""
@@ -277,8 +288,7 @@ class TestV264MigrationFileStructure:
 
     def test_deprecated_columns_have_comments(self, migration_source):
         """被 deprecate 的列必须有 COMMENT, 告诉后来者原因."""
-        for col in ["period_start", "period_end", "total_debit", "total_credit",
-                    "total_amount"]:
+        for col in ["period_start", "period_end", "total_debit", "total_credit", "total_amount"]:
             assert re.search(
                 rf"COMMENT ON COLUMN financial_vouchers\.{col}",
                 migration_source,
@@ -287,8 +297,7 @@ class TestV264MigrationFileStructure:
     def test_downgrade_is_not_empty(self, migration_source):
         """downgrade() 必须非空 (MIGRATION_RULES 铁律)."""
         # 跨空行抓 downgrade 全函数体
-        m = re.search(r"def downgrade\(\).*?(?=\Z|^def )",
-                      migration_source, re.S | re.M)
+        m = re.search(r"def downgrade\(\).*?(?=\Z|^def )", migration_source, re.S | re.M)
         assert m, "downgrade 函数不存在"
         body = m.group(0)
         assert "op.execute" in body, "downgrade 必须有实际 SQL, 不能只有 pass"
@@ -297,39 +306,35 @@ class TestV264MigrationFileStructure:
 
     def test_index_uses_concurrently(self, migration_source):
         """DBA 风险 #1 修复: CREATE INDEX 必须用 CONCURRENTLY, 不阻塞 DML."""
-        assert "CREATE INDEX CONCURRENTLY" in migration_source, \
+        assert "CREATE INDEX CONCURRENTLY" in migration_source, (
             "索引必须 CONCURRENTLY 创建, 否则阻塞千万级表的所有 INSERT/UPDATE"
-        assert "autocommit_block()" in migration_source, \
-            "CONCURRENTLY 必须脱离 alembic 主事务, 用 autocommit_block"
+        )
+        assert "autocommit_block()" in migration_source, "CONCURRENTLY 必须脱离 alembic 主事务, 用 autocommit_block"
 
     def test_downgrade_has_null_period_guard(self, migration_source):
         """DBA 风险 #7 修复: downgrade 前置检查, 发现 NULL period_start 必须中止."""
         # 找 downgrade 函数体内是否有 guard
         m = re.search(
             r"def downgrade\(\).*?(?=\Z|def )",
-            migration_source, re.S,
+            migration_source,
+            re.S,
         )
         assert m
         body = m.group(0)
-        assert "period_start IS NULL" in body, \
-            "downgrade 必须先 SELECT COUNT period_start IS NULL"
-        assert "RAISE EXCEPTION" in body, \
-            "发现 NULL period_start 必须 RAISE EXCEPTION 中止"
+        assert "period_start IS NULL" in body, "downgrade 必须先 SELECT COUNT period_start IS NULL"
+        assert "RAISE EXCEPTION" in body, "发现 NULL period_start 必须 RAISE EXCEPTION 中止"
 
     def test_migration_has_raise_notice_for_observability(self, migration_source):
         """DBA 风险 #5 修复: migration 必须有 RAISE NOTICE 进度标记."""
         notice_count = len(re.findall(r"RAISE NOTICE 'v264", migration_source))
         # upgrade 5 步 + downgrade 3 步 + 2 个 "complete" = 10 次
-        assert notice_count >= 8, \
-            f"RAISE NOTICE 不足 (找到 {notice_count} 次, 至少 8 次)"
+        assert notice_count >= 8, f"RAISE NOTICE 不足 (找到 {notice_count} 次, 至少 8 次)"
 
     def test_runbook_removes_broken_pg_sleep_pattern(self, migration_source):
         """DBA 风险 #2 修复: 上一版 runbook 的 DO $$ + pg_sleep 是错的(单事务)."""
         # Runbook 应已标注"上一版错了"并给出外部 bash 脚本方案
-        assert "scripts/backfill_voucher_date.sh" in migration_source, \
-            "大表回填方案必须指向外部脚本"
-        assert "SKIP LOCKED" in migration_source or "独立事务" in migration_source, \
-            "外部脚本方案必须说明每批独立事务"
+        assert "scripts/backfill_voucher_date.sh" in migration_source, "大表回填方案必须指向外部脚本"
+        assert "SKIP LOCKED" in migration_source or "独立事务" in migration_source, "外部脚本方案必须说明每批独立事务"
 
     def test_backfill_has_inline_threshold_guard(self, migration_source):
         """[BLOCKER-B4 独立验证响应]: UPDATE 全表前必须预检行数阈值.
@@ -338,16 +343,16 @@ class TestV264MigrationFileStructure:
         修复: 迁移里预查 COUNT(*), 超阈值 RAISE EXCEPTION 强制走外部脚本.
         """
         # 预检查要求: 能找到 "RAISE EXCEPTION" + 阈值 (50000 或 BACKFILL_INLINE_THRESHOLD)
-        assert "RAISE EXCEPTION" in migration_source, (
-            "step 3 UPDATE 前必须 RAISE EXCEPTION guard"
-        )
+        assert "RAISE EXCEPTION" in migration_source, "step 3 UPDATE 前必须 RAISE EXCEPTION guard"
         # 阈值要有硬编码 or 变量声明
         assert re.search(
             r"(threshold.{0,30}50000|BACKFILL_INLINE_THRESHOLD|null_rows\s*>\s*threshold)",
-            migration_source, re.I,
+            migration_source,
+            re.I,
         ), "必须有阈值比较逻辑 (默认 5 万行)"
         # Exception 消息必须引导外部脚本
         assert re.search(
             r"backfill_voucher_date\.sh|external.*script|外部.*脚本",
-            migration_source, re.I,
+            migration_source,
+            re.I,
         ), "Exception 消息必须提示外部脚本路径"

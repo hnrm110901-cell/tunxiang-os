@@ -12,6 +12,7 @@
   9. v277 迁移静态校验（RLS + CHECK + 索引 + status 枚举）
   10. ModelRouter 注册 campaign_roi_forecast → MODERATE
 """
+
 from __future__ import annotations
 
 import os
@@ -37,6 +38,7 @@ from services.campaign_roi_forecast_service import (  # noqa: E402
 # ──────────────────────────────────────────────────────────────────────
 # 1. MAPE 计算
 # ──────────────────────────────────────────────────────────────────────
+
 
 def test_mape_empty_returns_one():
     assert mean_absolute_percentage_error([], []) == 1.0
@@ -65,6 +67,7 @@ def test_mape_perfect_prediction_returns_zero():
 # 2. Moving Average Forecast
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_moving_average_empty_history_returns_empty():
     by_day, conf = moving_average_forecast([], 5)
     assert by_day == {}
@@ -73,10 +76,7 @@ def test_moving_average_empty_history_returns_empty():
 
 def test_moving_average_constant_series_high_confidence():
     """稳定序列 → CV=0 → confidence 高"""
-    history = [
-        TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=10000)
-        for i in range(10)
-    ]
+    history = [TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=10000) for i in range(10)]
     by_day, conf = moving_average_forecast(history, 3)
     assert len(by_day) == 3
     # 所有预测等于历史均值
@@ -99,20 +99,21 @@ def test_moving_average_high_variance_low_confidence():
 # 3. Linear Trend Forecast
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_linear_trend_less_than_two_points():
-    by_day, conf = linear_trend_forecast([
-        TimeSeriesPoint(day=date(2026, 1, 1), revenue_fen=100),
-    ], 5)
+    by_day, conf = linear_trend_forecast(
+        [
+            TimeSeriesPoint(day=date(2026, 1, 1), revenue_fen=100),
+        ],
+        5,
+    )
     assert by_day == {}
     assert conf == 0.0
 
 
 def test_linear_trend_positive_slope():
     """单调递增 → 预测值大于最后一个历史值"""
-    history = [
-        TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=1000 + i * 100)
-        for i in range(5)
-    ]
+    history = [TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=1000 + i * 100) for i in range(5)]
     # 第 5 天 = 1400，预测第 6 天应 > 1400
     by_day, conf = linear_trend_forecast(history, 1)
     first_pred = list(by_day.values())[0]
@@ -135,13 +136,11 @@ def test_linear_trend_random_low_r2():
 # 4. Prophet 降级
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_try_prophet_returns_none_when_not_installed():
     """Prophet 在测试环境通常不可用 → 返 None"""
     # 即便 Prophet 装了，数据不足 30 点时也应返 None
-    history = [
-        TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=1000)
-        for i in range(5)
-    ]
+    history = [TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=1000) for i in range(5)]
     assert try_prophet_forecast(history, 7) is None
 
 
@@ -149,14 +148,12 @@ def test_try_prophet_returns_none_when_not_installed():
 # 5. Service 三级降级
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_service_small_history_falls_back_to_linear_or_moving():
     """history < 30 点 → 走 linear 或 moving_average，不触发 prophet"""
     service = CampaignROIForecastService()
-    history = [
-        TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=5000 + i * 100)
-        for i in range(10)
-    ]
+    history = [TimeSeriesPoint(day=date(2026, 1, i + 1), revenue_fen=5000 + i * 100) for i in range(10)]
     forecast = await service.forecast_baseline(
         history=history,
         forecast_start=date(2026, 1, 15),
@@ -195,6 +192,7 @@ async def test_service_invalid_date_range_returns_error():
 # 6. Backtest
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_backtest_perfect_prediction_mape_zero():
     service = CampaignROIForecastService()
     baseline = {date(2026, 1, 1): 10000, date(2026, 1, 2): 11000}
@@ -230,6 +228,7 @@ def test_backtest_exceeds_mape_threshold():
 # 7. Sonnet 分析
 # ──────────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_analyze_fallback_when_no_invoker_and_no_backtest():
     service = CampaignROIForecastService()
@@ -253,12 +252,17 @@ async def test_analyze_fallback_positive_uplift_within_mape():
     service = CampaignROIForecastService()
     forecast = ForecastResult(model="prophet", baseline_total_fen=100000, confidence=0.8)
     backtest = BacktestResult(
-        true_revenue_fen=120000, true_baseline_fen=100000,
-        true_uplift_fen=20000, mape=0.10, needs_calibration=False,
+        true_revenue_fen=120000,
+        true_baseline_fen=100000,
+        true_uplift_fen=20000,
+        mape=0.10,
+        needs_calibration=False,
     )
     analysis, actions = await service.analyze_with_sonnet(
-        campaign_name="春节大促", campaign_type="seasonal",
-        forecast=forecast, backtest=backtest,
+        campaign_name="春节大促",
+        campaign_type="seasonal",
+        forecast=forecast,
+        backtest=backtest,
     )
     assert "春节大促" in analysis
     assert any(a.get("action") == "记录活动模板入 playbook" for a in actions)
@@ -269,12 +273,17 @@ async def test_analyze_fallback_needs_calibration():
     service = CampaignROIForecastService()
     forecast = ForecastResult(model="linear", baseline_total_fen=100000, confidence=0.5)
     backtest = BacktestResult(
-        true_revenue_fen=500000, true_baseline_fen=100000,
-        true_uplift_fen=400000, mape=0.80, needs_calibration=True,
+        true_revenue_fen=500000,
+        true_baseline_fen=100000,
+        true_uplift_fen=400000,
+        mape=0.80,
+        needs_calibration=True,
     )
     analysis, actions = await service.analyze_with_sonnet(
-        campaign_name="异常活动", campaign_type="referral",
-        forecast=forecast, backtest=backtest,
+        campaign_name="异常活动",
+        campaign_type="referral",
+        forecast=forecast,
+        backtest=backtest,
     )
     assert "needs_calibration" in analysis or "80" in analysis or "0.80" in analysis or "MAPE" in analysis
     # 需 calibration 时 actions 包含 "剔除"
@@ -287,21 +296,22 @@ async def test_analyze_with_invoker_uses_sonnet_response():
 
     async def mock_sonnet(prompt: str, model_id: str) -> str:
         invoked.append({"prompt": prompt, "model": model_id})
-        return (
-            "活动增量显著，建议沉淀模板。\n"
-            "action1|5000|high\n"
-            "action2|2000|med\n"
-        )
+        return "活动增量显著，建议沉淀模板。\naction1|5000|high\naction2|2000|med\n"
 
     service = CampaignROIForecastService(sonnet_invoker=mock_sonnet)
     forecast = ForecastResult(model="prophet", baseline_total_fen=100000, confidence=0.9)
     backtest = BacktestResult(
-        true_revenue_fen=120000, true_baseline_fen=100000,
-        true_uplift_fen=20000, mape=0.1, needs_calibration=False,
+        true_revenue_fen=120000,
+        true_baseline_fen=100000,
+        true_uplift_fen=20000,
+        mape=0.1,
+        needs_calibration=False,
     )
     analysis, actions = await service.analyze_with_sonnet(
-        campaign_name="test", campaign_type="seasonal",
-        forecast=forecast, backtest=backtest,
+        campaign_name="test",
+        campaign_type="seasonal",
+        forecast=forecast,
+        backtest=backtest,
     )
     assert len(invoked) == 1
     assert invoked[0]["model"] == "claude-sonnet-4-6"
@@ -321,8 +331,10 @@ async def test_analyze_sonnet_failure_falls_back():
     service = CampaignROIForecastService(sonnet_invoker=boom_sonnet)
     forecast = ForecastResult(model="prophet", baseline_total_fen=100000, confidence=0.8)
     analysis, actions = await service.analyze_with_sonnet(
-        campaign_name="failing", campaign_type="seasonal",
-        forecast=forecast, backtest=None,
+        campaign_name="failing",
+        campaign_type="seasonal",
+        forecast=forecast,
+        backtest=None,
     )
     # 不 crash，降级模板
     assert "failing" in analysis
@@ -333,8 +345,15 @@ async def test_analyze_sonnet_failure_falls_back():
 # ──────────────────────────────────────────────────────────────────────
 
 _MIG_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "..", "..",
-    "shared", "db-migrations", "versions", "v277_campaign_roi_forecasts.py"
+    os.path.dirname(__file__),
+    "..",
+    "..",
+    "..",
+    "..",
+    "shared",
+    "db-migrations",
+    "versions",
+    "v277_campaign_roi_forecasts.py",
 )
 
 
@@ -348,10 +367,18 @@ def _read_migration() -> str:
 def test_v277_creates_table_with_all_required_columns():
     content = _read_migration()
     for col in (
-        "baseline_forecast_fen", "uplift_forecast_fen", "forecast_confidence",
-        "actual_revenue_fen", "true_uplift_fen", "mape", "needs_calibration",
-        "sonnet_analysis", "recommended_actions", "training_data_snapshot",
-        "forecast_model", "status",
+        "baseline_forecast_fen",
+        "uplift_forecast_fen",
+        "forecast_confidence",
+        "actual_revenue_fen",
+        "true_uplift_fen",
+        "mape",
+        "needs_calibration",
+        "sonnet_analysis",
+        "recommended_actions",
+        "training_data_snapshot",
+        "forecast_model",
+        "status",
     ):
         assert col in content, f"缺列: {col}"
 
@@ -384,10 +411,20 @@ def test_v277_down_revision_chains_to_v276():
 # 9. ModelRouter 注册
 # ──────────────────────────────────────────────────────────────────────
 
+
 def test_model_router_registers_campaign_roi_as_moderate():
     path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "..", "..",
-        "services", "tunxiang-api", "src", "shared", "core", "model_router.py"
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "..",
+        "..",
+        "services",
+        "tunxiang-api",
+        "src",
+        "shared",
+        "core",
+        "model_router.py",
     )
     if not os.path.exists(path):
         pytest.skip("model_router.py 不存在")

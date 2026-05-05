@@ -1,28 +1,39 @@
-"""加盟管理 API
+"""加盟管理 API（PB.1 兼容层 — 残留独有端点，主路由已迁移）
 
 # ROUTER REGISTRATION:
 # from .api.franchise_routes import router as franchise_router
 # app.include_router(franchise_router, prefix="/api/v1/franchise")
 
-端点清单：
-  POST   /franchise/franchisees              - 创建加盟商
-  GET    /franchise/franchisees              - 加盟商列表（总部视角）
-  POST   /franchise/{id}/assign-store        - 分配门店
-  GET    /franchise/{id}/dashboard           - 加盟商仪表盘
-  POST   /franchise/bills/generate           - 生成月度账单
-  GET    /franchise/bills                    - 账单列表（?franchisee_id=）
-  POST   /franchise/bills/{id}/confirm       - 确认账单
-  POST   /franchise/bills/{id}/pay           - 标记已付款
-  GET    /franchise/overdue-alerts           - 欠款预警
+裁决（2026-05-04，路由冲突清理）：
+  本文件原是 PB.1 元-float 体系的薄基础版。当时为兼容 _fen 加了补丁，但
+  数据契约（franchisee_name/contact_name…）与前端实际使用的 v5 契约
+  （name/region/store_name…）冲突，且与 franchise_router.py、
+  franchise_v5_routes.py 三家撞车。
+
+  本次保留 v5（franchise_v5_routes.py）作为 /franchisees 的唯一实现，
+  因此从本文件**删除**以下端点：
+    GET    /franchise/franchisees                    → 由 v5 提供
+    POST   /franchise/franchisees                    → 由 v5 提供
+    GET    /franchise/franchisees/{id}/dashboard     → 由 router(V2) 提供
+
+  保留的独有端点（无冲突）：
+    POST   /franchise/franchisees/{id}/assign-store  - 分配门店
+    POST   /franchise/bills/generate                 - 生成月度账单
+    GET    /franchise/bills                          - 账单列表（?franchisee_id=）
+    POST   /franchise/bills/{id}/confirm             - 确认账单
+    POST   /franchise/bills/{id}/pay                 - 标记已付款
+    GET    /franchise/overdue-alerts                 - 欠款预警
 """
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
+
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.franchise_service import FranchiseService
 from ..services.royalty_calculator import RoyaltyCalculator
@@ -55,18 +66,31 @@ def _parse_tenant_uuid(x_tenant_id: Optional[str]) -> UUID:
 
 
 class RoyaltyTierReq(BaseModel):
-    min_revenue: float = Field(..., ge=0)
+    """阶梯分润请求模型。
+
+    金额单位约定（CLAUDE.md §10 Tier 1 财务红线）：
+    - 新字段：min_revenue_fen（分，int）— 推荐
+    - 旧字段：min_revenue（元，float）— 兼容保留，前端如已迁移可仅传 _fen
+    - 二选一：传 _fen 优先；都未传时取 0；都传时以 _fen 为准
+    """
+
+    min_revenue: Optional[float] = Field(
+        default=None, ge=0, description="[DEPRECATED] 元（float），改用 min_revenue_fen"
+    )
+    min_revenue_fen: Optional[int] = Field(default=None, ge=0, description="分（int，推荐）")
     rate: float = Field(..., gt=0, lt=1)
 
+    def effective_min_revenue_yuan(self) -> float:
+        """返回元（float）形态，供 model.RoyaltyTier 使用。
 
-class CreateFranchiseeReq(BaseModel):
-    franchisee_name: str = Field(..., max_length=100)
-    contact_name: Optional[str] = Field(None, max_length=50)
-    contact_phone: Optional[str] = Field(None, max_length=20)
-    contract_start: Optional[str] = None  # "YYYY-MM-DD"
-    contract_end: Optional[str] = None
-    royalty_rate: float = Field(default=0.05, gt=0, lt=1)
-    royalty_tiers: List[RoyaltyTierReq] = Field(default_factory=list)
+        优先级：min_revenue_fen > min_revenue > 0
+        通过 fen → yuan 精确除法（×100 单位换算无误差）。
+        """
+        if self.min_revenue_fen is not None:
+            return self.min_revenue_fen / 100.0
+        if self.min_revenue is not None:
+            return self.min_revenue
+        return 0.0
 
 
 class AssignStoreReq(BaseModel):
@@ -80,43 +104,14 @@ class GenerateBillsReq(BaseModel):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  加盟商管理端点
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-
-@router.post("/franchisees")
-async def create_franchisee(
-    req: CreateFranchiseeReq,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """创建加盟商（总部操作）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    try:
-        franchisee = await FranchiseService.create_franchisee(
-            data=req.model_dump(),
-            tenant_id=tenant_id,
-            db=None,
-        )
-        return {"ok": True, "data": franchisee.to_dict()}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/franchisees")
-async def list_franchisees(
-    status: Optional[str] = None,
-    page: int = 1,
-    size: int = 20,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """加盟商列表（总部视角，支持状态过滤和分页）。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    result = await FranchiseService.list_franchisees(
-        tenant_id=tenant_id,
-        db=None,
-        status=status,
-        page=page,
-        size=size,
-    )
-    return {"ok": True, "data": result}
+#
+# 已删除（2026-05-04 路由冲突裁决）：
+#   GET    /franchisees                       → 由 franchise_v5_routes.py 提供
+#   POST   /franchisees                       → 由 franchise_v5_routes.py 提供
+#   GET    /franchisees/{id}/dashboard        → 由 franchise_router.py (V2) 提供
+#
+# 保留独有端点：
+#   POST   /franchisees/{id}/assign-store     - 分配门店（无冲突）
 
 
 @router.post("/franchisees/{franchisee_id}/assign-store")
@@ -136,25 +131,7 @@ async def assign_store(
         )
         return {"ok": True, "data": link.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/franchisees/{franchisee_id}/dashboard")
-async def get_franchisee_dashboard(
-    franchisee_id: str,
-    x_tenant_id: Optional[str] = Header(None),
-):
-    """加盟商仪表盘：本月营业额、本月分润、累计欠款。"""
-    tenant_id = _parse_tenant_uuid(x_tenant_id)
-    try:
-        dashboard = await FranchiseService.get_franchisee_dashboard(
-            franchisee_id=UUID(franchisee_id),
-            tenant_id=tenant_id,
-            db=None,
-        )
-        return {"ok": True, "data": dashboard}
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -184,7 +161,7 @@ async def generate_bills(
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/bills")
@@ -228,7 +205,7 @@ async def confirm_bill(
         )
         return {"ok": True, "data": bill.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/bills/{bill_id}/pay")
@@ -246,7 +223,7 @@ async def mark_bill_paid(
         )
         return {"ok": True, "data": bill.to_dict()}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -256,14 +233,39 @@ async def mark_bill_paid(
 
 @router.get("/overdue-alerts")
 async def get_overdue_alerts(
-    threshold: float = 50000.0,
+    threshold_fen: Optional[int] = None,
+    threshold: Optional[float] = None,
     x_tenant_id: Optional[str] = Header(None),
 ):
-    """欠款预警：累计欠款超阈值的加盟商列表。"""
+    """欠款预警：累计欠款超阈值的加盟商列表。
+
+    阈值字段兼容（CLAUDE.md §10 — 金额一律分）：
+    - 推荐：threshold_fen（分，int）
+    - 兼容：threshold（元，float）— 未来弃用
+    - 都未传：默认 5 万元（5_000_000 分）
+    """
     tenant_id = _parse_tenant_uuid(x_tenant_id)
+
+    # 优先 _fen，再回退 yuan，最后默认 5 万元
+    if threshold_fen is not None:
+        threshold_yuan = threshold_fen / 100.0
+    elif threshold is not None:
+        threshold_yuan = threshold
+    else:
+        threshold_yuan = 50_000.0
+
     alerts = await FranchiseService.check_overdue_alerts(
         tenant_id=tenant_id,
         db=None,
-        threshold=threshold,
+        threshold=threshold_yuan,
     )
-    return {"ok": True, "data": {"alerts": alerts, "count": len(alerts)}}
+    return {
+        "ok": True,
+        "data": {
+            "alerts": alerts,
+            "count": len(alerts),
+            "threshold_fen": int(threshold_yuan * 100),
+            # 旧字段保留，便于前端逐步迁移
+            "threshold": threshold_yuan,
+        },
+    }

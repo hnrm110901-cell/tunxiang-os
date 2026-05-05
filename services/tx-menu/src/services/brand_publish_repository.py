@@ -47,7 +47,8 @@ class BrandPublishRepository:
         brand_uuid = uuid.UUID(brand_id) if brand_id else None
         creator_uuid = uuid.UUID(created_by) if created_by else None
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_publish_plans
                     (id, tenant_id, brand_id, plan_name, target_type, target_ids,
                      status, created_by)
@@ -56,7 +57,8 @@ class BrandPublishRepository:
                      'draft', :created_by)
                 RETURNING id, plan_name, target_type, target_ids, status,
                           created_at, updated_at, brand_id, created_by
-            """),
+            """
+            ),
             {
                 "id": plan_id,
                 "tid": self._tid,
@@ -73,12 +75,14 @@ class BrandPublishRepository:
     async def get_publish_plan(self, plan_id: str) -> Optional[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, plan_name, target_type, target_ids, status,
                        published_at, created_at, updated_at, brand_id, created_by
                 FROM menu_publish_plans
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -110,14 +114,16 @@ class BrandPublishRepository:
         params["limit"] = size
         params["offset"] = (page - 1) * size
         rows_result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, plan_name, target_type, target_ids, status,
                        published_at, created_at, updated_at, brand_id, created_by
                 FROM menu_publish_plans p
                 {filters}
                 ORDER BY p.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [self._plan_row_to_dict(r) for r in rows_result.fetchall()]
@@ -131,7 +137,8 @@ class BrandPublishRepository:
     ) -> Optional[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 UPDATE menu_publish_plans
                 SET status = :status,
                     published_at = COALESCE(:published_at, published_at),
@@ -139,7 +146,8 @@ class BrandPublishRepository:
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
                 RETURNING id, plan_name, target_type, target_ids, status,
                           published_at, created_at, updated_at, brand_id, created_by
-            """),
+            """
+            ),
             {
                 "id": uuid.UUID(plan_id),
                 "tid": self._tid,
@@ -168,7 +176,8 @@ class BrandPublishRepository:
             override_price = item.get("override_price_fen")
             is_available = item.get("is_available", True)
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO menu_publish_plan_items
                         (id, tenant_id, plan_id, dish_id, override_price_fen, is_available)
                     VALUES
@@ -177,7 +186,8 @@ class BrandPublishRepository:
                         override_price_fen = EXCLUDED.override_price_fen,
                         is_available = EXCLUDED.is_available
                     RETURNING id, plan_id, dish_id, override_price_fen, is_available, created_at
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "tid": self._tid,
@@ -204,7 +214,8 @@ class BrandPublishRepository:
     async def get_plan_items(self, plan_id: str) -> list[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT i.id, i.plan_id, i.dish_id, i.override_price_fen,
                        i.is_available, i.created_at,
                        d.dish_name, d.price_fen, d.image_url
@@ -212,7 +223,8 @@ class BrandPublishRepository:
                 JOIN dishes d ON d.id = i.dish_id AND d.tenant_id = i.tenant_id
                 WHERE i.plan_id = :plan_id AND i.tenant_id = :tid
                 ORDER BY d.dish_name
-            """),
+            """
+            ),
             {"plan_id": uuid.UUID(plan_id), "tid": self._tid},
         )
         rows = result.fetchall()
@@ -236,7 +248,8 @@ class BrandPublishRepository:
         """查找最新一个已发布的方案中，指定菜品针对该门店的覆盖价。"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT i.override_price_fen, i.is_available, p.plan_name
                 FROM menu_publish_plan_items i
                 JOIN menu_publish_plans p ON p.id = i.plan_id
@@ -252,7 +265,8 @@ class BrandPublishRepository:
                   )
                 ORDER BY p.published_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "dish_id": uuid.UUID(dish_id),
@@ -272,11 +286,13 @@ class BrandPublishRepository:
         """根据发布方案的 target_type 解析出最终的目标门店 ID 列表。"""
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT target_type, target_ids, brand_id
                 FROM menu_publish_plans
                 WHERE id = :id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"id": uuid.UUID(plan_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -305,12 +321,14 @@ class BrandPublishRepository:
             if not target_ids:
                 return []
             stores_result = await self.db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM stores
                     WHERE tenant_id = :tid
                       AND is_active = true
                       AND region = ANY(:regions)
-                """),
+                """
+                ),
                 {"tid": self._tid, "regions": target_ids},
             )
             return [str(r[0]) for r in stores_result.fetchall()]
@@ -369,7 +387,8 @@ class BrandPublishRepository:
         }
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO store_dish_overrides
                     (id, tenant_id, store_id, dish_id, updated_by,
                      local_price_fen, local_name, local_description,
@@ -383,7 +402,8 @@ class BrandPublishRepository:
                 RETURNING id, store_id, dish_id, local_price_fen, local_name,
                           local_description, local_image_url, is_available,
                           sort_order, updated_at
-            """),
+            """
+            ),
             insert_params,
         )
         row = result.fetchone()
@@ -392,7 +412,8 @@ class BrandPublishRepository:
     async def get_store_dish_override(self, store_id: str, dish_id: str) -> Optional[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, dish_id, local_price_fen, local_name,
                        local_description, local_image_url, is_available,
                        sort_order, updated_at
@@ -400,7 +421,8 @@ class BrandPublishRepository:
                 WHERE tenant_id = :tid
                   AND store_id = :store_id
                   AND dish_id = :dish_id
-            """),
+            """
+            ),
             {
                 "tid": self._tid,
                 "store_id": uuid.UUID(store_id),
@@ -413,7 +435,8 @@ class BrandPublishRepository:
     async def list_store_overrides(self, store_id: str) -> list[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT o.id, o.store_id, o.dish_id,
                        o.local_price_fen, o.local_name, o.local_description,
                        o.local_image_url, o.is_available, o.sort_order, o.updated_at,
@@ -424,7 +447,8 @@ class BrandPublishRepository:
                 WHERE o.tenant_id = :tid
                   AND o.store_id = :store_id
                 ORDER BY o.sort_order, d.dish_name
-            """),
+            """
+            ),
             {"tid": self._tid, "store_id": uuid.UUID(store_id)},
         )
         rows = result.fetchall()
@@ -475,7 +499,8 @@ class BrandPublishRepository:
             params[f"did_{i}"] = d
 
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 INSERT INTO store_dish_overrides
                     (id, tenant_id, store_id, dish_id, is_available, updated_by)
                 SELECT gen_random_uuid(), :tid, :store_id, d, :is_available, :updated_by
@@ -484,7 +509,8 @@ class BrandPublishRepository:
                     is_available = EXCLUDED.is_available,
                     updated_at   = NOW(),
                     updated_by   = EXCLUDED.updated_by
-            """),
+            """
+            ),
             params,
         )
         return result.rowcount or len(dish_ids)
@@ -498,7 +524,8 @@ class BrandPublishRepository:
         rule_id = uuid.uuid4()
         store_uuid = uuid.UUID(data["store_id"]) if data.get("store_id") else None
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO price_adjustment_rules
                     (id, tenant_id, store_id, rule_name, rule_type, channel,
                      time_start, time_end, date_start, date_end, weekdays,
@@ -511,7 +538,8 @@ class BrandPublishRepository:
                           time_start, time_end, date_start, date_end, weekdays,
                           adjustment_type, adjustment_value, priority, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": rule_id,
                 "tid": self._tid,
@@ -536,14 +564,16 @@ class BrandPublishRepository:
     async def get_price_rule(self, rule_id: str) -> Optional[dict]:
         await self._set_tenant()
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, rule_name, rule_type, channel,
                        time_start, time_end, date_start, date_end, weekdays,
                        adjustment_type, adjustment_value, priority, is_active,
                        created_at, updated_at
                 FROM price_adjustment_rules
                 WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": uuid.UUID(rule_id), "tid": self._tid},
         )
         row = result.fetchone()
@@ -564,7 +594,8 @@ class BrandPublishRepository:
             where += " AND is_active = :is_active"
             params["is_active"] = is_active
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, store_id, rule_name, rule_type, channel,
                        time_start, time_end, date_start, date_end, weekdays,
                        adjustment_type, adjustment_value, priority, is_active,
@@ -572,7 +603,8 @@ class BrandPublishRepository:
                 FROM price_adjustment_rules
                 {where}
                 ORDER BY priority DESC, created_at DESC
-            """),
+            """
+            ),
             params,
         )
         return [self._rule_row_to_dict(r) for r in result.fetchall()]
@@ -598,7 +630,8 @@ class BrandPublishRepository:
 
         set_clauses = ", ".join(f"{k} = :{k}" for k in updates)
         result = await self.db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE price_adjustment_rules
                 SET {set_clauses}, updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tid
@@ -606,7 +639,8 @@ class BrandPublishRepository:
                           time_start, time_end, date_start, date_end, weekdays,
                           adjustment_type, adjustment_value, priority, is_active,
                           created_at, updated_at
-            """),
+            """
+            ),
             {"id": uuid.UUID(rule_id), "tid": self._tid, **updates},
         )
         row = result.fetchone()
@@ -623,14 +657,16 @@ class BrandPublishRepository:
         for dish_id in dish_ids:
             dish_uuid = uuid.UUID(dish_id)
             result = await self.db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_price_adjustments
                         (id, tenant_id, rule_id, dish_id)
                     VALUES
                         (:id, :tid, :rule_id, :dish_id)
                     ON CONFLICT (tenant_id, rule_id, dish_id) DO NOTHING
                     RETURNING id, rule_id, dish_id, created_at
-                """),
+                """
+                ),
                 {
                     "id": uuid.uuid4(),
                     "tid": self._tid,
@@ -674,7 +710,8 @@ class BrandPublishRepository:
         }
 
         result = await self.db.execute(
-            text("""
+            text(
+                """
                 SELECT r.id, r.rule_type, r.channel, r.adjustment_type,
                        r.adjustment_value, r.priority,
                        r.time_start, r.time_end,
@@ -707,7 +744,8 @@ class BrandPublishRepository:
                        AND :at_date BETWEEN r.date_start AND r.date_end)
                   )
                 ORDER BY r.priority DESC
-            """),
+            """
+            ),
             params,
         )
         rows = result.fetchall()

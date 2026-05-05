@@ -62,7 +62,8 @@ async def _query_expiring_certs(
     """从 employee_certificates 查询即将到期或已过期的证书。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     id::text            AS document_id,
                     employee_id::text   AS employee_id,
@@ -76,7 +77,8 @@ async def _query_expiring_certs(
                   AND expiry_date <= CURRENT_DATE + :threshold * INTERVAL '1 day'
                   AND status != 'revoked'
                 ORDER BY expiry_date ASC
-            """),
+            """
+            ),
             {"threshold": threshold_days},
         )
         rows = []
@@ -115,7 +117,8 @@ async def _query_low_performers(
     """从 payroll_records 查询最近N月有薪资记录且净薪低于均值的员工（作为低绩效信号）。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 WITH recent AS (
                     SELECT
                         employee_id,
@@ -143,7 +146,8 @@ async def _query_low_performers(
                 WHERE r.avg_net < oa.global_avg * 0.8
                 ORDER BY r.avg_net ASC
                 LIMIT 50
-            """),
+            """
+            ),
             {"months": consecutive_months},
         )
         rows = []
@@ -167,7 +171,8 @@ async def _query_attendance_anomalies(db: AsyncSession) -> list[dict[str, Any]]:
     """从 daily_attendance 查询近30天出勤异常（缺勤/迟到超标）员工。"""
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     employee_id::text,
                     COUNT(*) FILTER (WHERE is_absent = true) AS absent_days,
@@ -181,7 +186,8 @@ async def _query_attendance_anomalies(db: AsyncSession) -> list[dict[str, Any]]:
                     OR COUNT(*) FILTER (WHERE is_late = true) >= 5
                 ORDER BY absent_days DESC, late_days DESC
                 LIMIT 50
-            """)
+            """
+            )
         )
         rows = []
         for r in result.fetchall():

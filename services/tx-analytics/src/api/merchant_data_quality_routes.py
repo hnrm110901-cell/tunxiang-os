@@ -83,7 +83,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
         # ── 1. 门店数据完整率 (20%) ──────────────────────────────────────────
         try:
             row = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) AS total,
                         COUNT(*) FILTER (
@@ -94,7 +95,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                     FROM stores
                     WHERE tenant_id = :tid
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             r = row.fetchone()
@@ -124,7 +126,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
         DISH_MIN = 10
         try:
             row = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT
                         COUNT(*) AS total,
                         COUNT(*) FILTER (
@@ -135,7 +138,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                     FROM dishes
                     WHERE tenant_id = :tid
                       AND is_deleted = FALSE
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             r = row.fetchone()
@@ -201,13 +205,15 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
         ORDER_MIN = 20
         try:
             row = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS total
                     FROM orders
                     WHERE tenant_id = :tid
                       AND is_deleted = FALSE
                       AND created_at >= NOW() - INTERVAL '90 days'
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             total = row.scalar() or 0
@@ -229,11 +235,13 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
         # ── 5. KPI 权重已配置 (10%) ──────────────────────────────────────────
         try:
             row = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS total
                     FROM merchant_kpi_weight_configs
                     WHERE tenant_id = :tid
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             total = row.scalar() or 0
@@ -288,7 +296,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
         # ── 7. 主键一致性 (10%) ──────────────────────────────────────────────
         try:
             row = await session.execute(
-                text("""
+                text(
+                    """
                     SELECT COUNT(*) AS orphan_count
                     FROM orders o
                     WHERE o.tenant_id = :tid
@@ -299,7 +308,8 @@ async def _run_quality_checks(tenant_id: str) -> list[dict]:
                             AND s.tenant_id = :tid
                             AND s.is_deleted = FALSE
                       )
-                """),
+                """
+                ),
                 {"tid": tenant_id},
             )
             orphans = row.scalar() or 0

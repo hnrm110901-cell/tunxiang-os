@@ -208,7 +208,8 @@ async def create_store(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO stores
                     (id, tenant_id, store_name, store_code, city, address, status,
                      phone, operation_mode, is_deleted)
@@ -217,7 +218,8 @@ async def create_store(
                      :phone, :operation_mode, false)
                 RETURNING id, tenant_id, store_name, store_code, city, address, status,
                           phone, operation_mode, is_deleted, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": tenant_id,
@@ -250,12 +252,14 @@ async def get_store(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_name, store_code, city, address, status,
                        phone, operation_mode, is_deleted, created_at, updated_at
                 FROM stores
                 WHERE id = :store_id AND is_deleted = false
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         rec = row.one_or_none()
@@ -341,12 +345,14 @@ async def delete_store(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE stores
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :store_id AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"store_id": store_id},
         )
         await db.commit()
@@ -444,14 +450,16 @@ async def create_table(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO tables
                     (id, tenant_id, store_id, table_no, area, seats, status, config, is_deleted)
                 VALUES
                     (:id, :tenant_id, :store_id, :table_no, :area, :seats, 'available', :config, false)
                 RETURNING id, tenant_id, store_id, table_no, area, seats, status,
                           config, is_deleted, created_at, updated_at
-            """),
+            """
+            ),
             {
                 "id": new_id,
                 "tenant_id": tenant_id,
@@ -482,12 +490,14 @@ async def get_table(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, store_id, table_no, area, seats, status,
                        config, is_deleted, created_at, updated_at
                 FROM tables
                 WHERE id = :table_id AND is_deleted = false
-            """),
+            """
+            ),
             {"table_id": table_id},
         )
         rec = row.one_or_none()
@@ -513,10 +523,12 @@ async def patch_table(
     # 先读取现有行以便合并 config
     try:
         existing_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, config FROM tables
                 WHERE id = :table_id AND is_deleted = false
-            """),
+            """
+            ),
             {"table_id": table_id},
         )
         existing = existing_row.one_or_none()
@@ -592,12 +604,14 @@ async def delete_table(
 
     try:
         row = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables
                 SET is_deleted = true, updated_at = NOW()
                 WHERE id = :table_id AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"table_id": table_id},
         )
         await db.commit()

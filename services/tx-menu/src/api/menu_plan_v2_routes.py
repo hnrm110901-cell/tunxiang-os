@@ -70,11 +70,13 @@ async def _set_tenant(db: AsyncSession, tenant_id: str) -> uuid.UUID:
 async def _fetch_plan(db: AsyncSession, plan_id: uuid.UUID, tid: uuid.UUID) -> dict:
     """查询方案基本信息，不存在则 404。"""
     res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, name, description, brand_id, status, effective_date, created_at, updated_at
             FROM menu_plans_v2
             WHERE id = :pid AND tenant_id = :tid AND is_deleted IS NOT TRUE
-        """),
+        """
+        ),
         {"pid": plan_id, "tid": tid},
     )
     row = res.fetchone()
@@ -162,11 +164,13 @@ async def create_menu_plan(
             _err(400, "无效的 effective_date 格式，应为 YYYY-MM-DD")
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO menu_plans_v2
               (id, tenant_id, name, description, brand_id, status, effective_date, created_by)
             VALUES (:id, :tid, :name, :desc, :brand_id, 'draft', :eff_date, :operator)
-        """),
+        """
+        ),
         {
             "id": plan_id,
             "tid": tid,
@@ -187,11 +191,13 @@ async def create_menu_plan(
             log.warning("create_plan.invalid_dish_id", dish_id=item.dish_id)
             continue
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_plan_v2_items
                   (tenant_id, plan_id, dish_id, price_fen, is_available)
                 VALUES (:tid, :plan_id, :dish_id, :price, :available)
-            """),
+            """
+            ),
             {
                 "tid": tid,
                 "plan_id": plan_id,
@@ -244,7 +250,8 @@ async def list_menu_plans(
     params["limit"] = size
     params["offset"] = (page - 1) * size
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT p.id, p.name, p.description, p.status, p.effective_date,
                    p.created_at, p.updated_at,
                    (SELECT COUNT(*) FROM menu_plan_v2_items i
@@ -253,7 +260,8 @@ async def list_menu_plans(
             {where}
             ORDER BY p.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [
@@ -287,11 +295,13 @@ async def get_push_task_progress(
 
     # 查询任务元数据
     task_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, plan_id, total_stores, created_at, push_mode, scheduled_at
             FROM menu_push_tasks
             WHERE id = :task_id AND tenant_id = :tid
-        """),
+        """
+        ),
         {"task_id": task_uuid, "tid": tid},
     )
     task_row = task_res.fetchone()
@@ -300,25 +310,29 @@ async def get_push_task_progress(
 
     # 统计各状态数量
     stats_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT status, COUNT(*) AS cnt
             FROM menu_push_logs
             WHERE task_id = :task_id AND tenant_id = :tid
             GROUP BY status
-        """),
+        """
+        ),
         {"task_id": task_uuid, "tid": tid},
     )
     stats = {row[0]: row[1] for row in stats_res.fetchall()}
 
     # 各门店详情
     detail_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT store_id, status, error_message, pushed_at
             FROM menu_push_logs
             WHERE task_id = :task_id AND tenant_id = :tid
             ORDER BY pushed_at DESC NULLS LAST
             LIMIT 200
-        """),
+        """
+        ),
         {"task_id": task_uuid, "tid": tid},
     )
     details = [
@@ -364,16 +378,19 @@ async def list_store_overrides_v2(
         _err(400, "无效的 store_id")
 
     count_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM menu_plan_store_overrides
             WHERE store_id = :store_id AND tenant_id = :tid AND is_deleted IS NOT TRUE
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tid": tid},
     )
     total = count_res.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT o.id, o.dish_id, d.dish_name, o.override_type, o.value,
                    o.reason, o.valid_from, o.valid_until, o.created_at
             FROM menu_plan_store_overrides o
@@ -381,7 +398,8 @@ async def list_store_overrides_v2(
             WHERE o.store_id = :store_id AND o.tenant_id = :tid AND o.is_deleted IS NOT TRUE
             ORDER BY o.created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         {
             "store_id": store_uuid,
             "tid": tid,
@@ -421,12 +439,14 @@ async def get_effective_menu(
 
     # 找到该门店当前激活的推送方案
     plan_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT plan_id FROM menu_store_active_plans
             WHERE store_id = :store_id AND tenant_id = :tid AND is_active = TRUE
             ORDER BY activated_at DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"store_id": store_uuid, "tid": tid},
     )
     plan_row = plan_res.fetchone()
@@ -438,7 +458,8 @@ async def get_effective_menu(
 
     # 拉取方案品项
     items_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT
                 i.dish_id,
                 d.dish_name,
@@ -463,7 +484,8 @@ async def get_effective_menu(
             ) o ON TRUE
             WHERE i.plan_id = :plan_id AND i.tenant_id = :tid
             ORDER BY d.dish_name
-        """),
+        """
+        ),
         {"plan_id": plan_id, "store_id": store_uuid, "tid": tid},
     )
 
@@ -522,13 +544,15 @@ async def get_menu_plan_detail(
 
     # 查询品项列表
     items_res = await db.execute(
-        text("""
+        text(
+            """
             SELECT i.dish_id, d.dish_name, i.price_fen, i.is_available, i.created_at
             FROM menu_plan_v2_items i
             LEFT JOIN dishes d ON d.id = i.dish_id AND d.tenant_id = i.tenant_id
             WHERE i.plan_id = :pid AND i.tenant_id = :tid
             ORDER BY d.dish_name
-        """),
+        """
+        ),
         {"pid": pid, "tid": tid},
     )
     items = [
@@ -603,11 +627,13 @@ async def update_menu_plan(
                 log.warning("update_plan.invalid_dish_id", dish_id=item.dish_id)
                 continue
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO menu_plan_v2_items
                       (tenant_id, plan_id, dish_id, price_fen, is_available)
                     VALUES (:tid, :plan_id, :dish_id, :price, :available)
-                """),
+                """
+                ),
                 {
                     "tid": tid,
                     "plan_id": pid,
@@ -651,11 +677,13 @@ async def publish_menu_plan(
 
     now = datetime.now(timezone.utc)
     await db.execute(
-        text("""
+        text(
+            """
             UPDATE menu_plans_v2
             SET status = 'published', published_at = :now, published_by = :operator, updated_at = :now
             WHERE id = :pid AND tenant_id = :tid
-        """),
+        """
+        ),
         {"now": now, "operator": x_operator, "pid": pid, "tid": tid},
     )
     await db.commit()
@@ -700,7 +728,7 @@ async def _execute_push_task(
                 text("SELECT set_config('app.tenant_id', :tid, true)"),
                 {"tid": str(tid)},
             )
-        except Exception:  # noqa: BLE001 — set_config 可能因连接/权限问题抛多种异常
+        except Exception:
             log.warning("push_task.set_tenant_failed", task_id=str(task_id), exc_info=True)
 
         success = 0
@@ -710,7 +738,8 @@ async def _execute_push_task(
             try:
                 # 写入/更新门店激活方案
                 await bg_db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO menu_store_active_plans
                           (tenant_id, store_id, plan_id, is_active, activated_at, override_store_settings)
                         VALUES (:tid, :store_id, :plan_id, TRUE, now(), :override)
@@ -720,7 +749,8 @@ async def _execute_push_task(
                           is_active              = TRUE,
                           activated_at           = now(),
                           override_store_settings = EXCLUDED.override_store_settings
-                    """),
+                    """
+                    ),
                     {
                         "tid": tid,
                         "store_id": store_id,
@@ -731,13 +761,15 @@ async def _execute_push_task(
 
                 # 写推送日志
                 await bg_db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO menu_push_logs
                           (tenant_id, task_id, plan_id, store_id, status, pushed_at)
                         VALUES (:tid, :task_id, :plan_id, :store_id, 'success', now())
                         ON CONFLICT (task_id, store_id)
                         DO UPDATE SET status = 'success', pushed_at = now(), error_message = NULL
-                    """),
+                    """
+                    ),
                     {"tid": tid, "task_id": task_id, "plan_id": plan_id, "store_id": store_id},
                 )
                 success += 1
@@ -746,13 +778,15 @@ async def _execute_push_task(
                 log.error("push_task.store_failed", store_id=str(store_id), error=str(exc))
                 try:
                     await bg_db.execute(
-                        text("""
+                        text(
+                            """
                             INSERT INTO menu_push_logs
                               (tenant_id, task_id, plan_id, store_id, status, error_message, pushed_at)
                             VALUES (:tid, :task_id, :plan_id, :store_id, 'failed', :err, now())
                             ON CONFLICT (task_id, store_id)
                             DO UPDATE SET status = 'failed', error_message = :err, pushed_at = now()
-                        """),
+                        """
+                        ),
                         {
                             "tid": tid,
                             "task_id": task_id,
@@ -823,10 +857,12 @@ async def push_menu_plan(
         except ValueError:
             _err(400, "方案 brand_id 格式无效")
         stores_res = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM stores
                 WHERE brand_id = :brand_id AND tenant_id = :tid AND is_deleted IS NOT TRUE
-            """),
+            """
+            ),
             {"brand_id": brand_uuid, "tid": tid},
         )
         store_uuids = [row[0] for row in stores_res.fetchall()]
@@ -839,12 +875,14 @@ async def push_menu_plan(
 
     # 创建推送任务记录
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO menu_push_tasks
               (id, tenant_id, plan_id, total_stores, push_mode, scheduled_at,
                override_store_settings, created_by)
             VALUES (:id, :tid, :plan_id, :total, :mode, :sched_at, :override, :operator)
-        """),
+        """
+        ),
         {
             "id": task_id,
             "tid": tid,
@@ -860,12 +898,14 @@ async def push_menu_plan(
     # 预创建 pending 日志
     for store_uuid in store_uuids:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO menu_push_logs
                   (tenant_id, task_id, plan_id, store_id, status)
                 VALUES (:tid, :task_id, :plan_id, :store_id, 'pending')
                 ON CONFLICT (task_id, store_id) DO NOTHING
-            """),
+            """
+            ),
             {"tid": tid, "task_id": task_id, "plan_id": pid, "store_id": store_uuid},
         )
 
@@ -947,13 +987,15 @@ async def create_store_override(
 
     override_id = uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO menu_plan_store_overrides
               (id, tenant_id, store_id, dish_id, override_type, value,
                reason, valid_from, valid_until, created_by)
             VALUES (:id, :tid, :store_id, :dish_id, :otype, :value,
                     :reason, :vf, :vu, :operator)
-        """),
+        """
+        ),
         {
             "id": override_id,
             "tid": tid,
@@ -1023,11 +1065,13 @@ async def delete_store_override(
         _err(400, "无效的 store_id 或 override_id")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE menu_plan_store_overrides
             SET is_deleted = TRUE, updated_at = now()
             WHERE id = :oid AND store_id = :store_id AND tenant_id = :tid AND is_deleted IS NOT TRUE
-        """),
+        """
+        ),
         {"oid": override_uuid, "store_id": store_uuid, "tid": tid},
     )
     if result.rowcount == 0:

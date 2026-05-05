@@ -13,6 +13,8 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
+from shared.security.src.error_handler import safe_http_exception
+
 from .wecom_contact import WecomAPIError, wecom_contact_sdk
 
 logger = structlog.get_logger()
@@ -141,13 +143,10 @@ async def create_contact_qrcode(
         )
     except WecomAPIError as exc:
         log.error("wecom_scrm_qrcode_api_error", errcode=exc.errcode, errmsg=exc.errmsg)
-        raise HTTPException(
-            status_code=502,
-            detail=f"wecom api error {exc.errcode}: {exc.errmsg}",
-        ) from exc
+        raise safe_http_exception(502, "企微 API 调用失败", exc) from exc
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         log.error("wecom_scrm_qrcode_network_error", error=str(exc))
-        raise HTTPException(status_code=503, detail="wecom api unavailable") from exc
+        raise safe_http_exception(503, "企微接口不可用", exc) from exc
 
     log.info("wecom_scrm_qrcode_ok", config_id=result.get("config_id"))
     return {"ok": True, "data": result}
@@ -174,13 +173,10 @@ async def get_staff_contacts(
             errcode=exc.errcode,
             errmsg=exc.errmsg,
         )
-        raise HTTPException(
-            status_code=502,
-            detail=f"wecom api error {exc.errcode}: {exc.errmsg}",
-        ) from exc
+        raise safe_http_exception(502, "企微 API 调用失败", exc) from exc
     except (httpx.ConnectError, httpx.TimeoutException) as exc:
         log.error("wecom_scrm_staff_contacts_network_error", error=str(exc))
-        raise HTTPException(status_code=503, detail="wecom api unavailable") from exc
+        raise safe_http_exception(503, "企微接口不可用", exc) from exc
 
     if not external_ids:
         log.info("wecom_scrm_staff_contacts_empty", user_id=user_id)

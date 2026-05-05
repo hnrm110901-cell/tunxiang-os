@@ -26,6 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 log = structlog.get_logger(__name__)
 
@@ -99,7 +100,8 @@ async def _fetch_bom_with_items(
 ) -> Optional[dict]:
     """查询 BOM 主表 + 明细行，返回组合字典，未找到返回 None。"""
     bom_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, tenant_id, dish_id, version, total_cost_fen,
                    yield_qty, yield_unit, is_active, notes,
                    created_at, updated_at, is_deleted
@@ -107,7 +109,8 @@ async def _fetch_bom_with_items(
             WHERE id = :bom_id
               AND tenant_id = :tid
               AND is_deleted = false
-        """),
+        """
+        ),
         {"bom_id": bom_id, "tid": tenant_id},
     )
     bom = bom_row.mappings().first()
@@ -115,7 +118,8 @@ async def _fetch_bom_with_items(
         return None
 
     items_row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, bom_id, ingredient_name, ingredient_code,
                    quantity, unit, unit_cost_fen, total_cost_fen,
                    loss_rate, is_semi_product, semi_product_bom_id, sort_order,
@@ -124,7 +128,8 @@ async def _fetch_bom_with_items(
             WHERE bom_id = :bom_id
               AND tenant_id = :tid
             ORDER BY sort_order, created_at
-        """),
+        """
+        ),
         {"bom_id": bom_id, "tid": tenant_id},
     )
     items = [dict(r) for r in items_row.mappings().all()]
@@ -191,12 +196,14 @@ async def list_boms(
         total = count_row.scalar() or 0
 
         rows = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id FROM dish_boms b
                 WHERE {where}
                 ORDER BY b.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         bom_ids = [str(r[0]) for r in rows.fetchall()]
@@ -228,11 +235,13 @@ async def create_bom(
 
         # 检查版本重复
         dup = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM dish_boms
                 WHERE tenant_id = :tid AND dish_id = :dish_id
                   AND version = :version AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": x_tenant_id, "dish_id": body.dish_id, "version": body.version},
         )
         if dup.first():
@@ -241,11 +250,13 @@ async def create_bom(
         # 若新建时 is_active=True，先将该菜品现有激活版本关闭
         if body.is_active:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_boms SET is_active = false
                     WHERE tenant_id = :tid AND dish_id = :dish_id
                       AND is_active = true AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "dish_id": body.dish_id},
             )
 
@@ -259,7 +270,8 @@ async def create_bom(
 
         # 插入 dish_boms
         bom_row = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dish_boms
                   (tenant_id, dish_id, version, total_cost_fen,
                    yield_qty, yield_unit, is_active, notes)
@@ -267,7 +279,8 @@ async def create_bom(
                   (:tid, :dish_id, :version, :total_cost_fen,
                    :yield_qty, :yield_unit, :is_active, :notes)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tid": x_tenant_id,
                 "dish_id": body.dish_id,
@@ -284,7 +297,8 @@ async def create_bom(
         # 批量插入 dish_bom_items
         for item, item_cost in items_with_cost:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO dish_bom_items
                       (tenant_id, bom_id, ingredient_name, ingredient_code,
                        quantity, unit, unit_cost_fen, total_cost_fen,
@@ -293,7 +307,8 @@ async def create_bom(
                       (:tid, :bom_id, :ingredient_name, :ingredient_code,
                        :quantity, :unit, :unit_cost_fen, :total_cost_fen,
                        :loss_rate, :is_semi_product, :semi_product_bom_id, :sort_order)
-                """),
+                """
+                ),
                 {
                     "tid": x_tenant_id,
                     "bom_id": bom_id,
@@ -318,7 +333,7 @@ async def create_bom(
 
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("create_bom.db_error", error=str(exc))
@@ -341,10 +356,12 @@ async def update_bom(
 
         # 验证BOM存在
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, dish_id, is_active FROM dish_boms
                 WHERE id = :bom_id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         row = existing.mappings().first()
@@ -356,11 +373,13 @@ async def update_bom(
         # 若 is_active 从 False→True，先关闭其他激活版本
         if body.is_active is True and not row["is_active"]:
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_boms SET is_active = false
                     WHERE tenant_id = :tid AND dish_id = :dish_id
                       AND is_active = true AND is_deleted = false AND id != :bom_id
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "dish_id": dish_id, "bom_id": bom_id},
             )
 
@@ -377,7 +396,8 @@ async def update_bom(
                 item_cost = _calc_item_cost(item.quantity, item.unit_cost_fen, item.loss_rate)
                 total_cost += item_cost
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         INSERT INTO dish_bom_items
                           (tenant_id, bom_id, ingredient_name, ingredient_code,
                            quantity, unit, unit_cost_fen, total_cost_fen,
@@ -386,7 +406,8 @@ async def update_bom(
                           (:tid, :bom_id, :ingredient_name, :ingredient_code,
                            :quantity, :unit, :unit_cost_fen, :total_cost_fen,
                            :loss_rate, :is_semi_product, :semi_product_bom_id, :sort_order)
-                    """),
+                    """
+                    ),
                     {
                         "tid": x_tenant_id,
                         "bom_id": bom_id,
@@ -426,11 +447,13 @@ async def update_bom(
 
         if set_clauses:
             await db.execute(
-                text(f"""
+                text(
+                    f"""
                     UPDATE dish_boms
                     SET {", ".join(set_clauses)}
                     WHERE id = :bom_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 update_params,
             )
 
@@ -462,10 +485,12 @@ async def delete_bom(
         await _set_tenant(db, x_tenant_id)
 
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, is_active FROM dish_boms
                 WHERE id = :bom_id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         row = existing.mappings().first()
@@ -475,10 +500,12 @@ async def delete_bom(
             raise HTTPException(status_code=400, detail="激活中的BOM不可删除，请先切换激活版本")
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_boms SET is_deleted = true, is_active = false
                 WHERE id = :bom_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         await db.commit()
@@ -510,21 +537,25 @@ async def calculate_bom_cost(
         await _set_tenant(db, x_tenant_id)
 
         existing = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM dish_boms
                 WHERE id = :bom_id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         if not existing.first():
             raise HTTPException(status_code=404, detail="BOM不存在")
 
         items_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, quantity, unit_cost_fen, loss_rate
                 FROM dish_bom_items
                 WHERE bom_id = :bom_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         items = items_row.mappings().all()
@@ -543,19 +574,23 @@ async def calculate_bom_cost(
             total_cost += item_cost
             updated_items.append({"id": str(item["id"]), "total_cost_fen": item_cost})
             await db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dish_bom_items
                     SET total_cost_fen = :cost
                     WHERE id = :item_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"cost": item_cost, "item_id": str(item["id"]), "tid": x_tenant_id},
             )
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE dish_boms SET total_cost_fen = :total
                 WHERE id = :bom_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"total": total_cost, "bom_id": bom_id, "tid": x_tenant_id},
         )
         await db.commit()
@@ -592,11 +627,13 @@ async def bom_cost_breakdown(
         await _set_tenant(db, x_tenant_id)
 
         bom_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, total_cost_fen, yield_qty, yield_unit, dish_id
                 FROM dish_boms
                 WHERE id = :bom_id AND tenant_id = :tid AND is_deleted = false
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         bom = bom_row.mappings().first()
@@ -604,14 +641,16 @@ async def bom_cost_breakdown(
             raise HTTPException(status_code=404, detail="BOM不存在")
 
         items_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_name, ingredient_code,
                        quantity, unit, unit_cost_fen, total_cost_fen,
                        loss_rate, is_semi_product
                 FROM dish_bom_items
                 WHERE bom_id = :bom_id AND tenant_id = :tid
                 ORDER BY total_cost_fen DESC
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         items = items_row.mappings().all()
@@ -679,21 +718,25 @@ async def consume_stock_by_bom(
         # 确定使用的BOM
         if body.bom_id:
             bom_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, total_cost_fen FROM dish_boms
                     WHERE id = :bom_id AND tenant_id = :tid
                       AND dish_id = :dish_id AND is_deleted = false
-                """),
+                """
+                ),
                 {"bom_id": body.bom_id, "tid": x_tenant_id, "dish_id": dish_id},
             )
         else:
             bom_row = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id, total_cost_fen FROM dish_boms
                     WHERE tenant_id = :tid AND dish_id = :dish_id
                       AND is_active = true AND is_deleted = false
                     LIMIT 1
-                """),
+                """
+                ),
                 {"tid": x_tenant_id, "dish_id": dish_id},
             )
 
@@ -705,12 +748,14 @@ async def consume_stock_by_bom(
 
         # 获取所有明细行
         items_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_code, ingredient_name,
                        quantity, unit, loss_rate
                 FROM dish_bom_items
                 WHERE bom_id = :bom_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"bom_id": bom_id, "tid": x_tenant_id},
         )
         bom_items = items_row.mappings().all()
@@ -733,7 +778,8 @@ async def consume_stock_by_bom(
             # 扣减库存（若 ingredients 表存在对应 ingredient_code+store_id 记录）
             if item["ingredient_code"]:
                 await db.execute(
-                    text("""
+                    text(
+                        """
                         UPDATE ingredients
                         SET current_quantity = current_quantity - :qty,
                             updated_at = now()
@@ -741,7 +787,8 @@ async def consume_stock_by_bom(
                           AND store_id = :store_id
                           AND ingredient_code = :code
                           AND is_deleted = false
-                    """),
+                    """
+                    ),
                     {
                         "qty": round(actual_qty, 4),
                         "tid": x_tenant_id,
@@ -772,7 +819,7 @@ async def consume_stock_by_bom(
 
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         await db.rollback()
         log.error("consume_stock_by_bom.db_error", error=str(exc))

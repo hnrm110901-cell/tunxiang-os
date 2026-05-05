@@ -49,6 +49,19 @@ on:
       - 'shared/db-migrations/versions/**'
       # Workflow 自身
       - '.github/workflows/tier1-gate.yml'
+      # 补充 Tier 1 路径（issue D6 修复）
+      - 'services/tx-pay/**'
+      - 'services/tx-trade/src/order_service.py'
+      - 'services/tx-trade/src/cashier_engine.py'
+      - 'services/tx-trade/src/wine_storage_service.py'
+      - 'services/tx-trade/src/payment_saga_service.py'
+      - 'services/tx-trade/tests/test_*tier1*.py'
+      - 'services/tx-finance/src/**'
+      - 'services/tx-finance/src/invoice_service.py'
+      - 'services/tx-finance/tests/test_*tier1*.py'
+      - 'shared/security/**'
+      - 'edge/sync-engine/**'
+      - 'shared/db-migrations/versions/v091*.py'
   push:
     branches: [main]
 
@@ -125,7 +138,8 @@ jobs:
           pip install --quiet \
             pytest pytest-asyncio \
             pydantic fastapi httpx \
-            sqlalchemy structlog
+            sqlalchemy structlog asyncpg \
+            pyyaml aiosqlite
 
       - name: Run ${{ matrix.group }}
         run: |

@@ -482,12 +482,14 @@ def test_no_broad_except() -> None:
         assert exc_type is not None, f"bare `except:` 在 budget_forecast.py:{node.lineno} —— 必须声明具体异常类型"
         # `except Exception:` / `except BaseException:` 不允许
         if isinstance(exc_type, ast.Name):
-            assert exc_type.id not in ("Exception", "BaseException"), (
-                f"broad `except {exc_type.id}:` 在 budget_forecast.py:{node.lineno} —— §十四 新代码禁止 except Exception"
-            )
+            assert exc_type.id not in (
+                "Exception",
+                "BaseException",
+            ), f"broad `except {exc_type.id}:` 在 budget_forecast.py:{node.lineno} —— §十四 新代码禁止 except Exception"
         if isinstance(exc_type, ast.Tuple):
             for elt in exc_type.elts:
                 if isinstance(elt, ast.Name):
-                    assert elt.id not in ("Exception", "BaseException"), (
-                        f"broad `except (..., {elt.id}, ...):` 在 budget_forecast.py:{node.lineno}"
-                    )
+                    assert elt.id not in (
+                        "Exception",
+                        "BaseException",
+                    ), f"broad `except (..., {elt.id}, ...):` 在 budget_forecast.py:{node.lineno}"

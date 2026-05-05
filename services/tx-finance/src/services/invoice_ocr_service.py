@@ -136,9 +136,7 @@ class InvoiceOCRService:
 
         if ocr_result is None:
             log.error("invoice_ocr.all_providers_failed")
-            raise OCRProviderUnavailableError(
-                "所有OCR提供商均不可用,请稍后重试或手动录入"
-            )
+            raise OCRProviderUnavailableError("所有OCR提供商均不可用,请稍后重试或手动录入")
 
         # 2. 提取结构化数据
         invoice_code = ocr_result.get("invoice_code", "")
@@ -148,9 +146,7 @@ class InvoiceOCRService:
         confidence_score = float(ocr_result.get("confidence_score", 0.0))
 
         # 3. SHA-256去重hash
-        duplicate_hash = self._compute_duplicate_hash(
-            invoice_code, invoice_number, total_amount_fen
-        )
+        duplicate_hash = self._compute_duplicate_hash(invoice_code, invoice_number, total_amount_fen)
 
         # 4. 检查是否重复（跨租户,集团多品牌场景）
         is_duplicate = await self._check_duplicate(db, tenant_id, duplicate_hash)
@@ -181,7 +177,8 @@ class InvoiceOCRService:
         now = datetime.now(timezone.utc)
 
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO invoice_ocr_results (
                     id, tenant_id, image_url, ocr_provider, ocr_raw_json,
                     invoice_code, invoice_number, invoice_date,
@@ -197,7 +194,8 @@ class InvoiceOCRService:
                     :verification_status, :is_duplicate, :duplicate_hash,
                     :confidence_score, :created_at, :updated_at
                 )
-            """),
+            """
+            ),
             {
                 "id": str(result_id),
                 "tenant_id": str(tenant_id),
@@ -253,9 +251,7 @@ class InvoiceOCRService:
             "confidence_score": confidence_score,
         }
 
-    async def _call_ocr_api(
-        self, image_url: str, provider: str
-    ) -> dict[str, Any]:
+    async def _call_ocr_api(self, image_url: str, provider: str) -> dict[str, Any]:
         """调用OCR提供商API
 
         当前实现：返回模拟OCR结果（预留真实HTTP调用位置）
@@ -358,13 +354,15 @@ class InvoiceOCRService:
             True 表示已存在
         """
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT 1 FROM invoice_ocr_results
                 WHERE tenant_id = :tenant_id
                   AND duplicate_hash = :duplicate_hash
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "duplicate_hash": duplicate_hash},
         )
         return result.scalar_one_or_none() is not None
@@ -411,9 +409,7 @@ class InvoiceOCRService:
         # 1. 查询OCR结果
         row = await self._get_ocr_result(db, tenant_id, ocr_result_id)
         if row is None:
-            raise OCRResultNotFoundError(
-                f"OCR结果 {ocr_result_id} 不存在或不属于租户 {tenant_id}"
-            )
+            raise OCRResultNotFoundError(f"OCR结果 {ocr_result_id} 不存在或不属于租户 {tenant_id}")
 
         # 2. 已验真或重复的不再验
         current_status = row["verification_status"]
@@ -440,14 +436,16 @@ class InvoiceOCRService:
         # 4. 更新数据库
         now = datetime.now(timezone.utc)
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE invoice_ocr_results
                 SET verification_status = :status,
                     verification_result = :result::JSONB,
                     updated_at = :updated_at
                 WHERE id = :id
                   AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "status": new_status,
                 "result": _json_dumps(verification_result),
@@ -500,17 +498,21 @@ class InvoiceOCRService:
                 result = await self.recognize_invoice(db, tenant_id, url)
                 results.append({"ok": True, "data": result, "image_url": url})
             except DuplicateInvoiceError as exc:
-                results.append({
-                    "ok": False,
-                    "image_url": url,
-                    "error": {"code": "DUPLICATE", "message": str(exc)},
-                })
+                results.append(
+                    {
+                        "ok": False,
+                        "image_url": url,
+                        "error": {"code": "DUPLICATE", "message": str(exc)},
+                    }
+                )
             except OCRProviderUnavailableError as exc:
-                results.append({
-                    "ok": False,
-                    "image_url": url,
-                    "error": {"code": "OCR_UNAVAILABLE", "message": str(exc)},
-                })
+                results.append(
+                    {
+                        "ok": False,
+                        "image_url": url,
+                        "error": {"code": "OCR_UNAVAILABLE", "message": str(exc)},
+                    }
+                )
 
         success_count = sum(1 for r in results if r.get("ok"))
         log.info(
@@ -572,7 +574,8 @@ class InvoiceOCRService:
 
         # 查询列表
         list_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, tenant_id, invoice_id, image_url, ocr_provider,
                        invoice_code, invoice_number, invoice_date,
                        seller_name, seller_tax_no, buyer_name, buyer_tax_no,
@@ -583,7 +586,8 @@ class InvoiceOCRService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         rows = list_result.mappings().all()
@@ -626,13 +630,15 @@ class InvoiceOCRService:
     ) -> Optional[Any]:
         """内部：查询单条OCR结果"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM invoice_ocr_results
                 WHERE id = :id
                   AND tenant_id = :tenant_id
                   AND is_deleted = FALSE
                 LIMIT 1
-            """),
+            """
+            ),
             {"id": str(result_id), "tenant_id": str(tenant_id)},
         )
         return result.mappings().first()
@@ -673,13 +679,15 @@ def _row_to_dict(row: Any) -> dict[str, Any]:
 def _row_to_detail_dict(row: Any) -> dict[str, Any]:
     """将数据库行转换为详情字典（含所有字段）"""
     base = _row_to_dict(row)
-    base.update({
-        "seller_tax_no": row.get("seller_tax_no"),
-        "buyer_tax_no": row.get("buyer_tax_no"),
-        "items": row.get("items", []),
-        "ocr_raw_json": row.get("ocr_raw_json"),
-        "verification_result": row.get("verification_result"),
-        "duplicate_hash": row.get("duplicate_hash"),
-        "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
-    })
+    base.update(
+        {
+            "seller_tax_no": row.get("seller_tax_no"),
+            "buyer_tax_no": row.get("buyer_tax_no"),
+            "items": row.get("items", []),
+            "ocr_raw_json": row.get("ocr_raw_json"),
+            "verification_result": row.get("verification_result"),
+            "duplicate_hash": row.get("duplicate_hash"),
+            "updated_at": row["updated_at"].isoformat() if row.get("updated_at") else None,
+        }
+    )
     return base

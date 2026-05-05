@@ -21,6 +21,7 @@ Tier 级别:
   cd /Users/lichun/Documents/GitHub/zhilian-os/services/tx-finance
   pytest src/tests/test_financial_voucher_service_tier1.py -v
 """
+
 from __future__ import annotations
 
 import os
@@ -40,7 +41,6 @@ from services.financial_voucher_service import (  # type: ignore  # noqa: E402
     VoucherLineInput,
 )
 
-
 # ─── 输入校验: VoucherLineInput dataclass 守 DB CHECK 前置 ────────────
 
 
@@ -49,44 +49,57 @@ class TestVoucherLineInputValidation:
 
     def test_valid_debit_only(self):
         line = VoucherLineInput(
-            account_code="1122", account_name="应收账款",
-            debit_fen=10000, credit_fen=0, summary="堂食应收",
+            account_code="1122",
+            account_name="应收账款",
+            debit_fen=10000,
+            credit_fen=0,
+            summary="堂食应收",
         )
         assert line.debit_fen == 10000
 
     def test_valid_credit_only(self):
         line = VoucherLineInput(
-            account_code="6001", account_name="主营业务收入",
-            debit_fen=0, credit_fen=10000,
+            account_code="6001",
+            account_name="主营业务收入",
+            debit_fen=0,
+            credit_fen=10000,
         )
         assert line.credit_fen == 10000
 
     def test_rejects_both_zero(self):
         with pytest.raises(ValueError, match="借贷互斥"):
             VoucherLineInput(
-                account_code="1122", account_name="应收账款",
-                debit_fen=0, credit_fen=0,
+                account_code="1122",
+                account_name="应收账款",
+                debit_fen=0,
+                credit_fen=0,
             )
 
     def test_rejects_both_nonzero(self):
         with pytest.raises(ValueError, match="借贷互斥"):
             VoucherLineInput(
-                account_code="1122", account_name="应收账款",
-                debit_fen=5000, credit_fen=5000,
+                account_code="1122",
+                account_name="应收账款",
+                debit_fen=5000,
+                credit_fen=5000,
             )
 
     def test_rejects_negative_debit(self):
         with pytest.raises(ValueError, match="借贷必须非负"):
             VoucherLineInput(
-                account_code="1122", account_name="应收账款",
-                debit_fen=-100, credit_fen=0,
+                account_code="1122",
+                account_name="应收账款",
+                debit_fen=-100,
+                credit_fen=0,
             )
 
     def test_rejects_negative_credit(self):
         with pytest.raises(ValueError, match="借贷必须非负"):
             VoucherLineInput(
-                account_code="6001", account_name="主营业务收入",
-                debit_fen=0, credit_fen=-100,
+                account_code="6001",
+                account_name="主营业务收入",
+                debit_fen=0,
+                credit_fen=-100,
             )
 
 
@@ -109,20 +122,28 @@ def _daily_settlement_payload(
         event_id=event_id,
         lines=[
             VoucherLineInput(
-                account_code="1001", account_name="库存现金",
-                debit_fen=3000, summary="堂食现金",
+                account_code="1001",
+                account_name="库存现金",
+                debit_fen=3000,
+                summary="堂食现金",
             ),
             VoucherLineInput(
-                account_code="1002.01", account_name="银行存款-微信",
-                debit_fen=4000, summary="堂食微信",
+                account_code="1002.01",
+                account_name="银行存款-微信",
+                debit_fen=4000,
+                summary="堂食微信",
             ),
             VoucherLineInput(
-                account_code="1002.02", account_name="银行存款-支付宝",
-                debit_fen=1600, summary="堂食支付宝",
+                account_code="1002.02",
+                account_name="银行存款-支付宝",
+                debit_fen=1600,
+                summary="堂食支付宝",
             ),
             VoucherLineInput(
-                account_code="6001", account_name="主营业务收入-餐饮",
-                credit_fen=8600, summary="2026-04-19 营业收入",
+                account_code="6001",
+                account_name="主营业务收入-餐饮",
+                credit_fen=8600,
+                summary="2026-04-19 营业收入",
             ),
         ],
     )
@@ -239,19 +260,17 @@ class TestCreateIdempotency:
         mock_result_hit.scalar_one_or_none = MagicMock(return_value=winner)
 
         session = AsyncMock()
-        session.execute = AsyncMock(side_effect=[
-            _tenant_assertion_mock(),  # B5 断言
-            mock_result_miss,           # 幂等 pre-check miss
-            mock_result_hit,            # refetch hit
-        ])
+        session.execute = AsyncMock(
+            side_effect=[
+                _tenant_assertion_mock(),  # B5 断言
+                mock_result_miss,  # 幂等 pre-check miss
+                mock_result_hit,  # refetch hit
+            ]
+        )
 
         # IntegrityError 的 orig 字符串必须含 uq_fv_tenant_event (service 识别线索)
-        fake_orig = Exception(
-            'duplicate key value violates unique constraint "uq_fv_tenant_event"'
-        )
-        session.flush = AsyncMock(
-            side_effect=IntegrityError("INSERT ...", {}, fake_orig)
-        )
+        fake_orig = Exception('duplicate key value violates unique constraint "uq_fv_tenant_event"')
+        session.flush = AsyncMock(side_effect=IntegrityError("INSERT ...", {}, fake_orig))
         session.rollback = AsyncMock()
 
         payload = _daily_settlement_payload(event_id=uuid.uuid4())
@@ -275,12 +294,8 @@ class TestCreateIdempotency:
         session.execute = AsyncMock(return_value=mock_result)
 
         # voucher_no 冲突 (非 partial UNIQUE)
-        fake_orig = Exception(
-            'duplicate key value violates unique constraint "financial_vouchers_voucher_no_key"'
-        )
-        session.flush = AsyncMock(
-            side_effect=IntegrityError("INSERT ...", {}, fake_orig)
-        )
+        fake_orig = Exception('duplicate key value violates unique constraint "financial_vouchers_voucher_no_key"')
+        session.flush = AsyncMock(side_effect=IntegrityError("INSERT ...", {}, fake_orig))
 
         payload = _daily_settlement_payload(event_id=uuid.uuid4())
         with pytest.raises(IntegrityError):
@@ -384,19 +399,14 @@ class TestTenantContextAssertion:
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
             lines=[
-                VoucherLineInput(account_code="1001", debit_fen=10000,
-                                 account_name="现金"),
-                VoucherLineInput(account_code="6001", credit_fen=10000,
-                                 account_name="收入"),
+                VoucherLineInput(account_code="1001", debit_fen=10000, account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000, account_name="收入"),
             ],
         )
 
     @pytest.mark.asyncio
     async def test_matching_tenant_passes(self):
         """payload.tenant_id == session app.tenant_id → 正常."""
-        from services.financial_voucher_service import (  # type: ignore
-            TenantContextMismatchError,
-        )
 
         svc = FinancialVoucherService()
         tenant = uuid.uuid4()
@@ -491,13 +501,11 @@ class TestEventIdRequiresEventType:
             voucher_no="V_NO_ETYPE",
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
-            event_type=None,           # 未填
-            event_id=uuid.uuid4(),     # 但 event_id 非空
+            event_type=None,  # 未填
+            event_id=uuid.uuid4(),  # 但 event_id 非空
             lines=[
-                VoucherLineInput(account_code="1001", account_name="现金",
-                                 debit_fen=10000),
-                VoucherLineInput(account_code="6001", account_name="收入",
-                                 credit_fen=10000),
+                VoucherLineInput(account_code="1001", account_name="现金", debit_fen=10000),
+                VoucherLineInput(account_code="6001", account_name="收入", credit_fen=10000),
             ],
         )
         with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
@@ -516,13 +524,11 @@ class TestEventIdRequiresEventType:
             voucher_no="V_BLANK_ETYPE",
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
-            event_type="   ",          # 纯空白
+            event_type="   ",  # 纯空白
             event_id=uuid.uuid4(),
             lines=[
-                VoucherLineInput(account_code="1001", debit_fen=10000,
-                                 account_name="现金"),
-                VoucherLineInput(account_code="6001", credit_fen=10000,
-                                 account_name="收入"),
+                VoucherLineInput(account_code="1001", debit_fen=10000, account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000, account_name="收入"),
             ],
         )
         with pytest.raises(ValueError, match="event_id 非空时 event_type 必填"):
@@ -543,10 +549,8 @@ class TestEventIdRequiresEventType:
             event_type=None,
             event_id=None,
             lines=[
-                VoucherLineInput(account_code="1001", debit_fen=10000,
-                                 account_name="现金"),
-                VoucherLineInput(account_code="6001", credit_fen=10000,
-                                 account_name="收入"),
+                VoucherLineInput(account_code="1001", debit_fen=10000, account_name="现金"),
+                VoucherLineInput(account_code="6001", credit_fen=10000, account_name="收入"),
             ],
         )
         result = await svc.create(payload, session=session)
@@ -563,9 +567,13 @@ class TestW2ETenantScopedLoad:
         session = AsyncMock()
 
         voucher = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_SCOPED", voucher_type="sales",
-            status="draft", entries=[], voided=False,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_SCOPED",
+            voucher_type="sales",
+            status="draft",
+            entries=[],
+            voided=False,
         )
         mock_result = MagicMock()
         mock_result.scalar_one_or_none = MagicMock(return_value=voucher)
@@ -574,8 +582,11 @@ class TestW2ETenantScopedLoad:
         session.get = AsyncMock()  # 不应被调
 
         await svc.void(
-            voucher.id, operator_id=uuid.uuid4(), reason="test",
-            session=session, tenant_id=voucher.tenant_id,  # 显式传
+            voucher.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
+            tenant_id=voucher.tenant_id,  # 显式传
         )
 
         # 走 execute (SELECT WHERE), 不走 session.get
@@ -598,8 +609,11 @@ class TestW2ETenantScopedLoad:
 
         with pytest.raises(ValueError, match="凭证不存在或无权限"):
             await svc.void(
-                uuid.uuid4(), operator_id=uuid.uuid4(), reason="test",
-                session=session, tenant_id=uuid.uuid4(),
+                uuid.uuid4(),
+                operator_id=uuid.uuid4(),
+                reason="test",
+                session=session,
+                tenant_id=uuid.uuid4(),
             )
 
     @pytest.mark.asyncio
@@ -612,15 +626,21 @@ class TestW2ETenantScopedLoad:
         session = AsyncMock()
 
         voucher = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_COMPAT", voucher_type="sales",
-            status="draft", entries=[], voided=False,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_COMPAT",
+            voucher_type="sales",
+            status="draft",
+            entries=[],
+            voided=False,
         )
         session.get = AsyncMock(return_value=voucher)
         session.flush = AsyncMock()
 
         await svc.void(
-            voucher.id, operator_id=uuid.uuid4(), reason="test",
+            voucher.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
             session=session,  # 不传 tenant_id
         )
 
@@ -638,10 +658,14 @@ class TestW2ETenantScopedLoad:
         session = AsyncMock()
 
         voucher = FinancialVoucher(
-            id=uuid.uuid4(), tenant_id=uuid.uuid4(),
-            voucher_no="V_RED_SCOPED", voucher_type="sales",
-            total_amount_fen=10000, status="exported",
-            entries=[], voided=False,
+            id=uuid.uuid4(),
+            tenant_id=uuid.uuid4(),
+            voucher_no="V_RED_SCOPED",
+            voucher_type="sales",
+            total_amount_fen=10000,
+            status="exported",
+            entries=[],
+            voided=False,
         )
         voucher.lines = []
         # 2 次 execute: [load voucher hit, pre-check miss]
@@ -653,8 +677,11 @@ class TestW2ETenantScopedLoad:
         session.flush = AsyncMock()
 
         await svc.red_flush(
-            voucher.id, operator_id=uuid.uuid4(), reason="test",
-            session=session, tenant_id=voucher.tenant_id,
+            voucher.id,
+            operator_id=uuid.uuid4(),
+            reason="test",
+            session=session,
+            tenant_id=voucher.tenant_id,
         )
 
         # 走 2 次 execute: 加载 + pre-check
@@ -673,8 +700,11 @@ class TestW2ETenantScopedLoad:
 
         with pytest.raises(ValueError, match="凭证不存在或无权限"):
             await svc.red_flush(
-                uuid.uuid4(), operator_id=uuid.uuid4(), reason="test",
-                session=session, tenant_id=uuid.uuid4(),
+                uuid.uuid4(),
+                operator_id=uuid.uuid4(),
+                reason="test",
+                session=session,
+                tenant_id=uuid.uuid4(),
             )
 
 
@@ -693,10 +723,8 @@ class TestBalanceValidation:
             voucher_date=date(2026, 4, 19),
             voucher_type="sales",
             lines=[
-                VoucherLineInput(account_code="1122", account_name="应收",
-                                 debit_fen=10000),
-                VoucherLineInput(account_code="6001", account_name="收入",
-                                 credit_fen=9900),  # 少 1 分!
+                VoucherLineInput(account_code="1122", account_name="应收", debit_fen=10000),
+                VoucherLineInput(account_code="6001", account_name="收入", credit_fen=9900),  # 少 1 分!
             ],
         )
 
@@ -736,7 +764,9 @@ class TestBalanceValidation:
         # 绕过 dataclass 校验构造 0/0 lines (用 object.__setattr__)
         # 正常用户不会这么做, 但防御编程.
         bad_line = VoucherLineInput(
-            account_code="1001", account_name="现金", debit_fen=100,
+            account_code="1001",
+            account_name="现金",
+            debit_fen=100,
         )
         object.__setattr__(bad_line, "debit_fen", 0)  # 强制置 0
 

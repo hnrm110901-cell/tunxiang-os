@@ -2,7 +2,7 @@
 供应链服务
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import structlog
@@ -133,7 +133,7 @@ class SupplyChainService:
         order.status = status
         if notes is not None:
             order.notes = notes
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         await self.db.commit()
         return self._order_to_dict(order)

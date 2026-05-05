@@ -16,6 +16,7 @@
 注：本服务**同步**处理（webhook 调用直接完成 canonical 写入）。实际部署建议改
 异步：webhook 端点只校验 + 存原始 event + 200 响应；worker 拉事件做 canonical。
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -101,22 +102,17 @@ class XhsVerificationService:
                 signature_valid=bool(existing.get("signature_valid")),
                 transform_status=existing["transform_status"],
                 canonical_order_id=(
-                    str(existing["canonical_order_id"])
-                    if existing.get("canonical_order_id") else None
+                    str(existing["canonical_order_id"]) if existing.get("canonical_order_id") else None
                 ),
                 was_duplicate=True,
             )
 
         # 3. 定位 binding（通过 payload.shop_code 找 webhook_secret）
         shop_code = payload.get("shop_code") if isinstance(payload, dict) else None
-        binding = (
-            await self._find_binding_by_shop(shop_code) if shop_code else None
-        )
+        binding = await self._find_binding_by_shop(shop_code) if shop_code else None
 
         # 4. 签名校验
-        verify_result = self._verify_signature_with_binding(
-            headers=headers, body=body, binding=binding
-        )
+        verify_result = self._verify_signature_with_binding(headers=headers, body=body, binding=binding)
 
         # 5. 事件类型提取
         event_type = _extract_event_type(payload) if isinstance(payload, dict) else "unknown"
@@ -164,9 +160,7 @@ class XhsVerificationService:
             )
 
         try:
-            order = transform_canonical(
-                "xiaohongshu", payload, tenant_id=self._tenant_id
-            )
+            order = transform_canonical("xiaohongshu", payload, tenant_id=self._tenant_id)
         except TransformationError as exc:
             await self._update_event_status(
                 event_id=event_id,
@@ -184,9 +178,7 @@ class XhsVerificationService:
         # 9. 补充 store_id / brand_id（从 binding）
         if binding:
             order.store_id = str(binding["store_id"])
-            order.brand_id = (
-                str(binding["brand_id"]) if binding.get("brand_id") else None
-            )
+            order.brand_id = str(binding["brand_id"]) if binding.get("brand_id") else None
 
         # 10. 持久化 canonical（幂等 UPSERT）
         canonical_order_id = await self._upsert_canonical(order=order)
@@ -212,27 +204,26 @@ class XhsVerificationService:
     # 私有方法
     # ─────────────────────────────────────────────────────────────
 
-    async def _find_existing_event(
-        self, payload_sha: str
-    ) -> Optional[dict[str, Any]]:
+    async def _find_existing_event(self, payload_sha: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, transform_status, signature_valid, canonical_order_id
                 FROM xiaohongshu_verify_events
                 WHERE tenant_id = CAST(:tenant_id AS uuid)
                   AND payload_sha256 = :sha
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "sha": payload_sha},
         )
         rec = row.mappings().first()
         return dict(rec) if rec else None
 
-    async def _find_binding_by_shop(
-        self, shop_code: str
-    ) -> Optional[dict[str, Any]]:
+    async def _find_binding_by_shop(self, shop_code: str) -> Optional[dict[str, Any]]:
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT id, store_id, brand_id, xhs_merchant_id,
                        webhook_secret, status
                 FROM xiaohongshu_shop_bindings
@@ -240,7 +231,8 @@ class XhsVerificationService:
                   AND xhs_shop_code = :shop_code
                   AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tenant_id": self._tenant_id, "shop_code": shop_code},
         )
         rec = row.mappings().first()
@@ -295,16 +287,15 @@ class XhsVerificationService:
             "xhs_order_id": payload.get("order_id") or payload.get("verify_code"),
             "raw_payload": json.dumps(payload, ensure_ascii=False),
             "payload_sha256": payload_sha,
-            "received_headers": json.dumps(
-                _sanitize_headers(headers), ensure_ascii=False
-            ),
+            "received_headers": json.dumps(_sanitize_headers(headers), ensure_ascii=False),
             "signature_valid": verify_result.ok,
             "signature_error": verify_result.error_code if not verify_result.ok else None,
             "transform_status": "pending",
             "source_ip": source_ip,
         }
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO xiaohongshu_verify_events (
                     tenant_id, binding_id, store_id, event_type,
                     verify_code, xhs_shop_code, xhs_order_id,
@@ -321,7 +312,8 @@ class XhsVerificationService:
                     CAST(:source_ip AS inet)
                 )
                 RETURNING id
-            """),
+            """
+            ),
             params,
         )
         return str(row.scalar_one())
@@ -335,7 +327,8 @@ class XhsVerificationService:
         canonical_order_id: Optional[str] = None,
     ) -> None:
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE xiaohongshu_verify_events SET
                     transform_status = :status,
                     transform_error = COALESCE(:error, transform_error),
@@ -345,7 +338,8 @@ class XhsVerificationService:
                     processed_at = NOW(),
                     updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
-            """),
+            """
+            ),
             {
                 "id": event_id,
                 "status": transform_status,
@@ -364,7 +358,8 @@ class XhsVerificationService:
             params["canonical_order_no"] = order.canonical_order_no
 
         row = await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO canonical_delivery_orders (
                     tenant_id, canonical_order_no, platform, platform_order_id,
                     platform_sub_type, store_id, brand_id, order_type, status,
@@ -406,18 +401,21 @@ class XhsVerificationService:
                     platform_metadata = EXCLUDED.platform_metadata,
                     updated_at = NOW()
                 RETURNING id
-            """),
+            """
+            ),
             params,
         )
         return str(row.scalar_one())
 
     async def _touch_binding_webhook(self, *, binding_id: str) -> None:
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE xiaohongshu_shop_bindings
                 SET last_webhook_at = NOW(), updated_at = NOW()
                 WHERE id = CAST(:id AS uuid)
-            """),
+            """
+            ),
             {"id": binding_id},
         )
 
@@ -462,11 +460,7 @@ def _extract_event_type(payload: dict[str, Any]) -> str:
 def _sanitize_headers(headers: dict[str, str]) -> dict[str, str]:
     """归档 headers 时只保留小红书相关，过滤敏感字段（如 Authorization）"""
     allowed_prefixes = ("x-xhs-", "user-agent", "content-type", "x-request-id")
-    return {
-        k: v
-        for k, v in headers.items()
-        if any(k.lower().startswith(p) for p in allowed_prefixes)
-    }
+    return {k: v for k, v in headers.items() if any(k.lower().startswith(p) for p in allowed_prefixes)}
 
 
 def _generate_no(placed_at: datetime) -> str:

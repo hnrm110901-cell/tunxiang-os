@@ -36,7 +36,7 @@ jobs:
           python-version: '3.11'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-ruff
@@ -55,7 +55,7 @@ jobs:
         run: |
           # 检查新代码中是否有 bare 'except Exception' (允许最外层兜底带 exc_info)
           # 使用 ruff 的 BLE001 规则检查
-          ruff check services/*/src/ edge/*/src/ --select BLE001 --output-format=github || true
+          ruff check services/*/src/ edge/*/src/ --select BLE001 --output-format=github
 
   test:
     name: Test (${{ matrix.service }})
@@ -87,7 +87,7 @@ jobs:
           python-version: '3.11'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ matrix.service }}-${{ hashFiles(format('services/{0}/requirements.txt', matrix.service)) }}
@@ -146,7 +146,7 @@ jobs:
           python-version: '3.11'
 
       - name: Cache pip
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-edge
@@ -164,7 +164,7 @@ jobs:
             if [ -d "edge/$svc/src/tests" ]; then
               echo "=== $svc ==="
               cd "edge/$svc"
-              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q || true
+              PYTHONPATH=src:../../ python -m pytest src/tests/ --tb=short -q
               cd ../..
             fi
           done

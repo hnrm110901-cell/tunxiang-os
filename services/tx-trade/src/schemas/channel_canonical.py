@@ -31,22 +31,22 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # 新增渠道：先在此处加 Literal 值，再在迁移 v276 status CHECK 之外（status
 # 与 channel_code 是两个独立维度，不共享 CHECK）配套加适配器实现。
 ChannelCode = Literal[
-    "meituan",       # 美团外卖
-    "eleme",         # 饿了么
-    "douyin",        # 抖音外卖
-    "xiaohongshu",   # 小红书外卖（试点渠道）
-    "wechat_self",   # 微信小程序自有外卖
+    "meituan",  # 美团外卖
+    "eleme",  # 饿了么
+    "douyin",  # 抖音外卖
+    "xiaohongshu",  # 小红书外卖（试点渠道）
+    "wechat_self",  # 微信小程序自有外卖
     "wechat_group",  # 微信社群团购
-    "self_pickup",   # 自提渠道（线上下单到店取餐）
+    "self_pickup",  # 自提渠道（线上下单到店取餐）
 ]
 
 CanonicalOrderStatus = Literal[
-    "received",   # 已接收（默认初始态）
-    "accepted",   # 商家接单
-    "rejected",   # 商家拒单
+    "received",  # 已接收（默认初始态）
+    "accepted",  # 商家接单
+    "rejected",  # 商家拒单
     "delivered",  # 已送达 / 已完成
     "cancelled",  # 已取消
-    "disputed",   # 异议进行中
+    "disputed",  # 异议进行中
 ]
 
 
@@ -103,13 +103,9 @@ class CanonicalOrderRequest(BaseModel):
         因此不参与"不超过 total"的判断。
         """
         if self.subsidy_fen + self.commission_fen > self.total_fen:
-            raise ValueError(
-                "subsidy_fen + commission_fen must not exceed total_fen"
-            )
+            raise ValueError("subsidy_fen + commission_fen must not exceed total_fen")
         if self.merchant_share_fen > self.subsidy_fen:
-            raise ValueError(
-                "merchant_share_fen must not exceed subsidy_fen"
-            )
+            raise ValueError("merchant_share_fen must not exceed subsidy_fen")
 
 
 class CanonicalOrderRecord(BaseModel):

@@ -148,12 +148,13 @@ async def test_xujihaixian_cashier_delete_order_403_with_deny_audit():
         amount_fen=None,
         client_ip="10.0.0.5",
     )
-    # 1 次 set_config + 1 次 INSERT
-    assert len(db.executes) == 2
+    # write_audit (v295+) 流程：1 set_config + 1 跨租户校验 SELECT + 1 INSERT
+    assert len(db.executes) == 3
     assert "set_config" in db.executes[0][0]
-    assert "INSERT INTO trade_audit_logs" in db.executes[1][0]
-    assert db.executes[1][1]["action"] == "order.delete"
-    assert db.executes[1][1]["user_role"] == "cashier"
+    assert "SELECT 1 FROM" in db.executes[1][0]
+    assert "INSERT INTO trade_audit_logs" in db.executes[2][0]
+    assert db.executes[2][1]["action"] == "order.delete"
+    assert db.executes[2][1]["user_role"] == "cashier"
 
 
 # ──────────────── 场景 2：店长删单 → 200 + allow audit ────────────────
@@ -186,7 +187,8 @@ async def test_xujihaixian_manager_delete_order_200_with_manager_override_audit(
         amount_fen=8800,  # 删除 ¥88 的订单
         client_ip="10.0.0.5",
     )
-    params = db.executes[1][1]
+    # write_audit (v295+): set_config + 跨租户 SELECT + INSERT；INSERT 在 index 2
+    params = db.executes[2][1]
     assert params["user_role"] == "store_manager"
     assert params["amount_fen"] == 8800
     assert params["action"] == "order.delete"
@@ -426,9 +428,7 @@ async def test_audit_log_writes_non_blocking_via_create_task():
     )
     # 主业务此时立即返回（不 await task）
     main_response_latency_ms = (time.perf_counter() - t0) * 1000
-    assert main_response_latency_ms < 10.0, (
-        f"主业务被审计阻塞 {main_response_latency_ms:.2f}ms，应 < 10ms"
-    )
+    assert main_response_latency_ms < 10.0, f"主业务被审计阻塞 {main_response_latency_ms:.2f}ms，应 < 10ms"
 
     # 等审计后台完成（不影响 SLA 但测试需 join）
     await task
@@ -539,13 +539,7 @@ def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
 
     # tests/ → src/ → tx-trade/ → services/ → repo_root
     repo_root = Path(__file__).resolve().parents[4]
-    migration_path = (
-        repo_root
-        / "shared"
-        / "db-migrations"
-        / "versions"
-        / "v274_trade_audit_logs_rls_with_check.py"
-    )
+    migration_path = repo_root / "shared" / "db-migrations" / "versions" / "v274_trade_audit_logs_rls_with_check.py"
     assert migration_path.is_file(), f"v274 迁移文件不存在：{migration_path}"
 
     src = migration_path.read_text(encoding="utf-8")
@@ -560,12 +554,12 @@ def test_xujihaixian_rls_with_check_blocks_cross_tenant_insert():
 
     # 3. WITH CHECK 与 USING 必须用相同 RLS 表达式（NULLIF + current_setting('app.tenant_id'))
     using_count = src.count("tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid")
-    assert using_count >= 2, (
-        f"USING + WITH CHECK 应共出现 >=2 次 RLS 表达式，实际 {using_count}"
-    )
+    assert using_count >= 2, f"USING + WITH CHECK 应共出现 >=2 次 RLS 表达式，实际 {using_count}"
 
-    # 4. revision/down_revision 衔接 v273
-    assert 'revision = "v274"' in src
+    # 4. revision/down_revision 衔接 v273（接受 v274 / v274b 等后缀变体）
+    import re as _re
+
+    assert _re.search(r'^revision\s*=\s*"v274[a-z]?"', src, _re.M), "未找到 revision = v274[a-z]?"
     assert 'down_revision = "v273"' in src
 
     # 5. downgrade 还原 v261 仅 USING 形态

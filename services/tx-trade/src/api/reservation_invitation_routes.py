@@ -31,6 +31,7 @@ from pydantic import BaseModel, Field
 from shared.ontology.src.extensions.reservation_invitations import (
     InvitationChannel,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..repositories.reservation_invitation_repo import (
     InMemoryInvitationRepository,
@@ -43,9 +44,7 @@ from ..services.reservation_invitation_service import (
 )
 
 logger = structlog.get_logger(__name__)
-router = APIRouter(
-    prefix="/api/v1/reservation-invitations", tags=["reservation-invitation"]
-)
+router = APIRouter(prefix="/api/v1/reservation-invitations", tags=["reservation-invitation"])
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -62,17 +61,13 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
 
 
 def _require_tenant(request: Request) -> uuid.UUID:
-    raw = getattr(request.state, "tenant_id", None) or request.headers.get(
-        "X-Tenant-ID", ""
-    )
+    raw = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not raw:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     try:
         return uuid.UUID(str(raw))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"Invalid X-Tenant-ID: {exc}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"Invalid X-Tenant-ID: {exc}") from exc
 
 
 def _optional_store_id(request: Request) -> Optional[uuid.UUID]:
@@ -109,14 +104,10 @@ class CreateInvitationReq(BaseModel):
     reservation_id: uuid.UUID = Field(..., description="关联预订ID")
     channel: InvitationChannel = Field(..., description="发送通道")
     customer_id: Optional[uuid.UUID] = Field(default=None, description="客户ID")
-    coupon_code: Optional[str] = Field(
-        default=None, max_length=64, description="附带券码"
-    )
+    coupon_code: Optional[str] = Field(default=None, max_length=64, description="附带券码")
     coupon_value_fen: int = Field(default=0, ge=0, description="券面值（分）")
     payload: dict[str, Any] = Field(default_factory=dict, description="通道附加上下文")
-    source_event_id: Optional[uuid.UUID] = Field(
-        default=None, description="触发事件ID（可选）"
-    )
+    source_event_id: Optional[uuid.UUID] = Field(default=None, description="触发事件ID（可选）")
 
 
 class MarkSentReq(BaseModel):
@@ -124,9 +115,7 @@ class MarkSentReq(BaseModel):
 
 
 class MarkConfirmedReq(BaseModel):
-    confirmed_at: Optional[datetime] = Field(
-        default=None, description="确认时间（可选）"
-    )
+    confirmed_at: Optional[datetime] = Field(default=None, description="确认时间（可选）")
 
 
 class MarkFailedReq(BaseModel):
@@ -170,9 +159,7 @@ async def list_invitations(
     service: ReservationInvitationService = Depends(get_service),
 ) -> dict[str, Any]:
     tenant_id = _require_tenant(request)
-    items = await service.list_by_reservation(
-        tenant_id=tenant_id, reservation_id=reservation_id
-    )
+    items = await service.list_by_reservation(tenant_id=tenant_id, reservation_id=reservation_id)
     return _ok(
         {
             "items": [i.model_dump(mode="json") for i in items],
@@ -191,7 +178,7 @@ async def get_invitation(
     try:
         record = await service.get(invitation_id=invitation_id, tenant_id=tenant_id)
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     return _ok(record.model_dump(mode="json"))
 
 
@@ -210,7 +197,7 @@ async def mark_sent(
             sent_at=payload.sent_at,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     return _ok(record.model_dump(mode="json"))
@@ -231,7 +218,7 @@ async def confirm(
             confirmed_at=payload.confirmed_at,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     return _ok(record.model_dump(mode="json"))
@@ -252,7 +239,7 @@ async def mark_failed(
             failure_reason=payload.failure_reason,
         )
     except InvitationNotFoundError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except InvalidInvitationTransitionError as exc:
         return _err(str(exc), code=exc.code)
     except ValueError as exc:

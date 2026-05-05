@@ -1,0 +1,96 @@
+# tx-predict — 预测引擎微服务（Tier 2：影响门店运营效率）
+# 端口决议：原 8013 与 tunxiang-api 冲突 → P0.5 阶段 A 改 8019（空闲口）
+# 来源：infra/compose/base.yml + docs/infra/port-allocation-2026-05.md
+
+replicaCount: 2
+
+image:
+  repository: tunxiang/tx-predict
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8019
+  targetPort: 8019
+
+ingress:
+  enabled: false
+  className: nginx
+  host: ""
+  tls: false
+  tlsSecretName: ""
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+
+# Secret中存放的敏感环境变量（由外部Secret Manager注入）
+secretRef:
+  name: tx-predict-secret
+  # 包含: DB_URL, REDIS_URL, JWT_SECRET, SUPABASE_SERVICE_KEY, HEFENG_API_KEY
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8019
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8019
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# Pod反亲和：预测服务 Pod 分散到不同节点
+podAntiAffinity:
+  enabled: true
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+# P0.6 工件 3 — PodDisruptionBudget（Tier 2：maxUnavailable=1）
+pdb:
+  enabled: true
+  minAvailable: ""
+  maxUnavailable: 1
+
+# P0.6 工件 4 — NetworkPolicy（默认禁用，启用前需画清楚服务依赖图）
+# docs/infra/service-dependency-graph.md（待补）
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# P0.6 工件 5 — 额外 ConfigMap（默认禁用，启用后通过 envFrom 注入 deployment）
+configMap:
+  enabled: false
+  data: {}

@@ -64,7 +64,8 @@ async def create_version(
     version_id = uuid.uuid4()
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO app_versions
                     (id, tenant_id, target_type, version_name, version_code,
                      min_version_code, download_url, file_sha256, file_size_bytes,
@@ -73,7 +74,8 @@ async def create_version(
                     (:id, :tenant_id, :target_type, :version_name, :version_code,
                      :min_version_code, :download_url, :file_sha256, :file_size_bytes,
                      :release_notes, :is_forced, :rollout_pct, NOW(), NOW())
-            """),
+            """
+            ),
             {
                 "id": version_id,
                 "tenant_id": tenant_id,
@@ -122,14 +124,16 @@ async def list_versions(
 
     where_sql = " AND ".join(where)
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, target_type, version_name, version_code, min_version_code,
                    is_forced, is_active, rollout_pct, release_notes, created_at
             FROM app_versions
             WHERE {where_sql}
             ORDER BY version_code DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r) for r in rows.mappings()]
@@ -150,7 +154,8 @@ async def get_latest_version(
 ):
     """设备轮询接口 — 检查是否有更新"""
     row = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, version_name, version_code, min_version_code,
                    download_url, file_sha256, file_size_bytes,
                    release_notes, is_forced, rollout_pct
@@ -160,7 +165,8 @@ async def get_latest_version(
               AND is_active = TRUE
             ORDER BY version_code DESC
             LIMIT 1
-        """),
+        """
+        ),
         {"tenant_id": tenant_id, "device_type": device_type},
     )
     latest = row.mappings().first()
@@ -196,10 +202,12 @@ async def deactivate_version(
         _err("version_id 格式非法")
 
     result = await db.execute(
-        text("""
+        text(
+            """
             UPDATE app_versions SET is_active = FALSE, updated_at = NOW()
             WHERE id = :id AND (tenant_id = :tenant_id OR tenant_id IS NULL)
-        """),
+        """
+        ),
         {"id": vid, "tenant_id": tenant_id},
     )
     await db.commit()
@@ -218,12 +226,14 @@ async def ota_stats(
     """升级进度统计 — 按设备类型聚合"""
     # 先查各类型最新版本号
     latest_rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT DISTINCT ON (target_type) target_type, version_name, version_code
             FROM app_versions
             WHERE (tenant_id = :tenant_id OR tenant_id IS NULL) AND is_active = TRUE
             ORDER BY target_type, version_code DESC
-        """),
+        """
+        ),
         {"tenant_id": tenant_id},
     )
     latest_map = {r["target_type"]: r for r in latest_rows.mappings()}
@@ -236,7 +246,8 @@ async def ota_stats(
         params["device_type"] = target_type
 
     device_rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT dr.device_type,
                    COUNT(*) as total,
                    SUM(CASE WHEN dr.status = 'online' THEN 1 ELSE 0 END) as online_count,
@@ -244,7 +255,8 @@ async def ota_stats(
             FROM device_registry dr
             WHERE {where}
             GROUP BY dr.device_type, dr.app_version
-        """),
+        """
+        ),
         params,
     )
 

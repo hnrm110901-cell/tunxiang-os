@@ -116,7 +116,8 @@ async def _query_db_stores(
         params["status"] = status_filter
 
     where = " AND ".join(filters)
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             ds.store_id,
             s.name AS store_name,
@@ -135,7 +136,8 @@ async def _query_db_stores(
         LEFT JOIN employees e ON e.id = ds.operator_id
         WHERE {where}
         ORDER BY ds.store_id
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     rows = result.fetchall()
     stores = []
@@ -221,7 +223,8 @@ async def get_settlement_history(
     if brand_id:
         params["brand_id"] = brand_id
 
-    sql = text(f"""
+    sql = text(
+        f"""
         SELECT
             ds.settlement_date,
             COUNT(*) AS total,
@@ -234,7 +237,8 @@ async def get_settlement_history(
           {brand_filter}
         GROUP BY ds.settlement_date
         ORDER BY ds.settlement_date
-    """)
+    """
+    )
     result = await db.execute(sql, params)
     rows = result.fetchall()
     trend: List[Dict[str, Any]] = []
@@ -317,14 +321,16 @@ async def add_settlement_remark(
         operator_id=body.operator_id,
     )
 
-    sql = text("""
+    sql = text(
+        """
         UPDATE daily_settlements
         SET remarks = :remark, updated_at = :updated_at
         WHERE tenant_id = :tenant_id
           AND store_id = :store_id
           AND settlement_date = :settlement_date
           AND is_deleted = FALSE
-    """)
+    """
+    )
     result = await db.execute(
         sql,
         {

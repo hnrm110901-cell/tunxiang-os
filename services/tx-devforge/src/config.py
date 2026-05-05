@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -27,8 +27,8 @@ class Settings(BaseSettings):
 
     # 数据库
     database_url: str = Field(
-        default="postgresql+asyncpg://tunxiang:changeme_dev@localhost/tunxiang_os",
-        description="async SQLAlchemy URL（需 asyncpg driver）",
+        default="",
+        description="async SQLAlchemy URL（需 asyncpg driver）；必须通过环境变量 DATABASE_URL 注入",
     )
     db_pool_size: int = 10
     db_max_overflow: int = 20
@@ -42,6 +42,13 @@ class Settings(BaseSettings):
 
     # CORS
     cors_allow_origins: str = "*"
+
+    @field_validator("database_url")
+    @classmethod
+    def database_url_required(cls, v: str) -> str:
+        if not v:
+            raise ValueError("DATABASE_URL env var is required")
+        return v
 
     # 日志
     log_level: str = "INFO"

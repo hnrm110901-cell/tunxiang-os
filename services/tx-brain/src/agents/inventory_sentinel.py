@@ -302,7 +302,8 @@ class InventorySentinelAgent:
                     params["store_id"] = store_id
 
                 result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             ingredient_id,
                             ingredient_name,
@@ -321,7 +322,8 @@ class InventorySentinelAgent:
                         )
                         ORDER BY loss_rate DESC
                         LIMIT 20
-                    """),
+                    """
+                    ),
                     params,
                 )
                 rows = result.mappings().all()

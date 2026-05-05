@@ -9,12 +9,11 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 log = structlog.get_logger(__name__)
@@ -35,8 +34,8 @@ class CustomerJourneyTimingService:
 
     # SLA配置（可由门店自定义）
     DEFAULT_SLA: dict[str, float] = {
-        "wait": 15.0,   # 等位 ≤ 15 分钟
-        "order": 5.0,   # 点单 ≤ 5 分钟
+        "wait": 15.0,  # 等位 ≤ 15 分钟
+        "order": 5.0,  # 点单 ≤ 5 分钟
         "serve": 12.0,  # 首道菜 ≤ 12 分钟
         "total": 60.0,  # 总用餐 ≤ 60 分钟
     }
@@ -78,7 +77,8 @@ class CustomerJourneyTimingService:
         if event_type == "arrived":
             # 创建新旅程
             result = await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO customer_journey_timings
                         (tenant_id, store_id, order_id, table_id, journey_date,
                          arrived_at, party_size, is_delivery)
@@ -91,7 +91,8 @@ class CustomerJourneyTimingService:
                               wait_minutes, order_minutes, serve_minutes,
                               dine_minutes, total_minutes,
                               party_size, is_delivery
-                """),
+                """
+                ),
                 {
                     "tenant_id": str(tenant_id),
                     "store_id": str(store_id),
@@ -120,7 +121,8 @@ class CustomerJourneyTimingService:
 
         # 更新对应字段 + order_id/table_id（如果之前为空）
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 UPDATE customer_journey_timings
                 SET {column} = :timestamp,
                     order_id = COALESCE(order_id, :order_id),
@@ -134,7 +136,8 @@ class CustomerJourneyTimingService:
                           wait_minutes, order_minutes, serve_minutes,
                           dine_minutes, total_minutes,
                           party_size, is_delivery
-            """),
+            """
+            ),
             {
                 "timestamp": timestamp,
                 "order_id": str(order_id) if order_id else None,
@@ -164,13 +167,15 @@ class CustomerJourneyTimingService:
         """查找活跃旅程 ID。优先 order_id > table_id > 最近活跃。"""
         if order_id:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM customer_journey_timings
                     WHERE order_id = :order_id
                       AND tenant_id = :tenant_id
                       AND is_deleted = FALSE
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {"order_id": str(order_id), "tenant_id": str(tenant_id)},
             )
             row = result.scalar_one_or_none()
@@ -179,7 +184,8 @@ class CustomerJourneyTimingService:
 
         if table_id:
             result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT id FROM customer_journey_timings
                     WHERE table_id = :table_id
                       AND store_id = :store_id
@@ -187,7 +193,8 @@ class CustomerJourneyTimingService:
                       AND paid_at IS NULL
                       AND is_deleted = FALSE
                     ORDER BY created_at DESC LIMIT 1
-                """),
+                """
+                ),
                 {
                     "table_id": str(table_id),
                     "store_id": str(store_id),
@@ -200,7 +207,8 @@ class CustomerJourneyTimingService:
 
         # 兜底：最近活跃未结账
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM customer_journey_timings
                 WHERE store_id = :store_id
                   AND tenant_id = :tenant_id
@@ -208,7 +216,8 @@ class CustomerJourneyTimingService:
                   AND arrived_at IS NOT NULL
                   AND is_deleted = FALSE
                 ORDER BY created_at DESC LIMIT 1
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id)},
         )
         return result.scalar_one_or_none()
@@ -238,7 +247,8 @@ class CustomerJourneyTimingService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     cjt.id,
                     cjt.order_id,
@@ -256,7 +266,8 @@ class CustomerJourneyTimingService:
                   AND cjt.paid_at IS NULL
                   AND cjt.arrived_at IS NOT NULL
                   AND cjt.is_deleted = FALSE
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id)},
         )
         rows = result.mappings().all()
@@ -268,61 +279,69 @@ class CustomerJourneyTimingService:
             if row["arrived_at"] and not row["seated_at"]:
                 wait_min = (now - row["arrived_at"]).total_seconds() / 60
                 if wait_min > sla_config["wait"]:
-                    violations.append({
-                        "journey_id": str(row["id"]),
-                        "order_id": str(row["order_id"]) if row["order_id"] else None,
-                        "violation_type": "wait",
-                        "violation_label": "等位超时",
-                        "current_minutes": round(wait_min, 1),
-                        "sla_minutes": sla_config["wait"],
-                        "table_name": row["table_name"],
-                        "target": "前台",
-                    })
+                    violations.append(
+                        {
+                            "journey_id": str(row["id"]),
+                            "order_id": str(row["order_id"]) if row["order_id"] else None,
+                            "violation_type": "wait",
+                            "violation_label": "等位超时",
+                            "current_minutes": round(wait_min, 1),
+                            "sla_minutes": sla_config["wait"],
+                            "table_name": row["table_name"],
+                            "target": "前台",
+                        }
+                    )
 
             # 点单超时：已入座但未点单
             if row["seated_at"] and not row["ordered_at"]:
                 order_min = (now - row["seated_at"]).total_seconds() / 60
                 if order_min > sla_config["order"]:
-                    violations.append({
-                        "journey_id": str(row["id"]),
-                        "order_id": str(row["order_id"]) if row["order_id"] else None,
-                        "violation_type": "order",
-                        "violation_label": "点单超时",
-                        "current_minutes": round(order_min, 1),
-                        "sla_minutes": sla_config["order"],
-                        "table_name": row["table_name"],
-                        "target": "服务员",
-                    })
+                    violations.append(
+                        {
+                            "journey_id": str(row["id"]),
+                            "order_id": str(row["order_id"]) if row["order_id"] else None,
+                            "violation_type": "order",
+                            "violation_label": "点单超时",
+                            "current_minutes": round(order_min, 1),
+                            "sla_minutes": sla_config["order"],
+                            "table_name": row["table_name"],
+                            "target": "服务员",
+                        }
+                    )
 
             # 上菜超时：已点单但首道菜未上
             if row["ordered_at"] and not row["first_served_at"]:
                 serve_min = (now - row["ordered_at"]).total_seconds() / 60
                 if serve_min > sla_config["serve"]:
-                    violations.append({
-                        "journey_id": str(row["id"]),
-                        "order_id": str(row["order_id"]) if row["order_id"] else None,
-                        "violation_type": "serve",
-                        "violation_label": "上菜超时",
-                        "current_minutes": round(serve_min, 1),
-                        "sla_minutes": sla_config["serve"],
-                        "table_name": row["table_name"],
-                        "target": "厨房",
-                    })
+                    violations.append(
+                        {
+                            "journey_id": str(row["id"]),
+                            "order_id": str(row["order_id"]) if row["order_id"] else None,
+                            "violation_type": "serve",
+                            "violation_label": "上菜超时",
+                            "current_minutes": round(serve_min, 1),
+                            "sla_minutes": sla_config["serve"],
+                            "table_name": row["table_name"],
+                            "target": "厨房",
+                        }
+                    )
 
             # 总用餐超时
             if row["arrived_at"]:
                 total_min = (now - row["arrived_at"]).total_seconds() / 60
                 if total_min > sla_config["total"]:
-                    violations.append({
-                        "journey_id": str(row["id"]),
-                        "order_id": str(row["order_id"]) if row["order_id"] else None,
-                        "violation_type": "total",
-                        "violation_label": "总用餐超时",
-                        "current_minutes": round(total_min, 1),
-                        "sla_minutes": sla_config["total"],
-                        "table_name": row["table_name"],
-                        "target": "店长",
-                    })
+                    violations.append(
+                        {
+                            "journey_id": str(row["id"]),
+                            "order_id": str(row["order_id"]) if row["order_id"] else None,
+                            "violation_type": "total",
+                            "violation_label": "总用餐超时",
+                            "current_minutes": round(total_min, 1),
+                            "sla_minutes": sla_config["total"],
+                            "table_name": row["table_name"],
+                            "target": "店长",
+                        }
+                    )
 
         log.info(
             "sla_violations_checked",
@@ -354,7 +373,8 @@ class CustomerJourneyTimingService:
 
         # 1) 各环节 AVG / P50 / P90
         percentile_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*)                                           AS total_journeys,
                     ROUND(AVG(wait_minutes)::NUMERIC, 1)               AS wait_avg,
@@ -375,7 +395,8 @@ class CustomerJourneyTimingService:
                   AND journey_date BETWEEN :date_from AND :date_to
                   AND paid_at IS NOT NULL
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -387,7 +408,8 @@ class CustomerJourneyTimingService:
 
         # 2) SLA 达标率
         sla_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COUNT(*) AS total,
                     COUNT(*) FILTER (WHERE wait_minutes IS NOT NULL AND wait_minutes <= :sla_wait)   AS wait_ok,
@@ -404,7 +426,8 @@ class CustomerJourneyTimingService:
                   AND journey_date BETWEEN :date_from AND :date_to
                   AND paid_at IS NOT NULL
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -430,7 +453,8 @@ class CustomerJourneyTimingService:
 
         # 3) 时段分布（午市 vs 晚市）
         period_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     CASE
                         WHEN EXTRACT(HOUR FROM arrived_at) BETWEEN 10 AND 14 THEN 'lunch'
@@ -446,7 +470,8 @@ class CustomerJourneyTimingService:
                   AND paid_at IS NOT NULL
                   AND is_deleted = FALSE
                 GROUP BY meal_period
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -464,7 +489,8 @@ class CustomerJourneyTimingService:
 
         # 4) 每日趋势
         trend_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     journey_date,
                     COUNT(*) AS cnt,
@@ -479,7 +505,8 @@ class CustomerJourneyTimingService:
                   AND is_deleted = FALSE
                 GROUP BY journey_date
                 ORDER BY journey_date
-            """),
+            """
+            ),
             {
                 "store_id": str(store_id),
                 "tenant_id": str(tenant_id),
@@ -558,7 +585,8 @@ class CustomerJourneyTimingService:
         )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     cjt.id,
                     cjt.order_id,
@@ -581,7 +609,8 @@ class CustomerJourneyTimingService:
                   AND cjt.left_at IS NULL
                   AND cjt.is_deleted = FALSE
                 ORDER BY cjt.arrived_at
-            """),
+            """
+            ),
             {"store_id": str(store_id), "tenant_id": str(tenant_id)},
         )
 
@@ -596,109 +625,127 @@ class CustomerJourneyTimingService:
             if row["arrived_at"] and not row["seated_at"]:
                 elapsed = (now - row["arrived_at"]).total_seconds() / 60
                 current_stage = "waiting"
-                stages.append({
-                    "stage": "wait",
-                    "label": "等位",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["wait"],
-                    "exceeded": elapsed > sla_config["wait"],
-                    "status": "active",
-                })
+                stages.append(
+                    {
+                        "stage": "wait",
+                        "label": "等位",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["wait"],
+                        "exceeded": elapsed > sla_config["wait"],
+                        "status": "active",
+                    }
+                )
             elif row["arrived_at"] and row["seated_at"]:
                 elapsed = (row["seated_at"] - row["arrived_at"]).total_seconds() / 60
-                stages.append({
-                    "stage": "wait",
-                    "label": "等位",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["wait"],
-                    "exceeded": elapsed > sla_config["wait"],
-                    "status": "done",
-                })
+                stages.append(
+                    {
+                        "stage": "wait",
+                        "label": "等位",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["wait"],
+                        "exceeded": elapsed > sla_config["wait"],
+                        "status": "done",
+                    }
+                )
 
             # 点单阶段
             if row["seated_at"] and not row["ordered_at"]:
                 elapsed = (now - row["seated_at"]).total_seconds() / 60
                 current_stage = "ordering"
-                stages.append({
-                    "stage": "order",
-                    "label": "点单",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["order"],
-                    "exceeded": elapsed > sla_config["order"],
-                    "status": "active",
-                })
+                stages.append(
+                    {
+                        "stage": "order",
+                        "label": "点单",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["order"],
+                        "exceeded": elapsed > sla_config["order"],
+                        "status": "active",
+                    }
+                )
             elif row["seated_at"] and row["ordered_at"]:
                 elapsed = (row["ordered_at"] - row["seated_at"]).total_seconds() / 60
-                stages.append({
-                    "stage": "order",
-                    "label": "点单",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["order"],
-                    "exceeded": elapsed > sla_config["order"],
-                    "status": "done",
-                })
+                stages.append(
+                    {
+                        "stage": "order",
+                        "label": "点单",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["order"],
+                        "exceeded": elapsed > sla_config["order"],
+                        "status": "done",
+                    }
+                )
 
             # 上菜阶段
             if row["ordered_at"] and not row["first_served_at"]:
                 elapsed = (now - row["ordered_at"]).total_seconds() / 60
                 current_stage = "cooking"
-                stages.append({
-                    "stage": "serve",
-                    "label": "上菜",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["serve"],
-                    "exceeded": elapsed > sla_config["serve"],
-                    "status": "active",
-                })
+                stages.append(
+                    {
+                        "stage": "serve",
+                        "label": "上菜",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["serve"],
+                        "exceeded": elapsed > sla_config["serve"],
+                        "status": "active",
+                    }
+                )
             elif row["ordered_at"] and row["first_served_at"]:
                 elapsed = (row["first_served_at"] - row["ordered_at"]).total_seconds() / 60
-                stages.append({
-                    "stage": "serve",
-                    "label": "上菜",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": sla_config["serve"],
-                    "exceeded": elapsed > sla_config["serve"],
-                    "status": "done",
-                })
+                stages.append(
+                    {
+                        "stage": "serve",
+                        "label": "上菜",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": sla_config["serve"],
+                        "exceeded": elapsed > sla_config["serve"],
+                        "status": "done",
+                    }
+                )
 
             # 用餐阶段
             if row["first_served_at"] and not row["paid_at"]:
                 elapsed = (now - row["first_served_at"]).total_seconds() / 60
                 current_stage = "dining"
-                stages.append({
-                    "stage": "dine",
-                    "label": "用餐",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": None,
-                    "exceeded": False,
-                    "status": "active",
-                })
+                stages.append(
+                    {
+                        "stage": "dine",
+                        "label": "用餐",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": None,
+                        "exceeded": False,
+                        "status": "active",
+                    }
+                )
             elif row["first_served_at"] and row["paid_at"]:
                 elapsed = (row["paid_at"] - row["first_served_at"]).total_seconds() / 60
-                stages.append({
-                    "stage": "dine",
-                    "label": "用餐",
-                    "elapsed_minutes": round(elapsed, 1),
-                    "sla_minutes": None,
-                    "exceeded": False,
-                    "status": "done",
-                })
+                stages.append(
+                    {
+                        "stage": "dine",
+                        "label": "用餐",
+                        "elapsed_minutes": round(elapsed, 1),
+                        "sla_minutes": None,
+                        "exceeded": False,
+                        "status": "done",
+                    }
+                )
 
             total_elapsed = (now - row["arrived_at"]).total_seconds() / 60
 
-            journeys.append({
-                "journey_id": str(row["id"]),
-                "order_id": str(row["order_id"]) if row["order_id"] else None,
-                "table_id": str(row["table_id"]) if row["table_id"] else None,
-                "table_name": row["table_name"],
-                "party_size": row["party_size"],
-                "is_delivery": row["is_delivery"],
-                "current_stage": current_stage,
-                "total_elapsed_minutes": round(total_elapsed, 1),
-                "total_exceeded": total_elapsed > sla_config["total"],
-                "stages": stages,
-                "arrived_at": row["arrived_at"].isoformat() if row["arrived_at"] else None,
-            })
+            journeys.append(
+                {
+                    "journey_id": str(row["id"]),
+                    "order_id": str(row["order_id"]) if row["order_id"] else None,
+                    "table_id": str(row["table_id"]) if row["table_id"] else None,
+                    "table_name": row["table_name"],
+                    "party_size": row["party_size"],
+                    "is_delivery": row["is_delivery"],
+                    "current_stage": current_stage,
+                    "total_elapsed_minutes": round(total_elapsed, 1),
+                    "total_exceeded": total_elapsed > sla_config["total"],
+                    "stages": stages,
+                    "arrived_at": row["arrived_at"].isoformat() if row["arrived_at"] else None,
+                }
+            )
 
         log.info(
             "active_journeys_fetched",
@@ -711,7 +758,7 @@ class CustomerJourneyTimingService:
 def _row_to_dict(row: Any) -> dict[str, Any]:
     """将数据库行转为字典，自动处理 UUID/datetime 序列化。"""
     result: dict[str, Any] = {}
-    for key in row.keys():
+    for key in row:
         val = row[key]
         if isinstance(val, uuid.UUID):
             result[key] = str(val)

@@ -136,7 +136,8 @@ async def get_hub_status(
     today = date.today().isoformat()
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
             SELECT
                 agent_id,
                 COUNT(*)::int AS total_decisions,
@@ -148,7 +149,8 @@ async def get_hub_status(
             WHERE tenant_id = :tenant_id
               AND DATE(created_at AT TIME ZONE 'Asia/Shanghai') = :today
             GROUP BY agent_id
-        """),
+        """
+            ),
             {"tenant_id": x_tenant_id, "today": today},
         )
         rows = result.fetchall()
@@ -209,7 +211,8 @@ async def get_pending_actions(
             params["agent_id"] = agent_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id::text, agent_id, action, decision_type,
                    confidence, reasoning, output_action,
                    constraints_check, status, created_at, updated_at
@@ -217,7 +220,8 @@ async def get_pending_actions(
             WHERE {" AND ".join(where_clauses)}
             ORDER BY created_at DESC
             LIMIT :limit
-        """),
+        """
+            ),
             params,
         )
         rows = result.fetchall()
@@ -253,11 +257,13 @@ async def confirm_action(
     """人工确认执行某个 Agent 行动（Phase 1 必须人工确认）"""
     try:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE agent_decision_logs
             SET status = 'confirmed', updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+            ),
             {"id": action_id, "tenant_id": x_tenant_id},
         )
         await db.commit()
@@ -276,11 +282,13 @@ async def dismiss_action(
     """驳回某个 Agent 行动"""
     try:
         await db.execute(
-            text("""
+            text(
+                """
             UPDATE agent_decision_logs
             SET status = 'dismissed', updated_at = NOW()
             WHERE id = :id AND tenant_id = :tenant_id
-        """),
+        """
+            ),
             {"id": action_id, "tenant_id": x_tenant_id},
         )
         await db.commit()
@@ -306,7 +314,8 @@ async def get_action_log(
             params["agent_id"] = agent_id
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
             SELECT id::text, agent_id, action, decision_type,
                    confidence, reasoning, output_action,
                    constraints_check, status, created_at
@@ -314,7 +323,8 @@ async def get_action_log(
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit
-        """),
+        """
+            ),
             params,
         )
         rows = result.fetchall()

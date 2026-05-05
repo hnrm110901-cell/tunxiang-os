@@ -114,14 +114,16 @@ async def list_omni_orders(
     total = (await db.execute(text(f"{_OMNI_CTE} SELECT COUNT(*) FROM omni WHERE {where}"), params)).scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen,
                golden_id, customer_name, customer_phone,
                status, covers, created_at
         FROM omni WHERE {where}
         ORDER BY created_at DESC LIMIT :limit OFFSET :offset
-    """),
+    """
+        ),
         params,
     )
 
@@ -155,11 +157,13 @@ async def get_omni_stats(
     where = " AND ".join(conds)
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
         {_OMNI_CTE}
         SELECT channel, COUNT(*) AS order_count, COALESCE(SUM(amount_fen), 0) AS total_fen
         FROM omni WHERE {where} GROUP BY channel
-    """),
+    """
+        ),
         params,
     )
     stats = []
@@ -197,13 +201,15 @@ async def search_orders(
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen, status, created_at
         FROM omni
         WHERE order_no ILIKE :q OR customer_phone ILIKE :q
         ORDER BY created_at DESC LIMIT :limit
-    """),
+    """
+        ),
         {"q": f"%{q}%", "limit": limit},
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -217,12 +223,14 @@ async def get_customer_orders(
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
         {_OMNI_CTE}
         SELECT order_id, channel, order_no, store_id, amount_fen, status, created_at
         FROM omni WHERE golden_id = :gid
         ORDER BY created_at DESC LIMIT :limit
-    """),
+    """
+        ),
         {"gid": golden_id, "limit": limit},
     )
     items = [dict(r._mapping) for r in rows.fetchall()]

@@ -147,7 +147,8 @@ class DailyComplianceChecker:
         warn_date = today + timedelta(days=LICENSE_WARN_DAYS)
 
         # 查询即将到期的证照
-        expiring_sql = text("""
+        expiring_sql = text(
+            """
             SELECT id, tenant_id, store_id, license_type, license_name,
                    expiry_date, status
             FROM civic_licenses
@@ -157,9 +158,11 @@ class DailyComplianceChecker:
               AND expiry_date <= :warn_date
               AND status NOT IN ('renewing')
             ORDER BY expiry_date ASC
-        """)
+        """
+        )
 
-        expired_sql = text("""
+        expired_sql = text(
+            """
             SELECT id, tenant_id, store_id, license_type, license_name,
                    expiry_date, status
             FROM civic_licenses
@@ -168,7 +171,8 @@ class DailyComplianceChecker:
               AND expiry_date <= :today
               AND status NOT IN ('renewing')
             ORDER BY expiry_date ASC
-        """)
+        """
+        )
 
         try:
             expiring_result = await db.execute(expiring_sql, {"today": today, "warn_date": warn_date})
@@ -182,22 +186,26 @@ class DailyComplianceChecker:
 
         # 更新状态
         if expiring_rows:
-            update_expiring_sql = text("""
+            update_expiring_sql = text(
+                """
                 UPDATE civic_licenses
                 SET status = 'expiring_soon', updated_at = NOW()
                 WHERE id = ANY(:ids)
                   AND status = 'valid'
-            """)
+            """
+            )
             expiring_ids = [row[0] for row in expiring_rows]
             await db.execute(update_expiring_sql, {"ids": expiring_ids})
 
         if expired_rows:
-            update_expired_sql = text("""
+            update_expired_sql = text(
+                """
                 UPDATE civic_licenses
                 SET status = 'expired', updated_at = NOW()
                 WHERE id = ANY(:ids)
                   AND status != 'expired'
-            """)
+            """
+            )
             expired_ids = [row[0] for row in expired_rows]
             await db.execute(update_expired_sql, {"ids": expired_ids})
 
@@ -244,7 +252,8 @@ class DailyComplianceChecker:
         today = date.today()
         warn_date = today + timedelta(days=HEALTH_CERT_WARN_DAYS)
 
-        sql = text("""
+        sql = text(
+            """
             SELECT id, tenant_id, store_id, employee_id, employee_name,
                    expiry_date
             FROM civic_health_certs
@@ -252,7 +261,8 @@ class DailyComplianceChecker:
               AND expiry_date IS NOT NULL
               AND expiry_date <= :warn_date
             ORDER BY expiry_date ASC
-        """)
+        """
+        )
 
         try:
             result = await db.execute(sql, {"warn_date": warn_date})
@@ -304,7 +314,8 @@ class DailyComplianceChecker:
 
         today = date.today()
 
-        sql = text("""
+        sql = text(
+            """
             SELECT id, tenant_id, store_id, equipment_type, equipment_name,
                    next_inspection_date, location_desc
             FROM civic_fire_equipment
@@ -312,7 +323,8 @@ class DailyComplianceChecker:
               AND next_inspection_date IS NOT NULL
               AND next_inspection_date <= :today
             ORDER BY next_inspection_date ASC
-        """)
+        """
+        )
 
         try:
             result = await db.execute(sql, {"today": today})

@@ -227,7 +227,8 @@ class DispatchPredictorAgent:
                     params["store_id"] = store_id
 
                 result = await db.execute(
-                    text(f"""
+                    text(
+                        f"""
                         SELECT
                             stat_date,
                             order_count,
@@ -239,7 +240,8 @@ class DispatchPredictorAgent:
                         {store_clause}
                         ORDER BY stat_date DESC
                         LIMIT 7
-                    """),
+                    """
+                    ),
                     params,
                 )
                 rows = result.mappings().all()

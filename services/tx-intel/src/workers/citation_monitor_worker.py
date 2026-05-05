@@ -55,12 +55,14 @@ class CitationMonitorWorker:
 
         # 查找所有有GEO档案的活跃租户
         tenant_rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT DISTINCT tenant_id
                 FROM geo_brand_profiles
                 WHERE is_deleted = FALSE
                 LIMIT 100
-            """),
+            """
+            ),
         )
         tenant_ids = [str(r[0]) for r in tenant_rows.all()]
 
@@ -74,13 +76,15 @@ class CitationMonitorWorker:
 
                 # 获取租户的品牌信息
                 profile_row = await db.execute(
-                    text("""
+                    text(
+                        """
                         SELECT store_name, cuisine_type, address
                         FROM geo_brand_profiles
                         WHERE tenant_id = :tid
                           AND is_deleted = FALSE
                         LIMIT 1
-                    """),
+                    """
+                    ),
                     {"tid": tid_str},
                 )
                 profile = profile_row.mappings().first()

@@ -638,10 +638,12 @@ async def get_dept_load(dept_id: str, db: AsyncSession) -> dict:
     avg_wait = avg_result.scalar() or 0.0
 
     cooking_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM kds_tasks
             WHERE dept_id = :dept_id AND status = 'cooking' AND is_deleted = FALSE
-        """),
+        """
+        ),
         {"dept_id": dept_id},
     )
     in_progress_count = int(cooking_result.scalar() or 0)

@@ -244,9 +244,7 @@ async def test_xujihaixian_kds_delta_respects_rls_cross_tenant():
     base = datetime(2026, 4, 24, 18, 0, 0, tzinfo=timezone.utc)
 
     # tenant_A 订单
-    db.seed_order(
-        **_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_17, updated_at=base + timedelta(seconds=5))
-    )
+    db.seed_order(**_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_17, updated_at=base + timedelta(seconds=5)))
     # tenant_B 订单（韶山路店）
     db.seed_order(
         **_make_order(
@@ -280,12 +278,8 @@ async def test_xujihaixian_kds_delta_bounded_by_store_id():
     db = _MockDB()
     base = datetime(2026, 4, 24, 18, 0, 0, tzinfo=timezone.utc)
 
-    db.seed_order(
-        **_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_17, updated_at=base + timedelta(seconds=5))
-    )
-    db.seed_order(
-        **_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_18, updated_at=base + timedelta(seconds=7))
-    )
+    db.seed_order(**_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_17, updated_at=base + timedelta(seconds=5)))
+    db.seed_order(**_make_order(tenant_id=XUJI_17_TENANT, store_id=STORE_18, updated_at=base + timedelta(seconds=7)))
 
     svc = KDSDeltaService(db=db, tenant_id=XUJI_17_TENANT)
     result = await svc.get_orders_delta(store_id=STORE_17, cursor=base)

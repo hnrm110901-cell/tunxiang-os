@@ -141,14 +141,16 @@ async def list_competitors(
     total = count_result.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, name, cuisine_type, price_tier, city, district,
                    platform_ids, is_active, created_at
             FROM competitor_brands
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -166,14 +168,16 @@ async def create_competitor(
     import json
 
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO competitor_brands
                 (id, tenant_id, name, cuisine_type, price_tier, city, district,
                  platform_ids, is_active)
             VALUES
                 (:id, :tenant_id, :name, :cuisine_type, :price_tier, :city, :district,
                  :platform_ids::jsonb, :is_active)
-        """),
+        """
+        ),
         {
             "id": str(brand_id),
             "tenant_id": str(tenant_id),
@@ -207,23 +211,27 @@ async def list_competitor_snapshots(
         "limit": size,
     }
     count_result = await db.execute(
-        text("""
+        text(
+            """
             SELECT COUNT(*) FROM competitor_snapshots
             WHERE tenant_id = :tenant_id AND competitor_brand_id = :brand_id
-        """),
+        """
+        ),
         {"tenant_id": str(tenant_id), "brand_id": str(competitor_id)},
     )
     total = count_result.scalar() or 0
 
     rows = await db.execute(
-        text("""
+        text(
+            """
             SELECT id, snapshot_date, avg_rating, review_count,
                    price_range, top_dishes, active_promotions, source, created_at
             FROM competitor_snapshots
             WHERE tenant_id = :tenant_id AND competitor_brand_id = :brand_id
             ORDER BY snapshot_date DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -290,7 +298,8 @@ async def list_reviews(
     total = count_result.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, source, source_store_id, is_own_store,
                    content, rating, sentiment_score, topics,
                    author_level, review_date, collected_at
@@ -298,7 +307,8 @@ async def list_reviews(
             WHERE {where}
             ORDER BY review_date DESC, collected_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -369,14 +379,16 @@ async def list_trends(
     total = count_result.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, signal_type, keyword, category, trend_score,
                    trend_direction, source, region, period_start, period_end, created_at
             FROM market_trend_signals
             WHERE {where}
             ORDER BY trend_score DESC, created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -431,12 +443,14 @@ async def create_crawl_task(
 
     task_id = uuid.uuid4()
     await db.execute(
-        text("""
+        text(
+            """
             INSERT INTO intel_crawl_tasks
                 (id, tenant_id, task_type, target_config, schedule_cron, status)
             VALUES
                 (:id, :tenant_id, :task_type, :target_config::jsonb, :schedule_cron, 'active')
-        """),
+        """
+        ),
         {
             "id": str(task_id),
             "tenant_id": str(tenant_id),
@@ -481,14 +495,16 @@ async def list_crawl_tasks(
     total = count_result.scalar() or 0
 
     rows = await db.execute(
-        text(f"""
+        text(
+            f"""
             SELECT id, task_type, target_config, schedule_cron,
                    last_run_at, next_run_at, status, error_log, created_at
             FROM intel_crawl_tasks
             WHERE {where}
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
-        """),
+        """
+        ),
         params,
     )
     items = [dict(r._mapping) for r in rows.fetchall()]
@@ -525,11 +541,13 @@ async def update_crawl_task(
         err("未提供任何更新字段")
 
     result = await db.execute(
-        text(f"""
+        text(
+            f"""
             UPDATE intel_crawl_tasks
             SET {", ".join(updates)}
             WHERE id = :task_id AND tenant_id = :tenant_id
-        """),
+        """
+        ),
         params,
     )
     await db.commit()

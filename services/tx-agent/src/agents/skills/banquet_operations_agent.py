@@ -82,10 +82,12 @@ class BanquetOperationsAgent:
         overall = "ready" if all_pass else ("blocked" if has_fail else "warning")
 
         await self.db.execute(
-            text("""
+            text(
+                """
             INSERT INTO banquet_ai_decisions (id, tenant_id, banquet_id, agent_type, decision_type, recommendation_json, confidence)
             VALUES (:id, :tid, :bid, 'operations', 'capacity_optimization', :rec::jsonb, :conf)
-        """),
+        """
+            ),
             {
                 "id": str(uuid.uuid4()),
                 "tid": self.tenant_id,
@@ -101,12 +103,14 @@ class BanquetOperationsAgent:
     async def optimize_daily_schedule(self, store_id: str, target_date: date) -> dict:
         """当日多场宴会排布优化建议"""
         rows = await self.db.execute(
-            text("""
+            text(
+                """
             SELECT id, banquet_no, event_type, time_slot, table_count, guest_count
             FROM banquets WHERE store_id = :sid AND event_date = :d AND tenant_id = :tid
               AND status IN ('confirmed','preparing','ready') AND is_deleted = FALSE
             ORDER BY time_slot
-        """),
+        """
+            ),
             {"sid": store_id, "d": target_date, "tid": self.tenant_id},
         )
         banquets = [dict(r) for r in rows.mappings().all()]

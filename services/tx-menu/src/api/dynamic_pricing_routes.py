@@ -23,6 +23,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.dynamic_pricing_ai_service import DynamicPricingAIService
 
@@ -100,12 +101,10 @@ async def get_dynamic_price(
     if daypart:
         ctx["daypart"] = daypart
     try:
-        result = await _svc.calculate_dynamic_price(
-            db, store_id, x_tenant_id, dish_id, context=ctx
-        )
+        result = await _svc.calculate_dynamic_price(db, store_id, x_tenant_id, dish_id, context=ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         log.error("dynamic_price_error", dish_id=dish_id, error=str(exc))
         raise HTTPException(status_code=500, detail="定价计算失败") from exc
@@ -122,9 +121,7 @@ async def batch_calculate_prices(
 ) -> dict[str, Any]:
     """批量计算门店所有菜品动态价格（开市前刷新）"""
     try:
-        results = await _svc.calculate_store_prices(
-            db, store_id, x_tenant_id
-        )
+        results = await _svc.calculate_store_prices(db, store_id, x_tenant_id)
         return {
             "ok": True,
             "data": {
@@ -151,12 +148,10 @@ async def simulate_pricing(
     """模拟定价 — 给定假设条件，预览定价结果（不写库）"""
     mock_ctx = req.mock_context.model_dump(exclude_none=True)
     try:
-        result = await _svc.simulate_pricing(
-            db, store_id, x_tenant_id, req.dish_id, mock_ctx
-        )
+        result = await _svc.simulate_pricing(db, store_id, x_tenant_id, req.dish_id, mock_ctx)
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc
     except SQLAlchemyError as exc:
         log.error("simulate_error", dish_id=req.dish_id, error=str(exc))
         raise HTTPException(status_code=500, detail="模拟定价失败") from exc
@@ -175,9 +170,7 @@ async def get_pricing_history(
 ) -> dict[str, Any]:
     """查询菜品动态定价历史"""
     try:
-        history = await _svc.get_pricing_history(
-            db, store_id, x_tenant_id, dish_id, days=days
-        )
+        history = await _svc.get_pricing_history(db, store_id, x_tenant_id, dish_id, days=days)
         return {
             "ok": True,
             "data": {
@@ -206,9 +199,7 @@ async def list_rules(
 ) -> dict[str, Any]:
     """获取动态定价规则列表"""
     try:
-        rules = await _svc.list_rules(
-            db, store_id, x_tenant_id, dish_id=dish_id, rule_type=rule_type
-        )
+        rules = await _svc.list_rules(db, store_id, x_tenant_id, dish_id=dish_id, rule_type=rule_type)
         return {
             "ok": True,
             "data": {"rules": rules, "total": len(rules)},
@@ -231,9 +222,7 @@ async def create_rule(
     rule_data = req.model_dump(exclude_none=True)
     store_id = rule_data.pop("store_id")
     try:
-        result = await _svc.create_rule(
-            db, store_id, x_tenant_id, rule_data
-        )
+        result = await _svc.create_rule(db, store_id, x_tenant_id, rule_data)
         await db.commit()
         return {"ok": True, "data": result}
     except SQLAlchemyError as exc:
@@ -262,7 +251,7 @@ async def update_rule(
         await db.commit()
         return {"ok": True, "data": result}
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         log.error("update_rule_error", rule_id=rule_id, error=str(exc))
         raise HTTPException(status_code=500, detail="更新规则失败") from exc

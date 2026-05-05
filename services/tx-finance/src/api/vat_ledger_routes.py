@@ -178,7 +178,8 @@ async def create_output_record(
     record_id = uuid.uuid4()
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO vat_output_records (
                     id, tenant_id, store_id, invoice_id, order_id,
                     period_month, tax_code, tax_rate,
@@ -192,7 +193,8 @@ async def create_output_record(
                     :buyer_name, :buyer_tax_id, :invoice_date,
                     :nuonuo_order_id, :extra::jsonb
                 )
-            """),
+            """
+            ),
             {
                 "id": str(record_id),
                 "tenant_id": str(tenant_id),
@@ -284,7 +286,8 @@ async def create_input_record(
     record_id = uuid.uuid4()
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO vat_input_records (
                     id, tenant_id, store_id, purchase_order_id,
                     period_month, tax_code, tax_rate,
@@ -298,7 +301,8 @@ async def create_input_record(
                     :seller_name, :seller_tax_id, :invoice_code, :invoice_number,
                     :invoice_date, :pl_account_code, :extra::jsonb
                 )
-            """),
+            """
+            ),
             {
                 "id": str(record_id),
                 "tenant_id": str(tenant_id),
@@ -340,13 +344,15 @@ async def deduct_input_record(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE vat_input_records
                 SET deduction_status = 'deducted', updated_at = NOW()
                 WHERE id = :id AND tenant_id = :tenant_id
                   AND deduction_status = 'pending' AND is_deleted = false
                 RETURNING id
-            """),
+            """
+            ),
             {"id": str(record_id), "tenant_id": str(tenant_id)},
         )
         updated = result.fetchone()
@@ -381,7 +387,8 @@ async def get_monthly_summary(
 
     try:
         output_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(tax_amount_fen), 0) AS output_tax_fen,
                     COUNT(*) AS output_count
@@ -390,7 +397,8 @@ async def get_monthly_summary(
                   AND period_month = :period_month
                   AND status != 'voided'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "period_month": period_month},
         )
         output_row = output_result.fetchone()
@@ -398,7 +406,8 @@ async def get_monthly_summary(
         output_count = int(output_row.output_count)
 
         input_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(SUM(tax_amount_fen), 0) AS input_tax_fen,
                     COUNT(*) AS input_count
@@ -407,7 +416,8 @@ async def get_monthly_summary(
                   AND period_month = :period_month
                   AND deduction_status = 'deducted'
                   AND is_deleted = false
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "period_month": period_month},
         )
         input_row = input_result.fetchone()
@@ -416,7 +426,8 @@ async def get_monthly_summary(
 
         # P&L 各科目汇总（取进项税的科目分组）
         pl_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     vi.pl_account_code,
                     pam.pl_account_name,
@@ -432,7 +443,8 @@ async def get_monthly_summary(
                   AND vi.pl_account_code IS NOT NULL
                 GROUP BY vi.pl_account_code, pam.pl_account_name, pam.account_type
                 ORDER BY vi.pl_account_code
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id), "period_month": period_month},
         )
         pl_summary = [dict(r._mapping) for r in pl_result]
@@ -466,11 +478,13 @@ async def list_pl_accounts(
 
     try:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM pl_account_mappings
                 WHERE tenant_id = :tenant_id
                 ORDER BY tax_code
-            """),
+            """
+            ),
             {"tenant_id": str(tenant_id)},
         )
         rows = [dict(r._mapping) for r in result]
@@ -494,7 +508,8 @@ async def upsert_pl_account(
     mapping_id = uuid.uuid4()
     try:
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO pl_account_mappings (
                     id, tenant_id, tax_code, pl_account_code, pl_account_name,
                     account_type, is_active
@@ -508,7 +523,8 @@ async def upsert_pl_account(
                     pl_account_name = EXCLUDED.pl_account_name,
                     account_type    = EXCLUDED.account_type,
                     is_active       = EXCLUDED.is_active
-            """),
+            """
+            ),
             {
                 "id": str(mapping_id),
                 "tenant_id": str(tenant_id),

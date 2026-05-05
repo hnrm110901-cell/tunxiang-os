@@ -40,7 +40,7 @@ TENANT_HEADERS = {"X-Tenant-ID": "00000000-0000-0000-0000-000000000001"}
 # 基础有效请求体
 _BASE_BODY = {
     "order_id": "order-001",
-    "auth_code": "134567890123",   # 微信：13 前缀，12 位
+    "auth_code": "134567890123",  # 微信：13 前缀，12 位
     "amount_fen": 1000,
     "operator_id": "op-001",
     "store_id": "store-001",
@@ -50,9 +50,7 @@ _BASE_BODY = {
 @pytest_asyncio.fixture
 async def client():
     """每个测试用独立 AsyncClient，并 patch asyncio.sleep 跳过 1.5s 延迟。"""
-    async with AsyncClient(
-        transport=ASGITransport(app=_app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=_app), base_url="http://test") as ac:
         yield ac
 
 
@@ -65,6 +63,7 @@ def clear_payments():
 
 
 # ─── 辅助：带 sleep mock 发起 scan-pay 请求 ──────────────────────────────────
+
 
 async def _scan_pay(client: AsyncClient, body: dict) -> dict:
     """发起 POST /api/v1/payments/scan-pay，同时跳过内部 asyncio.sleep。"""
@@ -133,8 +132,8 @@ async def test_scan_pay_success(client: AsyncClient):
     assert data["ok"] is True
 
     result = data["data"]
-    assert result["transaction_id"]          # 非空
-    assert result["payment_id"]              # 非空
+    assert result["transaction_id"]  # 非空
+    assert result["payment_id"]  # 非空
     assert result["status"] == "success"
     assert result["amount_fen"] == 8800
     assert result["order_id"] == "order-001"
@@ -269,22 +268,25 @@ async def test_cancel_payment_not_found(client: AsyncClient):
 # ─── 前缀枚举覆盖 ─────────────────────────────────────────────────────────────
 
 
-@pytest.mark.parametrize("prefix,expected_channel", [
-    ("10", "wechat"),
-    ("11", "wechat"),
-    ("12", "wechat"),
-    ("13", "wechat"),
-    ("14", "wechat"),
-    ("15", "wechat"),
-    ("25", "alipay"),
-    ("26", "alipay"),
-    ("27", "alipay"),
-    ("28", "alipay"),
-    ("29", "alipay"),
-    ("30", "alipay"),
-    ("99", "unionpay"),
-    ("50", "unionpay"),
-])
+@pytest.mark.parametrize(
+    "prefix,expected_channel",
+    [
+        ("10", "wechat"),
+        ("11", "wechat"),
+        ("12", "wechat"),
+        ("13", "wechat"),
+        ("14", "wechat"),
+        ("15", "wechat"),
+        ("25", "alipay"),
+        ("26", "alipay"),
+        ("27", "alipay"),
+        ("28", "alipay"),
+        ("29", "alipay"),
+        ("30", "alipay"),
+        ("99", "unionpay"),
+        ("50", "unionpay"),
+    ],
+)
 @pytest.mark.asyncio
 async def test_channel_prefix_coverage(client: AsyncClient, prefix: str, expected_channel: str):
     """参数化测试：覆盖所有合法前缀对应的渠道识别。"""

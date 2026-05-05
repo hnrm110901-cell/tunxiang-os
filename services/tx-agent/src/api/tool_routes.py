@@ -18,6 +18,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.tool_caller import ToolCaller, ToolCallError
 from ..services.tool_registry import ToolDefinition, ToolRegistry
@@ -188,7 +189,7 @@ async def invoke_tool(
             session_id=body.session_id,
         )
     except ToolCallError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "资源不存在", e) from e
 
     return {
         "ok": result.get("success", False),

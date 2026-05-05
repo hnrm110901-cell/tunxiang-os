@@ -29,6 +29,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.allergen_service import AllergenService
 
@@ -115,7 +116,7 @@ async def check_allergens(
         )
         return _ok(results)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="数据库查询失败") from exc
 
@@ -141,7 +142,7 @@ async def set_dish_allergens(
         )
         return _ok(result)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except SQLAlchemyError as exc:
         raise HTTPException(status_code=500, detail="数据库写入失败") from exc
 

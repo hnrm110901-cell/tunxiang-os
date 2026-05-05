@@ -4,11 +4,12 @@
   当食材库存低于阈值时，自动下架依赖此食材的菜品。
 """
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.inventory_menu_sync_service import (
     check_and_auto_soldout,
@@ -78,7 +79,7 @@ async def api_stock_update(
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/soldout-watch")
@@ -108,7 +109,7 @@ async def api_soldout_watch(
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.post("/ingredient/{ingredient_id}/restock")
@@ -141,7 +142,7 @@ async def api_restock(
             },
         }
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e
 
 
 @router.get("/dashboard")
@@ -167,4 +168,4 @@ async def api_inventory_dashboard(
         )
         return {"ok": True, "data": dashboard}
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "请求参数无效", e) from e

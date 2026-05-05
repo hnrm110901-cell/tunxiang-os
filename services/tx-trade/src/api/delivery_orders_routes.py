@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.delivery_order import DeliveryOrder
 
@@ -170,7 +171,7 @@ async def update_order_status(
         raise
     except ValueError as exc:
         log.warning("delivery_order.status_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.status_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -234,7 +235,7 @@ async def cancel_order(
         raise
     except ValueError as exc:
         log.warning("delivery_order.cancel_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.cancel_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")
@@ -321,7 +322,8 @@ async def _fetch_dish_items_from_db(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT DISTINCT elem->>'name' AS name,
                    (elem->>'price_fen')::int AS price_fen,
                    COALESCE(elem->>'spec', '') AS spec
@@ -334,7 +336,8 @@ async def _fetch_dish_items_from_db(
               AND elem->>'name' IS NOT NULL
               AND (elem->>'price_fen')::int > 0
             LIMIT 50
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         rows = result.fetchall()
     except Exception as exc:  # noqa: BLE001 — 菜品查询失败时生成空订单
@@ -374,7 +377,8 @@ async def _fetch_customer_sample_from_db(
     from sqlalchemy import text as _text  # noqa: PLC0415
 
     try:
-        sql = _text("""
+        sql = _text(
+            """
             SELECT customer_name, customer_phone, delivery_address
             FROM delivery_orders
             WHERE store_id = :store_id
@@ -382,7 +386,8 @@ async def _fetch_customer_sample_from_db(
               AND customer_name IS NOT NULL
             ORDER BY RANDOM()
             LIMIT 1
-        """)
+        """
+        )
         result = await db.execute(sql, {"store_id": store_id, "tenant_id": tenant_id})
         row = result.fetchone()
         if row:
@@ -504,7 +509,7 @@ async def mock_new_order(
 
     except ValueError as exc:
         log.warning("delivery_order.mock_value_error", error=str(exc))
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
     except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
         log.error("delivery_order.mock_error", error=str(exc), exc_info=True)
         raise HTTPException(status_code=500, detail="服务器内部错误")

@@ -28,6 +28,7 @@ from shared.ontology.src.extensions.sales_targets import (
     MetricType,
     PeriodType,
 )
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.sales_target_service import SalesTargetService
 
@@ -42,20 +43,13 @@ _service = SalesTargetService()
 
 
 def _get_tenant_id(request: Request) -> UUID:
-    tid = (
-        getattr(request.state, "tenant_id", None)
-        or request.headers.get("X-Tenant-ID", "")
-    )
+    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
     if not tid:
-        raise HTTPException(
-            status_code=400, detail="X-Tenant-ID header required"
-        )
+        raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     try:
         return UUID(str(tid))
     except ValueError as exc:
-        raise HTTPException(
-            status_code=400, detail=f"X-Tenant-ID invalid UUID: {tid}"
-        ) from exc
+        raise HTTPException(status_code=400, detail=f"X-Tenant-ID invalid UUID: {tid}") from exc
 
 
 def _ok(data: Any) -> dict:
@@ -124,9 +118,7 @@ class SetTargetRequest(BaseModel):
     metric_type: MetricType = Field(..., description="指标类型")
     target_value: int = Field(..., ge=0, description="目标值（金额单位=分）")
     store_id: UUID | None = Field(default=None, description="门店ID")
-    parent_target_id: UUID | None = Field(
-        default=None, description="上级目标ID"
-    )
+    parent_target_id: UUID | None = Field(default=None, description="上级目标ID")
     notes: str | None = Field(default=None, max_length=500)
 
 
@@ -165,7 +157,7 @@ async def set_target(
         )
         return _ok(_serialize_target(target))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{target_id}/decompose")
@@ -176,9 +168,7 @@ async def decompose_target(
 ) -> dict:
     tid = _get_tenant_id(request)
     try:
-        children = await _service.decompose_target(
-            db, tenant_id=tid, year_target_id=target_id
-        )
+        children = await _service.decompose_target(db, tenant_id=tid, year_target_id=target_id)
         return _ok(
             {
                 "total": len(children),
@@ -186,7 +176,7 @@ async def decompose_target(
             }
         )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.post("/{target_id}/progress")
@@ -207,7 +197,7 @@ async def record_progress(
         )
         return _ok(_serialize_progress(progress))
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise safe_http_exception(400, "请求参数无效", exc) from exc
 
 
 @router.get("")
@@ -241,12 +231,8 @@ async def list_targets(
 @router.get("/leaderboard")
 async def leaderboard(
     request: Request,
-    period: PeriodType = Query(
-        default=PeriodType.MONTH, description="周期粒度"
-    ),
-    metric: MetricType = Query(
-        default=MetricType.REVENUE_FEN, description="指标类型"
-    ),
+    period: PeriodType = Query(default=PeriodType.MONTH, description="周期粒度"),
+    metric: MetricType = Query(default=MetricType.REVENUE_FEN, description="指标类型"),
     limit: int = Query(default=50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
@@ -269,9 +255,7 @@ async def get_achievement(
 ) -> dict:
     tid = _get_tenant_id(request)
     try:
-        data = await _service.get_achievement(
-            db, tenant_id=tid, target_id=target_id
-        )
+        data = await _service.get_achievement(db, tenant_id=tid, target_id=target_id)
         return _ok(data)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise safe_http_exception(404, "资源不存在", exc) from exc

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
+from shared.security.src.error_handler import safe_http_exception
 
 from ..services.shift_handover_service import ShiftHandoverService
 
@@ -80,7 +81,7 @@ async def start_handover(
         return _ok(result)
     except ValueError as e:
         log.warning("start_handover_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "交班操作失败", e)
 
 
 # ─── 2. 现金清点 ───
@@ -107,7 +108,7 @@ async def record_cash_count(
         return _ok(result)
     except ValueError as e:
         log.warning("record_cash_count_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "现金清点操作失败", e)
 
 
 # ─── 3. 完成交班 ───
@@ -134,7 +135,7 @@ async def finalize_handover(
         return _ok(result)
     except ValueError as e:
         log.warning("finalize_handover_api_fail", error=str(e))
-        raise HTTPException(status_code=400, detail=str(e))
+        raise safe_http_exception(400, "完成交班操作失败", e)
 
 
 # ─── 4. 班次报告 ───
@@ -156,4 +157,4 @@ async def get_shift_summary(
         return _ok(result)
     except ValueError as e:
         log.warning("get_shift_summary_api_fail", error=str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise safe_http_exception(404, "班次记录不存在", e)

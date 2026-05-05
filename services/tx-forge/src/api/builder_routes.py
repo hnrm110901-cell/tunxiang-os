@@ -31,10 +31,12 @@ async def create_project(
     """创建低代码项目."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.builder_projects
+        text(
+            """INSERT INTO forge.builder_projects
                 (tenant_id, developer_id, project_name, template_type, status)
                 VALUES (:tid, :developer_id, :project_name, :template_type, 'draft')
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "developer_id": body.developer_id,
@@ -74,9 +76,11 @@ async def list_projects(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.builder_projects
+        text(
+            f"""SELECT * FROM forge.builder_projects
                 WHERE {where}
-                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -94,8 +98,10 @@ async def get_project(
     """获取项目详情."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""SELECT * FROM forge.builder_projects
-                WHERE tenant_id = :tid AND project_id = :project_id"""),
+        text(
+            """SELECT * FROM forge.builder_projects
+                WHERE tenant_id = :tid AND project_id = :project_id"""
+        ),
         {"tid": x_tenant_id, "project_id": project_id},
     )
     row = result.mappings().first()
@@ -134,10 +140,12 @@ async def update_project(
 
     set_sql = ", ".join(set_clauses)
     result = await db.execute(
-        text(f"""UPDATE forge.builder_projects
+        text(
+            f"""UPDATE forge.builder_projects
                 SET {set_sql}
                 WHERE tenant_id = :tid AND project_id = :project_id
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         params,
     )
     await db.commit()
@@ -159,10 +167,12 @@ async def submit_project(
     """提交项目为应用."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""UPDATE forge.builder_projects
+        text(
+            """UPDATE forge.builder_projects
                 SET status = 'submitted', updated_at = NOW()
                 WHERE tenant_id = :tid AND project_id = :project_id AND status = 'draft'
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {"tid": x_tenant_id, "project_id": project_id},
     )
     await db.commit()
@@ -191,9 +201,11 @@ async def list_templates(
     where = " AND ".join(clauses)
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.builder_templates
+        text(
+            f"""SELECT * FROM forge.builder_templates
                 WHERE {where}
-                ORDER BY usage_count DESC"""),
+                ORDER BY usage_count DESC"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()]}

@@ -1,12 +1,11 @@
 """生态健康仪表盘 — 8大飞轮指标 (v3.0)"""
 
-from datetime import date, datetime, timezone
+from datetime import date
 
+import structlog
 from fastapi import HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import structlog
 
 log = structlog.get_logger(__name__)
 
@@ -27,21 +26,21 @@ class ForgeEcosystemService:
     """生态健康仪表盘 — 8大飞轮指标"""
 
     # ── 计算指标 ─────────────────────────────────────────────
-    async def compute_metrics(
-        self, db: AsyncSession, *, metric_date: date | None = None
-    ) -> dict:
+    async def compute_metrics(self, db: AsyncSession, *, metric_date: date | None = None) -> dict:
         if metric_date is None:
             metric_date = date.today()
 
         # 1. ISV活跃率: 30天内有活动的开发者 / 总开发者
         isv_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     count(*) AS total_devs,
                     count(*) FILTER (WHERE updated_at >= :d::date - INTERVAL '30 days') AS active_devs
                 FROM forge_developers
                 WHERE is_deleted = false
-            """),
+            """
+            ),
             {"d": str(metric_date)},
         )
         isv = isv_row.mappings().one()
@@ -50,7 +49,8 @@ class ForgeEcosystemService:
 
         # 2. 产品质量分: AVG(rating) * (1 - uninstall_rate)
         quality_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     COALESCE(AVG(a.rating), 0) AS avg_rating,
                     COALESCE(SUM(a.install_count), 0) AS total_installs,
@@ -60,7 +60,8 @@ class ForgeEcosystemService:
                     ) AS uninstalled_count
                 FROM forge_apps a
                 WHERE a.is_deleted = false AND a.status = 'published'
-            """),
+            """
+            ),
         )
         q = quality_row.mappings().one()
         avg_rating = float(q["avg_rating"])
@@ -71,7 +72,8 @@ class ForgeEcosystemService:
 
         # 3. 安装密度: active_installs / active_stores
         density_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     (SELECT count(*) FROM forge_installations
                      WHERE status = 'active' AND is_deleted = false) AS active_installs,
@@ -79,14 +81,16 @@ class ForgeEcosystemService:
                         (SELECT count(*) FROM forge_installations
                          WHERE status = 'active' AND is_deleted = false), 1
                     ) AS active_stores
-            """),
+            """
+            ),
         )
         d = density_row.mappings().one()
         install_density = round(int(d["active_installs"]) / int(d["active_stores"]), 2)
 
         # 4. 效果转化率: outcome_events / agent_decisions
         outcome_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     (SELECT count(*) FROM forge_outcome_events
                      WHERE is_deleted = false
@@ -95,23 +99,24 @@ class ForgeEcosystemService:
                         (SELECT count(*) FROM agent_decision_logs
                          WHERE created_at >= :d::date - INTERVAL '30 days'), 1
                     ) AS agent_decisions
-            """),
+            """
+            ),
             {"d": str(metric_date)},
         )
         o = outcome_row.mappings().one()
-        outcome_conversion_rate = round(
-            int(o["outcome_events"]) / int(o["agent_decisions"]) * 100, 1
-        )
+        outcome_conversion_rate = round(int(o["outcome_events"]) / int(o["agent_decisions"]) * 100, 1)
 
         # 5. Token效率: outcomes / (total_tokens / 1000)
         token_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(input_tokens + output_tokens), 0) AS total_tokens
                 FROM forge_token_meters
                 WHERE is_deleted = false
                   AND period_type = 'daily'
                   AND period_key >= to_char(:d::date - INTERVAL '30 days', 'YYYY-MM-DD')
-            """),
+            """
+            ),
             {"d": str(metric_date)},
         )
         total_tokens_k = int(token_row.scalar() or 0) / 1000.0
@@ -126,11 +131,13 @@ class ForgeEcosystemService:
 
         # 8. 生态GMV: SUM(revenue_total_fen)
         gmv_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(SUM(revenue_total_fen), 0) AS ecosystem_gmv_fen
                 FROM forge_apps
                 WHERE is_deleted = false AND status = 'published'
-            """),
+            """
+            ),
         )
         ecosystem_gmv_fen = int(gmv_row.scalar() or 0)
 
@@ -146,9 +153,7 @@ class ForgeEcosystemService:
             "tthw_minutes": max(100 - tthw_minutes, 0),  # 越低越好
             "ecosystem_gmv_fen": min(ecosystem_gmv_fen / 100000, 100),  # 10万分满分
         }
-        composite_score = round(
-            sum(normalized[k] * _METRIC_WEIGHTS[k] for k in _METRIC_WEIGHTS), 1
-        )
+        composite_score = round(sum(normalized[k] * _METRIC_WEIGHTS[k] for k in _METRIC_WEIGHTS), 1)
 
         metrics = {
             "metric_date": str(metric_date),
@@ -165,7 +170,8 @@ class ForgeEcosystemService:
 
         # UPSERT
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_ecosystem_metrics
                     (id, tenant_id, metric_date,
                      isv_active_rate, product_quality_score, install_density,
@@ -190,7 +196,8 @@ class ForgeEcosystemService:
                      ecosystem_gmv_fen = EXCLUDED.ecosystem_gmv_fen,
                      composite_score = EXCLUDED.composite_score,
                      updated_at = NOW()
-            """),
+            """
+            ),
             metrics,
         )
 
@@ -200,7 +207,8 @@ class ForgeEcosystemService:
     # ── 历史指标查询 ─────────────────────────────────────────
     async def get_metrics(self, db: AsyncSession, *, days: int = 30) -> list[dict]:
         rows = await db.execute(
-            text("""
+            text(
+                """
                 SELECT metric_date, isv_active_rate, product_quality_score,
                        install_density, outcome_conversion_rate, token_efficiency,
                        developer_nps, tthw_minutes, ecosystem_gmv_fen,
@@ -209,7 +217,8 @@ class ForgeEcosystemService:
                 WHERE is_deleted = false
                 ORDER BY metric_date DESC
                 LIMIT :days
-            """),
+            """
+            ),
             {"days": days},
         )
         return [dict(r) for r in rows.mappings().all()]
@@ -217,7 +226,8 @@ class ForgeEcosystemService:
     # ── 最新指标 ─────────────────────────────────────────────
     async def get_latest(self, db: AsyncSession) -> dict:
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT metric_date, isv_active_rate, product_quality_score,
                        install_density, outcome_conversion_rate, token_efficiency,
                        developer_nps, tthw_minutes, ecosystem_gmv_fen,
@@ -226,7 +236,8 @@ class ForgeEcosystemService:
                 WHERE is_deleted = false
                 ORDER BY metric_date DESC
                 LIMIT 1
-            """),
+            """
+            ),
         )
         row = result.mappings().first()
         if not row:
@@ -237,7 +248,8 @@ class ForgeEcosystemService:
     async def get_flywheel_status(self, db: AsyncSession) -> dict:
         # 最新
         latest_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT metric_date, isv_active_rate, product_quality_score,
                        install_density, outcome_conversion_rate, token_efficiency,
                        developer_nps, tthw_minutes, ecosystem_gmv_fen,
@@ -246,7 +258,8 @@ class ForgeEcosystemService:
                 WHERE is_deleted = false
                 ORDER BY metric_date DESC
                 LIMIT 1
-            """),
+            """
+            ),
         )
         current = latest_row.mappings().first()
         if not current:
@@ -255,7 +268,8 @@ class ForgeEcosystemService:
 
         # 30天前
         prev_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT metric_date, isv_active_rate, product_quality_score,
                        install_density, outcome_conversion_rate, token_efficiency,
                        developer_nps, tthw_minutes, ecosystem_gmv_fen,
@@ -265,7 +279,8 @@ class ForgeEcosystemService:
                   AND metric_date <= (:d::date - INTERVAL '30 days')
                 ORDER BY metric_date DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"d": str(current["metric_date"])},
         )
         previous = prev_row.mappings().first()
@@ -273,9 +288,15 @@ class ForgeEcosystemService:
 
         # 计算趋势
         trend_metrics = [
-            "isv_active_rate", "product_quality_score", "install_density",
-            "outcome_conversion_rate", "token_efficiency", "developer_nps",
-            "tthw_minutes", "ecosystem_gmv_fen", "composite_score",
+            "isv_active_rate",
+            "product_quality_score",
+            "install_density",
+            "outcome_conversion_rate",
+            "token_efficiency",
+            "developer_nps",
+            "tthw_minutes",
+            "ecosystem_gmv_fen",
+            "composite_score",
         ]
         trends: dict = {}
         if previous:

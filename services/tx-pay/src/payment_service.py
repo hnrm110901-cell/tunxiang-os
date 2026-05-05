@@ -269,7 +269,8 @@ class PaymentNexusService:
     ) -> dict:
         """按支付方式汇总当日收款"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT method,
                        COUNT(*) AS count,
                        SUM(amount_fen) AS total_fen
@@ -279,7 +280,8 @@ class PaymentNexusService:
                   AND DATE(created_at) = :summary_date
                   AND status = 'paid'
                 GROUP BY method
-            """),
+            """
+            ),
             {"tenant_id": tenant_id, "store_id": store_id, "summary_date": summary_date},
         )
         rows = result.fetchall()
@@ -310,7 +312,8 @@ class PaymentNexusService:
             PayStatus.FAILED: "failed",
         }
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO payments (
                     payment_no, tenant_id, store_id, order_id,
                     method, amount_fen, status, trade_no,
@@ -321,7 +324,8 @@ class PaymentNexusService:
                     :channel_data::JSONB, NOW()
                 )
                 ON CONFLICT (payment_no) DO NOTHING
-            """),
+            """
+            ),
             {
                 "payment_no": result.payment_id,
                 "tenant_id": tenant_id,

@@ -105,7 +105,8 @@ class DiningSessionService:
     async def _next_session_seq(self, store_id: uuid.UUID, today: date_type) -> int:
         """当日会话序号（原子自增，使用 PG advisory lock 防并发冲突）"""
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT COALESCE(MAX(
                     CAST(SUBSTRING(session_no, LENGTH(session_no) - 3) AS INT)
                 ), 0) + 1 AS next_seq
@@ -113,7 +114,8 @@ class DiningSessionService:
                 WHERE store_id  = :store_id
                   AND tenant_id = :tenant_id
                   AND DATE(opened_at AT TIME ZONE 'UTC') = :today
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": self._tenant_id, "today": today},
         )
         row = result.mappings().one()
@@ -164,10 +166,12 @@ class DiningSessionService:
 
         # 获取桌台信息（桌号快照、低消配置）
         table_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT table_no, config, min_consume_fen, area, seats, table_type
                 FROM tables WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": table_id, "tid": self._tenant_id},
         )
         table_info = table_row.mappings().one_or_none()
@@ -192,10 +196,12 @@ class DiningSessionService:
         zone_coupon_config: dict = {}
         if zone_id:
             zone_row = await self._db.execute(
-                text("""
+                text(
+                    """
                     SELECT pay_mode, service_mode, pricing_policy, coupon_config
                     FROM table_zones WHERE id = :zid AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"zid": zone_id, "tid": self._tenant_id},
             )
             zone_info = zone_row.mappings().one_or_none()
@@ -230,7 +236,8 @@ class DiningSessionService:
 
         # 插入 dining_sessions
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dining_sessions (
                     id, tenant_id, store_id, table_id, session_no,
                     guest_count, vip_customer_id, booking_id,
@@ -250,7 +257,8 @@ class DiningSessionService:
                     :zone_pricing_snapshot, :order_type,
                     :now, :now, FALSE
                 )
-            """),
+            """
+            ),
             {
                 "id": session_id,
                 "tenant_id": self._tenant_id,
@@ -276,11 +284,13 @@ class DiningSessionService:
 
         # 更新 tables.status → occupied
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables
                 SET status = 'occupied', updated_at = :now
                 WHERE id = :table_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "table_id": table_id, "tid": self._tenant_id},
         )
 
@@ -341,7 +351,8 @@ class DiningSessionService:
         """按 ID 获取堂食会话"""
         await self._set_tenant()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT ds.*,
                        t.table_no, t.area, t.floor, t.seats,
                        e.emp_name AS lead_waiter_name
@@ -351,7 +362,8 @@ class DiningSessionService:
                 WHERE ds.id        = :session_id
                   AND ds.tenant_id = :tenant_id
                   AND ds.is_deleted = FALSE
-            """),
+            """
+            ),
             {"session_id": session_id, "tenant_id": self._tenant_id},
         )
         row = result.mappings().one_or_none()
@@ -361,7 +373,8 @@ class DiningSessionService:
         """获取桌台的当前活跃会话（非终态）"""
         await self._set_tenant()
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT * FROM dining_sessions
                 WHERE store_id  = :store_id
                   AND table_id  = :table_id
@@ -370,7 +383,8 @@ class DiningSessionService:
                   AND status NOT IN ('paid', 'clearing', 'disabled')
                 ORDER BY opened_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "store_id": store_id,
                 "table_id": table_id,
@@ -387,7 +401,8 @@ class DiningSessionService:
         await self._set_tenant()
         # 用 LEFT JOIN + GROUP BY 替代相关子查询，避免 N+1 问题（P2 性能修复）
         result = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT
                     ds.id, ds.session_no, ds.status, ds.session_type,
                     ds.guest_count, ds.opened_at, ds.first_order_at,
@@ -417,7 +432,8 @@ class DiningSessionService:
                   AND ds.is_deleted = FALSE
                   AND ds.status NOT IN ('paid', 'clearing', 'disabled')
                 ORDER BY t.floor, t.area, t.table_no
-            """),
+            """
+            ),
             {"store_id": store_id, "tenant_id": self._tenant_id},
         )
         return [dict(r) for r in result.mappings().all()]
@@ -458,13 +474,15 @@ class DiningSessionService:
         ts_field = ts_field_map.get(new_status)
         if ts_field:
             await self._db.execute(
-                text(f"""
+                text(
+                    f"""
                     UPDATE dining_sessions
                     SET status     = :new_status,
                         {ts_field} = :now,
                         updated_at = :now
                     WHERE id = :session_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "new_status": new_status,
                     "now": now,
@@ -474,12 +492,14 @@ class DiningSessionService:
             )
         else:
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dining_sessions
                     SET status     = :new_status,
                         updated_at = :now
                     WHERE id = :session_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {
                     "new_status": new_status,
                     "now": now,
@@ -549,7 +569,8 @@ class DiningSessionService:
 
         # 更新汇总字段
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET total_orders       = total_orders + 1,
                     total_items        = total_items + :item_count,
@@ -557,7 +578,8 @@ class DiningSessionService:
                     first_order_at     = COALESCE(first_order_at, :now),
                     updated_at         = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "item_count": item_count,
                 "amount_fen": order_amount_fen,
@@ -615,13 +637,15 @@ class DiningSessionService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET last_dish_served_at  = :now,
                     first_dish_served_at = COALESCE(first_dish_served_at, :now),
                     updated_at           = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"now": now, "session_id": session_id, "tenant_id": self._tenant_id},
         )
 
@@ -668,10 +692,12 @@ class DiningSessionService:
 
         # 获取目标桌台信息（桌号 + 低消配置）
         target_row = await self._db.execute(
-            text("""
+            text(
+                """
                 SELECT table_no, min_consume_fen, config
                 FROM tables WHERE id = :id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"id": target_table_id, "tid": self._tenant_id},
         )
         target_info = target_row.mappings().one_or_none()
@@ -696,14 +722,16 @@ class DiningSessionService:
 
         # 更新会话的 table_id、桌号快照和 room_config
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET table_id          = :target_table_id,
                     table_no_snapshot = :new_table_no,
                     room_config       = :room_config,
                     updated_at        = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "target_table_id": target_table_id,
                 "new_table_no": new_table_no,
@@ -716,7 +744,8 @@ class DiningSessionService:
 
         # KDS 待出品任务：同步更新桌号（厨师和传菜员屏幕显示新桌号）
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE kds_tasks
                 SET table_number = :new_table_no,
                     updated_at   = :now
@@ -724,7 +753,8 @@ class DiningSessionService:
                   AND tenant_id         = :tenant_id
                   AND status IN ('pending', 'cooking')
                   AND is_deleted = false
-            """),
+            """
+            ),
             {
                 "new_table_no": new_table_no,
                 "now": now,
@@ -735,17 +765,21 @@ class DiningSessionService:
 
         # 旧桌台 → free，新桌台 → occupied
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables SET status = 'free', updated_at = :now
                 WHERE id = :old_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "old_id": old_table_id, "tid": self._tenant_id},
         )
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables SET status = 'occupied', updated_at = :now
                 WHERE id = :new_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "new_id": target_table_id, "tid": self._tenant_id},
         )
 
@@ -827,13 +861,15 @@ class DiningSessionService:
 
             # 将副会话的订单关联到主会话
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE orders
                     SET dining_session_id = :primary_id,
                         updated_at        = :now
                     WHERE dining_session_id = :sec_id
                       AND tenant_id        = :tenant_id
-                """),
+                """
+                ),
                 {
                     "primary_id": primary_session_id,
                     "now": now,
@@ -845,26 +881,31 @@ class DiningSessionService:
             # 释放副会话桌台
             sec_table_id = uuid.UUID(str(sec["table_id"]))
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE tables SET status = 'free', updated_at = :now
                     WHERE id = :table_id AND tenant_id = :tid
-                """),
+                """
+                ),
                 {"now": now, "table_id": sec_table_id, "tid": self._tenant_id},
             )
 
             # 逻辑删除副会话
             await self._db.execute(
-                text("""
+                text(
+                    """
                     UPDATE dining_sessions
                     SET is_deleted = TRUE, updated_at = :now
                     WHERE id = :sec_id AND tenant_id = :tenant_id
-                """),
+                """
+                ),
                 {"now": now, "sec_id": sec_id, "tenant_id": self._tenant_id},
             )
 
         # 重新汇总主会话金额
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions ds
                 SET total_orders     = (
                         SELECT COUNT(*) FROM orders o
@@ -879,7 +920,8 @@ class DiningSessionService:
                     ),
                     updated_at = :now
                 WHERE ds.id = :primary_id AND ds.tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"now": now, "primary_id": primary_session_id, "tenant_id": self._tenant_id},
         )
 
@@ -980,14 +1022,16 @@ class DiningSessionService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET min_spend_override    = true,
                     min_spend_override_by = :approver_id,
                     min_spend_override_at = :now,
                     updated_at            = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "approver_id": approver_id,
                 "now": now,
@@ -1040,7 +1084,8 @@ class DiningSessionService:
         now = _now_utc()
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET final_amount_fen    = :final_amount_fen,
                     discount_amount_fen = :discount_amount_fen,
@@ -1050,7 +1095,8 @@ class DiningSessionService:
                     updated_at          = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
                   AND status = 'billing'
-            """),
+            """
+            ),
             {
                 "final_amount_fen": final_amount_fen,
                 "discount_amount_fen": discount_amount_fen,
@@ -1119,23 +1165,27 @@ class DiningSessionService:
         store_id = uuid.UUID(str(session["store_id"]))
 
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET status     = 'clearing',
                     cleared_at = :now,
                     updated_at = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {"now": now, "session_id": session_id, "tenant_id": self._tenant_id},
         )
 
         # 桌台状态 → free（可以开新台）
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE tables
                 SET status = 'free', updated_at = :now
                 WHERE id = :table_id AND tenant_id = :tid
-            """),
+            """
+            ),
             {"now": now, "table_id": table_id, "tid": self._tenant_id},
         )
 
@@ -1189,12 +1239,14 @@ class DiningSessionService:
 
         now = _now_utc()
         await self._db.execute(
-            text("""
+            text(
+                """
                 UPDATE dining_sessions
                 SET vip_customer_id = :customer_id,
                     updated_at      = :now
                 WHERE id = :session_id AND tenant_id = :tenant_id
-            """),
+            """
+            ),
             {
                 "customer_id": customer_id,
                 "now": now,
@@ -1239,7 +1291,8 @@ class DiningSessionService:
     ) -> None:
         """写入 dining_session_events（会话内部事件流，append-only）。"""
         await self._db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO dining_session_events (
                     id, tenant_id, store_id, table_session_id,
                     event_type, payload,
@@ -1249,7 +1302,8 @@ class DiningSessionService:
                     :event_type, :payload::jsonb,
                     :operator_id, :operator_type, NOW()
                 )
-            """),
+            """
+            ),
             {
                 "tenant_id": self._tenant_id,
                 "store_id": store_id,

@@ -31,12 +31,14 @@ async def create_evidence_card(
     """创建证据卡片."""
     await _set_tenant(db, x_tenant_id)
     result = await db.execute(
-        text("""INSERT INTO forge.evidence_cards
+        text(
+            """INSERT INTO forge.evidence_cards
                 (tenant_id, app_id, card_type, title, summary, evidence_data,
                  score, verified_by, verification_method, expires_at)
                 VALUES (:tid, :app_id, :card_type, :title, :summary, :evidence_data::jsonb,
                         :score, :verified_by, :verification_method, :expires_at)
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         {
             "tid": x_tenant_id,
             "app_id": body.app_id,
@@ -85,9 +87,11 @@ async def list_evidence_cards(
     total = total_row.scalar() or 0
 
     rows = await db.execute(
-        text(f"""SELECT * FROM forge.evidence_cards
+        text(
+            f"""SELECT * FROM forge.evidence_cards
                 WHERE {where}
-                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""),
+                ORDER BY created_at DESC LIMIT :limit OFFSET :offset"""
+        ),
         params,
     )
     return {"items": [dict(r) for r in rows.mappings().all()], "total": total}
@@ -106,9 +110,11 @@ async def app_trust_profile(
     await _set_tenant(db, x_tenant_id)
 
     cards = await db.execute(
-        text("""SELECT * FROM forge.evidence_cards
+        text(
+            """SELECT * FROM forge.evidence_cards
                 WHERE tenant_id = :tid AND app_id = :app_id
-                ORDER BY card_type, created_at DESC"""),
+                ORDER BY card_type, created_at DESC"""
+        ),
         {"tid": x_tenant_id, "app_id": app_id},
     )
     all_cards = [dict(r) for r in cards.mappings().all()]
@@ -173,10 +179,12 @@ async def update_evidence_card(
 
     set_sql = ", ".join(set_clauses)
     result = await db.execute(
-        text(f"""UPDATE forge.evidence_cards
+        text(
+            f"""UPDATE forge.evidence_cards
                 SET {set_sql}
                 WHERE tenant_id = :tid AND card_id = :card_id
-                RETURNING *"""),
+                RETURNING *"""
+        ),
         params,
     )
     await db.commit()

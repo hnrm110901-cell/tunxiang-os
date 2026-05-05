@@ -76,12 +76,14 @@ class GrowthTouchService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT content_template
                 FROM growth_touch_templates
                 WHERE tenant_id = :tid AND template_code = :code AND is_deleted = false
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "code": template_code},
         )
         row = result.fetchone()
@@ -136,12 +138,14 @@ class GrowthTouchService:
         touch_template_code: Optional[str] = None
         if step_no is not None:
             step_result = await db.execute(
-                text("""
+                text(
+                    """
                     SELECT touch_template_code
                     FROM growth_journey_template_steps
                     WHERE tenant_id = :tid AND template_id = :tmpl_id
                       AND step_no = :step_no AND is_deleted = false
-                """),
+                """
+                ),
                 {"tid": tenant_id, "tmpl_id": str(template_id), "step_no": step_no},
             )
             step_row = step_result.fetchone()
@@ -162,11 +166,13 @@ class GrowthTouchService:
 
         # 2. 频控检查: marketing_pause_until 和 growth_opt_out
         profile_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT marketing_pause_until, growth_opt_out, service_repair_status
                 FROM customer_growth_profiles
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id)},
         )
         profile_row = profile_result.fetchone()
@@ -205,11 +211,13 @@ class GrowthTouchService:
         # ── 品牌级频控（V2.3）──
         if execution_state == "pending" and brand_id:
             brand_config = await db.execute(
-                text("""
+                text(
+                    """
                 SELECT max_touch_per_customer_day, max_touch_per_customer_week, daily_touch_budget
                 FROM growth_brand_configs
                 WHERE brand_id = :bid AND tenant_id = :tid AND is_deleted = FALSE
-            """),
+            """
+                ),
                 {"bid": str(brand_id), "tid": tenant_id},
             )
             bc = brand_config.fetchone()
@@ -221,12 +229,14 @@ class GrowthTouchService:
 
                 # 检查该客户在该品牌下今日触达次数
                 today_count_result = await db.execute(
-                    text("""
+                    text(
+                        """
                     SELECT COUNT(*) FROM growth_touch_executions
                     WHERE customer_id = :cid AND brand_id = :bid AND is_deleted = FALSE
                       AND created_at::date = CURRENT_DATE
                       AND execution_state NOT IN ('blocked', 'skipped')
-                """),
+                """
+                    ),
                     {"cid": str(customer_id), "bid": str(brand_id)},
                 )
                 tc = today_count_result.scalar() or 0
@@ -239,12 +249,14 @@ class GrowthTouchService:
                 # 检查该品牌今日总触达预算
                 if execution_state == "pending":
                     brand_today_result = await db.execute(
-                        text("""
+                        text(
+                            """
                         SELECT COUNT(*) FROM growth_touch_executions
                         WHERE brand_id = :bid AND is_deleted = FALSE
                           AND created_at::date = CURRENT_DATE
                           AND execution_state NOT IN ('blocked', 'skipped')
-                    """),
+                    """
+                        ),
                         {"bid": str(brand_id)},
                     )
                     bt = brand_today_result.scalar() or 0
@@ -286,7 +298,8 @@ class GrowthTouchService:
 
         # 5. INSERT growth_touch_executions
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO growth_touch_executions
                     (id, tenant_id, customer_id, enrollment_id, template_id,
                      step_no, channel, mechanism_type, rendered_content,
@@ -301,7 +314,8 @@ class GrowthTouchService:
                           step_no, channel, execution_state, block_reason,
                           brand_id, store_id,
                           created_at
-            """),
+            """
+            ),
             {
                 "id": execution_id,
                 "tenant_id": tenant_id,
@@ -384,12 +398,14 @@ class GrowthTouchService:
         await self._set_tenant(db, tenant_id)
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_touch_executions
                 SET execution_state = :state, updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
                 RETURNING id, customer_id, channel, execution_state, updated_at
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(execution_id), "state": state},
         )
         row = result.fetchone()
@@ -423,7 +439,8 @@ class GrowthTouchService:
 
         # 查找ATTRIBUTION_WINDOW_HOURS内最近一次已delivered且未归因的触达
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, channel, template_id, enrollment_id
                 FROM growth_touch_executions
                 WHERE tenant_id = :tid
@@ -434,7 +451,8 @@ class GrowthTouchService:
                   AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id)},
         )
         row = result.fetchone()
@@ -450,14 +468,16 @@ class GrowthTouchService:
         execution_id = touch["id"]
 
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_touch_executions
                 SET attributed_order_id = :order_id,
                     revenue_fen = :revenue_fen,
                     profit_fen = :profit_fen,
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "eid": str(execution_id),
@@ -539,7 +559,8 @@ class GrowthTouchService:
         params["lim"] = size
         params["off"] = offset
         rows_result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT id, customer_id, journey_enrollment_id, journey_template_id,
                        step_no, touch_template_id, channel, mechanism_type,
                        execution_state, blocked_reason, rendered_content,
@@ -550,7 +571,8 @@ class GrowthTouchService:
                 WHERE {where_sql}
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]
@@ -570,11 +592,13 @@ class GrowthTouchService:
 
         # 查execution获取customer_id
         exec_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, channel, journey_template_id, journey_enrollment_id
                 FROM growth_touch_executions
                 WHERE tenant_id = :tid AND id = :eid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "eid": str(execution_id)},
         )
         exec_row = exec_result.fetchone()
@@ -586,14 +610,16 @@ class GrowthTouchService:
 
         # 直接更新该execution的归因
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE growth_touch_executions
                 SET attributed_order_id = :order_id,
                     attributed_revenue_fen = :revenue_fen,
                     attributed_gross_profit_fen = :profit_fen,
                     updated_at = NOW()
                 WHERE tenant_id = :tid AND id = :eid
-            """),
+            """
+            ),
             {
                 "tid": tenant_id,
                 "eid": str(execution_id),
@@ -651,17 +677,20 @@ class GrowthTouchService:
         offset = (page - 1) * size
 
         count_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT COUNT(*)
                 FROM growth_touch_executions
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id)},
         )
         total = count_result.scalar() or 0
 
         rows_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, customer_id, enrollment_id, template_id, step_no,
                        channel, mechanism_type, execution_state, block_reason,
                        attributed_order_id, revenue_fen, profit_fen,
@@ -670,7 +699,8 @@ class GrowthTouchService:
                 WHERE tenant_id = :tid AND customer_id = :cid AND is_deleted = false
                 ORDER BY created_at DESC
                 LIMIT :lim OFFSET :off
-            """),
+            """
+            ),
             {"tid": tenant_id, "cid": str(customer_id), "lim": size, "off": offset},
         )
         items = [dict(r._mapping) for r in rows_result.fetchall()]

@@ -10,6 +10,7 @@
   POST /api/v1/supply/delivery/temperature-thresholds                创建阈值
   GET  /api/v1/supply/delivery/temperature-thresholds                列出阈值
 """
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.security.src.error_handler import safe_http_exception
 
 from ..models.delivery_temperature import (
     AlertHandlePayload,
@@ -108,7 +110,7 @@ async def post_temperature(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -179,9 +181,7 @@ async def list_active_alerts(
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    rows = await svc.list_active_alerts(
-        tenant_id=x_tenant_id, severity=severity, limit=limit, db=db
-    )
+    rows = await svc.list_active_alerts(tenant_id=x_tenant_id, severity=severity, limit=limit, db=db)
     return _ok({"items": rows, "count": len(rows)})
 
 
@@ -205,7 +205,7 @@ async def handle_alert(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise safe_http_exception(404, "资源不存在", exc) from exc
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -235,7 +235,7 @@ async def create_threshold(
         return _ok(result)
     except ValueError as exc:
         await db.rollback()
-        raise HTTPException(status_code=422, detail=str(exc))
+        raise safe_http_exception(422, "请求格式错误", exc) from exc
 
 
 @router.get("/temperature-thresholds")
@@ -244,7 +244,5 @@ async def list_thresholds(
     x_tenant_id: str = Header(alias="X-Tenant-ID"),
     db: AsyncSession = Depends(get_db),
 ):
-    rows = await svc.list_thresholds(
-        tenant_id=x_tenant_id, enabled_only=enabled_only, db=db
-    )
+    rows = await svc.list_thresholds(tenant_id=x_tenant_id, enabled_only=enabled_only, db=db)
     return _ok({"items": rows, "count": len(rows)})

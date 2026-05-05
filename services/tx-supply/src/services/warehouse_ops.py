@@ -113,7 +113,8 @@ async def create_transfer_order(
 
         # v064 schema: from_store_id / to_store_id，主键为 UUID
         await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO warehouse_transfers
                     (id, tenant_id, from_store_id, to_store_id,
                      status, created_at, updated_at)
@@ -122,7 +123,8 @@ async def create_transfer_order(
                      :from_store::uuid, :to_store::uuid,
                      'pending', :now, :now)
                 RETURNING id
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "from_store": from_warehouse,
@@ -133,14 +135,16 @@ async def create_transfer_order(
 
         # 查回刚插入的 UUID（RETURNING）
         id_row = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id FROM warehouse_transfers
                 WHERE tenant_id = :tenant_id::uuid
                   AND from_store_id = :from_store::uuid
                   AND to_store_id = :to_store::uuid
                 ORDER BY created_at DESC
                 LIMIT 1
-            """),
+            """
+            ),
             {
                 "tenant_id": tenant_id,
                 "from_store": from_warehouse,
@@ -155,7 +159,8 @@ async def create_transfer_order(
 
         for item in items:
             await db.execute(
-                text("""
+                text(
+                    """
                     INSERT INTO warehouse_transfer_items
                         (id, transfer_id, tenant_id, ingredient_id,
                          ingredient_name, unit, requested_qty,
@@ -165,7 +170,8 @@ async def create_transfer_order(
                          :ingredient_id::uuid,
                          :name, :unit, :quantity,
                          :now, :now)
-                """),
+                """
+                ),
                 {
                     "transfer_id": transfer_id,
                     "tenant_id": tenant_id,
@@ -216,7 +222,8 @@ async def approve_transfer_order(
 
         # v064: approved_by 为 UUID 类型；status 枚举: pending/in_transit/received/cancelled
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE warehouse_transfers
                 SET status = 'in_transit',
                     approved_by = :approver_id::uuid,
@@ -224,7 +231,8 @@ async def approve_transfer_order(
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
                   AND status = 'pending'
                 RETURNING id, status
-            """),
+            """
+            ),
             {
                 "id": transfer_id,
                 "tenant_id": tenant_id,
@@ -282,14 +290,16 @@ async def receive_transfer_order(
 
         # v064: status 为 received（非 completed），无 received_by/received_at 列
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE warehouse_transfers
                 SET status = 'received',
                     updated_at = :now
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
                   AND status = 'in_transit'
                 RETURNING id, status
-            """),
+            """
+            ),
             {
                 "id": transfer_id,
                 "tenant_id": tenant_id,
@@ -343,14 +353,16 @@ async def get_transfer_order(
 
         # v064 schema: from_store_id / to_store_id，无 item_count / total_qty 聚合列
         header = await db.execute(
-            text("""
+            text(
+                """
                 SELECT id, tenant_id, from_store_id, to_store_id,
                        status, approved_by,
                        created_at, updated_at
                 FROM warehouse_transfers
                 WHERE id = :id::uuid AND tenant_id = :tenant_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"id": transfer_id, "tenant_id": tenant_id},
         )
         row = header.mappings().one_or_none()
@@ -358,13 +370,15 @@ async def get_transfer_order(
             return {"ok": False, "error": f"Transfer {transfer_id} not found"}
 
         items_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT ingredient_id, ingredient_name, requested_qty AS quantity,
                        actual_qty, unit
                 FROM warehouse_transfer_items
                 WHERE transfer_id = :transfer_id::uuid AND tenant_id = :tenant_id::uuid
                   AND is_deleted = FALSE
-            """),
+            """
+            ),
             {"transfer_id": transfer_id, "tenant_id": tenant_id},
         )
         items = [dict(r) for r in items_result.mappings().all()]

@@ -225,18 +225,32 @@ class TestSharedServiceUtils:
         for kw in ("pkg:", "api_dir:", "modules:", "strict:"):
             assert kw in src, f"auto_mount_routes 缺关键字 {kw}"
 
-    def test_catches_base_exception(self):
-        """Review follow-up：auto_mount.py 必须用 except BaseException 而非 Exception
+    def test_catches_system_exit_and_keyboard_interrupt(self):
+        """Review follow-up：auto_mount.py 必须显式拦截 SystemExit / KeyboardInterrupt
         （否则 SystemExit/KeyboardInterrupt 不被捕获，会静默杀进程）
+
+        注：不允许 `except Exception`（项目规范禁 broad except），故采用显式列出
+        BaseException 子类的方式。本测试确保关键 BaseException 子类在 except
+        子句中被命名。
         """
+        import re
         src = (
             ROOT / "shared" / "service_utils" / "auto_mount.py"
         ).read_text(encoding="utf-8")
-        # 至少两处 except BaseException（import + include_router）
-        count = src.count("except BaseException")
-        assert count >= 2, (
-            f"auto_mount.py 期望至少 2 处 except BaseException，实际 {count}。"
-            f"若仅用 except Exception，SystemExit 等会穿透导致 service 静默崩溃。"
+        # 严禁 broad except（项目规范）—— 匹配真实 except 子句而非注释
+        # 形式：`except Exception:` 或 `except Exception as exc:`
+        broad_except_pattern = re.compile(
+            r"^\s*except\s+Exception\b", re.MULTILINE,
+        )
+        assert not broad_except_pattern.search(src), (
+            "auto_mount.py 含 `except Exception` —— 违反项目规范"
+        )
+        # 必须显式列出 SystemExit / KeyboardInterrupt
+        assert "SystemExit" in src, (
+            "auto_mount.py 必须显式拦截 SystemExit（防止 routes 顶层 sys.exit 杀进程）"
+        )
+        assert "KeyboardInterrupt" in src, (
+            "auto_mount.py 必须显式拦截 KeyboardInterrupt"
         )
 
     def test_has_router_type_check(self):

@@ -167,7 +167,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         stmt = (
             select(_DeliveryStoreConfigRow.__table__)
@@ -217,7 +217,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         # 确保配置存在
         row = await self._fetch_config_row(sid, platform, tid, db)
@@ -266,7 +266,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         now = datetime.now(tz=timezone.utc)
         auto_off = now + timedelta(minutes=duration_minutes)
@@ -319,7 +319,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         row = await self._fetch_config_row(sid, platform, tid, db)
         if row is None:
@@ -403,7 +403,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         rating = int(review_data.get("rating", 5))
         reviewed_at = review_data.get("reviewed_at") or datetime.now(tz=timezone.utc)
@@ -458,7 +458,7 @@ class DeliveryOpsService:
         rid = uuid.UUID(str(review_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         row = await self._fetch_review_row(rid, tid, db)
         if row is None:
@@ -525,7 +525,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=days)
         tbl = _DeliveryReviewRow.__table__
@@ -568,7 +568,7 @@ class DeliveryOpsService:
         rid = uuid.UUID(str(review_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         row = await self._fetch_review_row(rid, tid, db)
         if row is None:
@@ -605,7 +605,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         tbl = _DeliveryReviewRow.__table__
         stmt = (
@@ -637,7 +637,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         platform_healths: list[PlatformHealth] = []
 
@@ -678,7 +678,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         cutoff = datetime.now(tz=timezone.utc).date() - timedelta(days=days)
         tbl = _PlatformHealthSnapshotRow.__table__
@@ -712,7 +712,7 @@ class DeliveryOpsService:
         sid = uuid.UUID(str(store_id))
         tid = uuid.UUID(str(tenant_id))
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tid)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tid)})
 
         tbl = _PlatformHealthSnapshotRow.__table__
         values = {
@@ -756,7 +756,7 @@ class DeliveryOpsService:
     ) -> Optional[dict[str, Any]]:
         from sqlalchemy import text  # noqa: PLC0415
 
-        await db.execute(text("SET LOCAL app.tenant_id = :tid"), {"tid": str(tenant_id)})
+        await db.execute(text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)})
         tbl = _DeliveryStoreConfigRow.__table__
         stmt = select(tbl).where(
             and_(

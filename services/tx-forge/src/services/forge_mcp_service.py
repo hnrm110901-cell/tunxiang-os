@@ -43,7 +43,8 @@ class ForgeMCPService:
         server_id = f"mcp_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_mcp_servers
                     (id, tenant_id, server_id, app_id, server_name,
                      transport, base_url, capabilities,
@@ -56,7 +57,8 @@ class ForgeMCPService:
                 RETURNING server_id, app_id, server_name, transport,
                           base_url, capabilities, health_endpoint,
                           health_status, created_at
-            """),
+            """
+            ),
             {
                 "server_id": server_id,
                 "app_id": app_id,
@@ -130,7 +132,8 @@ class ForgeMCPService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT s.server_id, s.app_id, s.server_name, s.transport,
                        s.base_url, s.health_status, s.last_health_check,
                        s.created_at,
@@ -145,7 +148,8 @@ class ForgeMCPService:
                 WHERE {where_clause}
                 ORDER BY s.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -155,14 +159,16 @@ class ForgeMCPService:
     async def get_server(self, db: AsyncSession, server_id: str) -> dict:
         """获取 MCP Server 详情及其所有工具"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT server_id, app_id, server_name, transport,
                        base_url, capabilities, health_endpoint,
                        health_status, last_health_check,
                        created_at, updated_at
                 FROM forge_mcp_servers
                 WHERE server_id = :server_id AND is_deleted = false
-            """),
+            """
+            ),
             {"server_id": server_id},
         )
         server_row = result.mappings().first()
@@ -173,7 +179,8 @@ class ForgeMCPService:
 
         # 获取所有工具
         tools_result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT tool_id, tool_name, description,
                        input_schema, output_schema,
                        ontology_bindings, trust_tier_required,
@@ -182,7 +189,8 @@ class ForgeMCPService:
                 FROM forge_mcp_tools
                 WHERE server_id = :server_id AND is_deleted = false
                 ORDER BY tool_name ASC
-            """),
+            """
+            ),
             {"server_id": server_id},
         )
         server_dict["tools"] = [dict(t) for t in tools_result.mappings().all()]
@@ -204,14 +212,16 @@ class ForgeMCPService:
             )
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_mcp_servers
                 SET health_status = :health_status,
                     last_health_check = NOW(),
                     updated_at = NOW()
                 WHERE server_id = :server_id AND is_deleted = false
                 RETURNING server_id, server_name, health_status, last_health_check
-            """),
+            """
+            ),
             {"server_id": server_id, "health_status": health_status},
         )
         row = result.mappings().first()
@@ -260,7 +270,8 @@ class ForgeMCPService:
         total = count_result.scalar_one()
 
         result = await db.execute(
-            text(f"""
+            text(
+                f"""
                 SELECT t.tool_id, t.server_id, t.tool_name, t.description,
                        t.ontology_bindings, t.trust_tier_required,
                        t.call_count, t.avg_latency_ms,
@@ -269,7 +280,8 @@ class ForgeMCPService:
                 WHERE {where_clause}
                 ORDER BY t.created_at DESC
                 LIMIT :limit OFFSET :offset
-            """),
+            """
+            ),
             params,
         )
         items = [dict(r) for r in result.mappings().all()]
@@ -279,7 +291,8 @@ class ForgeMCPService:
     async def get_tool_schema(self, db: AsyncSession, tool_id: str) -> dict:
         """获取单个工具的完整 Schema，包括所属 Server 信息"""
         result = await db.execute(
-            text("""
+            text(
+                """
                 SELECT t.tool_id, t.server_id, t.tool_name, t.description,
                        t.input_schema, t.output_schema,
                        t.ontology_bindings, t.trust_tier_required,
@@ -291,7 +304,8 @@ class ForgeMCPService:
                 LEFT JOIN forge_mcp_servers s ON s.server_id = t.server_id
                     AND s.is_deleted = false
                 WHERE t.tool_id = :tool_id AND t.is_deleted = false
-            """),
+            """
+            ),
             {"tool_id": tool_id},
         )
         row = result.mappings().first()
@@ -323,7 +337,8 @@ class ForgeMCPService:
         tool_id = f"tool_{uuid4().hex[:12]}"
 
         result = await db.execute(
-            text("""
+            text(
+                """
                 INSERT INTO forge_mcp_tools
                     (id, tenant_id, tool_id, server_id, tool_name,
                      description, input_schema, output_schema,
@@ -339,7 +354,8 @@ class ForgeMCPService:
                           input_schema, output_schema,
                           ontology_bindings, trust_tier_required,
                           created_at
-            """),
+            """
+            ),
             {
                 "tool_id": tool_id,
                 "server_id": server_id,
@@ -371,7 +387,8 @@ class ForgeMCPService:
     ) -> None:
         """记录一次工具调用，更新调用计数和滚动平均延迟"""
         await db.execute(
-            text("""
+            text(
+                """
                 UPDATE forge_mcp_tools
                 SET call_count = call_count + 1,
                     avg_latency_ms = CASE
@@ -380,6 +397,7 @@ class ForgeMCPService:
                     END,
                     updated_at = NOW()
                 WHERE tool_id = :tool_id AND is_deleted = false
-            """),
+            """
+            ),
             {"tool_id": tool_id, "latency_ms": latency_ms},
         )

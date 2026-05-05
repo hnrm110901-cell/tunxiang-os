@@ -1,0 +1,138 @@
+# ============================================================
+# 屯象OS 租户身份层 — 最黔线 (zqx)
+# ============================================================
+# 本文件是 **纯商户身份层**，只承载与该商户绑定的：
+#   - 独占数据库（tunxiang_zqx）
+#   - 商户编码 / 租户ID / 品牌名 env
+#   - 商户专属种子（scripts/seed_zqx.py）
+#   - 独占 volume / network 命名空间
+#
+# 本文件 **不再承载**：
+#   - host 端口映射（生产部署各家在自己的 VM/服务器上跑，
+#     端口走默认 8000/5432/6379 等，docker-network 内部直连即可，
+#     外部访问由各 VM 的 nginx/反代自配）
+#   - 端口偏移（同机多实例联调请叠加 special/multi-host-dev.yml）
+#
+# 生产场景用法（独立部署，无偏移）:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/prod.yml \
+#                  -f infra/compose/tenants/zqx.yml up -d
+#
+# 演示场景用法:
+#   docker compose -f infra/compose/base.yml \
+#                  -f infra/compose/envs/demo.yml \
+#                  -f infra/compose/tenants/zqx.yml up -d
+#
+# 同机多家联调（dev 专用，不要叠加到生产）:
+#   见 infra/compose/special/multi-host-dev.yml 与
+#   .env.zqx.dev.example
+#
+# KPI 重点：客单价 / 会员复购 / 渠道组合
+# ============================================================
+
+x-zqx-env: &zqx-env
+  TX_MERCHANT_CODE: zqx
+  TX_TENANT_ID: zqx-demo-tenant
+  TX_MERCHANT_NAME: 最黔线
+  DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_zqx_2024@postgres:5432/tunxiang_zqx
+
+services:
+  postgres:
+    environment:
+      POSTGRES_USER: tunxiang
+      POSTGRES_PASSWORD: tunxiang_zqx_2024
+      POSTGRES_DB: tunxiang_zqx
+    volumes:
+      - zqx_pg_data:/var/lib/postgresql/data
+      - ../docker/init-rls.sql:/docker-entrypoint-initdb.d/01-rls.sql
+
+  gateway:
+    environment:
+      <<: *zqx-env
+
+  tx-trade:
+    environment:
+      <<: *zqx-env
+
+  tx-menu:
+    environment:
+      <<: *zqx-env
+
+  tx-member:
+    environment:
+      <<: *zqx-env
+
+  tx-ops:
+    environment:
+      <<: *zqx-env
+
+  tx-finance:
+    environment:
+      <<: *zqx-env
+
+  tx-analytics:
+    environment:
+      <<: *zqx-env
+
+  # 种子数据：迁移完成后执行 zqx 专属 seed
+  # profiles: [seed] —— 默认不启动；需要播种时显式 `--profile seed`
+  # （生产部署只在初始化时跑一次，独立部署也不需要常驻此 service）
+  # 依赖的 migrate 服务由 envs/demo.yml 提供；prod 场景因 profile 不激活
+  # 而被 compose 整体丢弃，不会触发 depends_on 校验。
+  seed-data:
+    image: python:3.11-slim
+    working_dir: /app
+    restart: "no"
+    profiles:
+      - seed
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple
+             sqlalchemy asyncpg psycopg2-binary httpx &&
+             python3 /app/scripts/seed_zqx.py &&
+             echo 'zqx 种子数据植入完成'"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://tunxiang:tunxiang_zqx_2024@postgres:5432/tunxiang_zqx
+      PYTHONPATH: /app
+      TX_MERCHANT_CODE: zqx
+      TX_TENANT_ID: zqx-demo-tenant
+    volumes:
+      - ../../scripts:/app/scripts
+      - ../../shared:/app/shared
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-zqx}"
+      tunxiang.tenant: zqx
+
+  web-admin:
+    environment:
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    volumes: !override
+      - ../../apps/web-admin:/app
+      - zqx_web_admin_nm:/app/node_modules
+
+  web-pos:
+    environment:
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    volumes: !override
+      - ../../apps/web-pos:/app
+      - zqx_web_pos_nm:/app/node_modules
+
+  web-kds:
+    environment:
+      VITE_MERCHANT_CODE: zqx
+      VITE_TENANT_ID: zqx-demo-tenant
+    volumes: !override
+      - ../../apps/web-kds:/app
+      - zqx_web_kds_nm:/app/node_modules
+
+volumes:
+  zqx_pg_data:
+  zqx_web_admin_nm:
+  zqx_web_pos_nm:
+  zqx_web_kds_nm:
