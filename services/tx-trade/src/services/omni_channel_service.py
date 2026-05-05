@@ -808,40 +808,36 @@ class OmniChannelService:
         return internal_id
 
     def _get_platform_adapter(self, platform: str) -> Any:
-        """获取平台adapter实例（从环境变量读取secret）
+        """获取平台adapter实例，委托 delivery_factory 完成适配器实例化。
 
-        实际部署时通过依赖注入或工厂函数提供已配置的adapter。
-        测试时通过mock替换。
+        环境变量映射：
+          meituan → MEITUAN_APP_KEY, MEITUAN_APP_SECRET, MEITUAN_POI_ID
+          eleme   → ELEME_APP_KEY, ELEME_APP_SECRET
+          douyin  → DOUYIN_APP_ID, DOUYIN_APP_SECRET
         """
         import os
 
-        if platform == "meituan":
-            from shared.adapters.meituan_saas.src.adapter import MeituanSaasAdapter
+        from shared.adapters.delivery_factory import get_delivery_adapter
 
-            return MeituanSaasAdapter(
-                config={
-                    "app_key": os.environ.get("MEITUAN_APP_KEY", ""),
-                    "app_secret": os.environ.get("MEITUAN_APP_SECRET", ""),
-                    "poi_id": os.environ.get("MEITUAN_POI_ID", ""),
-                }
-            )
-        elif platform == "eleme":
-            from shared.adapters.eleme.src.adapter import ElemeAdapter
+        # 每个平台的自有配置字段
+        platform_configs = {
+            "meituan": {
+                "app_key": os.environ.get("MEITUAN_APP_KEY", ""),
+                "app_secret": os.environ.get("MEITUAN_APP_SECRET", ""),
+                "poi_id": os.environ.get("MEITUAN_POI_ID", ""),
+            },
+            "eleme": {
+                "app_key": os.environ.get("ELEME_APP_KEY", ""),
+                "app_secret": os.environ.get("ELEME_APP_SECRET", ""),
+            },
+            "douyin": {
+                "app_id": os.environ.get("DOUYIN_APP_ID", ""),
+                "app_secret": os.environ.get("DOUYIN_APP_SECRET", ""),
+            },
+        }
 
-            return ElemeAdapter(
-                config={
-                    "app_key": os.environ.get("ELEME_APP_KEY", ""),
-                    "app_secret": os.environ.get("ELEME_APP_SECRET", ""),
-                }
-            )
-        elif platform == "douyin":
-            from shared.adapters.douyin.src.adapter import DouyinAdapter
-
-            return DouyinAdapter(
-                config={
-                    "app_id": os.environ.get("DOUYIN_APP_ID", ""),
-                    "app_secret": os.environ.get("DOUYIN_APP_SECRET", ""),
-                }
-            )
-        else:
+        config = platform_configs.get(platform)
+        if config is None:
             raise UnsupportedPlatformError(f"不支持的平台: {platform}")
+
+        return get_delivery_adapter(platform, config=config)
