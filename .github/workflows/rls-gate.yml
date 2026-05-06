@@ -109,6 +109,14 @@ jobs:
               r"ALTER\s+TABLE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+ENABLE\s+ROW\s+LEVEL\s+SECURITY",
               re.IGNORECASE,
           )
+          # 审计 S-05（P0）：FORCE ROW LEVEL SECURITY 强制 — 即便 app role 持有
+          # BYPASSRLS（如 SET LOCAL row_security = off）也无法绕过。无 FORCE 时
+          # 任何 BYPASSRLS / SUPERUSER 路径直读全租户数据，多租户隔离失效。
+          # 详细 rollout 见 docs/security/rls-force-rollout.md。
+          FORCE_RE = re.compile(
+              r"ALTER\s+TABLE\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+FORCE\s+ROW\s+LEVEL\s+SECURITY",
+              re.IGNORECASE,
+          )
           POLICY_RE = re.compile(
               r"CREATE\s+POLICY\s+\w+\s+ON\s+([a-zA-Z_][a-zA-Z0-9_]*)",
               re.IGNORECASE,
@@ -127,6 +135,7 @@ jobs:
 
               created = {m.group(1).lower() for m in CREATE_RE.finditer(source)}
               rls_enabled = {m.group(1).lower() for m in RLS_RE.finditer(source)}
+              rls_forced = {m.group(1).lower() for m in FORCE_RE.finditer(source)}
               policies = {m.group(1).lower() for m in POLICY_RE.finditer(source)}
 
               # 本 migration 新建的表必须 ENABLE RLS
@@ -135,6 +144,15 @@ jobs:
                   failures.append(
                       f"[{path.name}] 下列新建表未启用 RLS: {sorted(no_rls)}\n"
                       f"  Fix: 在 migration 里添加 ALTER TABLE <t> ENABLE ROW LEVEL SECURITY"
+                  )
+
+              # 审计 S-05：启用 RLS 的表必须同时 FORCE，防 BYPASSRLS 绕过
+              missing_force = rls_enabled - rls_forced
+              if missing_force:
+                  failures.append(
+                      f"[{path.name}] 下列启用 RLS 的表未 FORCE: {sorted(missing_force)}\n"
+                      f"  Fix: 添加 ALTER TABLE <t> FORCE ROW LEVEL SECURITY\n"
+                      f"  Why: 无 FORCE 时持 BYPASSRLS 的 app role 可绕策略读所有租户数据"
                   )
 
               # 启用 RLS 的表必须有 POLICY

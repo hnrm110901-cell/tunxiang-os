@@ -4722,20 +4722,11 @@ TestV264MigrationFileStructure（结构契约,防漂移）
 - **代理 fallback**：reclaude:56227 整轮 502 → 切 ClashX:7890 push/PR 全通
 
 ### 下一步（下一会话）
-1. 等 12 PR admin merge：独立链 #184/#185/#188/#190/#191；PG.7 v 链 #187→#189→#192；PG.7 lint 链 #186→#193；docs #194；audit P0 主+客户端 #195→#196
+1. 等 10 PR admin merge：独立链 #184/#185/#188/#190/#191；PG.7 v 链 #187→#189→#192；PG.7 lint 链 #186→#193
 2. PR merge 后跑 `scripts/check_rls_with_check.py --strict` 验证从 28 → 0（合理预期：脚本扫的是字面 SQL，所以 baseline 文件仍 28 处。运行时 policy 由 v40X migration 修补，与 lint 是不同抽象层）
-3. 若创始人放行 W8 sgc gap / PD.1 积分系统 / 代理 fallback / Tier1 镜像 registry（issue #198）中任一，对应启动新 sprint
-4. ~~**建议**：补一个 follow-up issue/PR — lint baseline drain 计划~~ → ✅ 落 issue #197
-5. ~~**建议**：runner Tier B 路径 A（预构建依赖镜像）作为 #188 follow-up~~ → ✅ 落 issue #198（待创始人确认 registry 后实施）
-
-### 跨会话事件（pid 921 / s004 tab）
-本会话期间 s004 tab 的并发 Claude Code 主会话（vanilla `claude`，非 OMC subagent）独立完成审计 P0 批次：
-- **PR #195** audit/p0-fixes-batch-1-5 — 23 P0 阻断项（S-02/S-03/S-04/S-05/F1/F2/F3/OPS-001/002/003/004 + 双轮独立 review；分支共 20 commit = 1 base 共享 + 18 pid 921 audit + 1 我误置的 README）
-- **PR #196** audit/p0-followup-edge-hmac-client — edge sync-engine 客户端 HMAC 签名（解 #195 NEW-P0 阻塞，2 commit / 15 tier1 测试全过）
-- ⚠️ **#195 CI UNSTABLE**：源/测试配对 fail（CLAUDE.md §20 违规 — Tier 1 源改没配 *tier1*.py）+ Tier 1 测试 regression（tx-trade/tx-org）+ Ruff×9 → admin merge 前需 pid 921 修
-- 双 PR 必须**严格按 #195 → #196 顺序合**，倒序或漏合会让 `EDGE_SYNC_HMAC_REQUIRED=true` cutover 时打死全部 Mac mini
-
-**教训已落 memory**：`feedback_parallel_claude_sessions` + `project_tunxiang_clones`（3 份 clone + 7 个 -3p worktrees 实情）
+3. 若创始人放行 W8 sgc gap / PD.1 积分系统 / 代理 fallback 中任一，对应启动新 sprint
+4. **建议**：补一个 follow-up issue/PR — lint baseline drain 计划（migration squash 时把 14 文件字面 SQL 一并改 WITH CHECK + 清 baseline）
+5. **建议**：runner Tier B 路径 A（预构建依赖镜像）作为 #188 follow-up，预期再 ~40% 加速
 
 ### 已知风险
 - **PG.7 PR 链 stack 复杂**：#187 → #189 → #192 + #186 → #193 两条独立 stack；admin 若按错顺序 merge 会触发 alembic 多 heads / lint 找不到脚本 fail。docs 已注明依赖

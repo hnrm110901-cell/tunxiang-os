@@ -74,16 +74,6 @@ class OrderService:
         table_no: Optional[str] = None,
         customer_id: Optional[str] = None,
         waiter_id: Optional[str] = None,
-    ) -> dict:
-        await self._set_tenant()
-
-    async def create_order(
-        self,
-        store_id: str,
-        order_type: str = OrderType.dine_in.value,
-        table_no: Optional[str] = None,
-        customer_id: Optional[str] = None,
-        waiter_id: Optional[str] = None,
         is_offline: bool = False,
         items_data: Optional[list[dict]] = None,
         payments_data: Optional[list[dict]] = None,
