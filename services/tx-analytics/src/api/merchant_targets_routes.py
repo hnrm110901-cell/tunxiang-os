@@ -147,9 +147,6 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                     """
                     ),
                     {"tid": tenant_id},
-                          AND created_at >= NOW() - (:days * INTERVAL '1 day')
-                    """),
-                    {"tid": tenant_id, "days": 30},
                 )
                 r = row.fetchone()
                 if r and r.order_count and r.order_count > 0:
@@ -174,9 +171,6 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                     """
                     ),
                     {"tid": tenant_id},
-                          AND created_at >= NOW() - (:days * INTERVAL '1 day')
-                    """),
-                    {"tid": tenant_id, "days": 30},
                 )
                 row_tables = await session.execute(
                     text(

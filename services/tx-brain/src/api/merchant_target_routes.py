@@ -14,7 +14,7 @@ from __future__ import annotations
 import copy
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 import structlog
 from fastapi import APIRouter, HTTPException
@@ -94,7 +94,9 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
         if "table_turnover_rate" in kpi_keys:
             try:
                 r1 = await session.execute(
-                    text("SELECT COUNT(*) AS cnt FROM orders WHERE tenant_id = :tid AND is_deleted = FALSE AND created_at >= NOW() - (:days * INTERVAL '1 day')"),
+                    text(
+                        "SELECT COUNT(*) AS cnt FROM orders WHERE tenant_id = :tid AND is_deleted = FALSE AND created_at >= NOW() - (:days * INTERVAL '1 day')"
+                    ),
                     {"tid": tenant_id, "days": 30},
                 )
                 r2 = await session.execute(
@@ -156,14 +158,16 @@ async def get_merchant_target_gap(merchant_code: str) -> dict:
         if actual is None:
             actual = round(target * 0.85, 2)
         gap_pct = round((actual - target) / target * 100, 1) if target else 0.0
-        gaps.append({
-            "kpi": kpi,
-            "label": KPI_LABELS.get(kpi, kpi),
-            "target": target,
-            "actual": actual,
-            "gap_pct": gap_pct,
-            "recommendation": _gen_recommendation(kpi, target, actual, gap_pct),
-        })
+        gaps.append(
+            {
+                "kpi": kpi,
+                "label": KPI_LABELS.get(kpi, kpi),
+                "target": target,
+                "actual": actual,
+                "gap_pct": gap_pct,
+                "recommendation": _gen_recommendation(kpi, target, actual, gap_pct),
+            }
+        )
 
     completion_scores = []
     for g in gaps:
@@ -216,14 +220,19 @@ async def analyze_merchant_targets(payload: AnalyzeRequest) -> dict:
         if eff < worst_gap:
             worst_gap = eff
             worst_kpi = kpi
-        kpi_results.append({
-            "kpi": kpi,
-            "label": KPI_LABELS.get(kpi, kpi),
-            "gap_pct": gap_pct,
-            "status": "超出目标" if eff >= 5 else ("接近目标" if eff >= -5 else "低于目标"),
-        })
+        kpi_results.append(
+            {
+                "kpi": kpi,
+                "label": KPI_LABELS.get(kpi, kpi),
+                "gap_pct": gap_pct,
+                "status": "超出目标" if eff >= 5 else ("接近目标" if eff >= -5 else "低于目标"),
+            }
+        )
 
-    completion = [min(max((100 + (-g["gap_pct"] if g["kpi"] in LOWER_IS_BETTER else g["gap_pct"])) / 100, 0), 1) * 100 for g in kpi_results]
+    completion = [
+        min(max((100 + (-g["gap_pct"] if g["kpi"] in LOWER_IS_BETTER else g["gap_pct"])) / 100, 0), 1) * 100
+        for g in kpi_results
+    ]
     score = round(sum(completion) / len(completion), 1) if completion else 0.0
     health = "良好" if score >= 80 else ("一般" if score >= 60 else "需关注")
 
