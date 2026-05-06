@@ -39,8 +39,12 @@ PLATFORM_CONFIG: dict[str, dict] = {
 
 
 def _get_tenant_id(request: Request) -> str:
-    # cutover 后只信 InternalJwtMiddleware 注入的 state；dev 兜底 "default" 保留（生产由 middleware 强制注入）
-    return getattr(request.state, "tenant_id", "") or "default"
+    # cutover 后强制 fail-closed：state 缺失 = middleware 未生效或 JWT claims 缺 tenant_id，
+    # 不再回退 "default" 租户（review P0：可能静默读到测试数据中的 default 租户行）
+    tid = getattr(request.state, "tenant_id", "")
+    if not tid:
+        raise HTTPException(status_code=401, detail="X-Internal-JWT required (state.tenant_id missing)")
+    return tid
 
 
 async def _get_db(request: Request):

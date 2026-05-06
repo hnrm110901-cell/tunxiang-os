@@ -43,8 +43,15 @@ raw header 直读（无 state 兜底）、X-Tenant-Id 大小写变体。
 | 4 | `services/tunxiang-api/src/shared/middleware.py:20` | 单体入口 | 遗留 API 适配层入口 middleware；与 gateway 同性质，本 middleware 注入 state |
 | 5 | `services/tx-devforge/src/middlewares/tenant.py:60` | dev tools 入口 | DevForge 自有租户 middleware；devforge 是 dev 工具，不暴露生产数据 |
 | 6 | `services/tx-trade/src/security/rbac.py:87` | RBAC context | 本身用于 audit log 的 fallback context 字段；与 tenant_id 受信路径无关 |
-| 7 | `services/tx-trade/src/api/webhook_routes.py:105` | 公网回调 | 美团/饿了么/抖音等三方 webhook 入口；不经 gateway，外部签名验证后允许读 header |
-| 8 | `services/tx-trade/src/api/booking_webhook_routes.py:100` | 公网回调 | 第三方预订平台 webhook；同上 |
+| 7 | `services/tx-trade/src/api/webhook_routes.py:105` | 公网回调 | 美团/饿了么/抖音 webhook（`/api/v1/webhook/*`）；外部签名验证后允许读 header；**依赖 PR #215 webhook 路径豁免** |
+| 8 | `services/tx-trade/src/api/booking_webhook_routes.py:100` | 公网回调 | 微信/大众点评等预订 webhook（`/api/v1/booking/webhook/*`）；同上 |
+
+> **⚠️ 关联依赖**（review P0 修正）：tx-trade 已挂载 InternalJwtMiddleware（PR #208）。
+> 若 webhook 路径未在 middleware 的 `_EXEMPT_REGEX` 白名单中，所有外部 webhook 都会被
+> 401 拦截。**PR #215 已加 `r"/webhooks?(/|$)"` regex 豁免**，覆盖 19 个 webhook
+> endpoint（11 文件）—— 包括 `/api/v1/webhook/*`、`/api/v1/booking/webhook/*`、
+> `/api/v1/delivery/webhooks/*`、`/api/v1/im/webhook/*` 等。新增 webhook 路径必须
+> 含 `/webhook` 或 `/webhooks` 路径段才能被自动豁免。
 
 **不再保留 query_params 兜底**：
 `tx-org/api/attendance_compliance_routes.py:49` 的 `?tenant_id=X` 兜底已在
