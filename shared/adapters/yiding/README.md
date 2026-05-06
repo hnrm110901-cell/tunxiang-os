@@ -1,186 +1,238 @@
 # 易订适配器 - YiDing Adapter
 
-智链OS与易订预订系统的集成适配器。
+屯象OS 与易订预订系统（https://open.zhidianfan.com/yidingopen/）的集成适配器。
 
-## 功能特性
+基于真实易订开放 API 实现预订数据读取、会员查询、订单列表等双向同步功能。
 
-- ✅ 完整的预订管理API
-- ✅ 客户信息查询和管理
-- ✅ 桌台可用性查询
-- ✅ 预订统计和分析
-- ✅ 自动重试和错误处理
-- ✅ 内存缓存优化性能
-- ✅ 统一数据格式转换
+---
 
-## 安装
+## 配置说明
 
-```bash
-cd packages/api-adapters/yiding
-pip install -r requirements.txt
-```
-
-## 使用示例
-
-### 初始化适配器
+### 配置文件
 
 ```python
-from yiding import YiDingAdapter, YiDingConfig
+from src.types import YiDingConfig
 
 config: YiDingConfig = {
-    "base_url": "https://api.yiding.com",
-    "app_id": "your_app_id",
-    "app_secret": "your_app_secret",
-    "timeout": 10,
-    "max_retries": 3,
-    "cache_ttl": 300
-}
-
-adapter = YiDingAdapter(config)
-```
-
-### 创建预订
-
-```python
-from yiding import CreateReservationDTO, TableType
-
-reservation_data: CreateReservationDTO = {
-    "store_id": "STORE001",
-    "customer_name": "张三",
-    "customer_phone": "13800138000",
-    "reservation_date": "2026-02-20",
-    "reservation_time": "18:00",
-    "party_size": 4,
-    "table_type": TableType.MEDIUM,
-    "special_requests": "靠窗位置"
-}
-
-reservation = await adapter.create_reservation(reservation_data)
-print(f"预订成功: {reservation['id']}")
-```
-
-### 查询客户
-
-```python
-customer = await adapter.get_customer_by_phone("13800138000")
-
-if customer:
-    print(f"客户: {customer['name']}")
-    print(f"累计消费: {customer['total_spent'] / 100}元")
-    print(f"到店次数: {customer['total_visits']}次")
-```
-
-### 查询可用桌台
-
-```python
-tables = await adapter.get_available_tables(
-    store_id="STORE001",
-    date="2026-02-20",
-    time="18:00",
-    party_size=4
-)
-
-for table in tables:
-    print(f"桌号: {table['table_number']}, 容量: {table['capacity']}人")
-```
-
-### 获取预订统计
-
-```python
-stats = await adapter.get_reservation_stats(
-    store_id="STORE001",
-    start_date="2026-02-01",
-    end_date="2026-02-28"
-)
-
-print(f"总预订数: {stats['total_reservations']}")
-print(f"确认率: {stats['confirmation_rate'] * 100}%")
-print(f"取消率: {stats['cancellation_rate'] * 100}%")
-```
-
-## 数据格式
-
-### UnifiedReservation
-
-```python
-{
-    "id": "yiding_12345",
-    "external_id": "12345",
-    "source": "yiding",
-    "store_id": "STORE001",
-    "customer_name": "张三",
-    "customer_phone": "13800138000",
-    "reservation_date": "2026-02-20",
-    "reservation_time": "18:00",
-    "party_size": 4,
-    "table_type": "medium",
-    "status": "confirmed",
-    "deposit_amount": 10000,  # 100元
-    "estimated_amount": 40000,  # 400元
-    ...
+    "base_url": "https://open.zhidianfan.com/yidingopen/",  # API 基础 URL
+    "appid": "your_app_id",                                   # 应用 ID（账号）
+    "secret": "your_app_secret",                              # 应用密钥（密码）
+    "hotel_id": "30",                                         # 门店 ID（多店时可选）
+    "timeout": 10,                                            # 超时时间（秒）
+    "max_retries": 3,                                         # 最大重试次数
+    "cache_ttl": 300,                                         # 缓存过期时间（秒）
 }
 ```
 
-### UnifiedCustomer
+### 环境变量
+
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `YIDING_TIMEOUT` | HTTP 超时（秒） | `10` |
+| `YIDING_MAX_RETRIES` | 最大重试次数 | `3` |
+
+---
+
+## 快速开始
 
 ```python
-{
-    "id": "yiding_67890",
-    "external_id": "67890",
-    "source": "yiding",
-    "phone": "13800138000",
-    "name": "张三",
-    "member_level": "VIP",
-    "total_visits": 15,
-    "total_spent": 480000,  # 4800元
-    "preferences": {
-        "favorite_dishes": ["清蒸鲈鱼", "手撕包菜"],
-        "table_preference": "8号包间",
-        ...
-    },
-    ...
+import asyncio
+from src.adapter import YiDingAdapter
+from src.types import YiDingConfig
+
+config: YiDingConfig = {
+    "base_url": "https://open.zhidianfan.com/yidingopen/",
+    "appid": "your_appid",
+    "secret": "your_secret",
 }
+
+async def main():
+    adapter = YiDingAdapter(config)
+    try:
+        # 健康检查
+        ok = await adapter.health_check()
+        print(f"易订连接: {'OK' if ok else 'FAILED'}")
+
+        # 获取待处理订单（轮询）
+        orders = await adapter.get_pending_orders()
+        print(f"待处理订单: {len(orders)} 条")
+
+        # 查询会员
+        member = await adapter.get_member_info("13800138000")
+        if member:
+            print(f"会员: {member['name']}, 累计消费: {member['total_amount']}元")
+    finally:
+        await adapter.close()
+
+asyncio.run(main())
 ```
 
-## 错误处理
+---
+
+## API 方法参考
+
+### 核心业务流程：易订 Polling Workflow
+
+易订使用**轮询（polling）** 模式交付线上预订订单，与多数 POS 系统的 Webhook 模式不同：
+
+```
+1. get_pending_orders()   → 拉取待处理订单列表（含 requestId）
+2. 内部处理订单（存本地 DB 或推送 POS）
+3. confirm_orders()       → 用 requestId 确认已收到（下次轮询不再返回这些订单）
+```
+
+**重要**：不调用 `confirm_orders()` 会导致同一批订单在每次轮询中反复返回。
+
+### 方法清单
+
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| `health_check()` | - | 通过获取 Token 验证连通性 |
+| `get_pending_orders()` | GET `/resv/orders` | 获取待处理线上预订（轮询入口） |
+| `confirm_orders(orders, request_id)` | PUT `/resv/orders` | 确认已收到订单 |
+| `check_table_status(table_code, meal_type_code, resv_date)` | GET `/resv/resvable` | 检查桌位预订状态 |
+| `update_order(data)` | PUT `/resv/hh_orders` | 新建/更新线下预订 |
+| `get_member_info(vip_phone)` | GET `/resv/user_info` | 按手机号查询会员 |
+| `get_member_list(start_date, end_date)` | GET `/resv/user/list` | 获取会员列表 |
+| `get_order_list(start_date, end_date)` | GET `/resv/orders/list` | 获取预订订单列表 |
+| `get_order_list_v2(start_date, end_date)` | GET `/resv/orders/list/V2` | 订单列表 V2（更多字段） |
+| `get_reservation_stats(start_date, end_date)` | - | 预订统计（基于 V2 计算） |
+| `sync_tables(areas, tables)` | POST `/sync/tables` | 桌位同步（POS -> 易订） |
+| `sync_dishes(dls, xls, cms, remarks, making_method)` | POST `/sync/dishes` | 菜品同步（POS -> 易订） |
+| `sync_bills(bills)` | POST `/sync/bills` | 账单数据同步 |
+| `sync_vips(vips, classes, hotel_id)` | POST `/sync/vips` | 客史数据同步 |
+
+---
+
+## 字段映射
+
+### UnifiedReservation（统一预订格式）
+
+| 字段 | 易订原始字段 | 类型 | 说明 |
+|------|-------------|------|------|
+| `external_id` | `resv_order` | str | 易订订单号 |
+| `store_id` | `hotel_id` | str | 门店 ID |
+| `customer_name` | `vip_name` | str | 客户姓名 |
+| `customer_phone` | `vip_phone` | str | 客户手机号 |
+| `reservation_time` | `dest_time` | str | 预计到店时间 |
+| `party_size` | `resv_num` | int | 就餐人数 |
+| `status` | `status` | enum | 预订状态映射 |
+| `deposit_amount` | `deposit_amount` | str | 押金金额 |
+| `pay_amount` | `paymount` | int | 结账金额 |
+| `source_name` | `sourceName` | str | 订单来源（V2） |
+| `table_area_name` | `table_area_name` | str | 桌位区域（V2） |
+| `in_table_time` | `inTableTime` | str | 入座时间（V2） |
+
+### ReservationStatus 映射
+
+| 易订状态码 | 含义 | Unified 映射 |
+|-----------|------|-------------|
+| 1 | 预订 | `PENDING` |
+| 2 | 入座 | `SEATED` |
+| 3 | 结账 | `COMPLETED` |
+| 4 | 退订 | `CANCELLED` |
+| 6 | 换台 | `TABLE_CHANGE` |
+
+---
+
+## 错误码表
+
+| error_code | 含义 | 处理建议 |
+|-----------|------|---------|
+| 0 | 成功 | - |
+| 1 | 数据不存在 | 查询类返回 None，非异常 |
+| -2 | Token 过期 | 自动重试（SDK 内置） |
+| -3 | Token 无效 | 自动重试（SDK 内置） |
+| 其他 | API 业务错误 | 检查请求参数或联系易订支持 |
+
+所有网络级异常（超时/连接断开）以 `YiDingAPIError` 形式抛出，SDK 内置指数退避重试（默认最多 3 次）。
+
+---
+
+## 幂等性
+
+适配器内置幂等性支持，防止网络重试导致重复操作：
 
 ```python
-from yiding import YiDingAPIError
+# 生成幂等键
+key = adapter.idempotency_key("sync_tables", payload)
 
-try:
-    reservation = await adapter.create_reservation(data)
-except YiDingAPIError as e:
-    print(f"API错误: {e.message}")
-    print(f"状态码: {e.status_code}")
-    print(f"错误码: {e.error_code}")
+# 先检查是否已处理过
+if adapter.is_duplicate(key):
+    logger.info("duplicate request, skipping")
+    return
+
+# 执行操作...
+result = await adapter.sync_tables(areas, tables)
+
+# 标记已处理
+adapter.mark_idempotent(key)
 ```
 
-## 缓存策略
+幂等性基于 `操作名:租户ID:请求体JSON（排序后）` 的 MD5 哈希，确保相同操作+相同数据不会被重复执行。
 
-适配器使用内存缓存来提升性能:
+---
 
-- 单个预订: 缓存5分钟
-- 预订列表: 缓存5分钟
-- 客户信息: 缓存5分钟
+## 事件发射
 
-缓存会在数据更新时自动失效。
+适配器在关键操作完成后自动向 `tx_adapter_events` 流发射 `STATUS_PUSHED` 事件：
 
-## 测试
+| 操作方法 | scope | stream_id 模式 |
+|----------|-------|----------------|
+| `get_pending_orders()` | `orders` | `yiding:pending:{hotel_id}` |
+| `confirm_orders()` | `orders` | `yiding:confirm:{hotel_id}` |
+| `sync_tables()` | `tables` | `yiding:tables:{hotel_id}` |
+| `sync_dishes()` | `dishes` | `yiding:dishes:{hotel_id}` |
+
+事件包含 `adapter_name: "yiding"`、`scope`、`ingested_count` / `pushed_count` 等字段。
+
+设置适配器级别 `_tenant_id` 以启用租户级隔离：
+```python
+adapter._tenant_id = "tenant-uuid"
+```
+
+---
+
+## 注意事项
+
+### aiohttp 依赖
+易订适配器使用 **aiohttp** 作为 HTTP 客户端（而非 httpx），因为易订 API 的 `access_token` 通过 query param 传递，且 token 刷新逻辑与 aiohttp 的 session 管理集成更紧密。
+
+需安装依赖：
+```bash
+pip install aiohttp
+```
+
+### Polling 机制
+易订使用轮询（polling）而非 Webhook 交付线上订单，这与其他适配器不同：
+- 轮询间隔建议 30-60 秒
+- 每次轮询后必须调用 `confirm_orders()` 确认
+- 未确认的订单会在下次轮询中重复返回
+
+### Token 管理
+- Token 由 SDK 自动管理，1 小时有效期内复用
+- Token 过期时自动刷新（提前 5 分钟）
+- Token 过期由易订 API 返回 `error_code: -2/-3` 触发
+
+### 缓存
+适配器内置内存缓存（TTL 默认 300 秒），缓存 key 基于请求参数哈希，适用于高频调用的只读接口。
+
+---
+
+## 测试指南
 
 ```bash
 # 运行所有测试
-pytest tests/
+pytest shared/adapters/yiding/tests/ -v
 
-# 运行特定测试
-pytest tests/test_adapter.py::TestYiDingAdapter::test_create_reservation
+# 运行特定测试类别
+pytest shared/adapters/yiding/tests/test_adapter.py -v -k "test_idempotency"
 
 # 查看覆盖率
-pytest --cov=src --cov-report=html tests/
+pytest --cov=shared/adapters/yiding/src --cov-report=html shared/adapters/yiding/tests/
+
+# E2E 测试（需要真实配置）
+YIDING_APPID=xxx YIDING_SECRET=xxx pytest tests/test_e2e.py
 ```
 
-## API文档
-
-详细API文档请参考: [易订开放平台文档](https://open.yiding.com/docs)
-
-## 许可证
-
-MIT
+测试基于 Mock（`unittest.mock.patch`），不依赖外部服务。

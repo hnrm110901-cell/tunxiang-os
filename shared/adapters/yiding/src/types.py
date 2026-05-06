@@ -5,20 +5,12 @@
 本文件保留易订特有的配置类型，并re-export公共字典类型以保持向后兼容。
 """
 
-import os
-import sys
-
-# 确保 base.src.types 可导入
-_adapters_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-if _adapters_dir not in sys.path:
-    sys.path.insert(0, _adapters_dir)
-
 from typing import TypedDict
 
 # ============================================
 # 从行业公共字典re-export（向后兼容）
 # ============================================
-from base.src.types import (  # noqa: F401, E402
+from shared.adapters.base.src.types import (  # noqa: F401
     ChannelSource,
     CreateReservationRequest,
     CustomerLevel,

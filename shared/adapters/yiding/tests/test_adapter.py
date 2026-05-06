@@ -1,10 +1,15 @@
 """
 易订适配器测试 - YiDing Adapter Tests
 
-基于真实易订API格式编写
+基于真实易订API格式编写，覆盖：
+- 核心 API 方法
+- 数据映射
+- 缓存
+- 幂等性
+- 事件发射
 """
 
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from src.adapter import YiDingAdapter
@@ -326,3 +331,81 @@ class TestYiDingCache:
 
         cached = await cache.get_reservation("test123")
         assert cached is None
+
+
+class TestYiDingIdempotency:
+    """幂等性测试"""
+
+    def test_idempotency_key_is_deterministic(self, adapter):
+        """相同操作名+相同payload生成相同幂等键"""
+        payload = {"areas": [{"area_code": "1"}], "tables": [{"table_code": "001"}]}
+        key1 = adapter.idempotency_key("sync_tables", payload)
+        key2 = adapter.idempotency_key("sync_tables", payload)
+        assert key1 == key2
+        assert isinstance(key1, str)
+        assert len(key1) == 32  # MD5 hex
+
+    def test_idempotency_key_differs_by_payload(self, adapter):
+        """不同payload生成不同幂等键"""
+        key1 = adapter.idempotency_key("sync_tables", {"a": 1})
+        key2 = adapter.idempotency_key("sync_tables", {"a": 2})
+        assert key1 != key2
+
+    def test_idempotency_key_differs_by_operation(self, adapter):
+        """不同操作名生成不同幂等键"""
+        payload = {"table_code": "001"}
+        key1 = adapter.idempotency_key("sync_tables", payload)
+        key2 = adapter.idempotency_key("sync_dishes", payload)
+        assert key1 != key2
+
+    def test_is_duplicate_returns_false_for_new_key(self, adapter):
+        """未标记的key返回False"""
+        assert adapter.is_duplicate("nonexistent_key") is False
+
+    def test_is_duplicate_returns_true_after_mark(self, adapter):
+        """标记后返回True"""
+        adapter.mark_idempotent("test_key_123")
+        assert adapter.is_duplicate("test_key_123") is True
+        # 清理
+        adapter._nonce_store.discard("test_key_123")
+
+
+class TestYiDingEvents:
+    """事件发射测试"""
+
+    @pytest.mark.asyncio
+    async def test_emit_sync_event_does_not_raise(self, adapter):
+        """_emit_sync_event 异常时不应冒泡到调用方"""
+        # 没有事件总线依赖时，方法应静默降级
+        await adapter._emit_sync_event(
+            "status_pushed", "orders", "test:stream", {"count": 1}
+        )
+        # 没有异常即通过
+
+    @pytest.mark.asyncio
+    async def test_sync_tables_triggers_event(self, adapter):
+        """sync_tables 成功后触发事件发射"""
+        mock_response = {"error_code": 0, "data": {}}
+        with patch.object(adapter.client, "post", return_value=mock_response):
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.sync_tables(
+                    areas=[{"area_code": "1", "area_name": "大厅", "sort_id": 1}],
+                    tables=[{"table_code": "001", "table_name": "1号桌", "max_people_num": "10"}],
+                )
+                mock_emit.assert_awaited_once()
+                args, _ = mock_emit.call_args
+                assert args[1] == "tables"  # scope
+
+    @pytest.mark.asyncio
+    async def test_confirm_orders_triggers_event(self, adapter):
+        """confirm_orders 成功后触发事件发射"""
+        mock_response = {"error_code": 0, "data": {}}
+        with patch.object(adapter.client, "put", return_value=mock_response):
+            with patch.object(adapter, "_emit_sync_event", new_callable=AsyncMock) as mock_emit:
+                await adapter.confirm_orders(
+                    orders=[{"resv_order": "ORDER001", "status": 1, "order_type": 1}],
+                    request_id=1234,
+                )
+                mock_emit.assert_awaited_once()
+                args, _ = mock_emit.call_args
+                assert args[1] == "orders"  # scope
