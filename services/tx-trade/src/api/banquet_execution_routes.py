@@ -12,7 +12,7 @@ from ..services.banquet_execution_service import BanquetExecutionService
 
 
 def _tid(r: Request) -> str:
-    t = getattr(r.state, "tenant_id", None) or r.headers.get("X-Tenant-ID", "")
+    t = getattr(r.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not t:
         raise HTTPException(400, "X-Tenant-ID required")
     return t

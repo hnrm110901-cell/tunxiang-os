@@ -61,7 +61,7 @@ def _err(msg: str, code: str = "BAD_REQUEST") -> dict[str, Any]:
 
 
 def _require_tenant(request: Request) -> uuid.UUID:
-    raw = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    raw = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not raw:
         raise HTTPException(status_code=400, detail="Missing X-Tenant-ID")
     try:

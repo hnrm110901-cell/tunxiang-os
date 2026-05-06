@@ -36,7 +36,7 @@ log = structlog.get_logger(__name__)
 
 
 def _get_tenant_id(request: Request) -> str:
-    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "") or "default"
+    return getattr(request.state, "tenant_id", "") or "default"  # cutover 后 dev "default" 兜底（生产由 middleware 强制注入 state）
 
 
 # ─── 数据库依赖（软依赖，无DB时降级Mock） ───

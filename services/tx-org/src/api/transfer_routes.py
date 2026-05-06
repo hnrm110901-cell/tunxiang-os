@@ -37,7 +37,7 @@ router = APIRouter(prefix="/api/v1/transfers", tags=["transfers"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    tid = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tid:
         raise HTTPException(status_code=400, detail={"error": "missing tenant_id"})
     return str(tid).strip()

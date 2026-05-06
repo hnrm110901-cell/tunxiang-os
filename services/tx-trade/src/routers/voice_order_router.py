@@ -172,7 +172,7 @@ async def transcribe_audio(body: TranscribeRequest, request: Request) -> dict:
     将 base64 音频转发到 mac-station 或 Core ML Bridge 进行语音识别。
     优先尝试 mac-station；失败时自动降级到 coreml-bridge。
     """
-    tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
 
     payload = {"audio_base64": body.audio_base64, "format": body.format}
     if tenant_id:

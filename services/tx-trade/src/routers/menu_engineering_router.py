@@ -89,7 +89,7 @@ def _build_analysis(raw: list[dict]) -> dict:
 
 
 def _tenant_id(request: Request) -> str:
-    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "") or "default"
+    return getattr(request.state, "tenant_id", "") or "default"  # cutover 后 dev "default" 兜底（生产由 middleware 强制注入 state）
 
 
 # ─── 路由 ───

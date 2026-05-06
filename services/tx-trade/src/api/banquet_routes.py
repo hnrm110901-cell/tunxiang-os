@@ -18,7 +18,7 @@ router = APIRouter(prefix="/api/v1/banquets", tags=["banquet"])
 
 
 async def _get_db(request: Request):
-    tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         from fastapi import HTTPException
 
@@ -28,7 +28,7 @@ async def _get_db(request: Request):
 
 
 def _svc(request: Request, db: AsyncSession = Depends(_get_db)) -> BanquetIntegrationService:
-    tenant_id = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     store_id = request.headers.get("X-Store-ID", "")
     return BanquetIntegrationService(tenant_id=tenant_id, store_id=store_id, db=db)
 

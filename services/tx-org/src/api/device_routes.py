@@ -48,7 +48,7 @@ def _err(code: str, message: str, status_code: int = 400) -> HTTPException:
 
 
 def _get_tenant_id(request: Request) -> str:
-    tid = getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    tid = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tid:
         raise _err("MISSING_TENANT_ID", "X-Tenant-ID header required")
     return tid
