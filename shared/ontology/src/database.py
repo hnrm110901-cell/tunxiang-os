@@ -78,50 +78,27 @@ async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, Non
 async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
     """跳过 RLS 的 DB session，仅限系统级操作（微信回调跨租户查询等）。
 
-    审计 S-05 阶段 4 修复（双模式，env 切换 cutover）：
+    审计 S-05 阶段 5 cutover 完成后单一模式：
+        SET LOCAL ROLE tx_system_role  → 临时持有 BYPASSRLS（scope 由代码点严格控制）
+        FINALLY RESET ROLE             → 恢复到 app 角色（无 BYPASSRLS）
 
-    模式 A — Legacy（默认，向后兼容）
-        SET LOCAL row_security = off
-        要求 DB 用户持有 BYPASSRLS 权限（或 SUPERUSER）
-        部署：GRANT BYPASSRLS ON ROLE tunxiang TO tunxiang
-        风险：app role 全局可绕 RLS（即便配 FORCE 也无效）—— 这是 S-05 P0 根因
+    要求（cutover 完成判定）：
+      - DBA 已跑 scripts/db/create_tx_system_role.sql 创建专用角色
+      - DBA 已跑 ALTER ROLE tunxiang NOBYPASSRLS 撤回 app 角色 BYPASSRLS
+      - 详见 docs/security/cutover-cleanup-plan.md §3.2
 
-    模式 B — tx_system_role（新模式，env RLS_USE_TX_SYSTEM_ROLE=true 启用）
-        SET LOCAL ROLE tx_system_role
-        要求：DBA 已通过 scripts/db/create_tx_system_role.sql 创建专用角色：
-              CREATE ROLE tx_system_role NOINHERIT NOLOGIN;
-              GRANT BYPASSRLS ON ROLE tx_system_role TO tx_system_role;
-              GRANT tx_system_role TO tunxiang;
-              ALTER ROLE tunxiang NOBYPASSRLS;
-        优点：BYPASSRLS 仅在 SET LOCAL ROLE 期间生效，scope 由代码点严格控制，
-              app role 全局回归普通用户身份，配合 FORCE RLS 真正达成纵深防御
-
-    Cutover 路径（详见 docs/security/rls-force-rollout.md 阶段 4-5）：
-      1. 部署本代码（默认模式 A，无变化）
-      2. DBA 跑 scripts/db/create_tx_system_role.sql（创建角色但不撤 BYPASSRLS）
-      3. 在一个测试 pod 设 RLS_USE_TX_SYSTEM_ROLE=true，灰度验证 5 处合法
-         调用方仍可工作
-      4. 全量 pod 切 RLS_USE_TX_SYSTEM_ROLE=true
-      5. 24h 观察后 DBA 跑 ALTER ROLE tunxiang NOBYPASSRLS 真撤权限
-      6. 此时模式 A 自动失效（即便代码回退也无 BYPASSRLS 可用），等同于
-         强制使用模式 B
+    历史 row_security = off 双模式已删除（cleanup commit）。
+    cutover 完成后即便误用旧模式 (SET LOCAL row_security = off) 也无效 ——
+    app role 已 NOBYPASSRLS，RLS 策略无条件强制生效。
 
     已知合法调用方（路由层须配强鉴权）：
       gateway hub_api / tx-trade banquet_payment_routes /
       wechat_pay_notify_service / tx-analytics seed_loader /
       tx-brain brain_routes
     """
-    use_role = os.environ.get("RLS_USE_TX_SYSTEM_ROLE", "").strip().lower() in (
-        "true", "1", "yes", "on"
-    )
     async with async_session_factory() as session:
         try:
-            if use_role:
-                # 模式 B：临时切到 tx_system_role（要求 DBA 已 GRANT tx_system_role TO tunxiang）
-                await session.execute(text("SET LOCAL ROLE tx_system_role"))
-            else:
-                # 模式 A：legacy，要求 app role 持 BYPASSRLS
-                await session.execute(text("SET LOCAL row_security = off"))
+            await session.execute(text("SET LOCAL ROLE tx_system_role"))
             yield session
             await session.commit()
         except Exception:
@@ -129,16 +106,9 @@ async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             try:
-                if use_role:
-                    await session.execute(text("RESET ROLE"))
-                else:
-                    await session.execute(text("SELECT set_config('app.tenant_id', '', true)"))
+                await session.execute(text("RESET ROLE"))
             except Exception:  # noqa: BLE001
-                logger.warning(
-                    "failed_to_cleanup_no_rls_session",
-                    context="get_db_no_rls",
-                    mode="role" if use_role else "row_security",
-                )
+                logger.warning("failed_to_reset_role", context="get_db_no_rls")
 
 
 class TenantSession:
