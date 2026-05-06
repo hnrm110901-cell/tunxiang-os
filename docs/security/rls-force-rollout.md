@@ -118,7 +118,22 @@ def downgrade() -> None:
     """)
 ```
 
-### 阶段 4（D3-D4）：撤 BYPASSRLS + 引入 tx_system_role
+### 阶段 4（D3-D4）：撤 BYPASSRLS + 引入 tx_system_role — ✅ 已落代码
+
+**已交付**（独立 PR `audit/p0-followup-rls-stage-4-bypassrls`，DO NOT MERGE pending staging dry-run）：
+
+- `shared/ontology/src/database.py` `get_db_no_rls()` 改造为**双模式 env-driven**：
+  - 默认（`RLS_USE_TX_SYSTEM_ROLE` 未设/false）→ 模式 A `SET LOCAL row_security = off`（向后兼容）
+  - `RLS_USE_TX_SYSTEM_ROLE=true` → 模式 B `SET LOCAL ROLE tx_system_role`
+- `scripts/db/create_tx_system_role.sql` — DBA 部署脚本（NOINHERIT + NOLOGIN + BYPASSRLS + GRANT TO tunxiang + 默认表权限）
+- `scripts/db/revoke_tunxiang_bypassrls.sql` — 阶段 5 cutover 收尾脚本
+- `tests/tier1/test_get_db_no_rls_role_switching_tier1.py` — 27 个 Tier 1 测试覆盖双模式 SQL 生成 + finally 清理 + 异常路径 + env 解析
+
+部署 4 步无破坏切换：
+1. 部署应用代码（默认模式 A，无变化）
+2. DBA 跑 `create_tx_system_role.sql`（创建角色但不撤主角色 BYPASSRLS）
+3. 灰度 pod 设 `RLS_USE_TX_SYSTEM_ROLE=true`，验证 5 处合法调用方仍工作
+4. 全量 pod 切 → 阶段 5 撤 BYPASSRLS
 
 #### 4.1 创建专用系统角色
 
