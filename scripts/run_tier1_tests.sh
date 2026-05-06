@@ -147,16 +147,25 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 2
 fi
 
+# pip cache volume: 跨 docker run 共享 wheel 缓存，避免每个文件重新下载依赖
+# 47 文件 × 18s pip install ≈ 14 分钟下载冗余 → 命中缓存后只剩纯安装时间
+PIP_CACHE_DIR="${PIP_CACHE_DIR:-$HOME/.cache/tunxiang-tier1-pip}"
+mkdir -p "$PIP_CACHE_DIR"
+
 echo "=== Tier 1 Docker Runner ==="
 echo "Image:  $IMAGE"
 echo "Deps:   $DEPS"
+echo "Cache:  $PIP_CACHE_DIR"
 echo "Tests:  ${#PYTEST_ARGS[@]} target(s)"
 echo ""
 
 # 透传模式（-k/-m/...）：单容器跑（用户已显式控制范围）
 case "${1:-}" in
     -k|-m|-x|-v|--tb|-q)
-        exec docker run --rm -v "$REPO_ROOT:/app" -w /app "$IMAGE" \
+        exec docker run --rm \
+            -v "$REPO_ROOT:/app" -w /app \
+            -v "$PIP_CACHE_DIR:/root/.cache/pip" \
+            "$IMAGE" \
             bash -c "pip install --quiet $DEPS && python -m pytest ${PYTEST_ARGS[*]} --tb=short"
         ;;
 esac
@@ -169,7 +178,10 @@ PASS=0
 FAIL_FILES=()
 for test_file in "${PYTEST_ARGS[@]}"; do
     echo "--- $test_file ---"
-    if docker run --rm -v "$REPO_ROOT:/app" -w /app "$IMAGE" \
+    if docker run --rm \
+        -v "$REPO_ROOT:/app" -w /app \
+        -v "$PIP_CACHE_DIR:/root/.cache/pip" \
+        "$IMAGE" \
         bash -c "set -o pipefail; pip install --quiet $DEPS 2>/dev/null && python -m pytest '$test_file' --tb=line -q 2>&1 | tail -5"; then
         PASS=$((PASS + 1))
     else
