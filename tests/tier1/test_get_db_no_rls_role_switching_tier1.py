@@ -48,6 +48,7 @@ def _load_database_module():
 
 _db_module = _load_database_module()
 get_db_no_rls = _db_module.get_db_no_rls
+verify_tx_system_role_exists = _db_module.verify_tx_system_role_exists
 
 
 class _CapturingSession:
@@ -186,6 +187,55 @@ class TestExceptionHandling:
             pass
         sql_blob = " ".join(session.executed_sqls)
         assert "RESET ROLE" in sql_blob
+
+
+class TestVerifyTxSystemRoleExists:
+    """启动期校验 tx_system_role 存在（review P1 修复 — fail-fast 替代运行期硬错）。"""
+
+    @pytest.mark.asyncio
+    async def test_role_exists_returns_silently(self):
+        """pg_roles 查到 tx_system_role → 校验通过，不 raise。"""
+        captured: list[str] = []
+
+        class _OkSession:
+            async def execute(self, sql_obj, *_a, **_kw):
+                captured.append(str(sql_obj))
+                m = mock.MagicMock()
+                m.scalar = mock.MagicMock(return_value=1)
+                return m
+
+            async def commit(self): pass
+            async def rollback(self): pass
+
+        class _Ctx:
+            async def __aenter__(self): return _OkSession()
+            async def __aexit__(self, *a): return False
+
+        with mock.patch.object(_db_module, "async_session_factory", side_effect=lambda: _Ctx()):
+            await verify_tx_system_role_exists()  # 不应 raise
+
+        assert any("pg_roles" in s for s in captured)
+        assert any("tx_system_role" in s for s in captured)
+
+    @pytest.mark.asyncio
+    async def test_role_missing_raises_runtime_error(self):
+        """pg_roles 查不到 tx_system_role → raise RuntimeError 且消息含 fix 指引。"""
+        class _NoRowSession:
+            async def execute(self, sql_obj, *_a, **_kw):
+                m = mock.MagicMock()
+                m.scalar = mock.MagicMock(return_value=None)
+                return m
+
+            async def commit(self): pass
+            async def rollback(self): pass
+
+        class _Ctx:
+            async def __aenter__(self): return _NoRowSession()
+            async def __aexit__(self, *a): return False
+
+        with mock.patch.object(_db_module, "async_session_factory", side_effect=lambda: _Ctx()):
+            with pytest.raises(RuntimeError, match="tx_system_role 角色不存在"):
+                await verify_tx_system_role_exists()
 
 
 class TestNoEnvDependency:

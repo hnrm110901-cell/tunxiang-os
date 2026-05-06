@@ -75,6 +75,34 @@ async def get_db_with_tenant(tenant_id: str) -> AsyncGenerator[AsyncSession, Non
             raise
 
 
+async def verify_tx_system_role_exists() -> None:
+    """启动期校验 tx_system_role 是否存在 — fail-fast，避免运行期首次调用时才暴露。
+
+    cutover 后 get_db_no_rls() 强依赖 tx_system_role 存在；如果 DBA 漏跑
+    scripts/db/create_tx_system_role.sql，PG 在首次 SET LOCAL ROLE 时报：
+        ERROR: role "tx_system_role" does not exist
+    这种错误可能在部署数小时后才被某条 wechat_pay_notify / banquet_payment
+    路径触发 —— 资金一致性 Tier 1 域，损失大。
+
+    本函数应在所有 get_db_no_rls 调用方服务的 startup hook 中调用一次：
+        gateway / tx-trade / tx-analytics / tx-brain
+
+    Raises:
+        RuntimeError: tx_system_role 不存在
+    """
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT 1 FROM pg_roles WHERE rolname = 'tx_system_role'")
+        )
+        if result.scalar() != 1:
+            raise RuntimeError(
+                "tx_system_role 角色不存在 — DBA 必须先跑 "
+                "scripts/db/create_tx_system_role.sql；"
+                "详见 docs/security/cutover-cleanup-plan.md §3.2"
+            )
+        logger.info("tx_system_role_verified_at_startup")
+
+
 async def get_db_no_rls() -> AsyncGenerator[AsyncSession, None]:
     """跳过 RLS 的 DB session，仅限系统级操作（微信回调跨租户查询等）。
 
