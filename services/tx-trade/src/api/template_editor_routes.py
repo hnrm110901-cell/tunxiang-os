@@ -16,7 +16,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -42,7 +42,8 @@ class ElementDef(BaseModel):
     # 以下字段均可选，element 类型不同字段不同
     align: Optional[str] = None
     bold: Optional[bool] = None
-    size: Optional[str] = None
+    # size 多型：text 元素用枚举字符串（"normal" / "double_height"），qrcode 用整数模块大小（1-16）
+    size: Optional[Union[str, int]] = None
     char: Optional[str] = None
     fields: Optional[list[str]] = None
     show_price: Optional[bool] = None
