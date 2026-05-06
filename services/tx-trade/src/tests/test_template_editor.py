@@ -23,6 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.printer_driver import (
     ESC_BOLD_ON,
+    ESC_FEED,
     ESC_INIT,
     GS_CUT_PARTIAL,
     GS_SIZE_DOUBLE_HEIGHT,
@@ -128,8 +129,8 @@ class TestTemplateRenderer:
         config = {"elements": [{"id": "e2", "type": "store_address"}]}
         ctx = {**SAMPLE_CONTEXT, "store_address": ""}
         result = await renderer.render(config, ctx)
-        # 去掉 ESC_INIT 和 cut 之后基本为空
-        inner = result[len(ESC_INIT) : -len(b"\x03" + GS_CUT_PARTIAL) - 1]
+        # 去掉前缀 ESC_INIT 和后缀 (ESC_FEED + b"\x03" + GS_CUT_PARTIAL) 后应为空
+        inner = result[len(ESC_INIT) : -len(ESC_FEED + b"\x03" + GS_CUT_PARTIAL)]
         assert len(inner) == 0
 
     @pytest.mark.asyncio
@@ -480,7 +481,7 @@ class TestElementsCatalog:
         assert resp.json()["ok"] is True
 
     def test_catalog_contains_all_element_types(self, client):
-        """catalog 应包含全部 12 种 element 类型。"""
+        """catalog 应包含全部 17 种 element 类型（含美化增强 5 项）。"""
         expected_types = {
             "store_name",
             "store_address",
@@ -494,6 +495,11 @@ class TestElementsCatalog:
             "custom_text",
             "blank_lines",
             "logo_text",
+            "inverted_header",
+            "styled_separator",
+            "box_section",
+            "logo_image",
+            "underlined_text",
         }
         resp = client.get(
             "/api/v1/receipt-templates/elements/catalog",
