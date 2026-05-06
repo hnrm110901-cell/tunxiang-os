@@ -14,7 +14,7 @@
 |---|---|---|---:|---|---:|
 | R1 | `services/tunxiang-api/` | 迁 import → 删 service | 半天 | 中（7 skill + 测试改路径）| 4 |
 | R2 | `edge/mac-mini/` | git mv 入 mac-station → 删 | 30 分钟 | 低 | 2 |
-| R3 | `apps/android-shell/` | diff → 合并差异 → 删 | 1 小时 | 中（壳层关键代码）| 3 |
+| R3 | `apps/android-shell/` × `apps/android-pos/` | ⏸ **SUSPENDED** — 升级为独立 V4 架构对齐 sprint（见 v4-architecture-alignment.md）| 7 天 | 高（双重宪法违反，需重新对齐）| — |
 | R4 | `tx-brain` + `tx-intel` + `tx-predict` → `tx-agent/sub/` | **W12 后做**，本计划仅留 marker | — | 高 | （延后）|
 | R5 | `shared/adapters/meituan/`（空目录）| git rm | 1 分钟 | 零 | 1 |
 | R6 | 外卖三家 单文件 + 目录重命名 | git mv + 改 import | 1 小时 | 低 | 5 |
@@ -93,46 +93,39 @@ Physical hardware is the same Mac mini — naming was confusing."
 
 ---
 
-## R3 — 合并 `apps/android-shell/` 入 `apps/android-pos/`
+## R3 — `apps/android-shell` × `apps/android-pos` ⏸ **SUSPENDED**（2026-05-06）
 
-**已查证**
-- `android-shell/.../MainActivity.kt` (3.2KB) + `TXBridge.kt` (9.7KB)
-- `android-pos/src/main/kotlin/com/tunxiang/pos/MainActivity.kt` ✅ 已存在
-- `android-pos/src/main/kotlin/com/tunxiang/pos/bridge/TXBridge.kt` ✅ 已存在
-- android-pos 共 40 个 kt/java 文件，是当前主战场
+**状态变更**：原 plan 假设是简单合并（情况 A 直接删 / 情况 B cherry-pick 后删）。深入勘察后发现这不是物理重复，是**两套架构方向之争**，且 pos 当前实装存在双重宪法违反。R3 不能在 sprint-0-dedup 范围内闭环，已升级为独立的 V4 架构对齐 sprint。
 
-**前置检查 / 决策点**
-```bash
-# diff 同名文件，决定哪个保留
-diff apps/android-shell/app/src/main/java/com/tunxiang/pos/MainActivity.kt \
-     apps/android-pos/src/main/kotlin/com/tunxiang/pos/MainActivity.kt
+**升级理由**
 
-diff apps/android-shell/app/src/main/java/com/tunxiang/pos/TXBridge.kt \
-     apps/android-pos/src/main/kotlin/com/tunxiang/pos/bridge/TXBridge.kt
+勘察 `apps/android-pos/src/main/kotlin/com/tunxiang/pos/bridge/TXBridge.kt:119-122` + `data/remote/ApiClient.kt` + `sync/SyncManager.kt` 三处证据：
+
+```kotlin
+// pos/TXBridge.kt:119-122 — V4 团队的真实意图
+fun getMacMiniUrl(): String {
+    // No longer needed in V4 (Room DB replaces Mac mini for POS)
+    return ""
+}
 ```
 
-**两种情况**
-- **情况 A**（大概率）：android-pos 是更新版，android-shell 已被超越 → 直接 `git rm -r apps/android-shell`
-- **情况 B**：android-shell 有 android-pos 缺失的早期能力（如某个 BroadcastReceiver / ServiceConnection） → cherry-pick 关键片段进 android-pos 后再删
+- pos 5 屏 Compose（OrderScreen / SettleScreen / DailyClose / Shift / TableMap）共 2186 行业务代码 → **违反 CLAUDE.md §十三 第 1 条铁律（"禁止 Kotlin 写业务逻辑"）**
+- pos 用 Room DB 作本地真相源 + Retrofit 直连云端，绕开 mac-station → **违反 CLAUDE.md §八 路线 C（"Mac mini = 本地 PG 真相源"）**
+- shell 路线相反：WebView only + 真实 `getMacMiniUrl` → 符合路线 C，但收银 hot path 在商米 T2 物理性能边界以内不够稳
 
-**执行（情况 A）**
-```bash
-git rm -r apps/android-shell
-git commit -m "chore(android): remove android-shell (R3)
+**第一性原理判断**：收银 hot path 必须 Native（Compose），cool path 必须 WebView（React），Mac mini PG 是真相源。当前 shell 和 pos **都不完整**——shell 缺 Native hot path，pos 缺 Mac mini 真相源。直接合并/删除任何一方都把宪法债买进 V4。
 
-android-shell was the early WebView+TXBridge skeleton.
-android-pos has been the full implementation since v300+ (40 kt files,
-TXBridge under bridge/ subpackage). Confirmed no production build
-references android-shell."
-```
+按创始人原则"MVP 前 + 稳定 + 零技术债"，R3 升级为：
 
-**执行（情况 B）**：手动 cherry-pick 后同 A。
+→ 详见 [`.omc/plans/v4-architecture-alignment.md`](v4-architecture-alignment.md)（7 天独立 sprint）
 
-**验收**：
-- `cd apps/android-pos && ./gradlew assembleDebug` 成功
-- 商米 T2 实机 webview 起页 OK
+**本计划下 R3 的动作**：
+- ❌ 不删 `apps/android-shell`
+- ❌ 不改 `apps/android-pos`
+- ✅ 升级到 V4 架构对齐 sprint，作为独立工作单元
+- ✅ V4 sprint 完成后回头删 shell（V4 sprint 的 D7 即此动作）
 
-**回滚**：`git revert <sha>`
+**回滚**：本 commit 不动代码，无需回滚。
 
 ---
 
@@ -322,12 +315,12 @@ added — no code change. See .omc/plans/post-w12-tx-agent-merger.md."
 
 ---
 
-## 执行顺序（建议一天内连做）
+## 执行顺序（更新于 2026-05-06）
 
 ```
-R5  → 1 分钟，清空目录
-R2  → 30 分钟，mac-mini 合并
-R3  → 1 小时，android-shell 合并（含 diff 决策）
+R5  ❌ 取消（false alarm — meituan/ 不是空目录，是 meituan-saas/）
+R2  ✅ 完成（commit 586aabe3 已落 chore/sprint-0-dedup）
+R3  ⏸ SUSPENDED → 升级为 v4-architecture-alignment 独立 sprint（7 天）
 R1  → 半天，tunxiang-api 删除（最高风险，留时间跑全测）
 R6  → 1 小时，重命名外卖
 R7  → 10 分钟，miniapp v1 冻结 banner
@@ -335,6 +328,9 @@ R4  → 5 分钟，加 marker docs
 ```
 
 每条 R 一次 commit，PR 名 `chore(dedup): sprint-0 R1-R7`。**不要合成一个大 commit**。
+
+R3 升级后的处理：sprint-0-dedup PR 在 R1/R6/R7/R4 完成后即可 ship，不等 R3。
+V4 架构对齐 sprint 单独走 PR，shell 删除是该 sprint 的最后一步（D7）。
 
 ---
 
