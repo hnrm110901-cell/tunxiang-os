@@ -1,3 +1,65 @@
+## 2026-05-06 main CI 修复 merge + 三 clone 同步 + Track D 启动（PR #233 / #234）
+
+### 今日完成
+- **PR #233 squash merge → main**（commit `eaa57141`）— 含 namespace 兼容层 + lint 长尾修复
+  - 仓库根 `conftest.py` 把所有 `services/<svc>/src/services/` 追加进 `sys.modules["services"].__path__`，让容器风格裸 import (`from services.banquet_payment_service import ...`) 解析回正确 src 路径
+  - `services/tx-trade/conftest.py` 注释更新交叉引用根 conftest
+  - `python-ci.yml` pytest 加 `--continue-on-collection-errors`
+  - lint 修：`merchant_targets_routes.py` 30+ syntax artifact、`demo_monitor_routes.py` 5-branch if-elif 合 dict 查表、`tx-brain/merchant_target_routes.py` unused Any、`tx-analytics/main.py` I001 import-sort、3 文件 ruff format auto-fix
+  - `pyproject.toml` 加 BLE001 grandfather list（30 文件，70 处历史 except Exception 兜底；CLAUDE.md §14 修复期遗留）
+
+- **三 clone 同步**：
+  - canonical `/Users/lichun/tunxiang-os` → main `eaa57141`（fast-forward）
+  - Documents/GitHub `/Users/lichun/Documents/GitHub/tunxiang-os` → main `eaa57141`（用 `fetch origin main:main` 不切分支不动 worktree）
+  - WorkBuddy `/Users/lichun/WorkBuddy/.../tunxiang-os` → 仅 fetch 更新 origin/main（worktree 126 项 dirty + 18 worktree 锁定，绝对不动）
+
+- **pg6 obsolete 分支清理**：
+  - `feat/franchise-last-event-id-pg6` 单 commit `b21912f3` patch-id (`7e78c783...`) = main 上 `356161e7` (#147 已 merged 2026-05-04)，纯冗余
+  - 删 local + remote pg6 ref；PR #147 历史完整保留（state=MERGED, merge commit 不丢）
+  - main 还有 v396 follow-up：`#159` 索引改 CONCURRENTLY 生产零阻塞 / `#163` 合并 v393+v396 双 alembic head
+
+- **Issue #220 Track D 启动 — PR #234**（fix/track-d-tx-trade-tests）：
+  - `test_template_editor.py` 单跑 7 fail → **0 fail（52/52 pass）** ✅
+  - 修 1 production schema bug：`ElementDef.size: Optional[str]` → `Optional[Union[str, int]]`，对齐 catalog 自身定义（qrcode size 是 number，store_name size 是字符串枚举），解决 preview 接口对带 qrcode 的合法 config 返 422
+  - 修 2 test 漂移：catalog 期待集合 12→17 项（追加 inverted_header / styled_separator / box_section / logo_image / underlined_text）；`test_store_address_empty_skipped` slice math 漏算 ESC_FEED 前缀
+  - 2 atomic commits（Tier 3）+ ruff lint clean
+
+### 关键决策
+- **PR #233 接受 partial merge**（lint green, test job 仍 red）— Track D 1246 项 pre-existing 测试 bug 是多周工作量，不能因 perfect 阻塞 lint 修；CI 第一次有真实信号
+- **三 clone 同步策略分级**：clean clone 用 `fetch origin main:main` 直接 ff（不切分支）；dirty/worktree-locked clone 仅 fetch（不动 ref），防并发 Claude session 互踩
+- **pg6 不 rebase 而 delete**：rebase 会因 patch-id 匹配把唯一 commit 跳过，pg6=main 纯冗余；删才是清理
+- **meta_path finder 上次反思补充**：之前判 net wash 不准。仅按 fail 数对比，忽略了 ERROR→FAIL 是进步（测试至少跑得起来）。本轮发现 cross-test pollution 是大头：单跑 `test_template_editor` 52 pass 但全套显示 25 ERROR + 0 fail（27 pass）。pollution 治理应作为下轮独立调研项
+- **Track D 单文件 ROI 评估**：基于调研，"快修"基本枯竭。`test_sprint3_booking.py`（28 errors）和 `test_service_charge.py`（9 errors）都是产线已重构 in-memory→DB 但测试未跟进的架构级过时，每文件需重写 ~1k LOC。`test_template_editor` 是难得的纯漂移
+- **Tier 边界遵守**：`test_invoice_service.py`（9 errors）涉及全电发票 = Tier 1，需 TDD + 三条硬约束验收，超本轮快修边界，留给独立 sprint
+- **CLAUDE.md §18 防漂移声明**：本轮在切 Track D 前显式声明范围（1 文件 / Tier 3 / 不动 ontology+migration+Tier1）；仅在发现真 schema bug 时显式扩范围（1 行 production 修）
+
+### 数据变化
+- main HEAD：`b5b7e735` → `eaa57141`
+- tx-trade test baseline（per service Test job）：
+  - 修前：291 fail / 1308 pass / 162 error
+  - 修后（PR #234）：290 fail / 1309 pass / 162 error（pollution 把 6/7 修好的 fail 在全套以 ERROR 计，仅 1 进 fail 计数）
+- 三 clone 状态全清：canonical & Documents/GitHub local main 都至 `eaa57141`；WorkBuddy origin/main ref 至 `eaa57141`
+
+### 遗留问题
+- **PR #234 等 review/merge**
+- **Issue #220 Track D 仍 1246 项**（869 fail + 377 collection error）—  
+  - 80%+ 是测试架构级过时（in-memory→DB 重构后未跟），需按文件重写 ~1k LOC 量级
+  - 25 文件的 cross-test pollution（`test_template_editor` 等 25 ERROR 在全套）是关键调研项 — 找到污染源（最可能是 SQLAlchemy MetaData 双重注册 + `services.X` 浅路径 import 污染 sys.modules）一次治可解锁多文件
+- **WorkBuddy clone 长期落后**（worktree dirty + 18 个并发 Claude-3p worktree 锁定）— 那边的 session 自己决定何时整合 main `eaa57141`
+- **Documents/GitHub clone 现在 100% clean**（无过时分支，main 至最新）
+
+### 明日计划
+- 等 PR #234 review/merge
+- 若继续 Track D，下一目标候选（按 ROI 排）：
+  1. cross-test pollution 调研（一次治多文件）— 复杂度高但收益大
+  2. `test_template_editor` 在全套的 25 ERROR 是 pollution 调研最干净的入口
+  3. 选 1-2 个架构级过时文件做完整重写示范，让团队拿模板按服务 owner 分配
+- 若切其他任务：
+  - Task #14 — 7 个 code-touching PR 等团队 review/merge
+  - Task #23 — RLS 阶段 5 灰度（需 DBA）
+
+---
+
 ## 2026-05-05 PG.7 主线收官 + Tier 1 runner pip cache + ADR 草稿（10 PR）
 
 ### 今日完成
