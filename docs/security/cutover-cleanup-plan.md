@@ -122,13 +122,26 @@ if not secret:
 
 ---
 
-## 五、合本 PR 后的下一步（独立 PR）
+## 五、合本 PR 后的下一步（已开 3 个独立草稿 PR）
 
-按照 §三 顺序拆 3 个独立 PR：
+3 个 follow-up cleanup 已作为 DO NOT MERGE 草稿 PR 推送，cutover 完成后按
+依赖顺序合：
 
-1. `cleanup/proxy-simplify-after-cutover` — 简化 gateway proxy strip 逻辑
-2. `cleanup/rls-no-bypass-single-mode` — 移除 get_db_no_rls 双模式（依赖 RLS 阶段 5 完成）
-3. `cleanup/internal-jwt-no-dev-fallback` — 移除 InternalJwt dev 兜底
+1. **PR #213** — `audit/p0-followup-cleanup-proxy-simplify`
+   - 文件：`services/gateway/src/proxy.py`
+   - 删除 `mint_internal_jwt` 的 `ImportError` 兜底（cutover 后 helper 必存在）
+   - 移到模块级 import（每请求省 ~50µs）
+   - 依赖：PR #195 + #208 已 merge + 全环境注入 `TX_INTERNAL_JWT_SECRET`
+
+2. **PR #214** — `audit/p0-followup-cleanup-rls-no-bypass-single-mode`
+   - 文件：`shared/ontology/src/database.py` + 测试同步重写
+   - 删除 `get_db_no_rls()` 的双模式 env 切换，强制 `SET LOCAL ROLE tx_system_role`
+   - 依赖：PR #207 灰度 100% + DBA `ALTER ROLE tunxiang NOBYPASSRLS` + PR #199 已 merge
+
+3. **PR #215** — `audit/p0-followup-cleanup-internal-jwt-no-dev-fallback`
+   - 文件：`shared/security/src/internal_jwt_middleware.py` + 11 测试用例改写
+   - 删除 dev/staging 跳过校验路径（无 secret → 500，无 token → 401，全环境一致）
+   - 依赖：PR #208 已 merge + 全环境（含 dev/CI）注入 `TX_INTERNAL_JWT_SECRET`
 
 每个 PR 独立 review + 独立灰度 + 独立回滚。
 
