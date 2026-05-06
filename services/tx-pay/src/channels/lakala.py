@@ -98,6 +98,7 @@ class LakalaChannel(BasePaymentChannel):
 
     async def query(self, payment_id: str, trade_no: Optional[str] = None) -> PaymentResult:
         if self._client is None:
+            payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -107,7 +108,16 @@ class LakalaChannel(BasePaymentChannel):
                 channel_data={"mock": True},
             )
 
-        result = await self._client.query(out_trade_no=payment_id)
+        try:
+            result = await self._client.query(out_trade_no=payment_id)
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="lakala", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="lakala", status="connect_error").inc()
+            raise
+
+        payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
         status_map = {"SUCCESS": PayStatus.SUCCESS, "PAYING": PayStatus.PENDING, "CLOSED": PayStatus.CLOSED}
         return PaymentResult(
             payment_id=payment_id,
@@ -128,6 +138,7 @@ class LakalaChannel(BasePaymentChannel):
         rid = refund_id or f"REFLKL{uuid.uuid4().hex[:10].upper()}"
 
         if self._client is None:
+            payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
             return RefundResult(
                 refund_id=rid,
                 payment_id=payment_id,
@@ -137,11 +148,20 @@ class LakalaChannel(BasePaymentChannel):
                 refunded_at=datetime.now(timezone.utc),
             )
 
-        result = await self._client.refund(
-            out_trade_no=payment_id,
-            refund_fee=refund_amount_fen,
-            out_refund_no=rid,
-        )
+        try:
+            result = await self._client.refund(
+                out_trade_no=payment_id,
+                refund_fee=refund_amount_fen,
+                out_refund_no=rid,
+            )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="lakala", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="lakala", status="connect_error").inc()
+            raise
+
+        payment_channel_requests_total.labels(channel="lakala", status="2xx").inc()
         return RefundResult(
             refund_id=rid,
             payment_id=payment_id,
