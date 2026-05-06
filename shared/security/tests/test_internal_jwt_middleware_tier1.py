@@ -47,6 +47,22 @@ def _make_app() -> FastAPI:
     async def metrics() -> dict:
         return {"ok": True}
 
+    @app.post("/api/v1/webhook/meituan/order")
+    async def webhook_meituan_order(request: Request) -> dict:
+        return {"ok": True, "auth_method": getattr(request.state, "auth_method", None)}
+
+    @app.post("/api/v1/booking/webhook/wechat")
+    async def webhook_booking_wechat(request: Request) -> dict:
+        return {"ok": True}
+
+    @app.post("/api/v1/delivery/webhooks/grabfood")
+    async def webhook_grabfood(request: Request) -> dict:
+        return {"ok": True}
+
+    @app.get("/api/v1/no-webhook-here/list")
+    async def normal_endpoint() -> dict:
+        return {"ok": True}
+
     return app
 
 
@@ -184,6 +200,56 @@ class TestExemptPaths:
             client = TestClient(_make_app())
             r = client.get("/metrics")
             assert r.status_code == 200
+
+
+class TestExternalWebhookExempt:
+    """外部平台 webhook 必须无条件放行（cutover 后修复）—— 美团/饿了么/抖音/微信
+    等回调走公网入口，不带 X-Internal-JWT；webhook 路由内部有平台签名校验。"""
+
+    def test_webhook_path_exempt_no_token(self):
+        """/api/v1/webhook/meituan/order — 标准 webhook 路径应放行无 token 请求。"""
+        with mock.patch.dict(
+            os.environ,
+            {"TX_INTERNAL_JWT_SECRET": _TEST_SECRET, "TX_ENV": "production"},
+            clear=True,
+        ):
+            client = TestClient(_make_app())
+            r = client.post("/api/v1/webhook/meituan/order")
+            assert r.status_code == 200, "外部平台 webhook 必须 200，否则美团/饿了么订单全断"
+            assert r.json()["auth_method"] is None  # 未注入 state
+
+    def test_booking_webhook_subpath_exempt(self):
+        """/api/v1/booking/webhook/wechat — 嵌套 webhook 路径段也必须豁免。"""
+        with mock.patch.dict(
+            os.environ,
+            {"TX_INTERNAL_JWT_SECRET": _TEST_SECRET, "TX_ENV": "production"},
+            clear=True,
+        ):
+            client = TestClient(_make_app())
+            r = client.post("/api/v1/booking/webhook/wechat")
+            assert r.status_code == 200
+
+    def test_webhooks_plural_exempt(self):
+        """复数 webhooks 也必须豁免（delivery_panel_router 等用 /webhooks 复数形式）。"""
+        with mock.patch.dict(
+            os.environ,
+            {"TX_INTERNAL_JWT_SECRET": _TEST_SECRET, "TX_ENV": "production"},
+            clear=True,
+        ):
+            client = TestClient(_make_app())
+            r = client.post("/api/v1/delivery/webhooks/grabfood")
+            assert r.status_code == 200
+
+    def test_non_webhook_path_with_webhook_substring_not_exempt(self):
+        """/no-webhook-here/list 含 'webhook' 子串但不是路径段，必须仍走鉴权（401）。"""
+        with mock.patch.dict(
+            os.environ,
+            {"TX_INTERNAL_JWT_SECRET": _TEST_SECRET, "TX_ENV": "production"},
+            clear=True,
+        ):
+            client = TestClient(_make_app())
+            r = client.get("/api/v1/no-webhook-here/list")
+            assert r.status_code == 401, "正则必须按路径段匹配，不能误判子串"
 
 
 class TestExpiredToken:

@@ -150,6 +150,10 @@ jobs:
           PYTHONPATH=. python -m pytest -v --tb=short --no-header $FILES
         env:
           PYTHONDONTWRITEBYTECODE: 1
+          # InternalJwtMiddleware fail-closed 后 CI 必须注入 secret，否则
+          # 任何挂载该 middleware 的 TestClient 测试都会 500（非 webhook 路径）
+          TX_INTERNAL_JWT_SECRET: ci-test-secret-32-bytes-aaaaaaaaaaa
+          TX_ENV: test
 
       - name: Annotate 失败
         if: failure()

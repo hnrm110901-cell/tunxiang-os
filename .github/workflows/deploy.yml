@@ -93,6 +93,10 @@ jobs:
             pyyaml aiosqlite
 
       - name: 跑 Tier 1 全套（按文件隔离，避免跨 service conftest 冲突）
+        env:
+          # InternalJwtMiddleware fail-closed 后 CI 必须注入 secret
+          TX_INTERNAL_JWT_SECRET: ci-test-secret-32-bytes-aaaaaaaaaaa
+          TX_ENV: test
         run: |
           # 与 tier1-gate.yml 一致：扫 services/**/tests/**/*tier1*.py
           # + services/**/src/tests/**/*tier1*.py + tests/tier1/**
