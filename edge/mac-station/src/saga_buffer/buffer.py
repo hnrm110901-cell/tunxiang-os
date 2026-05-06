@@ -18,7 +18,7 @@
 
 状态机：pending → flushing → sent / dead_letter
 
-关联：edge/mac-mini/offline_buffer.py 已有 aiosqlite 样板可对照
+关联：edge/mac-station/src/order_offline_buffer.py 已有 aiosqlite 样板可对照
 Flag：edge.payment.saga_buffer（默认 off）
 """
 

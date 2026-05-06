@@ -37,24 +37,26 @@ MAC_STATION_URL = os.getenv("MAC_STATION_URL", "http://localhost:8000")
 # 打印超时（秒）
 PRINT_TIMEOUT_SEC = 5
 
-# ─── 打印重试队列（懒加载，edge/mac-mini 不在路径时降级为纯日志）───
+# ─── 打印重试队列（懒加载，edge/mac-station/src 不在路径时降级为纯日志）───
 
 _print_queue = None
 
 
 def _get_print_queue():
-    """懒加载 PrintQueue 实例。edge/mac-mini 未部署时返回 None（降级模式）。"""
+    """懒加载 PrintQueue 实例。edge/mac-station 未部署时返回 None（降级模式）。"""
     global _print_queue
     if _print_queue is not None:
         return _print_queue
 
-    # 将 edge/mac-mini 加入 sys.path（支持独立部署和单体部署两种场景）
-    edge_mac_mini_path = os.getenv(
+    # 将 edge/mac-station/src 加入 sys.path（支持独立部署和单体部署两种场景）
+    # env var 名 EDGE_MAC_MINI_PATH 保留向后兼容（生产配置不需要立即改），
+    # 默认值已迁移到 mac-station/src（R2 dedup, 2026-05-06）
+    edge_path = os.getenv(
         "EDGE_MAC_MINI_PATH",
-        os.path.join(os.path.dirname(__file__), "../../../../../edge/mac-mini"),
+        os.path.join(os.path.dirname(__file__), "../../../../edge/mac-station/src"),
     )
-    if edge_mac_mini_path not in sys.path:
-        sys.path.insert(0, edge_mac_mini_path)
+    if edge_path not in sys.path:
+        sys.path.insert(0, edge_path)
 
     try:
         from print_queue import PrintQueue  # noqa: PLC0415
@@ -62,7 +64,7 @@ def _get_print_queue():
         _print_queue = PrintQueue()
         logger.info("kitchen_print.queue_loaded", db_path=os.getenv("PRINT_QUEUE_DB", "(default)"))
     except ImportError:
-        logger.warning("kitchen_print.queue_unavailable", reason="edge/mac-mini 模块未找到，降级为纯日志模式")
+        logger.warning("kitchen_print.queue_unavailable", reason="edge/mac-station/src 模块未找到，降级为纯日志模式")
         _print_queue = None
 
     return _print_queue
@@ -274,7 +276,7 @@ async def send_to_printer(
     """通过 Mac mini 的 /api/print 接口发送 ESC/POS 数据到网络打印机。
 
     打印失败时自动将任务加入 PrintQueue 重试队列（对上游调用方透明）。
-    如果 PrintQueue 不可用（edge/mac-mini 未部署），降级为纯日志记录。
+    如果 PrintQueue 不可用（edge/mac-station 未部署），降级为纯日志记录。
 
     Args:
         esc_pos_bytes: ESC/POS 字节流

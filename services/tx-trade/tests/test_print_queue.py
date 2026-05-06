@@ -8,13 +8,13 @@
 """
 import os
 
-# 将 edge/mac-mini 加入测试路径
+# 将 edge/mac-station/src 加入测试路径（R2 dedup, 2026-05-06: print_queue 已从 mac-mini 迁出）
 import sys
 from datetime import datetime, timedelta, timezone
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../edge/mac-mini"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../edge/mac-station/src"))
 
 from print_queue import JobStatus, PrintJob, PrintQueue
 

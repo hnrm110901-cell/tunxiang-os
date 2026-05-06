@@ -122,9 +122,10 @@ tunxiang-os/
     tunxiang-api/               # 遗留 API 兼容层
   edge/                         # Mac mini M4 边缘智能后台
     mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本
+                                # 含: print_queue.py（打印重试队列）+ order_offline_buffer.py（订单离线缓冲）+ offline_buffer.py（通用 skill 缓冲）
+                                # R2 dedup (2026-05-06): edge/mac-mini/ 已合并入此目录
     coreml-bridge/              # Swift — Core ML HTTP 桥接（port 8100）
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
-    mac-mini/                   # Python — Mac mini 工具集（离线缓冲/打印队列）
   shared/
     ontology/                   # Ontology 实体定义（Pydantic models）
     db-migrations/              # Alembic 迁移（229 个版本，v001-v229）
