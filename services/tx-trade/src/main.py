@@ -314,16 +314,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
-# 审计 S-02（P0）闭环 part 2：校验 gateway 注入的 X-Internal-JWT，把受信
-# claims 写入 request.state；下游路由的 _get_tenant_id() 已经优先读
-# request.state.tenant_id（HEADER 仅作 fallback），中间件挂载后 cutover
-# 路径上 X-Tenant-ID header 不再是信任源。
-# 兼容期：env TX_INTERNAL_JWT_SECRET 未配置（dev/staging）时 middleware skip，
-# 行为与现状一致。详见 shared/security/src/internal_jwt_middleware.py。
-from shared.security.src.internal_jwt_middleware import InternalJwtMiddleware
-
-app.add_middleware(InternalJwtMiddleware)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
@@ -331,6 +321,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 审计 S-02 闭环：校验 gateway 注入的 X-Internal-JWT，把受信 claims 写入
+# request.state；env TX_INTERNAL_JWT_SECRET 未配时 skip 不破坏现状。
+# 必须在 CORSMiddleware 之后 add（FastAPI 后 add 的在内层；CORS preflight
+# OPTIONS 走外层 CORS 直接返 200，不经 JWT 校验）。
+# 详见 docs/security/internal-jwt-rollout.md
+from shared.security.src.internal_jwt_middleware import InternalJwtMiddleware
+
+app.add_middleware(InternalJwtMiddleware)
 app.include_router(orders_router)
 app.include_router(cashier_router)
 app.include_router(kds_router)
