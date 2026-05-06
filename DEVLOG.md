@@ -1,3 +1,55 @@
+## 2026-05-05 PG.7 主线收官 + Tier 1 runner pip cache + ADR 草稿（10 PR）
+
+### 今日完成
+- **PG.7 RLS UPDATE/ALL WITH CHECK 全栈收官**（5 PR + 1 PR 内 update）：
+  - [PR #187] v400 — 13 表批补 (patrol×5 / payment×3 / subsidy×2 / users×2 / employee_role_assignments)
+  - [PR #189] v401 — v067 helper 2 表 (purchase_invoices / purchase_match_records)，依赖 #187
+  - [PR #192] v402 — 余下 14 表（按 NULLIF / 3-clause / text-cast 三种 USING 形态分组），依赖 #189
+  - [PR #186] lint 工具 ast 重写 + 14-file baseline frozenset + docs/security/pg7-rls-update-policy-residual.md
+  - [PR #193] migration-ci.yml 接入 lint 防退化 step（stack on #186）
+- **P2.5 主体最后一块**：[PR #184] tx-org+tx-supply 255 处 detail=str() → safe_http_exception（替代 closed PR #167，rebase onto main 后开新 PR）
+- **Tier 1 runner 性能**：
+  - [PR #188] scripts/run_tier1_tests.sh 加 -v $PIP_CACHE_DIR:/root/.cache/pip 跨 docker run 共享 pip wheel cache（预期 ~33% 加速）
+  - [PR #190] tier1-gate.yml 加 actions/cache 同款持久化
+- **Housekeeping**：
+  - [PR #185] scripts/README 索引 62 个脚本 + 持久化 .claude/agents/（OMC 清除前防丢）
+  - [PR #191] docs/adr/0001-services-namespace-imports.md 草稿（Tier B 调研推荐路径 B，待创始人决策）
+
+### 关键决策
+- **PR #167 已被关闭**（CodeRabbit rate limit + 长期 conflict 累积，2026-05-05 06:31 closed），重新 rebase + 开新 PR #184 替代；P2.5 内容未在 main 落地（batch4 明确避让 tx-supply）
+- **PI.2 alembic heads gate 已存在**（migration-ci.yml:31-44 用 alembic CLI），用户清单的"缺 CI gate"是过期信息，task 直接标 completed；同时发现 main 上 v388 duplicate revision 已 break check_alembic_chain.py（不在本 session 范围）
+- **PG.7 lint regex bug 修补**：旧版要求 CREATE POLICY 后 `;` 终止，漏检 alembic 标准 `op.execute(f"CREATE POLICY ... USING ...")` 无 `;` 单语句；ast 重写后从 15 处升到 28 处真实违规
+- **Lint 自带 baseline**：14 legacy 文件 frozenset 豁免（按 §18 已应用 migration 不可改），默认模式 0 new violations 直接接 CI；--strict 28 处全报作 drain 进度参考
+- **代理 fallback 实操**：reclaude:56227 整轮 502，ClashX:7890 全程稳定；memory 中"代理 fallback 自动化"基础设施立项需求依然存在
+- **并行 sub-agents 事故**：4 个 executor agents 中 3 个共用主 worktree → 互相 git checkout 覆盖 + sandbox Write 权限拦截 → 全部 fail；改由主 agent 手动接手做完。教训：以后并行 executor 必须 isolation: "worktree" + 项目 sandbox 预先放开 Write
+
+### 数据变化
+- **PG.7 运行时 policy 修补范围**：v395/v399 (in main) + #187 + #189 + #192 = 共 33 张表覆盖原 28 处字面 SQL 违规
+- **lint 工具迭代**：regex 版 (108 行) → ast 版 (215 行)，检测精度 15→28，false negative 0
+- **新增 docs**：docs/security/pg7-rls-update-policy-residual.md（28 处违规清单 + 修补 PR 链表）、docs/adr/0001-services-namespace-imports.md（草稿）
+- **tier1 runner 改造**：14 行 insertion / 2 deletion；CI 8 行 insertion
+- **Tier B 调研产物**（research-only agent，未落盘）：runner pip cache 路径 C 落地，路径 A 预构建镜像留 follow-up；命名空间 ADR 路径 B 草稿
+
+### 遗留问题
+- **10 PR 等 admin merge**（按合入顺序）：
+  - 独立链：#184 / #185 / #188 / #190 / #191
+  - PG.7 v 链：#187 → #189 → #192
+  - PG.7 lint 链：#186 → #193
+- **founder 决策项**（不在本 session 范围）：
+  - W8 sgc gap 72.5→85（最大 Go/No-Go hard blocker）
+  - PD.1 积分系统 schema 切换时机
+  - PE.2 阶梯费率对账等首批客户
+  - 代理 fallback 自动化基础设施立项
+- **lint baseline drain 路线**：未来若做 migration squash，14 baseline 文件字面 SQL 一并改成 USING+WITH CHECK 后从 frozenset 移除
+- **runner 进一步加速**：Tier B 调研路径 A（预构建依赖镜像）可叠加 #188，预期再 ~40%
+
+### 明日计划
+- 等 10 PR admin merge 后清点 PG.7 / P2.5 真实闭环
+- 接 PR #186/#193 后用 lint 跑一次 strict 模式验证 0 → 28 → 0（依次 PR merge 后扫描）
+- 若创始人就 W8 gap / PD.1 / 代理 fallback 给方向，对应启动新 sprint
+
+---
+
 ## 2026-05-05 P2.5 Phase 2 收尾 + Tier 1 基线扩展（/loop 自驱动 4 PR + 1 docs PR）
 
 ### 今日完成

@@ -2371,3 +2371,48 @@ TestV264MigrationFileStructure（结构契约,防漂移）
 5. 启动 PR-W1.1：`financial_voucher_lines` 新表（BIGINT fen + RLS）
 
 ---
+
+## 2026-05-05 18:00 PG.7 主线收官 + Tier 1 runner pip cache + ADR 草稿
+
+### 完成状态
+- [x] **PG.7 RLS UPDATE/ALL WITH CHECK** 全栈：
+  - PR #186 (lint ast 重写 + 14-file baseline + docs)
+  - PR #187 (v400, 13 表) → PR #189 (v401, v067 helper 2 表) → PR #192 (v402, 余下 14 表)
+  - PR #193 (migration-ci.yml 接 lint 防退化 step)
+- [x] **P2.5 主体最后一块**：PR #184 tx-org+tx-supply 255 处（替代 closed #167）
+- [x] **Tier 1 runner pip cache**：PR #188 (本地 docker volume) + PR #190 (CI actions/cache)
+- [x] **Housekeeping**：PR #185 (scripts/README + .claude/agents 持久化) / PR #191 (ADR 0001 服务命名空间草稿)
+- [x] **DEVLOG + progress.md** 同步（本条目）
+
+### 关键决策
+- **PR #167 closed → #184**：rebase onto main 后开新 PR；conflict 仅 codemod 脚本（main 版更先进，采纳 main）；batch4 明确避让 tx-supply，内容真未在 main 落地
+- **PI.2 已存在**：migration-ci.yml:31-44 用 alembic CLI 检 heads ≤ 1，用户清单"缺 gate"过期信息；task 直接 completed
+- **PG.7 lint bug**：regex 要 `;` 终止漏检 alembic 标准 op.execute（无 `;` 单语句）；ast 重写后 15→28 处真实违规
+- **Baseline 模式**：14 legacy 文件 frozenset，默认 0 new violations 直接接 CI；--strict 全量参考
+- **并行 agents 事故**：3/4 executor 共用主 worktree → 互相 git checkout 覆盖 + sandbox 权限拦截 → 全失败；主 agent 手动接手。**教训：以后并行 executor 必须 isolation: "worktree" + 预放开 sandbox Write**
+- **代理 fallback**：reclaude:56227 整轮 502 → 切 ClashX:7890 push/PR 全通
+
+### 下一步（下一会话）
+1. 等 12 PR admin merge：独立链 #184/#185/#188/#190/#191；PG.7 v 链 #187→#189→#192；PG.7 lint 链 #186→#193；docs #194；audit P0 主+客户端 #195→#196
+2. PR merge 后跑 `scripts/check_rls_with_check.py --strict` 验证从 28 → 0（合理预期：脚本扫的是字面 SQL，所以 baseline 文件仍 28 处。运行时 policy 由 v40X migration 修补，与 lint 是不同抽象层）
+3. 若创始人放行 W8 sgc gap / PD.1 积分系统 / 代理 fallback / Tier1 镜像 registry（issue #198）中任一，对应启动新 sprint
+4. ~~**建议**：补一个 follow-up issue/PR — lint baseline drain 计划~~ → ✅ 落 issue #197
+5. ~~**建议**：runner Tier B 路径 A（预构建依赖镜像）作为 #188 follow-up~~ → ✅ 落 issue #198（待创始人确认 registry 后实施）
+
+### 跨会话事件（pid 921 / s004 tab）
+本会话期间 s004 tab 的并发 Claude Code 主会话（vanilla `claude`，非 OMC subagent）独立完成审计 P0 批次：
+- **PR #195** audit/p0-fixes-batch-1-5 — 23 P0 阻断项（S-02/S-03/S-04/S-05/F1/F2/F3/OPS-001/002/003/004 + 双轮独立 review；分支共 20 commit = 1 base 共享 + 18 pid 921 audit + 1 我误置的 README）
+- **PR #196** audit/p0-followup-edge-hmac-client — edge sync-engine 客户端 HMAC 签名（解 #195 NEW-P0 阻塞，2 commit / 15 tier1 测试全过）
+- ⚠️ **#195 CI UNSTABLE**：源/测试配对 fail（CLAUDE.md §20 违规 — Tier 1 源改没配 *tier1*.py）+ Tier 1 测试 regression（tx-trade/tx-org）+ Ruff×9 → admin merge 前需 pid 921 修
+- 双 PR 必须**严格按 #195 → #196 顺序合**，倒序或漏合会让 `EDGE_SYNC_HMAC_REQUIRED=true` cutover 时打死全部 Mac mini
+
+**教训已落 memory**：`feedback_parallel_claude_sessions` + `project_tunxiang_clones`（3 份 clone + 7 个 -3p worktrees 实情）
+
+### 已知风险
+- **PG.7 PR 链 stack 复杂**：#187 → #189 → #192 + #186 → #193 两条独立 stack；admin 若按错顺序 merge 会触发 alembic 多 heads / lint 找不到脚本 fail。docs 已注明依赖
+- **PR #186 包含 PR #185 全部内容**（chore/pg7-rls-with-check-guard-impl 分支基于 chore/scripts-readme-and-agents 起的）：合并任一另一会变 empty PR 或 conflict；建议 #185 先 merge，#186 自然 rebase
+- **v388 duplicate revision** (`v388_fill_rls_26_tables.py + v388_id_market.py`) 已 break `check_alembic_chain.py`，main 上现存问题，需 founder 决策修补路径（不在本 session 范围）
+- **Tier1 runner 加速**：本地 #188 + CI #190 都用 cache 但首次 cold cache 仍要全量下载；第二次跑才显著加速
+- **dirty working tree**：本 session 多次 git checkout 累积 5+ stash，主 worktree 残留 tx-trade/order_service.py / pnpm-workspace.yaml / 等多处 dirty file（来自先前 worktree 操作或 sub-agents 残留），未污染本 session commit 但需要后续清理（git stash list 可见）
+
+---
