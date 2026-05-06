@@ -61,11 +61,111 @@ jobs:
             cd ../..
           done
 
+  # ─── Tier 1 + RLS Gate（审计 OPS-001 修复：原本 deploy 不依赖任何 gate，
+  #     tier1-gate.yml / rls-gate.yml 仅在 PR 触发，push to main 时部署不被阻塞。
+  #     此处把同等强度的 gate 内嵌到 deploy 链条中。）───
+  tier1-and-rls-gate:
+    name: Tier 1 + RLS Gate
+    runs-on: ubuntu-latest
+    needs: pre-deploy-check
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Cache pip
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-tier1-gate
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: 安装依赖
+        run: |
+          pip install --quiet \
+            pytest pytest-asyncio \
+            pydantic fastapi httpx \
+            sqlalchemy structlog asyncpg \
+            pyyaml aiosqlite
+
+      - name: 跑 Tier 1 全套（按文件隔离，避免跨 service conftest 冲突）
+        run: |
+          # 与 tier1-gate.yml 一致：扫 services/**/tests/**/*tier1*.py
+          # + services/**/src/tests/**/*tier1*.py + tests/tier1/**
+          mapfile -t TIER1_FILES < <(find services edge tests \
+            \( -path '*/tests/*' -o -path 'tests/tier1/*' \) \
+            -name 'test_*tier1*.py' -type f 2>/dev/null | sort -u)
+          if [ ${#TIER1_FILES[@]} -eq 0 ]; then
+            echo "::error::No Tier 1 test files discovered"
+            exit 1
+          fi
+          echo "Discovered ${#TIER1_FILES[@]} Tier 1 test files"
+          fail=0
+          for f in "${TIER1_FILES[@]}"; do
+            echo "::group::$f"
+            if ! PYTHONPATH=. python -m pytest -q --tb=line --no-header "$f"; then
+              fail=$((fail + 1))
+            fi
+            echo "::endgroup::"
+          done
+          if [ "$fail" -gt 0 ]; then
+            echo "::error::$fail Tier 1 test files failed — deploy blocked (audit OPS-001)"
+            exit 1
+          fi
+
+      - name: RLS 静态检查（审计 S-05：ENABLE 必须配 FORCE）
+        run: |
+          missing_force=0
+          violators=()
+          for mig in shared/db-migrations/versions/*.py; do
+            if grep -q "ENABLE ROW LEVEL SECURITY" "$mig" 2>/dev/null; then
+              if ! grep -q "FORCE ROW LEVEL SECURITY" "$mig" 2>/dev/null; then
+                missing_force=$((missing_force + 1))
+                violators+=("$(basename "$mig")")
+              fi
+            fi
+          done
+          if [ "$missing_force" -gt 0 ]; then
+            # 当前为非阻塞警告（历史债 ~176 张表），待 RLS-FORCE 批量修迁移上线后改 exit 1
+            echo "::warning::$missing_force migrations ENABLE RLS without FORCE (audit S-05)"
+            printf '::warning::  - %s\n' "${violators[@]:0:10}"
+            if [ "$missing_force" -gt 10 ]; then
+              echo "::warning::  ... and $((missing_force - 10)) more"
+            fi
+          fi
+
+      - name: k6 P99 结果非占位检查（审计 OPS-004）
+        run: |
+          # 拒绝合成占位结果作为部署证据
+          K6_FILE=infra/performance/k6-latest-results.json
+          if [ -f "$K6_FILE" ]; then
+            if grep -q "Baseline result — replace with real k6 run output\|placeholder\|PLACEHOLDER" "$K6_FILE"; then
+              echo "::error::$K6_FILE 仍含占位 marker — 必须替换为真实 staging k6 跑测结果（审计 OPS-004）"
+              exit 1
+            fi
+            # 解析 P99 并强制 < 200ms（Tier 1 SLO）
+            # 独立 review P2-2：用 python3 直接 int 转换，避免 ${P99%.*} 在科学
+            # 计数法（如 1.5e+02 = 150）下被截成 "1" 误判通过的边界 bug。
+            P99=$(python3 -c "import json; d=json.load(open('$K6_FILE')); print(d.get('metrics',{}).get('http_req_duration',{}).get('p(99)','999'))")
+            P99_INT=$(python3 -c "print(int(float('$P99')))" 2>/dev/null || echo 999)
+            if [ "$P99_INT" -ge 200 ]; then
+              echo "::error::k6 实测 P99 = ${P99}ms ≥ 200ms — 违反 Tier 1 SLO（CLAUDE.md §22）"
+              exit 1
+            fi
+            echo "k6 P99 = ${P99}ms < 200ms ✓"
+          else
+            echo "::warning::$K6_FILE 不存在 — staging 应至少跑一次 k6 留证据"
+          fi
+
   # ─── Staging 部署 ───
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: pre-deploy-check
+    needs: [pre-deploy-check, tier1-and-rls-gate]
     if: >-
       github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'staging')

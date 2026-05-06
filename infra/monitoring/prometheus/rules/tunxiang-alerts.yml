@@ -11,15 +11,25 @@ groups:
           summary: "服务 {{ $labels.job }} 宕机"
           description: "服务 {{ $labels.job }} (实例 {{ $labels.instance }}) 已宕机超过1分钟，请立即处理。"
 
-      # API响应时间过高
+      # API响应时间过高（审计 OPS-003 修复：阈值从 2s → 0.2s = 真实 SLO 目标 P99 < 200ms）
       - alert: HighResponseTime
-        expr: http_request_duration_seconds_p99 > 2
+        expr: http_request_duration_seconds_p99 > 0.2
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.job }} P99延迟超过2秒"
-          description: "服务 {{ $labels.job }} P99延迟为 {{ $value }}s，超过2秒阈值，持续5分钟。"
+          summary: "{{ $labels.job }} P99延迟超过200ms"
+          description: "服务 {{ $labels.job }} P99延迟为 {{ $value }}s，超过Tier 1 SLO 0.2s阈值，持续5分钟。"
+
+      # 备用：基于 histogram_quantile 的标准 P99 告警（不依赖 _p99 自定义指标）
+      - alert: HighResponseTimeHistogram
+        expr: histogram_quantile(0.99, sum by (job, le) (rate(http_request_duration_seconds_bucket[5m]))) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} P99延迟超过200ms（histogram_quantile 计算）"
+          description: "{{ $labels.job }} histogram_quantile P99 = {{ $value }}s，超过Tier 1 SLO 0.2s。"
 
       # 错误率过高
       - alert: HighErrorRate
@@ -92,3 +102,71 @@ groups:
         annotations:
           summary: "Agent执行失败率超过10%"
           description: "Agent类型 {{ $labels.agent_type }} 失败率为 {{ $value | humanizePercentage }}。"
+
+  # ─── 支付 SLO 告警（审计 OPS-002 修复：原本零支付 SLO 规则）───
+  #
+  # ⚠️ 独立 review P1-3：本组规则当前**不会触发**，因为下列指标在代码库里
+  # 还未被任何服务暴露（grep -r "payment_saga_total" services/ 返回 0）：
+  #   payment_saga_total{result="success|failed|compensated"}
+  #   payment_saga_compensated_total{reason="..."}
+  #   payment_channel_requests_total{channel="wechat|alipay|lakala", status="2xx|4xx|5xx"}
+  #
+  # 规则保留作为指标契约 + 后续暴露后立即生效；徐记海鲜 DEMO 前必须做完：
+  #   1. tx-trade payment_saga_service.py 加 prometheus_client.Counter 实例化
+  #   2. tx-pay channels/{wechat,alipay,lakala}.py 在请求发出/响应处加 increment
+  #   3. 服务暴露 /metrics（用 prometheus_fastapi_instrumentator 已在 main.py 接好）
+  #   4. 跑一次端到端微信支付看告警是否能在故障注入下 fire
+  # 暴露方式参考 services/tx-pay/src/metrics.py（如不存在需新增）。
+  # SLO 目标（CLAUDE.md §22）：支付成功率 > 99.9%。
+  - name: tunxiang-payment-slo
+    rules:
+      # 支付成功率低于 99.9%（Tier 1 阻断）
+      - alert: PaymentSuccessRateLow
+        expr: |
+          (
+            sum(rate(payment_saga_total{result="success"}[10m]))
+            / sum(rate(payment_saga_total[10m]))
+          ) < 0.999
+        for: 10m
+        labels:
+          severity: critical
+          tier: "1"
+        annotations:
+          summary: "支付成功率低于 99.9%（Tier 1 SLO 红线）"
+          description: "近10分钟支付成功率为 {{ $value | humanizePercentage }}，低于 99.9% Tier 1 SLO。立刻检查 tx-pay 渠道（微信/支付宝/拉卡拉）状态、tx-trade Saga 补偿日志、网关日志。"
+
+      # Saga 补偿激增（短窗口异常）
+      - alert: PaymentSagaCompensationSpike
+        expr: rate(payment_saga_compensated_total[5m]) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          tier: "1"
+        annotations:
+          summary: "支付 Saga 补偿率激增（>5%/s 持续 3 分钟）"
+          description: "{{ $labels.reason }} 补偿速率 {{ $value }}/s。可能：渠道侧 5xx、网络抖动、Saga 资源被锁。检查 tx-trade payment_saga_service 日志。"
+
+      # 完全无支付流量超过 5 分钟（业务高峰期假死）
+      - alert: PaymentTrafficStalled
+        expr: sum(rate(payment_saga_total[5m])) == 0
+        for: 5m
+        labels:
+          severity: critical
+          tier: "1"
+        annotations:
+          summary: "支付流量完全停止超过 5 分钟"
+          description: "5 分钟内零支付请求 — 营业时段视同 P0 故障：检查 gateway 入口、tx-trade /tx-pay 进程、数据库连接池。"
+
+      # 微信/支付宝渠道 5xx 率过高（按渠道维度）
+      - alert: PaymentChannelHighErrorRate
+        expr: |
+          sum by (channel) (rate(payment_channel_requests_total{status="5xx"}[5m]))
+          / sum by (channel) (rate(payment_channel_requests_total[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          tier: "1"
+        annotations:
+          summary: "{{ $labels.channel }} 渠道 5xx 错误率超过 1%"
+          description: "渠道 {{ $labels.channel }} 5xx 率 {{ $value | humanizePercentage }}。可能渠道侧故障 — 立刻评估降级到现金或备用渠道（参 docs/runbooks/payment-provider-failure.md）。"

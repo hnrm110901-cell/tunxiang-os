@@ -226,72 +226,126 @@ async def initiate_wechat_pay(
 
 @router.post("/deposit/callback")
 async def wechat_payment_callback(
-    body: WechatCallbackReq,
+    request: Request,
     db: AsyncSession = Depends(_get_db_no_tenant),
 ):
     """微信支付回调（无需 X-Tenant-ID，验签后处理）
 
-    步骤1：签名校验（生产环境须配置 WECHAT_PAY_PUBLIC_KEY_PATH 环境变量）。
-    步骤2：用 payment_no 从 banquet_deposits 跨租户查找 tenant_id。
-    步骤3：用真实 tenant_id 建立租户隔离 session，调用 handle_payment_callback。
+    审计 S-04（P0）修复：强制走 WechatPayService.verify_callback —— V3 RSA-SHA256
+    签名校验 + AES-256-GCM 解密。原本的 ``WechatCallbackReq`` 直接接受未验签 JSON，
+    任何能猜到 ``payment_no`` 的人都可伪造回调确认押金或触发开票（Tier 1 零容忍）。
+    生产环境若未配置微信公钥，``WechatPayService.__init__`` 已 fail-closed，
+    除非显式设置 ``TX_WECHAT_PAY_ALLOW_MOCK=1``（仅限灰度演练）。
+
+    步骤1：读原始 body + headers，调 verify_callback（验签 + 解密）。失败 → 400。
+    步骤2：从解密后通知取 out_trade_no / transaction_id / amount.payer_total / success_time。
+    步骤3：用 payment_no 跨租户查 tenant_id（db 已跳过 RLS）。
+    步骤4：用真实 tenant_id 建立租户隔离 session，调 handle_payment_callback。
+
+    返回：成功必须回 ``{"code":"SUCCESS","message":"成功"}``（微信 V3 约定，否则会重试）。
     """
-    logger.info(
-        "banquet_deposit.callback_received",
-        payment_no=body.payment_no,
-        wechat_transaction_id=body.wechat_transaction_id,
-        paid_fen=body.paid_fen,
-    )
+    from datetime import datetime as _dt
+    from datetime import timezone as _tz
 
-    # 步骤1：微信签名校验
-    # 生产环境须配置 WECHAT_PAY_PUBLIC_KEY_PATH，用微信平台公钥验签。
-    # 当前跳过验签，仅适用于开发/内网环境。
-    # wechat_sig = request.headers.get("Wechatpay-Signature", "")
-    # if not _verify_wechat_signature(wechat_sig, body.model_dump()):
-    #     raise HTTPException(status_code=401, detail="微信回调签名校验失败")
-
-    # 步骤2：跨租户查询 tenant_id（db 已跳过 RLS）
     from sqlalchemy import text as _text
 
+    from shared.integrations.wechat_pay import get_wechat_pay_service
+
+    body_bytes = await request.body()
+    headers = {k.lower(): v for k, v in request.headers.items()}
+
+    # 步骤1：验签 + 解密（fail-closed）
+    try:
+        notify = await get_wechat_pay_service().verify_callback(headers, body_bytes)
+    except ValueError as exc:
+        client_ip = request.client.host if request.client else "unknown"
+        logger.warning(
+            "banquet_deposit.callback_signature_invalid",
+            error=str(exc),
+            ip=client_ip,
+        )
+        # 验签/时间戳/解密失败统一 400，微信端按指数退避重试
+        raise HTTPException(status_code=400, detail="invalid signature")
+    except RuntimeError as exc:
+        # 生产 mock 配置缺失（理论上 __init__ 已阻止启动；保险起见）
+        logger.error("banquet_deposit.callback_service_misconfigured", error=str(exc))
+        raise HTTPException(status_code=500, detail="payment service misconfigured")
+
+    payment_no = str(notify.get("out_trade_no") or "")
+    wechat_transaction_id = str(notify.get("transaction_id") or "")
+    amount_obj = notify.get("amount") or {}
+    paid_fen_raw = amount_obj.get("payer_total") if isinstance(amount_obj, dict) else None
+    success_time_raw = notify.get("success_time") or ""
+
+    if not payment_no or not wechat_transaction_id or paid_fen_raw is None:
+        logger.warning(
+            "banquet_deposit.callback_missing_fields",
+            has_payment_no=bool(payment_no),
+            has_txn_id=bool(wechat_transaction_id),
+            has_amount=paid_fen_raw is not None,
+        )
+        raise HTTPException(status_code=400, detail="malformed callback payload")
+
+    try:
+        paid_fen = int(paid_fen_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="invalid amount in callback") from None
+
+    if success_time_raw:
+        try:
+            paid_at = _dt.fromisoformat(str(success_time_raw).replace("Z", "+00:00"))
+        except ValueError:
+            paid_at = _dt.now(_tz.utc)
+    else:
+        paid_at = _dt.now(_tz.utc)
+
+    logger.info(
+        "banquet_deposit.callback_verified",
+        payment_no=payment_no,
+        wechat_transaction_id=wechat_transaction_id,
+        paid_fen=paid_fen,
+    )
+
+    # 步骤3：跨租户查询 tenant_id（db 已跳过 RLS）
     row = await db.execute(
         _text("SELECT tenant_id FROM banquet_deposits WHERE payment_no = :pno LIMIT 1"),
-        {"pno": body.payment_no},
+        {"pno": payment_no},
     )
     record = row.mappings().first()
     if not record:
-        logger.warning(
-            "banquet_deposit.callback_no_match",
-            payment_no=body.payment_no,
-        )
-        return _ok({"message": "payment_no not found, ignored"})
+        logger.warning("banquet_deposit.callback_no_match", payment_no=payment_no)
+        # 微信约定：未找到也按"已处理"回 SUCCESS，避免无意义重试
+        return {"code": "SUCCESS", "message": "成功"}
 
     tenant_id = str(record["tenant_id"])
 
-    # 步骤3：用真实 tenant_id 建立租户隔离 session，调用业务处理
+    # 步骤4：用真实 tenant_id 建立租户隔离 session，调用业务处理
     try:
         async for tenant_db in get_db_with_tenant(tenant_id):
             svc = BanquetPaymentService(tenant_id=tenant_id, db=tenant_db)
             await svc.handle_payment_callback(
-                payment_no=body.payment_no,
-                wechat_transaction_id=body.wechat_transaction_id,
-                paid_fen=body.paid_fen,
-                paid_at=body.paid_at,
+                payment_no=payment_no,
+                wechat_transaction_id=wechat_transaction_id,
+                paid_fen=paid_fen,
+                paid_at=paid_at,
             )
     except ValueError as exc:
         logger.error(
             "banquet_deposit.callback_handle_failed",
-            payment_no=body.payment_no,
+            payment_no=payment_no,
             tenant_id=tenant_id,
             error=str(exc),
         )
-        return _err(str(exc))
+        # 业务异常仍回 400 让微信重试（避免单次失败永久丢消息）
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     logger.info(
         "banquet_deposit.callback_processed",
-        payment_no=body.payment_no,
+        payment_no=payment_no,
         tenant_id=tenant_id,
-        paid_fen=body.paid_fen,
+        paid_fen=paid_fen,
     )
-    return _ok({"message": "callback processed"})
+    return {"code": "SUCCESS", "message": "成功"}
 
 
 # ─── 电子确认单端点 ──────────────────────────────────────────────────────────

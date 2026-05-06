@@ -28,6 +28,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import TradeEventType, UniversalPublisher
 
+from ..metrics import payment_saga_compensated_total, payment_saga_total
+
 logger = structlog.get_logger(__name__)
 
 
@@ -190,6 +192,7 @@ class PaymentSagaService:
         except ValueError as exc:
             log.warning("saga_s1_failed", error=str(exc))
             await self._update_step(saga_id, SagaStep.FAILED, compensation_reason=str(exc))
+            payment_saga_total.labels(result="failed").inc()
             return {
                 "saga_id": str(saga_id),
                 "payment_id": None,
@@ -216,6 +219,7 @@ class PaymentSagaService:
         except (ValueError, RuntimeError) as exc:
             log.error("saga_s2_failed", error=str(exc))
             await self._update_step(saga_id, SagaStep.FAILED, compensation_reason=str(exc))
+            payment_saga_total.labels(result="failed").inc()
             return {
                 "saga_id": str(saga_id),
                 "payment_id": None,
@@ -242,6 +246,7 @@ class PaymentSagaService:
                 reason=f"S3 complete_order 失败: {exc}",
             )
             status = SagaStep.COMPENSATED if compensated else SagaStep.FAILED
+            payment_saga_total.labels(result=status).inc()
             return {
                 "saga_id": str(saga_id),
                 "payment_id": payment_id,
@@ -253,6 +258,7 @@ class PaymentSagaService:
 
         # ── 成功 ─────────────────────────────────────────────────────────
         await self._update_step(saga_id, SagaStep.DONE)
+        payment_saga_total.labels(result="success").inc()
         log.info("saga_done", payment_id=payment_id, payment_no=payment_no)
 
         asyncio.create_task(
@@ -341,6 +347,10 @@ class PaymentSagaService:
             },
         )
         await self._db.flush()
+        # 标准化 reason label（避免 Counter cardinality 爆炸）：取首段中文/英文关键词
+        # 示例：'S3 complete_order 失败: ValueError(...)' → 's3_complete_failed'
+        _reason_label = reason.split(":")[0].strip()[:64] if reason else "unknown"
+        payment_saga_compensated_total.labels(reason=_reason_label).inc()
         log.info("saga_compensated", payment_id=payment_id)
 
         asyncio.create_task(
