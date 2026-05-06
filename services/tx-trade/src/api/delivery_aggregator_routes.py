@@ -39,7 +39,8 @@ PLATFORM_CONFIG: dict[str, dict] = {
 
 
 def _get_tenant_id(request: Request) -> str:
-    return request.headers.get("X-Tenant-Id", request.headers.get("X-Tenant-ID", "default"))
+    # cutover 后只信 InternalJwtMiddleware 注入的 state；dev 兜底 "default" 保留（生产由 middleware 强制注入）
+    return getattr(request.state, "tenant_id", "") or "default"
 
 
 async def _get_db(request: Request):

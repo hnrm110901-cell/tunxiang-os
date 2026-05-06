@@ -43,7 +43,7 @@ def _err_resp(msg: str) -> dict:
 
 
 def _get_tenant_id(request: Request) -> str:
-    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    return getattr(request.state, "tenant_id", "") or ""  # cutover 后只信 InternalJwtMiddleware 注入的 state
 
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:

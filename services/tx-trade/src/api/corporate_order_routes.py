@@ -31,7 +31,8 @@ router = APIRouter(prefix="/api/v1/trade/corporate", tags=["corporate-orders"])
 
 
 def _get_tenant_id(request: Request) -> str:
-    return request.headers.get("X-Tenant-Id", "default")
+    # cutover 后只信 InternalJwtMiddleware 注入的 state；dev 兜底 "default" 保留
+    return getattr(request.state, "tenant_id", "") or "default"
 
 
 async def _get_db(request: Request):

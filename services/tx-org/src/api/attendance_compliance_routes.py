@@ -46,10 +46,8 @@ router = APIRouter(
 
 
 def _tenant_id(request: Request) -> str:
-    tid = request.headers.get("X-Tenant-ID", "")
-    if not tid:
-        tid = request.query_params.get("tenant_id", "")
-    return tid
+    # cutover 后只信 InternalJwtMiddleware 注入的 state（query_params 兜底已移除：S-02 防 ?tenant_id= 绕过）
+    return getattr(request.state, "tenant_id", "") or ""
 
 
 # ── Pydantic Models ──────────────────────────────────────────────────────────

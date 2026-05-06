@@ -124,7 +124,7 @@ async def init_salary_config(req: InitSalaryConfigReq):
 @router.post("/salary-items/init-db")
 async def init_salary_items_db(req: InitSalaryItemsReq, request: Request):
     """为租户初始化标准薪资项到 DB（从模板批量写入 salary_item_templates 表）"""
-    tenant_id = request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="缺少 X-Tenant-ID")
 
@@ -143,7 +143,7 @@ async def list_tenant_salary_items(
     enabled_only: bool = False,
 ):
     """获取租户已持久化的薪资项列表（从 DB 读取）"""
-    tenant_id = request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="缺少 X-Tenant-ID")
 
@@ -161,7 +161,7 @@ async def list_tenant_salary_items(
 @router.post("/salary-items/custom")
 async def create_custom_item(req: CustomSalaryItemReq, request: Request):
     """创建自定义薪资项（写入 DB）"""
-    tenant_id = request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="缺少 X-Tenant-ID")
 
@@ -187,7 +187,7 @@ async def create_custom_item(req: CustomSalaryItemReq, request: Request):
 @router.put("/salary-items/{item_code}/toggle")
 async def toggle_item(item_code: str, req: ToggleReq, request: Request):
     """启用/禁用租户的某个薪资项"""
-    tenant_id = request.headers.get("X-Tenant-ID", "")
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="缺少 X-Tenant-ID")
 

@@ -51,7 +51,8 @@ router = APIRouter(prefix="/api/v1/tasks", tags=["tasks"])
 
 
 def _tenant_id(request: Request) -> UUID:
-    raw = request.headers.get("X-Tenant-ID", "").strip()
+    # cutover 后只信 InternalJwtMiddleware 注入的 state（state 已是受信 UUID 字符串）
+    raw = (getattr(request.state, "tenant_id", "") or "").strip()
     if not raw:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     try:

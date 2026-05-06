@@ -58,7 +58,7 @@ _EXPIRE_TIMEOUT_MIN = 15
 
 
 def _get_tenant_id(request: Request) -> str:
-    return request.headers.get("X-Tenant-ID", "")
+    return getattr(request.state, "tenant_id", "") or ""  # cutover 后只信 InternalJwtMiddleware 注入的 state
 
 
 def _ok(data: object) -> dict:

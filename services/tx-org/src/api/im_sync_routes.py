@@ -24,8 +24,8 @@ def _err(msg: str, code: str = "IM_ERROR") -> dict[str, Any]:
 
 
 def _get_tenant_id(request: Request) -> str:
-    """从请求头提取 tenant_id（X-Tenant-ID）。"""
-    return request.headers.get("X-Tenant-ID", "")
+    """cutover 后只信 InternalJwtMiddleware 注入的 state（不再读 X-Tenant-ID header）。"""
+    return getattr(request.state, "tenant_id", "") or ""
 
 
 # ─── 请求/响应模型 ───────────────────────────────────────────────────────────

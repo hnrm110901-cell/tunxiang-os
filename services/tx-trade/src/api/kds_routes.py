@@ -528,7 +528,7 @@ async def api_kds_orders_delta(
         }
     """
     # 三方租户一致性校验（与 A3 offline_sync 一致模式）
-    tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, "tenant_id", None)
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     if user.tenant_id and user.tenant_id != tenant_id:
@@ -599,7 +599,7 @@ async def api_kds_device_heartbeat(
     KDS 默认 30s 一次心跳；POS / crew_phone 遵循各自节奏。
     返回 server_time 供客户端校准时钟 + 建议 poll_interval_ms。
     """
-    tenant_id = request.headers.get("X-Tenant-ID") or getattr(request.state, "tenant_id", None)
+    tenant_id = getattr(request.state, "tenant_id", "")  # cutover 后只信 InternalJwtMiddleware 注入的 state
     if not tenant_id:
         raise HTTPException(status_code=400, detail="X-Tenant-ID header required")
     if user.tenant_id and user.tenant_id != tenant_id:

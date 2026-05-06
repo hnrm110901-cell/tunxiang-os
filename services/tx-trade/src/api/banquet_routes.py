@@ -267,7 +267,7 @@ class BuildQuoteReq(BaseModel):
 
 
 def _tenant_id(request: Request) -> str:
-    return getattr(request.state, "tenant_id", None) or request.headers.get("X-Tenant-ID", "")
+    return getattr(request.state, "tenant_id", "") or ""  # cutover 后只信 InternalJwtMiddleware 注入的 state
 
 
 @router.post("/templates")
