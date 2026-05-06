@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter
@@ -24,8 +23,7 @@ logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/analytics", tags=["demo-monitor"])
 
 _DEMO_MERCHANTS: dict[str, str] = {
-    code: str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{code}-demo-tenant"))
-    for code in ("czyz", "zqx", "sgc")
+    code: str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{code}-demo-tenant")) for code in ("czyz", "zqx", "sgc")
 }
 
 _MERCHANT_NAMES = {
@@ -134,19 +132,8 @@ async def _check_merchant_health(merchant_code: str, tenant_id: str) -> dict:
             overall_ok = False
 
     # 简化数据质量评分：5项检查，各20分
-    quality_score = 0
-    for c in checks:
-        base = 20
-        if c["name"] == "stores" and c["count"] >= 1:
-            quality_score += base
-        elif c["name"] == "dishes" and c["count"] >= 10:
-            quality_score += base
-        elif c["name"] == "members" and c["count"] >= 5:
-            quality_score += base
-        elif c["name"] == "orders_90d" and c["count"] >= 20:
-            quality_score += base
-        elif c["name"] == "tables" and c["count"] >= 5:
-            quality_score += base
+    _MIN_COUNTS = {"stores": 1, "dishes": 10, "members": 5, "orders_90d": 20, "tables": 5}
+    quality_score = sum(20 for c in checks if c["count"] >= _MIN_COUNTS.get(c["name"], 0))
 
     status = "error" if all(not c["ok"] for c in checks) else ("degraded" if not overall_ok else "healthy")
 

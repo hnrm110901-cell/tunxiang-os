@@ -68,6 +68,38 @@ ignore = [
 "shared/events/**/*.py" = ["S608"]  # Same justification — server-side SQL, not user input
 "shared/knowledge_store/**/*.py" = ["S608"]  # server-controlled graph/vector queries
 "edge/**/*.py" = ["S608"]
+# BLE001 grandfather list — 30 文件历史 except Exception 兜底（CLAUDE.md §14 修复期遗留）
+# 新代码仍受 BLE001 规则约束（不在此列表的文件不豁免）。逐个清理走 Issue #220 跟进。
+"services/gateway/src/middleware/api_key_middleware.py" = ["BLE001"]
+"services/gateway/src/migration/tiancai_config_mapper.py" = ["BLE001"]
+"services/tx-agent/src/services/ai_coach_service.py" = ["BLE001"]
+"services/tx-agent/src/services/knowledge_retrieval.py" = ["BLE001"]
+"services/tx-agent/src/services/malaysia_forecasting_service.py" = ["BLE001"]
+"services/tx-analytics/src/main.py" = ["BLE001"]
+"services/tx-expense/src/agents/a3_standard_compliance.py" = ["BLE001"]
+"services/tx-expense/src/agents/a5_travel_assistant.py" = ["BLE001"]
+"services/tx-expense/src/api/petty_cash_routes.py" = ["BLE001"]
+"services/tx-finance/src/services/settlement_notify_service.py" = ["BLE001"]
+"services/tx-malaysia/src/api/sme_onboarding_routes.py" = ["BLE001"]
+"services/tx-malaysia/src/services/ai_insights_service.py" = ["BLE001"]
+"services/tx-malaysia/src/services/my_dashboard_service.py" = ["BLE001"]
+"services/tx-malaysia/src/services/pdpa_service.py" = ["BLE001"]
+"services/tx-menu/src/api/menu_plan_v2_routes.py" = ["BLE001"]
+"services/tx-menu/src/api/pricing_routes.py" = ["BLE001"]
+"services/tx-menu/src/services/upsell_generator.py" = ["BLE001"]
+"services/tx-ops/src/tests/test_ops_extended.py" = ["BLE001"]
+"services/tx-ops/src/tests/test_ops_settlement_summary.py" = ["BLE001"]
+"services/tx-org/src/api/efficiency.py" = ["BLE001"]
+"services/tx-org/src/api/store_health_routes.py" = ["BLE001"]
+"services/tx-pay/src/orchestrator/saga.py" = ["BLE001"]
+"services/tx-pay/src/orchestrator/split_pay.py" = ["BLE001"]
+"services/tx-supply/src/services/delivery_route_service.py" = ["BLE001"]
+"services/tx-supply/src/services/demand_forecast.py" = ["BLE001"]
+"services/tx-trade/src/api/discount_engine_routes.py" = ["BLE001"]
+"services/tx-trade/src/api/kds_delta_routes.py" = ["BLE001"]
+"services/tx-trade/src/main.py" = ["BLE001"]
+"services/tx-trade/src/services/my_payment_notify_service.py" = ["BLE001"]
+"services/tx-trade/src/tests/test_trade_misc.py" = ["BLE001"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

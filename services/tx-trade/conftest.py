@@ -8,6 +8,9 @@
   2. SRC 加入 path  → from services.xxx / from api.xxx / from models.xxx 等裸 import
   3. 创建 services.tx_trade.src 命名空间包 → 支持 from services.tx_trade.src.xxx import
      (保持和容器一致的全路径 import，相对 import from ..models.xxx 也能正确解析)
+
+`from services.<bare_module>` 形式的裸 import 由仓库根 conftest.py 统一处理
+（追加各服务 src/services/ 到顶级 services namespace 的 __path__）。
 """
 import os
 import sys
@@ -24,9 +27,6 @@ for p in [ROOT, SRC_DIR]:
 
 
 # 2. 建立 services.tx_trade / services.tx_trade.src 命名空间包
-#    注意：不注册顶级 "services"，避免覆盖 SRC_DIR/services/ 路径
-#    这样 from services.xxx 走 SRC_DIR/services/xxx.py（正常裸 import）
-#    而 from services.tx_trade.src.services.xxx 走完整容器包路径
 def _ensure_ns(name: str, path: str) -> None:
     if name not in sys.modules:
         mod = types.ModuleType(name)
@@ -41,7 +41,7 @@ def _ensure_ns(name: str, path: str) -> None:
         sys.modules[name] = mod
 
 
-# tx_trade 包（注意：不动顶级 services，避免冲突）
+# tx_trade 包
 _ensure_ns("services.tx_trade", SVC_DIR)
 _ensure_ns("services.tx_trade.src", SRC_DIR)
 
