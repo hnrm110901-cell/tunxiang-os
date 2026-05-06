@@ -117,30 +117,30 @@ class TestProductionMode:
             assert r.status_code == 401
 
 
-class TestDevStageCompat:
-    """无 TX_INTERNAL_JWT_SECRET 时（dev/test/staging）放行，保持 cutover 前兼容。"""
+class TestFailClosedAllEnvs:
+    """cutover 完成后：dev/staging/prod 全环境都强制要 secret + token，
+    历史 dev 跳过路径已删除（详见 docs/security/cutover-cleanup-plan.md §3.3）。"""
 
-    def test_no_secret_no_token_passes(self):
+    def test_no_secret_returns_500_in_dev(self):
+        """dev 无 secret = 服务器配置错误，500 fail-closed。"""
         with mock.patch.dict(os.environ, {"TX_ENV": "dev"}, clear=True):
             client = TestClient(_make_app())
             r = client.get("/api/v1/probe")
-            assert r.status_code == 200
-            assert r.json()["auth_method"] is None  # 未注入
+            assert r.status_code == 500
+            assert r.json()["error"]["code"] == "INTERNAL_JWT_NOT_CONFIGURED"
 
-    def test_no_secret_with_token_passes_no_state(self):
-        """有 secret 才校验；无 secret 时即便客户端发了 token 也忽略放行。"""
+    def test_no_secret_returns_500_in_test(self):
+        """test 无 secret 也 500，不再静默跳过。"""
         with mock.patch.dict(os.environ, {"TX_ENV": "test"}, clear=True):
             client = TestClient(_make_app())
             r = client.get(
                 "/api/v1/probe",
                 headers={"X-Internal-JWT": "anything"},
             )
-            assert r.status_code == 200
-            assert r.json()["auth_method"] is None
+            assert r.status_code == 500
 
-    def test_secret_set_no_token_in_dev_still_passes(self):
-        """生产 fail-closed，但 dev/staging 有 secret 但 client 没发 token —
-        过渡期允许通过（让升级中的 client 不破坏）。"""
+    def test_secret_set_no_token_in_staging_returns_401(self):
+        """staging 有 secret 但 client 没发 token = 来自 gateway 之外，401（与 prod 等价）。"""
         with mock.patch.dict(
             os.environ,
             {"TX_INTERNAL_JWT_SECRET": _TEST_SECRET, "TX_ENV": "staging"},
@@ -148,21 +148,17 @@ class TestDevStageCompat:
         ):
             client = TestClient(_make_app())
             r = client.get("/api/v1/probe")
-            assert r.status_code == 200
-            assert r.json()["auth_method"] is None
+            assert r.status_code == 401
 
-
-class TestProductionFailClosed:
-    """生产环境无 secret 配置 → middleware 直接拒（兜底，启动期已经拒）。"""
-
-    def test_production_no_secret_returns_401_with_token(self):
+    def test_production_no_secret_returns_500_with_token(self):
+        """生产环境无 secret = 配置缺失，500（不再 401，避免误导为认证错误）。"""
         with mock.patch.dict(os.environ, {"TX_ENV": "production"}, clear=True):
             client = TestClient(_make_app())
             r = client.get(
                 "/api/v1/probe",
                 headers={"X-Internal-JWT": "any.token.here"},
             )
-            assert r.status_code == 401
+            assert r.status_code == 500
             assert r.json()["error"]["code"] == "INTERNAL_JWT_NOT_CONFIGURED"
 
 
