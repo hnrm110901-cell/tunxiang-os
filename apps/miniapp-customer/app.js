@@ -1,4 +1,9 @@
-// TunxiangOS 微信小程序 — 顾客端
+// TunxiangOS 微信小程序 — 顾客端 v1
+//
+// ⚠️ DEPRECATED (2026-05-06, sprint-0-dedup R7)
+// 本项目已被 apps/miniapp-customer-v2 (Taro + TypeScript) 取代。
+// 维护策略：仅安全补丁 + 已合作客户 bug 修复。新功能请去 v2。
+// 详见 ./README.md
 var auth = require('./utils/auth.js');
 var config = require('./utils/config.js');
 
