@@ -65,6 +65,15 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
+
+# 审计 S-02 闭环：校验 gateway 注入的 X-Internal-JWT，把受信 claims 写入
+# request.state；env TX_INTERNAL_JWT_SECRET 未配时 skip 不破坏现状。
+# 必须在 CORSMiddleware 之后 add（FastAPI 后 add 的在内层；CORS preflight
+# OPTIONS 走外层 CORS 直接返 200，不经 JWT 校验）。
+# 详见 docs/security/internal-jwt-rollout.md
+from shared.security.src.internal_jwt_middleware import InternalJwtMiddleware
+
+app.add_middleware(InternalJwtMiddleware)
 # ── Feature Flag 启动检查 ──────────────────────────────────────────
 # SupplyFlags.RECEIVING_INSPECTION: 收货验收功能（入库加权均价计算）
 if is_enabled(SupplyFlags.RECEIVING_INSPECTION):

@@ -35,29 +35,38 @@ app.add_middleware(InternalJwtMiddleware)
 | # | 服务 | 端口 | 挂载状态 | 路由改造（_get_tenant_id 优先 state）|
 |---|---|---|---|---|
 | 1 | gateway | 8000 | N/A（gateway 自己签 JWT，不验自己的） | — |
-| 2 | tx-trade | 8001 | ✅ 本 PR | ✅ 现有路由已优先 state |
-| 3 | tx-menu | 8002 | ⏳ | ⏳ |
-| 4 | tx-member | 8003 | ⏳ | ⏳ |
-| 5 | tx-growth | 8004 | ⏳ | ⏳ |
-| 6 | tx-ops | 8005 | ⏳ | ⏳ |
-| 7 | tx-supply | 8006 | ⏳ | ⏳ |
-| 8 | tx-finance | 8007 | ⏳ | ⏳ |
-| 9 | tx-agent | 8008 | ⏳ | ⏳ |
-| 10 | tx-analytics | 8009 | ⏳ | ⏳ |
-| 11 | tx-brain | 8010 | ⏳ | ⏳ |
-| 12 | tx-intel | 8011 | ⏳ | ⏳ |
-| 13 | tx-org | 8012 | ⏳ | ⏳ |
-| 14 | tx-civic | 8014 | ⏳ | ⏳ |
-| 15 | tx-pay | 8016 | ⏳ | ⏳ |
-| 16 | tx-forge | 8013 | ⏳ | ⏳ |
-| 17 | tx-devforge | 8017 | ⏳ | ⏳ |
-| 18 | tx-expense | — | ⏳ | ⏳ |
-| 19 | tx-predict | — | ⏳ | ⏳ |
-| 20 | tx-indonesia | — | ⏳ | ⏳ |
-| 21 | tx-malaysia | — | ⏳ | ⏳ |
-| 22 | tx-vietnam | — | ⏳ | ⏳ |
-| 23 | mcp-server | — | ⏳ | ⏳ |
-| 24 | tunxiang-api | — | ⏳ | ⏳ |
+| 2 | tx-trade | 8001 | ✅ PR #202 + 本 PR 修挂载位置 | ✅ 现有路由已优先 state |
+| 3 | tx-menu | 8002 | ✅ 本 PR | ⏳ 路由现写法已支持 state |
+| 4 | tx-member | 8003 | ✅ 本 PR | ⏳ 同上 |
+| 5 | tx-growth | 8004 | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 6 | tx-ops | 8005 | ✅ 本 PR | ⏳ 同上 |
+| 7 | tx-supply | 8006 | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 8 | tx-finance | 8007 | ✅ 本 PR | ⏳ 同上 |
+| 9 | tx-agent | 8008 | ✅ 本 PR | ⏳ 同上 |
+| 10 | tx-analytics | 8009 | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 11 | tx-brain | 8010 | ✅ 本 PR | ⏳ 同上 |
+| 12 | tx-intel | 8011 | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 13 | tx-org | 8012 | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 14 | tx-civic | 8014 | ✅ 本 PR | ⏳ 同上 |
+| 15 | tx-pay | 8016 | ✅ 本 PR | ⏳ 同上 |
+| 16 | tx-forge | 8013 | ✅ 本 PR | ⏳ 同上 |
+| 17 | tx-devforge | 8017 | ✅ 本 PR | ⏳ 同上 |
+| 18 | tx-expense | — | ✅ 本 PR | ⏳ 同上 |
+| 19 | tx-predict | — | ✅ 本 PR（无 CORS） | ⏳ 同上 |
+| 20 | tx-indonesia | — | ✅ 本 PR | ⏳ 同上 |
+| 21 | tx-malaysia | — | ✅ 本 PR | ⏳ 同上 |
+| 22 | tx-vietnam | — | ✅ 本 PR | ⏳ 同上 |
+| 23 | mcp-server | — | N/A（无 main.py 入口） | — |
+| 24 | tunxiang-api | — | ✅ 本 PR | ⏳ 同上 |
+
+**S-02 完成度：50% (PR #202) → 70% (本 PR 含 22 服务挂载) → 100% (待 ops 配 secret + 24h 灰度)**
+
+⚠️ **修复 PR #202 引入的挂载顺序错**：tx-trade main.py 原本把 InternalJwtMiddleware
+add 在 CORS 之前 → InternalJwt 在外层 → CORS preflight (OPTIONS) **先经 JWT 校验** →
+生产模式 cutover 时所有 OPTIONS 请求 401 → CORS 失效，前端跨域请求全断。
+
+正确顺序：CORS 先 add（外层）→ InternalJwt 后 add（内层）→ OPTIONS 走外层
+CORS 直接返 200，不进 JWT 校验。本 PR 修了 tx-trade 同样问题。
 
 各服务路由 `_get_tenant_id()` 模板（兼容期写法）：
 

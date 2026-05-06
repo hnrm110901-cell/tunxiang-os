@@ -53,6 +53,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 审计 S-02 闭环：校验 gateway 注入的 X-Internal-JWT，把受信 claims 写入
+# request.state；env TX_INTERNAL_JWT_SECRET 未配时 skip 不破坏现状。
+# 必须在 CORSMiddleware 之后 add（FastAPI 后 add 的在内层；CORS preflight
+# OPTIONS 走外层 CORS 直接返 200，不经 JWT 校验）。
+# 详见 docs/security/internal-jwt-rollout.md
+from shared.security.src.internal_jwt_middleware import InternalJwtMiddleware
+
+app.add_middleware(InternalJwtMiddleware)
 # 注册路由
 app.include_router(trace_router)
 app.include_router(kitchen_router)
