@@ -1,3 +1,38 @@
+## 2026-05-06  main CI merge + 三 clone 同步 + Track D 启动（PR #233 / #234）
+
+### 本次会话目标
+1. PR #233 merge 进 main + 三 clone 同步
+2. Issue #220 Track D 启动 — 选最低成本路径让 tx-trade 测试有实质改善
+
+### 完成状态
+- [x] PR #233 squash merge 进 main（commit `eaa57141`）— main lint 从 RED → GREEN
+- [x] canonical / Documents/GitHub clone local main 同步到 `eaa57141`
+- [x] WorkBuddy clone 仅 fetch 更新 origin/main（dirty worktree 不动）
+- [x] pg6 obsolete 分支清理（local + remote 删；patch-id 已确认 = main 上 #147）
+- [x] Issue #220 状态评论 — disclosed Track D 1246 项 pre-existing 测试 bug
+- [x] PR #234 创建 — `test_template_editor.py` 7 fail → 0 fail（52/52 pass）
+
+### 关键决策
+- **PR #233 接受 partial merge**：lint green / test red 是中间状态。不为 perfect 阻塞 main lint。CI 第一次给真实信号
+- **三 clone 同步分级**：clean → `fetch origin main:main` 不切分支；dirty → 仅 fetch 不动 ref；防并发 Claude session 互踩
+- **pg6 删而非 rebase**：rebase 会 patch-id 跳过唯一 commit，pg6=main 纯冗余；删才是清理
+- **Track D 范围限定**：CLAUDE.md §18 防漂移声明，仅修 1 个 test 文件 + 1 行 production schema bug；不动 Tier 1（订单/支付/RLS/POS/存酒/发票），不动 ontology / migrations
+- **schema 修扩范围**：发现 `ElementDef.size: Optional[str]` 与 catalog 自定义（qrcode size = number）矛盾，是真 production schema bug。Tier 3 路径，1 行修复，符合 §3 surgical changes
+
+### 下一步
+- PR #234 等 review/merge
+- 若继续 Track D：
+  - cross-test pollution 调研 — 25 ERROR for `test_template_editor` 等多文件，单跑变 0 ERROR，根因找到一次治多文件
+  - 若调研无明显路径，选另一文件做架构级重写示范（约 1k LOC/文件）
+- 若切别的：Task #14（7 PR review）/ Task #23（RLS 阶段 5）
+
+### 已知风险
+- **WorkBuddy clone 长期落后** + 18 个 Claude-3p worktree 锁定 — 那边的 session 自决何时整合 main；不要从外部 push 到他们的 feature 分支
+- **Track D 长尾** — 1246 项 pre-existing 测试 bug 80%+ 是架构级过时，需按文件重写；多周工作量，需 DX/各服务 owner 分配
+- **Cross-test pollution 未根治** — `test_template_editor` 单跑全绿但全套 25 ERROR；pollution 源未找到（怀疑 SQLAlchemy MetaData 双注册 + `services.X` 浅路径 import）；不解决 → CI 信号永远比真实差很多
+
+---
+
 ## 2026-05-05 10:30  P2.5 Phase 2 收尾 + Tier 1 基线扩展（含 review P0 修补 + ClashX 7890 救场推送）
 
 ### 本次会话目标
