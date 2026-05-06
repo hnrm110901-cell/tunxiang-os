@@ -11,6 +11,8 @@ import structlog
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from shared.security.src.internal_jwt import mint_internal_jwt
+
 logger = structlog.get_logger()
 router = APIRouter()
 
@@ -139,22 +141,16 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
             trusted_role = getattr(request.state, "role", "") or ""
             if trusted_role:
                 headers["X-Internal-Role"] = str(trusted_role)
-            # 短期 HS256 内部 JWT —— 下游服务可挂 InternalJwtMiddleware 校验
-            # （独立 review P1-4：当前下游中间件未部署，本 token 仅签不验，
-            #  S-02 完成度 50%；follow-up tracker 在 docs/security/）
-            try:
-                from shared.security.src.internal_jwt import mint_internal_jwt
-
-                internal_jwt = mint_internal_jwt(
-                    tenant_id=str(trusted_tenant_id),
-                    user_id=str(trusted_user_id),
-                    role=str(trusted_role),
-                )
-                if internal_jwt:
-                    headers["X-Internal-JWT"] = internal_jwt
-            except ImportError:
-                # helper 尚未部署到环境时降级 — 不阻塞 proxy
-                pass
+            # 短期 HS256 内部 JWT —— 下游 InternalJwtMiddleware 校验后注入受信 state。
+            # cutover 完成后强制 mint（缺 secret 时 internal_jwt._get_secret() 会 raise，
+            # 启动期已 fail-closed；运行期任何 mint 异常都不应被静默吞，让 proxy 5xx）。
+            internal_jwt = mint_internal_jwt(
+                tenant_id=str(trusted_tenant_id),
+                user_id=str(trusted_user_id),
+                role=str(trusted_role),
+            )
+            if internal_jwt:
+                headers["X-Internal-JWT"] = internal_jwt
         body = await request.body()
 
         resp = await _http_pool.request(
