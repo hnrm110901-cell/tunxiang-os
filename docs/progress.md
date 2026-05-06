@@ -1,3 +1,35 @@
+## 2026-05-06 续  多 clone 物理统一 + WorkBuddy 抢救（14 archive 分支 / 268+ commits）
+
+### 本次会话目标
+1. 把 GitHub-based tunxiang-os 多渠道开发归整成统一渠道
+2. 抢救 WorkBuddy 上未推送的工作
+
+### 完成状态
+- [x] Phase 0 盘点：3 clone 实际状态 — Documents/GitHub 162+ unpushed commits / WorkBuddy 268+ unpushed commits
+- [x] 用户选项 4（混合）— 保 canonical + WorkBuddy，decom Documents/GitHub
+- [x] Documents/GitHub 4 阶段 decom：抢救→删本地→迁工件→`rm -rf`（释放 140 MB）
+- [x] WorkBuddy 3 级抢救：main 25 commits → feature 分支；9 unique branches → archive；4 zombie worktree dirty → archive
+- [x] memory 同步 3 clone → 2 clone
+
+### 关键决策
+- **patch-id 比对**取代盲目 push — 抓出 4 个分支 / 60+ commits 已通过 rebase 进 main，整支无需推（最大单支 `feat/p0-compose-consolidation-rebase` 28 commit 完全冗余）
+- **archive/workbuddy/* 命名空间** — 区分 Documents 与 WorkBuddy 来源，防同名分支冲突（`claude/distracted-cerf-fbdf7e` 在两 clone 都存在但 SHA 不同）
+- **Push by SHA 不用 symbolic name** — 防活跃 session 中途 commit 漂移
+- **locked worktree 可 commit** — git "locked" 只阻 worktree-level remove/move/prune，commit/push 全可；证实 8 个 locked 实际全是 2026-05-03 死掉的 zombie（lock mtime + dirty mtime + 5 active claude-3p cwd 全证）
+- **代理切换** — reclaude:56227 整轮 502 → ClashX:7890 + HTTP/1.1 救场（第三次验证 fallback 自动化立项）
+
+### 下一步
+- 等 3 active session 收尾后做最后一轮 dirty rescue（5 文件在 3 worktree）
+- 用户判断是否进入 WorkBuddy 物理 decom 第二轮（多日 triage）
+- 否则切 Track D / Task #14 / Task #23
+
+### 已知风险
+- **WorkBuddy 仍带未抢救的 5 dirty 文件** — 等 active session 落定再处理
+- **archive/workbuddy/locked-rescue-* 含 `__pycache__`** — `git add -A` 误带，已在 archive 中无害但不干净
+- **代理 fallback 仍手动**（每次大批 push 都要 reclaude → ClashX 切换）
+
+---
+
 ## 2026-05-06  main CI merge + 三 clone 同步 + Track D 启动（PR #233 / #234）
 
 ### 本次会话目标
