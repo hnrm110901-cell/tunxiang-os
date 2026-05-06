@@ -1,0 +1,129 @@
+# ======================================================================
+# NetworkPolicy values override — S-02 cutover Phase A (permissive)
+# ======================================================================
+#
+# 适用：21 个 tx-* helm charts（不含 api-gateway，用 networkpolicy-s02-gateway.yaml）
+#
+# 设计原则：
+#   - INGRESS 严格：只允许 gateway namespace + monitoring（Prometheus scrape）入站
+#     → 直接到 pod 的伪造请求被 K8s 拒绝（S-02 攻击面消失）
+#   - EGRESS 保守：允许 PG / Redis / DNS / 同 namespace 其他 tx-* / 公网
+#     → 不破坏现有业务（外部支付 API / Claude API / 微信回调相关 outbound）
+#
+# 阶段 B（strict）将收紧 egress 到具体目标（待写
+# infra/helm/_overrides/networkpolicy-s02-cutover-strict.yaml）。
+#
+# 用法：
+#   helm upgrade --install <chart> infra/helm/<chart> \
+#     -f infra/helm/<chart>/values.yaml \
+#     -f infra/helm/_overrides/networkpolicy-s02-cutover.yaml
+#
+# 全量应用见 scripts/k8s/apply_networkpolicy_s02.sh
+#
+# 启用前 ops 必须确认：
+#   1. namespace label 已设：tunxiang-gateway / tunxiang-services / monitoring
+#      kubectl label ns tunxiang-services kubernetes.io/metadata.name=tunxiang-services
+#   2. Pod label app.kubernetes.io/name=<service> 与 helm chart name 一致
+#   3. 服务依赖见 docs/infra/service-dependency-graph.md
+# ======================================================================
+
+networkPolicy:
+  enabled: true
+
+  ingress:
+    # 1. gateway namespace 入站（业务请求路径）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-gateway
+    # 2. monitoring namespace（Prometheus scrape /metrics）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+    # 3. 同 namespace 内其他 tx-* services（互调依赖见 dep graph）
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: Exists
+
+  egress:
+    # 1. PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: postgresql
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-data
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # 2. Redis（包括 nonce store + cache）
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: redis
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-data
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # 3. DNS（kube-system 默认 kube-dns / coredns）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 4. 同 namespace 其他 tx-* services（按依赖图）
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: Exists
+      ports:
+        - protocol: TCP
+          # 全 tx-* 端口范围 (8001-8017)
+          port: 8001
+          endPort: 8017
+
+    # 5. gateway service（部分服务回调 gateway，如 tx-agent / tx-growth）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-gateway
+      ports:
+        - protocol: TCP
+          port: 8000
+
+    # 6. ⚠️ 公网 HTTPS（外部支付 / Claude API / 微信 / SMS 等）
+    # Phase A 保守允许；Phase B (strict) 必须用 egress gateway 收紧到具体 IP/CIDR
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              # 排除 K8s 内部 service CIDR（防止绕过 ingress 限制）
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+  # ⚠️ Phase B 强收紧待办（写 strict override 时按依赖图删 #4 #6）：
+  # - egress #4 改为 matchLabels per-service（按 dep graph 列具体 callee）
+  # - egress #6 改为允许 egress-gateway pod，公网调用统一走 egress gateway
