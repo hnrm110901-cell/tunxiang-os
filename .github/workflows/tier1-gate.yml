@@ -132,6 +132,14 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 缓存 pip wheel
+        # 依赖列表 hardcoded 在本 workflow 的"安装依赖"step；手动 bust 改 key 后缀
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: tier1-pip-${{ runner.os }}-py311-${{ hashFiles('.github/workflows/tier1-gate.yml') }}
+          restore-keys: tier1-pip-${{ runner.os }}-py311-
+
       - name: 安装依赖
         run: |
           # 核心依赖（按 service requirements 最小化）
