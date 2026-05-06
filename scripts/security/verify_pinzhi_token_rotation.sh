@@ -1,17 +1,16 @@
 #!/usr/bin/env bash
-# 品智 17 个 Token 轮换 e2e 探测脚本
-# 对应 docs/runbooks/s01-pinzhi-token-rotation.md §5.1
-#
-# 用法：
-#   bash scripts/security/verify_pinzhi_token_rotation.sh         # 全 17 个店探测
-#   PINZHI_VERIFY_BRAND=czyz bash scripts/...                     # 单品牌
-#   PINZHI_VERIFY_TIMEOUT=10 bash scripts/...                     # 自定义超时
-#
-# 退出码：
-#   0 — 17 个店全 OK
-#   1 — 至少 1 个店 fail（详见 stderr）
-#   2 — 前置依赖缺失（jq / curl / env 未配）
+# ⚠️ DEPRECATED — 用 verify_pinzhi_token_rotation.py 替代
+# 本 bash 版调用 /api/shop/info 端点（adapter.py 实际不存在该端点），且无法
+# 生成 MD5 sign（品智所有端点必须签名）。会全部 SKIP/FAIL，无验证价值。
+# Python 版 verify_pinzhi_token_rotation.py 用真实 adapter 签名 +
+# /pinzhi/organizations.do 端点（adapter.py:170）。
+# 详见 docs/runbooks/s01-pinzhi-token-rotation.md §5.1
 
+echo "DEPRECATED — use verify_pinzhi_token_rotation.py instead" >&2
+echo "  python3 scripts/security/verify_pinzhi_token_rotation.py" >&2
+exit 2
+
+# 以下保留作历史参考；本脚本已 exit 2，不会执行
 set -euo pipefail
 
 TIMEOUT="${PINZHI_VERIFY_TIMEOUT:-5}"

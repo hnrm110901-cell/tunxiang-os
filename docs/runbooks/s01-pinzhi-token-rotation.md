@@ -121,11 +121,19 @@ git filter-repo --invert-paths \
 
 ```bash
 # 品智 token 格式：32 位十六进制（小写）— 用 .git-replace 做 blob 替换
+# 同时覆盖 PINZHI_PROBE_TOKEN 旧硬编码值（与 17 token 同格式 32-hex）
 git filter-repo --replace-text <(cat <<'EOF'
 regex:[a-f0-9]{32}==>REDACTED_PINZHI_TOKEN
 EOF
 ) --force
 ```
+
+> **注意**：`PINZHI_PROBE_TOKEN` 已在 Step B 删除文件 `scripts/probe_pinzhi_v2.py`
+> 中清除；本 Step C 的 32-hex regex 兜底覆盖任何其他位置（如代码注释、测试 fixture）
+> 残留的 token 字面值，包括但不限于：
+> - 17 个品智 token
+> - PINZHI_PROBE_TOKEN（旧硬编码）
+> - 任何其他 32-hex 凭证字面值
 
 ### Step D — 验证清理（无输出 = 已彻底清理）
 
@@ -168,11 +176,21 @@ git push origin --force --tags
 
 ### 5.1 17 token e2e 探测
 
-文件：`scripts/security/verify_pinzhi_token_rotation.sh`（与本 PR 一同新增）
+文件：`scripts/security/verify_pinzhi_token_rotation.py`（与本 PR 一同新增）。
+
+> 旧 `.sh` 版已 deprecated（独立 review 发现：用了不存在的 `/api/shop/info`
+> 端点 + 无法生成 MD5 sign）。Python 版用真实 `PinzhiAdapter` 的 `generate_sign()`
+> + `/pinzhi/organizations.do` 端点（adapter.py:170）。
 
 ```bash
-bash scripts/security/verify_pinzhi_token_rotation.sh
+python3 scripts/security/verify_pinzhi_token_rotation.py
 # 期望：17/17 OK，0 fail
+
+# 单品牌过滤
+PINZHI_VERIFY_BRAND=czyz python3 scripts/security/verify_pinzhi_token_rotation.py
+
+# 自定义超时（秒）
+PINZHI_VERIFY_TIMEOUT=10 python3 scripts/security/verify_pinzhi_token_rotation.py
 ```
 
 ### 5.2 SSM secret 存在性
