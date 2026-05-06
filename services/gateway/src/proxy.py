@@ -142,8 +142,9 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
             if trusted_role:
                 headers["X-Internal-Role"] = str(trusted_role)
             # 短期 HS256 内部 JWT —— 下游 InternalJwtMiddleware 校验后注入受信 state。
-            # cutover 完成后强制 mint（缺 secret 时 internal_jwt._get_secret() 会 raise，
-            # 启动期已 fail-closed；运行期任何 mint 异常都不应被静默吞，让 proxy 5xx）。
+            # cutover 完成后强制 mint（生产环境缺 secret 时 internal_jwt._get_secret() raise
+            # RuntimeError，由 main.py:_startup_validate_internal_jwt_secret() 启动期显式预检
+            # fail-fast；本运行期不再 try/except ImportError，任何 mint 异常都让 proxy 5xx）。
             internal_jwt = mint_internal_jwt(
                 tenant_id=str(trusted_tenant_id),
                 user_id=str(trusted_user_id),

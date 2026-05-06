@@ -115,6 +115,27 @@ async def _run_daily_sop() -> None:
 
 
 @app.on_event("startup")
+async def _startup_validate_internal_jwt_secret() -> None:
+    """启动期显式预检 TX_INTERNAL_JWT_SECRET（生产环境缺即 fail-fast）。
+
+    cleanup PR #213 配套：proxy.py 已删 mint_internal_jwt 的 try/except ImportError
+    兜底，运行期 secret 缺失会让首次请求 500 而非启动失败。本钩子提前在启动期触发
+    `_get_secret()` 的生产 raise，把 fail 时机从首请求提前到 startup（更易发现）。
+
+    非生产环境（dev/test/staging）secret 缺失时 _get_secret() 返 ""（不 raise），本检查
+    无副作用 — 仍由运行期日志 warn。
+    """
+    from shared.security.src.internal_jwt import _get_secret  # noqa: PLC0415
+
+    try:
+        _get_secret()
+        logger.info("internal_jwt_secret_validated_at_startup")
+    except RuntimeError:
+        logger.error("internal_jwt_secret_missing_in_production_startup_aborted", exc_info=True)
+        raise
+
+
+@app.on_event("startup")
 async def _startup() -> None:
     _scheduler.add_job(
         lambda: asyncio.create_task(_run_daily_sop()),
