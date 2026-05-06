@@ -34,6 +34,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from typing import Awaitable, Callable
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -61,6 +62,16 @@ _EXEMPT_PREFIXES = (
     "/redoc/",
     "/static/",
 )
+# 外部平台 webhook 豁免：美团/饿了么/抖音/微信/企业微信/钉钉/小红书 等回调走公网入口，
+# 不经 gateway，不带 X-Internal-JWT。这些路径必须有自己的签名校验（已在各 webhook
+# 路由内部实现）。匹配 `/webhook` 或 `/webhooks` 作为路径段（前后必须 `/` 或路径末尾）。
+# 已审计 11 文件 19 个 webhook endpoint 全部位于 services/tx-trade、tx-org，全部
+# 含外部平台签名校验。新增 webhook endpoint 必须确认含签名校验后才合法。
+#
+# ⚠️ HOT-PATCH（详见 docs/runbooks/audit-2026-05-execution-plan.md §九）：
+# 本 regex 必须与 PR #208 同时部署到 staging/prod，否则外部 webhook 会被
+# middleware 401 拦截（生产模式下 _is_production() = True + 缺 token 即 401）。
+_EXEMPT_REGEX = re.compile(r"/webhooks?(/|$)")
 
 _PRODUCTION_ENVS = ("production", "prod", "gray")
 
@@ -73,7 +84,11 @@ def _is_production() -> bool:
 def _is_exempt(path: str) -> bool:
     if path in _EXEMPT_PATHS:
         return True
-    return any(path.startswith(p) for p in _EXEMPT_PREFIXES)
+    if any(path.startswith(p) for p in _EXEMPT_PREFIXES):
+        return True
+    if _EXEMPT_REGEX.search(path):
+        return True
+    return False
 
 
 def _has_secret() -> bool:
