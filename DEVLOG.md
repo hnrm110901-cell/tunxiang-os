@@ -1,3 +1,36 @@
+## 2026-05-07 Sprint 2 #257 voice_order Agent (Tier 1) 落地 → 5/10
+
+### 今日完成（续，#257）
+- **#257 [S2-05] voice_order Agent (Tier 1) — 已落地**
+  - TDD：6 测试场景写在前 → impl 通过（red→green）
+  - 新增 action `process_voice_order` 端到端处理
+  - 三条硬约束 UI 表达全部覆盖：
+    - 食安：沽清菜拒绝 + 同类替代
+    - 体验：弱匹配 (score < 0.85) → 候选确认
+    - 毛利：数量 > 10 → 二次确认
+  - A2UI Surface 4 种输出：OrderConfirm / SoldOut / Candidate / ExcessiveQty
+  - quantity 解析升级：regex 匹配任意阿拉伯数字
+  - fuzzy match 升级：字符集 overlap fallback（指代场景）
+  - 6/6 测试通过，pytest 0.43s
+
+### 数据变化
+- voice_order.py +290 行
+- 新增 test_voice_order_tier1.py（6 场景）
+- Sprint 2 进度：**5 / 10 = 50% 关闭**
+
+### 遗留问题
+- Claude API 仍 0 调用（M2 增量叠加复杂表达校正）
+- Mac mini voice_service.py 路由对接（M2 集成测试）
+- 徐记海鲜菜单数据集 90% 准确率验证（M2 现场）
+- pre-existing typecheck 错（#267）
+- pnpm-lock.yaml + 之前未推送 commits 等代理恢复
+
+### 明日计划
+- 推 #258 attendance_compliance Agent（次优先级 Agent）
+- 或 #259 pinjin Tier 1 测试（尝在一起 M1 末上线必经）
+
+---
+
 ## 2026-05-07 Sprint 2 #254 落地 → 4/10 关闭
 
 ### 今日完成（续，#254）

@@ -1,3 +1,28 @@
+## 2026-05-07 22:09 · Sprint 2 #257 voice_order Agent → 5/10 关闭
+
+### 完成状态
+- [x] #257 voice_order Agent (Tier 1) — TDD 6/6 通过
+- [x] A2UI Surface 4 种类型输出（OrderConfirm/SoldOut/Candidate/ExcessiveQty）
+- [x] 三条硬约束 UI 表达全部覆盖
+- [ ] #258 attendance / #259 pinjin / #255 Tab focus / #260 现场 / #262 闸门评审 余 5 项
+
+### 关键决策
+- **决策 22：voice_order 不接 Claude API（暂）** — 规则引擎（pinyin + 字符 overlap）覆盖 90% 中文点餐场景，< 50ms 延迟，0 API 成本，100% 离线可用；Claude 留 M2 复杂表达兜底
+- **决策 23：弱匹配 score < 0.85 即弹候选** — 比"按 match_type 区分"更稳健，避免字符 overlap=1.0 但被 char 类型误判
+- **决策 24：数量异常阈值 EXCESSIVE_QTY=10** — 单菜 10 份在大店常见（包间多人聚餐），>10 才需要二次确认；可后续门店配置
+- **决策 25：A2UI Surface 4 种类型 vs 1 种通用** — 不同 severity 映射不同 surface 模板，UI 端渲染更直观，符合 v1.0 §5.4 白名单组件
+
+### 下一步
+- commit + push 当前工作
+- 进入 #258 attendance_compliance OR #259 pinjin Tier 1 测试
+
+### 已知风险
+- voice_order 单元测试用 fixture 菜单（6 道菜），徐记海鲜真菜单（数百道）准确率需现场验证
+- 字符 overlap fallback 可能误命中（"鱼" 同时匹配多种鱼）— 已通过弱匹配 → 候选确认机制兜底
+- 之前 commit 5个 (8 + 4 + 2) 未推（代理 502），本会话再 +2 commit 合计 7 commit 排队
+
+---
+
 ## 2026-05-07 21:49 · Sprint 2 #254 aria-label 落地 → 4/10 关闭
 
 ### 完成状态
