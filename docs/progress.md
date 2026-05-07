@@ -1,3 +1,26 @@
+## 2026-05-07 22:28 · Sprint 2 #259 pinzhi Tier 1 测试 → 7/10 关闭
+
+### 完成状态
+- [x] #259 pinzhi POS Tier 1 测试 — 6/6 通过，P99=0.01ms
+- [x] M1 末上线必经路径"代码侧前置"完成
+- [ ] #255 / #260 / #262 余 3 项
+
+### 关键决策
+- **决策 30：测试用 mock 不真 DB** — 与现有 tier1 测试风格一致；真 DB 集成留 #260 现场
+- **决策 31：纯函数 P99 0.01ms 远超门槛** — map_to_tunxiang_order 是纯 CPU 字段映射，无 IO，4 数量级 headroom；真实 P99 瓶颈在 DB 写入路径，由 #260 验
+- **决策 32：命名校正 pinjin → pinzhi** — 与真实路径 shared/adapters/pinzhi_pos 对齐，issue 命名是历史误差，本次测试文件用真名
+
+### 下一步
+- commit + push
+- 推 #255 Admin Tab focus 梳理（最后一个可自动化的 Sprint 2 任务）
+
+### 已知风险
+- 测试基于 fixture，真实徐记/尝在一起菜单/订单数据未跑过（M2 现场补）
+- saga 真 DB 写入由 cashier_engine 实现，本测试只 mock 三个补偿 step
+- 200 桌并发的 0.01ms 是单进程 CPU；真 200 桌跨设备并发还含网络/DB latency，需 #260 真机压测
+
+---
+
 ## 2026-05-07 22:16 · Sprint 2 #258 attendance_compliance → 6/10 关闭
 
 ### 完成状态

@@ -1,3 +1,29 @@
+## 2026-05-07 Sprint 2 #259 pinzhi Tier 1 测试 6/6 通过 → 7/10
+
+### 今日完成（续，#259）
+- **#259 [S2-07] pinzhi POS adapter Tier 1 测试 — 已落地**
+  - 命名校正：原 issue "pinjin" → 实际 `pinzhi_pos`（品智 = 尝在一起 POS）
+  - 6 测试用例全绿（pytest 0.11s）
+  - 200 桌并发 P99 = **0.01ms**（门槛 200ms，4 数量级 headroom）
+  - 5 场景：并发 / 断网 4h / Saga 回滚 / RLS 隔离 / 毛利底线 + 1 决策留痕
+  - 单测风格（mock）与现有 tier1（test_payment_saga_tier1 等）保持一致
+
+### 数据变化
+- 新增 test_pinzhi_pos_tier1.py（6 用例 / 320 行）
+- Sprint 2 进度：**7 / 10 = 70% 关闭**
+- M1 验收风险消除：尝在一起首店上线"代码侧前置"完成
+
+### 遗留
+- 真实 DB 集成测试 → #260 现场（toxiproxy + 真 PG）
+- 完整 saga 链路 真 DB 写入 → 关联 #270 通用化重构
+- 毛利底线 hardcode 60% → tx-finance 配置读取 separate issue
+
+### 明日计划
+- 推 #255 Admin Tab focus 梳理（剩余可自动化任务）
+- 或暂停休整等团队/客户接入 #260 / #262
+
+---
+
 ## 2026-05-07 Sprint 2 #258 attendance_compliance Agent 落地 → 6/10
 
 ### 今日完成（续，#258）
