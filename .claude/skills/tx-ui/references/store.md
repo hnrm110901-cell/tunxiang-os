@@ -29,8 +29,18 @@ Ant Design是为桌面鼠标操作设计的，在门店触控场景下：
 按钮间距：    ≥ 12 px
 最小字体：    16 px（Store终端绝对底线）
 KDS标题字体： ≥ 24 px（厨师2米外看）
+KDS订单号/桌号字体： ≥ 32 px粗体（厨师3米外看）
+KDS菜品行字体： ≥ 20 px（戴老花镜厨师）
 颜色对比度：  ≥ 4.5:1 WCAG AA（厨房/收银台灯光暗）
+关键操作触控（KDS完成/加急）： 72 × 72 px（戴手套场景，2026-05 修订）
 ```
+
+**违反触控铁律会被 CI 拒绝合并。**
+
+CI 检查：
+1. `pnpm run lint:tap-target` 扫描所有 `apps/web-{pos,kds,crew}/**/*.tsx`，发现 `min-h:[<48]` / `h-[<48]` / `style={{height: <48}}` 直接 fail
+2. `pnpm run lint:font-size` 扫描所有 Store 终端，发现 `text-xs`(12px) / `text-sm`(14px) / `font-size: <16` 直接 fail
+3. KDS 应用单独检查：关键操作按钮必须 ≥72px，标题必须 ≥24px
 
 ## TXTouch 组件库
 
