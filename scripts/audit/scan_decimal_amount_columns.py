@@ -275,6 +275,9 @@ def scan_directory(root: Path) -> list[Violation]:
         "**/src/services/*.py",        # SQLAlchemy Core Table() 出现位置
         "**/src/services/**/*.py",
         "**/src/ontology/**/*.py",     # tx-brain/src/ontology
+        # PR #264 round-2 反馈：shared/ontology/src/entities.py 等扁平 ORM 文件
+        "**/ontology/**/*.py",         # 含 shared/ontology/src/{entities,extensions}/*
+        "**/entities*.py",             # 显式覆盖 entities.py 命名约定
     ]
     parent_root = root.parent if root.parent != root else root
     for pattern in candidate_globs:

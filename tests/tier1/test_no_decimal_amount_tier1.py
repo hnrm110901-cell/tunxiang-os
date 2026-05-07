@@ -80,6 +80,15 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         # 待 P0-2 修复后删除（PR #272 fix/p0-2-wine-storage-fen）：
         ("services/tx-trade/src/models/wine_storage.py", 61, "storage_price"),
         ("services/tx-trade/src/models/wine_storage.py", 92, "price_at_trans"),
+        # ── shared/ontology/ ────────────────────────────────────────────
+        # 新增（PR #264 round-2 反馈：shared/ 域加入扫描）
+        # 4 项均为 *_margin Numeric(5,2) 百分比字段（注释「毛利率(%)」等），
+        # 业务语义是百分比非金额，但因 §18 ontology 冻结规则不能动 entities.py
+        # 修；标注为 known-acceptable，待创始人决策"是否扩 RATE_PATTERN 加 margin"
+        ("shared/ontology/src/entities.py", 250, "profit_margin"),
+        ("shared/ontology/src/entities.py", 390, "gross_margin_before"),
+        ("shared/ontology/src/entities.py", 391, "gross_margin_after"),
+        ("shared/ontology/src/entities.py", 422, "gross_margin"),
     ]
 )
 
@@ -89,13 +98,35 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
 
 @pytest.fixture(scope="module")
 def scan_results() -> frozenset[tuple[str, int, str]]:
-    """扫描 services/ 并返回 (file, line, column_name) 集合。"""
-    services_root = _REPO_ROOT / "services"
-    if not services_root.exists():
-        pytest.skip(f"services 目录不存在: {services_root}")
+    """扫描 services/ + shared/ 并返回 (file, line, column_name) 集合。
 
-    violations = scan_directory(services_root)
-    return frozenset((v.file, v.line, v.column_name) for v in violations)
+    PR #264 round-2 verifier 反馈：原版只扫 services/，
+    `shared/ontology/src/entities.py` 含 22 处 Numeric 漏过——
+    与 PR 标题"CI 守门基线"承诺直接矛盾。本轮加入 shared/ 一并守门。
+    """
+    services_root = _REPO_ROOT / "services"
+    shared_root = _REPO_ROOT / "shared"
+
+    if not services_root.exists() and not shared_root.exists():
+        pytest.skip("services/ 与 shared/ 都不存在")
+
+    all_violations: list = []
+    if services_root.exists():
+        all_violations.extend(scan_directory(services_root))
+    if shared_root.exists():
+        all_violations.extend(scan_directory(shared_root))
+
+    # 跨 root 去重 (file, line, column_name)
+    seen: set[tuple[str, int, str]] = set()
+    deduped: list = []
+    for v in all_violations:
+        key = (v.file, v.line, v.column_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(v)
+
+    return frozenset((v.file, v.line, v.column_name) for v in deduped)
 
 
 def test_no_new_decimal_amount_violations(scan_results: frozenset) -> None:
