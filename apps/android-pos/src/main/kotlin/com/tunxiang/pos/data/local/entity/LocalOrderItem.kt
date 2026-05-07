@@ -78,4 +78,16 @@ data class LocalOrderItem(
 
     @ColumnInfo(name = "synced")
     val synced: Boolean = false,
+
+    // ─── V4 sprint D2 (2026-05-07): hybrid architecture sync metadata ───
+
+    @ColumnInfo(name = "expires_at")
+    val expiresAt: Long? = null,                 // Cache expiry timestamp ms (4h TTL for read-cache)
+
+    @ColumnInfo(name = "source")
+    val source: String = "local-pending",        // "remote" / "local-pending" / "local-synced"
+                                                 // Default = "local-pending": write-table, see LocalOrder for rationale.
+
+    @ColumnInfo(name = "synced_at")
+    val syncedAt: Long? = null,                  // Last successful sync timestamp ms
 )

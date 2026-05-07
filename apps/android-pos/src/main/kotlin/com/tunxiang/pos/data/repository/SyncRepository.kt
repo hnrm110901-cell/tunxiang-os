@@ -16,6 +16,12 @@ import kotlinx.coroutines.flow.Flow
  * Max 3 retries with exponential backoff handled by WorkManager.
  * Failed entries after 3 retries are marked 'failed' for manual review.
  */
+// ⚠️ V4 sprint D3 stage 2 (REVIEW B1, 2026-05-07): this Repository must
+// switch its constructor to receive `apiClient: ApiClient` (not `api: TxCoreApi`)
+// so D4 mDNS-driven setBaseUrl propagates to network calls. Current code
+// captures the proxy reference at construction → stale URL after setBaseUrl.
+// Affected screens to update in lockstep: OrderScreen / SettleScreen /
+// DailyCloseScreen / ShiftScreen / TableMapScreen.
 class SyncRepository(
     private val syncQueueDao: SyncQueueDao,
     private val api: TxCoreApi,

@@ -48,6 +48,11 @@ import { FastFoodKDSView } from './pages/fastfood/FastFoodKDSView';
 import { PrintManagerPage } from './pages/PrintManagerPage';  // 模块4.2 打印管理可视化中心
 import { BanquetDepositPage } from './pages/BanquetDepositPage';  // 模块4.1 宴会定金管理
 import { StoreTwinPage } from './pages/StoreTwinPage';  // Phase 3: 门店数字孪生
+// V4 sprint D5b (2026-05-07): 4 cool path 缺口屏（marketing/campaign/food_safety/cross-brand）
+import { MarketingPage } from './pages/MarketingPage';
+import { CampaignPage } from './pages/CampaignPage';
+import { FoodSafetyPage } from './pages/FoodSafetyPage';
+import { CrossBrandPage } from './pages/CrossBrandPage';
 import { A2UIDemoPage } from './pages/A2UIDemoPage';  // Phase 3: A2UI 组件演示
 import { CommandPalette } from './components/CommandPalette';  // Cmd+K 命令面板
 
@@ -166,6 +171,12 @@ function AppLayout() {
         <Route path="/queue" element={<QueuePage />} />
         <Route path="/settings" element={<POSSettingsPage />} />
         <Route path="/reports" element={<POSReportsPage />} />
+        {/* V4 sprint D5b (2026-05-07): 4 cool path 缺口屏 */}
+        <Route path="/marketing" element={<MarketingPage />} />
+        <Route path="/campaigns/:id" element={<CampaignPage />} />
+        <Route path="/campaigns" element={<CampaignPage />} />
+        <Route path="/food-safety" element={<FoodSafetyPage />} />
+        <Route path="/cross-brand" element={<CrossBrandPage />} />
         <Route path="/handover" element={<HandoverPage />} />
         <Route path="/quick-cashier" element={<QuickCashierPage />} />
         {/* ─── Phase1: 存酒 / 押金 门店操作端 ─── */}

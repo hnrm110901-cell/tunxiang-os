@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.util.Log
 import androidx.work.*
 import com.tunxiang.pos.data.local.TunxiangDatabase
+import com.tunxiang.pos.data.remote.ApiClient
 import com.tunxiang.pos.data.remote.TxCoreApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,8 +26,19 @@ import java.util.concurrent.TimeUnit
 class SyncManager(
     private val context: Context,
     private val database: TunxiangDatabase,
-    private val api: TxCoreApi,
+    private val apiClient: ApiClient,
 ) {
+    /**
+     * Read the current TxCoreApi proxy. NEVER cache the returned reference
+     * across long suspensions — D3 setBaseUrl rebuilds the underlying proxy
+     * on mac-station discovery, and a cached reference would silently use
+     * the stale URL.
+     *
+     * This getter exists for stage 2 sync operations to access the live
+     * Retrofit proxy without re-invoking ApiClient construction.
+     */
+    @Suppress("unused")  // stage 2 will consume this
+    private val api: TxCoreApi get() = apiClient.txCoreApi
     companion object {
         private const val TAG = "SyncManager"
         const val SYNC_WORK_NAME = "tx_pos_sync"

@@ -18,6 +18,12 @@ import java.util.concurrent.TimeUnit
  * - X-Tenant-ID header injection
  * - Request/response logging (debug builds)
  * - Timeout configuration for POS network conditions
+ *
+ * V4 sprint D3 (2026-05-07): supports runtime baseUrl override (B2 review fix
+ * of D2). When mac-station is discovered (D4 mDNS) or operator changes the
+ * server address in settings, call [setBaseUrl] and the next network call
+ * uses the new URL — no App restart required. The shared OkHttpClient
+ * connection pool is preserved across rebuilds.
  */
 class ApiClient(
     baseUrl: String,
@@ -66,13 +72,68 @@ class ApiClient(
         .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))  // 复用连接
         .build()
 
-    private val retrofit = Retrofit.Builder()
-        .baseUrl(baseUrl)
-        .client(okHttpClient)
-        .addConverterFactory(GsonConverterFactory.create())
-        .build()
+    /**
+     * Atomic snapshot of the live Retrofit configuration. Single @Volatile
+     * field guarantees readers always see a consistent (baseUrl, retrofit, api)
+     * triple — no torn read where currentBaseUrl is new but txCoreApi is stale.
+     *
+     * W1 review fix (2026-05-07): replaces three separate @Volatile fields
+     * which JMM doesn't guarantee atomic-together visibility for.
+     */
+    private data class RetrofitState(
+        val baseUrl: String,
+        val retrofit: Retrofit,
+        val api: TxCoreApi,
+    )
 
-    val txCoreApi: TxCoreApi = retrofit.create(TxCoreApi::class.java)
+    @Volatile
+    private var state: RetrofitState = run {
+        val r = buildRetrofit(baseUrl)
+        RetrofitState(baseUrl, r, r.create(TxCoreApi::class.java))
+    }
+
+    /**
+     * Active TxCoreApi proxy. Always reflects the most recent [setBaseUrl].
+     * Pattern: read once per network call (don't cache across long suspensions).
+     */
+    val txCoreApi: TxCoreApi get() = state.api
+
+    /** For diagnostics / settings UI: returns the URL the next request will use. */
+    fun getBaseUrl(): String = state.baseUrl
+
+    /**
+     * Switch the API base URL at runtime. Idempotent: no-op if [newBaseUrl]
+     * equals the current value.
+     *
+     * Thread-safety: synchronized so concurrent mDNS rediscovery + operator
+     * manual change don't race; readers (txCoreApi getter / getBaseUrl) read
+     * the @Volatile state pointer atomically without locking.
+     *
+     * The OkHttpClient (and its connection pool) is reused across rebuilds —
+     * only Retrofit + the API proxy regenerate. In-flight requests on the
+     * old base URL complete normally; the new state takes effect on the next
+     * request that calls [txCoreApi].
+     *
+     * Caller responsibility (D3/D4): after a successful switch, re-trigger
+     * any in-flight or queued sync operations so they pick up the new URL.
+     */
+    @Synchronized
+    fun setBaseUrl(newBaseUrl: String) {
+        require(newBaseUrl.isNotBlank()) { "newBaseUrl must not be blank" }
+        require(newBaseUrl.endsWith("/")) {
+            "Retrofit baseUrl must end with '/' — got: $newBaseUrl"
+        }
+        if (newBaseUrl == state.baseUrl) return
+        val r = buildRetrofit(newBaseUrl)
+        state = RetrofitState(newBaseUrl, r, r.create(TxCoreApi::class.java))
+    }
+
+    private fun buildRetrofit(baseUrl: String): Retrofit =
+        Retrofit.Builder()
+            .baseUrl(baseUrl)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
 
     // ─── Auth helpers ───
 

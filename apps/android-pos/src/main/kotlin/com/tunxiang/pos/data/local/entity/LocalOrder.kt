@@ -78,7 +78,26 @@ data class LocalOrder(
 
     @ColumnInfo(name = "synced")
     val synced: Boolean = false,                 // Whether synced to server
+                                                 // INVARIANT (D3 W1, 2026-05-07): synced must equal
+                                                 // (source != SyncSource.LOCAL_PENDING). v1 SyncWorker
+                                                 // reads `synced`; D3 stage 2 Repository write paths
+                                                 // must keep both fields consistent. D6 cleanup may
+                                                 // drop `synced` once no v1 callers remain.
 
     @ColumnInfo(name = "server_id")
     val serverId: String? = null,                // Server-assigned ID after sync
+
+    // ─── V4 sprint D2 (2026-05-07): hybrid architecture sync metadata ───
+
+    @ColumnInfo(name = "expires_at")
+    val expiresAt: Long? = null,                 // Cache expiry timestamp ms (4h TTL for read-cache)
+
+    @ColumnInfo(name = "source")
+    val source: String = "local-pending",        // "remote" / "local-pending" / "local-synced"
+                                                 // Default = "local-pending" because LocalOrder is a write-table:
+                                                 // any new row is by definition created locally; mac-station sync
+                                                 // success will rewrite to "remote" or "local-synced".
+
+    @ColumnInfo(name = "synced_at")
+    val syncedAt: Long? = null,                  // Last successful sync timestamp ms
 )

@@ -45,19 +45,64 @@ iPad（可选）： 纯显示和触控，不连任何外设
 
 ---
 
-## 三、技术路线：Web App + 多壳层
+## 三、技术路线：Native Hot Path + WebView Cool Path 混合架构
+
+> **V4 修订（2026-05-07，详见 [docs/adr/0002-hybrid-architecture.md](docs/adr/0002-hybrid-architecture.md)）**：
+> 旧路线"一套 React Web App，多端运行"在徐记海鲜 / 天财商龙存量客户的物理需求下不成立。
+> 商米 T2 4GB RAM + 老 Chromium WebView 撑不住 200 桌并发收银 hot path（按键 < 50ms / 称重 < 200ms / 打印 < 500ms）。
+> 修订为 hot/cool path 混合架构 + Mac mini PG 真相源（路线 C）。
 
 ### 决策原则
-- **一套 React Web App，多端运行**。安卓用 WebView，iPad 用 WKWebView，总部用浏览器。
-- **复用现有代码**：530K 行 Python + 232K 行 TypeScript 全部保留。
-- **Swift 最小化**：仅用于 Core ML 桥接（必须）+ iPad 壳层（可选）。
-- **Kotlin 最小化**：仅用于安卓 POS 壳层的 JS Bridge 外设调用。
+- **Hot path（高频按键 + 资金安全）必须 Native Compose**。收银 5 屏（OrderScreen / TableMapScreen / SettleScreen / ShiftScreen / DailyCloseScreen）锁定 Kotlin Compose Native，直调商米 SDK，零 JS Bridge 序列化开销。
+- **Cool path（高频迭代 + 多端一致 + AI 注入）必须 WebView + React**。菜品 CMS / 营销 / 看板 / Agent 决策弹窗 / 报表 / 食安等走 React，OTA 即改即生效，跨端复用。
+- **Mac mini PG 是单一真相源**。pos 通过 mac-station HTTP 读写，Room 仅作 4h 断网缓冲（见 §八 路线 C）。
+- **TXBridge 是 Native ↔ WebView 的唯一桥梁**。WebView 调外设走 TXBridge（11 JS API），不直接持商米 SDK 引用。
+- **iPad 仅承载 cool path**。WKWebView 加载 React，hot path 通过 HTTP 转发到安卓 POS 主机。
+
+### Hot/Cool Path 边界（D1 sign-off 2026-05-07，G1-G20 全同意）
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│ android-pos (Compose 主进程)                                        │
+│                                                                    │
+│  Hot Path (Native Compose, P99 < 50ms)                            │
+│  ├── OrderScreen / TableMapScreen / SettleScreen                  │
+│  ├── ShiftScreen / DailyCloseScreen                               │
+│  ├── 退款 / 修改/作废订单 / 储值卡充值 / 储值卡消费 / 优惠券核销   │
+│  ├── 礼品卡 / 押金 / 存酒 / 宴会当天结算 / 小费 / 打印补打         │
+│  ├── 外卖单接单/推单/改单 / 全电发票申请                            │
+│  └── 直调 Sunmi SDK (打印/称重/扫码/钱箱)                          │
+│                                                                    │
+│  Cool Path (WebViewScreen + React)                                │
+│  ├── 菜品 CMS / 营销活动 / 优惠券规则                              │
+│  ├── 经营驾驶舱 / Agent 决策弹窗                                   │
+│  ├── 总部 SOP / 培训 / 通知                                        │
+│  ├── 报表 / 财务 / 食安溯源 / 跨品牌切换                           │
+│  ├── 宴会订单提前创建 / 桌台预订 / 排队叫号                         │
+│  ├── 会员卡查询/绑定 / 菜品 86沽清 / 设备维护 / 全电发票管理        │
+│  └── 通过 TXBridge (DI 风格 + 11 JS API) 调外设                    │
+└────────────────────────────────────────────────────────────────────┘
+            ↓ 唯一真相源 + 唯一同步路径
+┌────────────────────────────────────────────────────────────────────┐
+│ Mac mini (mac-station) — 路线 C                                     │
+│  ├── 本地 PG 真相源                                                 │
+│  ├── Room 仅作 4h 断网缓冲（带 expires_at + source 字段）           │
+│  └── sync-engine ↔ 云端 PG（300 秒/轮）                             │
+└────────────────────────────────────────────────────────────────────┘
+```
+
+详见 [docs/architecture/v4-d1-hot-cool-path-boundary.md](docs/architecture/v4-d1-hot-cool-path-boundary.md)（含 20 项灰色地带定性 + 创始人签字）。
+
+### 决策原则补充（与旧路线的关系）
+- **复用现有代码**：530K 行 Python + 232K 行 TypeScript 全部保留。React 不被废弃，只是不再承担 hot path。
+- **Swift 最小化**：仅用于 Core ML 桥接（必须）+ iPad 壳层（cool path only）。
+- **Kotlin Compose 业务化**：android-pos 写 5 屏 Native 业务，**这是 V4 的新方向**（旧版 §十三 第 1 条铁律已废止，见修订版）。
 
 ### 技术栈总览
 | 层 | 技术 | 说明 |
 |----|------|------|
 | 前端 Web App | React 18 + TypeScript + Tailwind + Zustand | 一套代码，所有终端共用 |
-| 安卓 POS 壳层 | Kotlin + WebView + JS Bridge | 加载 React App，桥接商米外设 SDK |
+| 安卓 POS 壳层 | Kotlin Compose + WebView + TXBridge | hot path: Compose Native 直调 Sunmi SDK；cool path: WebViewScreen 加载 React + 11 JS API |
 | iPad 壳层（可选） | Swift + WKWebView | 高端店升级包。不写业务逻辑 |
 | Mac mini 本地 | Python FastAPI + PostgreSQL 16 | 门店本地 API + 本地 DB 副本 + sync engine |
 | Core ML 桥接 | Swift HTTP Server (port 8100) | 封装 M4 Neural Engine，暴露 /predict/* 给 Python |
@@ -100,7 +145,7 @@ tunxiang-os/
     miniapp-customer/           # 微信小程序 — 顾客端 v1（8 主包 + 7 分包）
     miniapp-customer-v2/        # 微信小程序 — 顾客端 v2
     android-pos/                # Kotlin — 安卓 POS 壳层（WebView + TXBridge + 商米SDK）
-    android-shell/              # Kotlin — 安卓壳层新版
+    android-shell/              # Kotlin — V3 历史遗留（V4 sprint D7 删除前作为 TXBridge 247行 + AIDL 抢救来源）
     ios-shell/                  # Swift — iOS 壳层（WKWebView）
     windows-pos-shell/          # Electron — Windows POS 壳层（WebView2）
   services/                     # 14 个业务微服务 + 2 个支撑服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
@@ -221,56 +266,111 @@ is_deleted   BOOLEAN DEFAULT FALSE
 
 ---
 
-## 七、安卓 POS 壳层规范（android-shell）
+## 七、安卓 POS 混合壳规范（android-pos）
+
+> **V4 修订（2026-05-07）**：旧节标题"android-shell（WebView only）"已废止。
+> android-shell 留为 V3 历史抢救来源（OTA v094 + AIDL 文件 + ServiceConnection 真绑），
+> 在 V4 sprint D7 抢救完成后删除（详见 [docs/architecture/v4-pre-d1-audit.md](docs/architecture/v4-pre-d1-audit.md)）。
 
 ### 架构
-商米 WebView 加载 React Web App，外设调用通过 JS Bridge 桥接。
 
-### JS Bridge 接口定义
-React Web App 通过 `window.TXBridge.*` 调用安卓原生能力：
+`apps/android-pos` 是 Compose 主进程，承载 hot path 5 Native 屏 + WebView cool path 容器。
+Hot path 直调商米 SDK；cool path 走 WebView 加载 React，通过 TXBridge 调外设。
+
+```
+android-pos (Compose Application)
+├── Hot Path (Compose Native, 5 屏 + 资金 Tier 1 灰色地带 13 项)
+│   ├── OrderScreen / TableMapScreen / SettleScreen
+│   ├── ShiftScreen / DailyCloseScreen
+│   └── 直调 SunmiPrinter / SunmiCashBox / SunmiScanner / SunmiScale
+│       (⚠️ Printer + CashBox 当前为骨架 stub，D4 cherry-pick shell AIDL
+│        + ServiceConnection 后真接入 IWoyouService；Scanner + Scale 已真接 SDK)
+└── Cool Path (WebViewScreen 容器)
+    └── 加载 web-pos React URL (mac-station / 云端) + 注入 TXBridge
+```
+
+### Hot Path: Native Compose 业务规范
+
+- **5 屏锁定**（D1 sign-off）：OrderScreen / TableMapScreen / SettleScreen / ShiftScreen / DailyCloseScreen
+- **数据真相源**：mac-station HTTP API（CLAUDE.md §八 路线 C）
+- **本地缓存**：Room 4h TTL（`expires_at` 字段）+ `source` 字段区分 remote / local-pending / local-synced
+- **外设调用**：直接 `SunmiPrinter.printRaw(...)` / `SunmiCashBox.open()` 等，**不走 TXBridge**（cool path 才走 TXBridge）
+- **业务逻辑允许写在 Compose 屏 + Repository**——这是 V4 修订的核心，旧"Kotlin 不写业务"铁律已废止（见 §十三）
+
+### Cool Path: WebView + TXBridge 规范
+
+`WebViewScreen` 加载 cool path React URL，注入 TXBridge 让 React 调外设。
+
+#### TXBridge JS 接口（11 方法）
 
 ```kotlin
-// android-shell 暴露给 Web 的接口
-interface TXBridge {
+class TXBridge(
+    private val context: Context,
+    private val webView: WebView,
+    private val printer: SunmiPrinter,
+    private val scale: SunmiScale,
+    private val scanner: SunmiScanner,
+    private val cashBox: SunmiCashBox,
+) {
     // 打印
-    fun print(content: String)          // ESC/POS 打印（小票/厨房单）
-    fun openCashBox()                   // 弹出钱箱
+    @JavascriptInterface fun print(content: String)
+    @JavascriptInterface fun printText(text: String, fontSize: Int = 24, bold: Boolean = false)
+
+    // 钱箱
+    @JavascriptInterface fun openCashBox()
 
     // 称重
-    fun startScale()                    // 开始监听电子秤
-    fun onScaleData(callback: String)   // 称重数据回调
+    @JavascriptInterface fun startScale()
+    @JavascriptInterface fun stopScale()
+    @JavascriptInterface fun onScaleData(callback: String)
 
     // 扫码
-    fun scan()                          // 启动扫码
-    fun onScanResult(callback: String)  // 扫码结果回调
+    @JavascriptInterface fun scan()
+    @JavascriptInterface fun onScanResult(callback: String)
 
-    // 设备信息
-    fun getDeviceInfo(): String         // 返回设备型号/序列号
+    // 设备 / Mac mini
+    @JavascriptInterface fun getDeviceInfo(): String
+    @JavascriptInterface fun getMacMiniUrl(): String
 
-    // 与 Mac mini 通信
-    fun getMacMiniUrl(): String         // 返回局域网内 Mac mini 地址
+    // 心跳（OTA + 健康）
+    @JavascriptInterface fun reportHeartbeat()
 }
 ```
 
-### React Web App 调用示例
+#### React Web App 调用示例（cool path 屏）
+
 ```typescript
-// 在 React 中调用打印
-const printReceipt = (orderData: OrderData) => {
+// React 在 WebViewScreen 中加载，通过 window.TXBridge.* 调外设
+const printReportFromCoolPath = (data: ReportData) => {
   if (window.TXBridge) {
-    // 安卓 POS 环境：通过 JS Bridge 调用商米打印 SDK
-    window.TXBridge.print(formatReceipt(orderData));
+    window.TXBridge.print(formatReport(data));
   } else {
-    // 浏览器/iPad 环境：通过 HTTP 发送到安卓 POS 执行
-    fetch(`${posHostUrl}/api/print`, { method: 'POST', body: JSON.stringify(orderData) });
+    // 浏览器/iPad WKWebView：通过 HTTP 转发到安卓 POS 主机
+    fetch(`${getPosMachineUrl()}/api/print`, { method: 'POST', body: JSON.stringify(data) });
   }
 };
 ```
 
 ### 关键规则
-- **所有外设调用只在 android-shell 层处理**
-- **React Web App 通过 TXBridge 接口抽象外设**，不直接依赖任何外设 SDK
-- **iPad 环境没有 TXBridge**，外设指令通过 HTTP 发送到安卓 POS 主机执行
+
+- **Hot path 屏直调 Sunmi SDK**，**不**走 TXBridge —— 性能要求 < 50ms 容不下 JS Bridge 序列化
+- **Cool path 屏调外设统一通过 TXBridge** —— React 不直接持商米 SDK 引用
+- **iPad / 浏览器没有 TXBridge** —— 外设指令通过 HTTP 转发到安卓 POS 主机执行
+- **iPad 不承载 hot path** —— 详见 §十二
+- **TXBridge 接口最小化**——每个新 @JavascriptInterface 必须有对应的 TypeScript 类型定义（在 `apps/web-pos/src/bridge/TXBridge.ts`）
 - 锁定商米 T2/V2 两款主力机型，减少适配成本
+
+### android-shell 的处理
+
+`apps/android-shell/` 在 V4 sprint D7 删除，删除前抢救其资产到 android-pos：
+
+| 资产 | 抢救位置 |
+|---|---|
+| TXBridge.kt 247 行 + ServiceConnection + BroadcastReceiver + 11 JS API | `android-pos/.../bridge/TXBridge.kt`（替换 D2 stub）|
+| MainActivity.kt 100 行（WebView 全屏 + 商米生命周期）| `android-pos/.../MainActivity.kt`（合并 Compose 入口）|
+| AIDL 文件（IWoyouService.aidl + ICallback.aidl）| `android-pos/.../aidl/woyou/aidlservice/jiuiv5/`（pos 缺，必须迁）|
+
+详见 V4 sprint plan §二 D4 + [docs/architecture/v4-pre-d1-audit.md](docs/architecture/v4-pre-d1-audit.md)。
 
 ---
 
@@ -341,7 +441,7 @@ class AgentDecisionLog(BaseModel):
 ```
 
 ### Agent 与安卓 POS 交互
-Agent 决策结果通过 Mac mini 本地 API → WebSocket → 安卓 POS WebView 推送到前端 UI。
+Agent 决策结果通过 Mac mini 本地 API → WebSocket → 安卓 POS **cool path WebViewScreen** 推送到前端 UI（V4 修订 2026-05-07：明确推送目标是 cool path 容器内的 React 弹窗，不影响 hot path 5 屏 Compose）。
 例：折扣守护 Agent 检测到异常折扣 → Mac mini 推送预警到安卓 POS → React App 弹出提醒。
 
 ---
@@ -362,15 +462,15 @@ Agent 决策结果通过 Mac mini 本地 API → WebSocket → 安卓 POS WebVie
 - 外设调用统一通过 `window.TXBridge` 抽象层，不直接依赖平台 API
 - API 调用：自定义 hook `useTxAPI()`
 
-### Kotlin（安卓 POS 壳层）
-- 仅做 WebView 壳层 + JS Bridge + 商米 SDK 调用
-- **不写业务逻辑**
-- JS Bridge 接口保持最小化，每个新接口必须有对应的 TypeScript 类型定义
+### Kotlin（android-pos 混合壳，V4 修订 2026-05-07）
+- **Hot path（5 屏 + 13 项资金灰色地带）允许并要求 Compose Native 写业务**——直调 Sunmi SDK，性能锁 < 50ms（详见 §三 / §七）
+- **Cool path（WebViewScreen 容器）保持 WebView only**：JS Bridge + Sunmi SDK 调用，**不写业务逻辑**
+- TXBridge JS 接口最小化，每个新 @JavascriptInterface 必须有对应的 TypeScript 类型定义（在 `apps/web-pos/src/bridge/TXBridge.ts`）
 
 ### Swift（Core ML 桥接 + iPad 壳层）
 - Core ML 桥接：Vapor/Hummingbird HTTP server，监听 localhost:8100
-- iPad 壳层：WKWebView 加载 React App，桥接 camera/notification
-- **不写业务逻辑**
+- iPad 壳层：WKWebView 加载 cool path React，桥接 camera/notification
+- **不写业务逻辑**（iPad 仅承担 cool path，hot path 通过 HTTP 转发到安卓 POS，详见 §十二）
 
 ### API 设计
 - RESTful，统一响应：`{ "ok": bool, "data": {}, "error": {} }`
@@ -426,30 +526,66 @@ Agent 决策结果通过 Mac mini 本地 API → WebSocket → 安卓 POS WebVie
 
 ## 十二、iPad 可选升级包规范
 
+> **V4 修订（2026-05-07）**：iPad **仅承载 cool path**，不再承担收银 hot path。
+> Hot path（5 屏 + 13 项资金灰色地带）锁定在安卓 POS Compose Native；iPad 通过 WKWebView 加载 cool path React，
+> hot path 操作通过 HTTP 转发到安卓 POS 主机执行。
+
 ### 适用场景
-高端连锁品牌（如徐记海鲜）希望用 iPad 提升门店品质感。
+高端连锁品牌（如徐记海鲜）希望用 iPad 提升门店品质感。iPad 主要用于：
+- 经营驾驶舱 / Agent 决策弹窗（cool path C3）
+- 菜品 CMS / 营销活动（cool path C1/C2）
+- 报表 / 食安溯源 / 跨品牌切换（cool path C5/C6/C8）
+- 总部下发 SOP / 培训（cool path C4）
+
+iPad 不适合：日常收银结账（hot path 性能要求 < 50ms，WKWebView 加载 React 在峰值跑不到这个延迟，且无法直接 5 屏同时驻留）。
 
 ### 技术实现
-- iPad 运行同一套 React Web App（通过 WKWebView 或 Safari）
-- iPad 不连接任何外设
-- 打印/称重等指令通过 WiFi HTTP 发送到安卓 POS 主机执行
-- 如果安卓 POS 主机断开，iPad 降级为"仅查看"模式
+- **iPad 运行 cool path React**（通过 WKWebView 或 Safari，复用 `apps/web-pos/src/pages/cool/*` 屏组）
+- **iPad 不连接任何外设**
+- **iPad 不承担 hot path 收银**——若操作员在 iPad 上点"结账"，跳转到安卓 POS 主机的 hot path 屏完成
+- **打印/称重等指令通过 WiFi HTTP 发送到安卓 POS 主机执行**
+- 如果安卓 POS 主机断开，iPad 降级为"仅查看"模式（cool path 看板/报表仍可读 mac-station 缓存）
 
-### iPad 环境判断
+### iPad / 浏览器 / 安卓 POS WebView 环境判断
+
+复用 `apps/web-pos/src/bridge/TXBridge.ts` 中现有 helper（V4 修订保持函数名稳定，避免 D5b 出现命名分歧）：
+
 ```typescript
+// 三种 cool path 运行环境（来自 web-pos/bridge/TXBridge.ts）
+const isAndroidPOS = () => !!window.TXBridge;                // android-pos 内嵌 WebView
 const isIPad = () => !window.TXBridge && /iPad/.test(navigator.userAgent);
-const isAndroidPOS = () => !!window.TXBridge;
-const isBrowser = () => !window.TXBridge && !isIPad();
+const isBrowser = () => !window.TXBridge && !isIPad();       // 总部 Web
 
-// 外设调用统一入口
-const printReceipt = async (data: OrderData) => {
+// 外设调用统一入口（cool path 通用）
+const printReportFromCoolPath = async (data: ReportData) => {
   if (isAndroidPOS()) {
-    window.TXBridge.print(formatReceipt(data));
+    // 在 android-pos 主机上的 cool path WebView：直调 TXBridge
+    window.TXBridge.print(formatReport(data));
   } else {
-    // iPad/浏览器：通过 HTTP 发送到安卓 POS
+    // iPad / 浏览器：HTTP 转发到安卓 POS 主机
     await fetch(`${getPosMachineUrl()}/api/print`, {
       method: 'POST', body: JSON.stringify(data)
     });
+  }
+};
+```
+
+> ⚠️ **D5b 必修**（review 2026-05-07）：`TXBridge.ts` 的 NativeTXBridge 接口当前只覆盖 8 方法（print / openCashBox / startScale / onScaleData / scan / onScanResult / getDeviceInfo / getMacMiniUrl）；§七 V4 新增的 3 方法 **printText / stopScale / reportHeartbeat** 必须在 D5b 同步进 TypeScript 接口定义，否则 React cool path 调它们将无类型提示。
+
+### Hot Path 跳转模式（iPad 用例，D7 后端 TODO）
+
+```typescript
+// iPad cool path 屏发现需要 hot path 操作（如"开始结账"按钮）
+const startSettleFromIPad = async (orderId: string) => {
+  if (isIPad()) {
+    // 推送一个"切换到安卓 POS 屏" intent 给同店所有 android-pos 设备
+    // ⚠️ 接口待建：mac-station + android-pos 当前都没有 /api/hot-path/jump 端点
+    //   D7 收尾时实装。在 D7 之前 iPad 用户尝试 hot path 操作会 fetch 失败。
+    await fetch(`${getPosMachineUrl()}/api/hot-path/jump`, {
+      method: 'POST',
+      body: JSON.stringify({ screen: 'SettleScreen', orderId })
+    });
+    // iPad 显示"已转交收银台 #1"提示，不参与 hot path 本身
   }
 };
 ```
@@ -458,9 +594,17 @@ const printReceipt = async (data: OrderData) => {
 
 ## 十三、禁止事项
 
-1. **禁止在 Kotlin/Swift 层写业务逻辑** — 壳层只做桥接
+> **V4 修订（2026-05-07）**：第 1 条旧铁律"禁止在 Kotlin/Swift 层写业务逻辑"已**废止**。
+> 收银 hot path 必须用 Compose Native 写业务以满足 < 50ms 响应；旧铁律会让屯象在徐记海鲜 / 天财商龙存量客户群体输给天财（Native）。
+> 新第 1 条限定 Native vs WebView 边界，而非禁止 Kotlin 写业务。详见 [docs/adr/0002-hybrid-architecture.md](docs/adr/0002-hybrid-architecture.md)。
+
+1. **Hot/Cool Path 边界铁律**（V4 修订）：
+   - **Hot path（5 屏 + 13 项资金灰色地带）必须在 Compose Native 写业务**，直调 Sunmi SDK，不走 TXBridge
+   - **Cool path 必须在 WebView + React 写业务**，调外设走 TXBridge 11 JS API
+   - **Native 与 WebView 通过 TXBridge / Mac mini PG 真相源解耦**，不互相直读对方内部状态
+   - 详见 §三 / §七 / [docs/architecture/v4-d1-hot-cool-path-boundary.md](docs/architecture/v4-d1-hot-cool-path-boundary.md)
 2. **禁止 Mac mini 连接任何外设** — 外设全部由安卓 POS 处理
-3. **禁止 iPad 直连外设** — 外设指令通过 HTTP 转发到安卓 POS
+3. **禁止 iPad 直连外设** — 外设指令通过 HTTP 转发到安卓 POS（iPad 不承担 hot path，详见 §十二）
 4. **禁止 broad except** — 必须指定具体异常类型
 5. **禁止硬编码密钥** — 环境变量注入
 6. **禁止跳过 RLS** — 所有 DB 操作必须带 tenant_id
@@ -779,9 +923,10 @@ DEV 环境功能验证
 | 指标 | 门槛 | 说明 |
 |------|------|------|
 | Tier 1 全绿 | 100% 测试通过 | 订单/支付/RLS/POS/存酒/发票 |
-| P99 延迟 | < 200ms | 200 桌并发场景 |
+| **Hot path P99 延迟（V4 修订）** | **< 50ms** | 商米 T2 Compose 按键响应（§三 hot path 物理需求）|
+| 全局 Tier 1 P99 延迟 | < 200ms | 200 桌并发场景（含 cool path WebView 渲染）|
 | 支付成功率 | > 99.9% | 含超时/失败回滚 |
-| 断网恢复 | 4 小时内无数据丢失 | CRDT 验证 |
+| 断网恢复 | 4 小时内无数据丢失 | CRDT 验证；mac-station PG 真相源 + Room 4h 缓冲 |
 | 收银员操作 | 无需技术培训即可使用 | 现场用户测试 |
 
 **这 5 个数字是屯象OS的真实交付标准，不是代码跑通。**
