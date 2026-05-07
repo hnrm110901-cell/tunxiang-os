@@ -40,11 +40,6 @@ def _gen_order_no() -> str:
 
 
 class OrderService:
-    def __init__(self, db: AsyncSession, tenant_id: str):
-        self.db = db
-        self.tenant_id = uuid.UUID(tenant_id)
-        self._tenant_id_str = tenant_id
-
     """收银核心服务
 
     离线模式：
@@ -59,8 +54,14 @@ class OrderService:
         tenant_id: str,
         offline_sync_service: Optional[Any] = None,
     ) -> None:
+        # PR #265 round-3 verifier 修复：原版双 __init__（line 42-46 + 56-64）
+        # 第二个覆盖第一个，导致 _tenant_id_str 在真实业务路径未初始化，
+        # _set_tenant() 调用 self._tenant_id_str 抛 AttributeError；
+        # 测试用 svc._tenant_id_str = str(svc.tenant_id) 临时 patch 兜过去。
+        # 现合并为单一 __init__，统一初始化所有实例属性。
         self.db = db
         self.tenant_id = uuid.UUID(tenant_id)
+        self._tenant_id_str = tenant_id
         self._offline_sync: Optional[Any] = offline_sync_service
 
     async def _set_tenant(self) -> None:
@@ -395,7 +396,15 @@ class OrderService:
             }
 
         # ── 在线正常路径 ──────────────────────────────────────────────────
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)))
+        # PR #265 round-3 verifier 修复：原版漏调 _set_tenant()，RLS 未注入
+        # app.tenant_id → 跨租户 settle 风险；与 cancel_order 的 _set_tenant
+        # 调用对齐
+        await self._set_tenant()
+        result = await self.db.execute(
+            select(Order)
+            .where(Order.id == uuid.UUID(order_id))
+            .where(Order.tenant_id == self.tenant_id)  # 显式 tenant 过滤双保险
+        )
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
