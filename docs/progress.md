@@ -1,3 +1,28 @@
+## 2026-05-07 22:16 · Sprint 2 #258 attendance_compliance → 6/10 关闭
+
+### 完成状态
+- [x] #258 attendance_compliance Agent — TDD 7/7 通过
+- [x] 6 类考勤异常规则引擎覆盖
+- [x] severity / remedy 双层映射
+- [ ] #259 / #255 / #260 / #262 余 4 项
+
+### 关键决策
+- **决策 26：考勤合规走纯规则引擎而非 Claude** — 6 类异常都是确定性时间窗口比较，规则引擎 < 50ms 且 100% 可解释，Claude 留 explanation 增强（M2）
+- **决策 27：constraint_scope=set() 显式豁免** — 考勤是 HR 决策辅助，不直接动毛利/食安/体验三约束维度，已写明 waived_reason
+- **决策 28：severity 三级映射 + 60min 分界** — 超过排班 60 分钟视 critical（劳动法风险），≤60min warning（可经理审批），简化判定无 info 级避免噪音
+- **决策 29：连续工作天数按字符串日期 +1 比对** — 简化跨月逻辑，足够 demo + Tier 2 验收，生产可改 datetime 严格比对（separate issue）
+
+### 下一步
+- commit + push 当前工作
+- 推 #259 pinjin Tier 1 测试（关键路径上线必经）
+
+### 已知风险
+- 误报率 < 5% 需 1 个月真实数据验证，本会话只做了规则正确性验证
+- "未休法定节假日" 当前需调用方传 holiday_dates 列表，未集成日历服务（M3）
+- "连续无休" 简化逻辑：只算实际打卡天，未考虑请假/调休状态（separate issue）
+
+---
+
 ## 2026-05-07 22:09 · Sprint 2 #257 voice_order Agent → 5/10 关闭
 
 ### 完成状态

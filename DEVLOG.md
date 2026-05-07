@@ -1,3 +1,30 @@
+## 2026-05-07 Sprint 2 #258 attendance_compliance Agent 落地 → 6/10
+
+### 今日完成（续，#258）
+- **#258 [S2-06] attendance_compliance Agent — 已落地**
+  - 6 类考勤异常规则引擎：迟到 / 早退 / 旷工 / 超时加班 / 未休法定节假日 / 连续 >6 天
+  - severity 三级映射：info / warning / critical（按 delay 量级 + 类别）
+  - remedy 处置建议路由：HR 介入 / 经理审批 / 补卡 / 自动忽略
+  - TDD 7/7 通过，pytest 0.44s
+  - constraint_scope=set() 已声明（HR 决策不触发三约束）
+
+### 数据变化
+- attendance_compliance_agent.py +220 行（新 action analyze_attendance_anomalies）
+- 新增 test_attendance_compliance_tier2.py（7 场景）
+- Sprint 2 进度：**6 / 10 = 60% 关闭**
+- 占位 Agent：8 → 6（#257 voice_order + #258 attendance）
+
+### 遗留
+- 误报率 < 5% 需要 HR 真实标注数据集（M2 现场）
+- Claude API 异常解释增强（M2 叠加）
+- web-admin / Crew 端 UI 推送（separate UI issue）
+
+### 明日计划
+- 推 #259 pinjin Tier 1 测试（尝在一起首店上线必经路径）
+- 或 #255 Admin Tab focus 梳理
+
+---
+
 ## 2026-05-07 Sprint 2 #257 voice_order Agent (Tier 1) 落地 → 5/10
 
 ### 今日完成（续，#257）
