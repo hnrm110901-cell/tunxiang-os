@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import '@tx/tokens/tokens.css';
 import '@tx/touch/styles/reset.css';
 import '@tx/touch/styles/animations.css';
+import '@tx/touch/styles/focus.css';
 import App from './App';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(

@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import '@tx/tokens/tokens.css';
+import '@tx/touch/styles/focus.css';
 import { injectTokens } from './design-system';
 import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';

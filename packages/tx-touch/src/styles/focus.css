@@ -1,0 +1,78 @@
+/*
+ * TXTouch · 全局焦点环样式
+ *
+ * v1.0 宪法 §7.2 — 键盘可达性基线
+ *
+ * 设计要点：
+ *   1. 用 :focus-visible 而非 :focus，触控点击后焦点环不残留
+ *   2. 焦点环 2px outline + 2px offset，色 --tx-primary
+ *   3. 暗色背景下用半透明白底 box-shadow 增强对比度（≥ 3:1）
+ *   4. 不破坏现有 :hover/:active 视觉语言
+ */
+
+/* ─── 通用元素：使用键盘 Tab 时显示焦点环 ─── */
+
+button:focus-visible,
+[role='button']:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--tx-primary);
+  outline-offset: 2px;
+  /* 暗色背景上额外加白色描边提升对比度 */
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.1);
+  border-radius: var(--tx-radius-sm, 8px);
+}
+
+/* ─── 触控点击不残留焦点环 ─── */
+
+button:focus:not(:focus-visible),
+[role='button']:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+[tabindex]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* ─── 减弱内部嵌套（同时聚焦）的视觉冲突 ─── */
+
+[role='button']:focus-visible button:focus-visible,
+button:focus-visible button:focus-visible {
+  outline-color: transparent;
+  box-shadow: none;
+}
+
+/* ─── 暗色主题下的焦点环（自动适配 prefers-color-scheme） ─── */
+
+@media (prefers-color-scheme: dark) {
+  button:focus-visible,
+  [role='button']:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2);
+  }
+}
+
+/* ─── Forced Colors 模式（高对比度 / Windows 高对比度）─── */
+
+@media (forced-colors: active) {
+  button:focus-visible,
+  [role='button']:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [tabindex]:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
