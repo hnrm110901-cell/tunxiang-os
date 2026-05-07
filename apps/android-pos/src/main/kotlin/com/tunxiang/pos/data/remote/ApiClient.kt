@@ -72,33 +72,47 @@ class ApiClient(
         .connectionPool(okhttp3.ConnectionPool(10, 5, TimeUnit.MINUTES))  // 复用连接
         .build()
 
-    /** Current base URL. Volatile because [setBaseUrl] mutates from arbitrary thread. */
-    @Volatile
-    private var currentBaseUrl: String = baseUrl
+    /**
+     * Atomic snapshot of the live Retrofit configuration. Single @Volatile
+     * field guarantees readers always see a consistent (baseUrl, retrofit, api)
+     * triple — no torn read where currentBaseUrl is new but txCoreApi is stale.
+     *
+     * W1 review fix (2026-05-07): replaces three separate @Volatile fields
+     * which JMM doesn't guarantee atomic-together visibility for.
+     */
+    private data class RetrofitState(
+        val baseUrl: String,
+        val retrofit: Retrofit,
+        val api: TxCoreApi,
+    )
 
-    /** Current Retrofit instance. Rebuilt by [setBaseUrl]. Always read via [txCoreApi]. */
     @Volatile
-    private var retrofit: Retrofit = buildRetrofit(baseUrl)
-
-    @Volatile
-    private var _txCoreApi: TxCoreApi = retrofit.create(TxCoreApi::class.java)
+    private var state: RetrofitState = run {
+        val r = buildRetrofit(baseUrl)
+        RetrofitState(baseUrl, r, r.create(TxCoreApi::class.java))
+    }
 
     /**
      * Active TxCoreApi proxy. Always reflects the most recent [setBaseUrl].
      * Pattern: read once per network call (don't cache across long suspensions).
      */
-    val txCoreApi: TxCoreApi get() = _txCoreApi
+    val txCoreApi: TxCoreApi get() = state.api
 
     /** For diagnostics / settings UI: returns the URL the next request will use. */
-    fun getBaseUrl(): String = currentBaseUrl
+    fun getBaseUrl(): String = state.baseUrl
 
     /**
      * Switch the API base URL at runtime. Idempotent: no-op if [newBaseUrl]
      * equals the current value.
      *
      * Thread-safety: synchronized so concurrent mDNS rediscovery + operator
-     * manual change don't race. The OkHttpClient (and its connection pool)
-     * is reused across rebuilds — only Retrofit + the API proxy regenerate.
+     * manual change don't race; readers (txCoreApi getter / getBaseUrl) read
+     * the @Volatile state pointer atomically without locking.
+     *
+     * The OkHttpClient (and its connection pool) is reused across rebuilds —
+     * only Retrofit + the API proxy regenerate. In-flight requests on the
+     * old base URL complete normally; the new state takes effect on the next
+     * request that calls [txCoreApi].
      *
      * Caller responsibility (D3/D4): after a successful switch, re-trigger
      * any in-flight or queued sync operations so they pick up the new URL.
@@ -109,10 +123,9 @@ class ApiClient(
         require(newBaseUrl.endsWith("/")) {
             "Retrofit baseUrl must end with '/' — got: $newBaseUrl"
         }
-        if (newBaseUrl == currentBaseUrl) return
-        currentBaseUrl = newBaseUrl
-        retrofit = buildRetrofit(newBaseUrl)
-        _txCoreApi = retrofit.create(TxCoreApi::class.java)
+        if (newBaseUrl == state.baseUrl) return
+        val r = buildRetrofit(newBaseUrl)
+        state = RetrofitState(newBaseUrl, r, r.create(TxCoreApi::class.java))
     }
 
     private fun buildRetrofit(baseUrl: String): Retrofit =

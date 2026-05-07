@@ -2,6 +2,7 @@ package com.tunxiang.pos.data.remote
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.tunxiang.pos.BuildConfig
 
 /**
@@ -31,6 +32,7 @@ import com.tunxiang.pos.BuildConfig
  * intentional and matches Application's own lifetime.
  */
 object ApiBaseUrlResolver {
+    private const val TAG = "ApiBaseUrlResolver"
     private const val PREFS_NAME = "tx_mac_station"
     private const val KEY_BASE_URL = "base_url"
 
@@ -53,6 +55,15 @@ object ApiBaseUrlResolver {
      *
      * Must be called exactly once after [ApiClient] is constructed. Calling
      * twice is a programming error (would leak two listeners).
+     *
+     * B2 review fix (2026-05-07): after registering the listener, re-read
+     * the persisted value and propagate any change that occurred between
+     * [resolveInitialUrl] and listener registration. Without this, fast
+     * mDNS discovery (< 5ms) racing the Application.onCreate sequence can
+     * silently lose the discovered URL — App keeps using the boot fallback.
+     *
+     * W2 review fix: setBaseUrl failures are now logged (not silently
+     * swallowed) so dirty SharedPreferences data is visible in logcat.
      */
     @Synchronized
     fun attachReactivePropagation(context: Context, apiClient: ApiClient) {
@@ -66,10 +77,35 @@ object ApiBaseUrlResolver {
             val newUrl = p.getString(KEY_BASE_URL, null)
             if (!newUrl.isNullOrBlank()) {
                 runCatching { apiClient.setBaseUrl(normalize(newUrl)) }
+                    .onFailure { e ->
+                        Log.e(
+                            TAG,
+                            "setBaseUrl propagation failed for url='$newUrl' — " +
+                                "prefs may be dirty; ApiClient kept previous URL",
+                            e,
+                        )
+                    }
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(l)
         listener = l
+
+        // B2 race-window plug: any value written to prefs between resolveInitialUrl()
+        // and listener registration would otherwise be lost. Re-read and reconcile.
+        val latestUrl = prefs.getString(KEY_BASE_URL, null)?.takeIf { it.isNotBlank() }
+        if (latestUrl != null) {
+            val normalized = normalize(latestUrl)
+            if (normalized != apiClient.getBaseUrl()) {
+                runCatching { apiClient.setBaseUrl(normalized) }
+                    .onFailure { e ->
+                        Log.e(
+                            TAG,
+                            "B2 reconcile setBaseUrl failed for url='$latestUrl'",
+                            e,
+                        )
+                    }
+            }
+        }
     }
 
     /**

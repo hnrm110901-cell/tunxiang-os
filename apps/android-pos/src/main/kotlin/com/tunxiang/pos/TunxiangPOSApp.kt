@@ -69,10 +69,13 @@ class TunxiangPOSApp : Application(), Configuration.Provider {
         ApiBaseUrlResolver.attachReactivePropagation(this, apiClient)
 
         // Sync Manager - monitors connectivity and drives sync
+        // V4 sprint D3 hotfix (B1 review 2026-05-07): pass ApiClient instance
+        // (not txCoreApi proxy) so SyncManager always reads the latest proxy
+        // via apiClient.txCoreApi getter — survives D4 mDNS-driven setBaseUrl.
         syncManager = SyncManager(
             context = applicationContext,
             database = database,
-            api = apiClient.txCoreApi
+            apiClient = apiClient
         )
         syncManager.startMonitoring()
     }

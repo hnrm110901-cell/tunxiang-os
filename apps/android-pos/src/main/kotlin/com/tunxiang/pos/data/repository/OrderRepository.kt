@@ -19,6 +19,12 @@ import java.util.UUID
  * 2. On success: save to Room + return
  * 3. On failure (network): save to Room + enqueue SyncQueue + return local data
  */
+// ⚠️ V4 sprint D3 stage 2 (REVIEW B1, 2026-05-07): this Repository must
+// switch its constructor to receive `apiClient: ApiClient` (not `api: TxCoreApi`)
+// so D4 mDNS-driven setBaseUrl propagates to network calls. Current code
+// captures the proxy reference at construction → stale URL after setBaseUrl.
+// Affected screens to update in lockstep: OrderScreen / SettleScreen /
+// DailyCloseScreen / ShiftScreen / TableMapScreen.
 class OrderRepository(
     private val orderDao: OrderDao,
     private val tableDao: TableDao,

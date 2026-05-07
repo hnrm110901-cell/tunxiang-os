@@ -15,6 +15,12 @@ import kotlinx.coroutines.flow.Flow
  * - Every 5 minutes: incremental (updated_after = last sync timestamp)
  * - Always serve from Room cache for instant UI
  */
+// ⚠️ V4 sprint D3 stage 2 (REVIEW B1, 2026-05-07): this Repository must
+// switch its constructor to receive `apiClient: ApiClient` (not `api: TxCoreApi`)
+// so D4 mDNS-driven setBaseUrl propagates to network calls. Current code
+// captures the proxy reference at construction → stale URL after setBaseUrl.
+// Affected screens to update in lockstep: OrderScreen / SettleScreen /
+// DailyCloseScreen / ShiftScreen / TableMapScreen.
 class DishRepository(
     private val dishDao: DishDao,
     private val api: TxCoreApi,

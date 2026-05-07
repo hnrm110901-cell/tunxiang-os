@@ -45,6 +45,15 @@ object SyncSource {
     /** Row was originally LOCAL_PENDING but has since been successfully synced to mac-station. */
     const val LOCAL_SYNCED = "local-synced"
 
-    /** All known source values; useful for `WHERE source IN (...)` validation in tests. */
-    val ALL: Set<String> = setOf(REMOTE, LOCAL_PENDING, LOCAL_SYNCED)
+    /**
+     * All known source values; useful for `WHERE source IN (...)` validation in tests.
+     *
+     * W5 review fix (2026-05-07): wrapped in unmodifiableSet — the bare setOf()
+     * returns a LinkedHashSet (MutableSet) and external callers casting to
+     * MutableSet could silently corrupt the enum. Now any mutation attempt
+     * throws UnsupportedOperationException.
+     */
+    val ALL: Set<String> = java.util.Collections.unmodifiableSet(
+        linkedSetOf(REMOTE, LOCAL_PENDING, LOCAL_SYNCED)
+    )
 }
