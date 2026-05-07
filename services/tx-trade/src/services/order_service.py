@@ -26,7 +26,7 @@ from shared.ontology.src.enums import OrderStatus
 from ..models.enums import OrderType, TableStatus
 from ..models.tables import Table
 from .attribution_hook import fire_order_attribution
-from .state_machine import InvalidTransitionError, transition_order
+from .state_machine import transition_order
 
 if TYPE_CHECKING:
     from edge.sync_engine.src.offline_sync_service import OfflineSyncService  # noqa: F401
