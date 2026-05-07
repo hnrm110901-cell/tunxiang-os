@@ -1,3 +1,32 @@
+## 2026-05-07 23:30 · Sprint 1 完结 8/8 + 闸门 hardcoded-color 4112 → 69
+
+### 完成状态
+- [x] **Sprint 1 100% 完成**：#244 / #245 / #246 / #247 / #248 / #249 / #250 / #251 全部关闭
+- [x] Sprint 1 Epic [#252] 关闭
+- [x] hardcoded-color baseline: 4112 → 69（98.3% 减幅）
+- [x] 3 波 codemod 工具入仓 + 后续 PR 可继续降 baseline
+- [x] JSX 属性 162 处副作用修复 + 2 处真实 type 收紧 fix
+- [x] 0 codemod-induced 新 typecheck 错
+- [ ] 未完成：commit 686 文件（待用户授权）
+
+### 关键决策（续）
+- **决策 11：codemod 替换为 `txColors.<name>` 而非 `var(--tx-primary)`** — JS 引用在所有 TS 上下文都 work（包括 AntD Tag color prop 这类不接受 CSS var 的位置），且 @tx/tokens 是真理源，符合 v1.0 §2.6 "终端独占 vs 跨终端共享" 中"Token 是跨终端共享"原则
+- **决策 12：CSS 文件用 var(--tx-*)** — CSS 中 CSS Variables 是天然解决方案，与 packages/tx-tokens/tokens.css 一致
+- **决策 13：69 残留拆 #273 follow-up，不强行机械处理** — 5 类边缘 case 需要更精细的手工/AST 处理，强行做会引入回归风险
+- **决策 14：baseline 锁住而非清零** — M2/M3 渐进切 strict，避免一次性大动作
+
+### 下一步
+- commit 686 文件 + 推送
+- 进入 Sprint 2（[Epic #263]）：S2-01 a11y 基线扫描
+
+### 已知风险
+- **686 文件未 commit**：本机若意外丢失工作 → 需要重跑 codemod。建议尽快 commit
+- baseline.json 4 项数字需团队协作维护（避免误操作 `--update-baseline` 走偏）
+- shared/design-system 现在依赖 @tx/tokens（之前不依赖），其他消费方需 `pnpm install`
+- pnpm-lock.yaml 第二次累积更新（@tx/tokens workspace dep）
+
+---
+
 ## 2026-05-07 22:30 · Sprint 1 #250 CI lint 落地 → 7/8 关闭
 
 ### 完成状态

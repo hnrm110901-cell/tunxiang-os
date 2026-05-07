@@ -1,3 +1,42 @@
+## 2026-05-07 续³ Sprint 1 #251 落地 → 8/8 = 100% 关闭 🎉
+
+### 今日完成（续³，#251）
+- **#251 [S1-08] 硬编码品牌色清理 — 已落地（98.3% 减幅）**
+  - **hardcoded-color: 4112 → 69 baseline 锁定**
+  - 3 波 codemod：
+    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#XXXXXX'` 字面量 → `txColors.<name>`（~3300 处）
+    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#XXXXXX` → `var(--tx-*)`（49 处）
+    - `scripts/lint-ui/codemod-color-cssinjs.mjs` — TSX/TS CSS shorthand string `'... #X ...'` → 模板字符串（424 处）
+  - lint 豁免规则细化：跳过 inline `//` 注释 + `var(--*, #X)` defensive fallback
+  - JSX 属性破损批量修复：`color=txColors.X` → `color={txColors.X}`（162 处，64 文件）
+  - 副作用 fix：AgreementUnitSelector `let creditColor: string` 显式类型 + shared/design-system 加 @tx/tokens devDep
+  - 关闭 **#252 Sprint 1 Epic** —— Sprint 1 100% 完成
+
+### 数据变化
+- **686 文件改动**（4636 行 +/3942 行 -）
+- 11 个 lint-ui 脚本（`scripts/lint-ui/`）
+- baseline.json 更新：`hardcoded-color: 4112 → 69`
+- typecheck 0 codemod-induced 新错（剩余 25 个 non-unused 错全部 pre-existing 模式）
+- 新建 follow-up issue：**#273**（hardcoded-color 残留 69 边缘 case）
+- 关闭 issue：#251 + #252 Epic = 2 个
+
+### Sprint 1 总账
+- **8 / 8 = 100% 关闭**：#244 / #245 / #246 / #247 / #248 / #249 / #250 / #251
+- Epic：#252 已关闭
+- Follow-up：#267 / #268 / #269 / #270 / #273 = 5 个待 M2/M3 阶段处理
+- 实际工期：2026-05-07 同日（计划 W1-W2 14 天）
+
+### 遗留
+- **686 文件未 commit**（用户决定 commit 时机）
+- pre-existing typecheck 错（#267 跟踪），不阻塞进度
+- 5 follow-up issue 进 M2/M3 计划
+
+### 明日计划（Sprint 2 启动）
+- 进入 [Epic #263]：a11y 基线 + 占位 Agent + 尝在一起首店上线
+- Sprint 2 起点：S2-01 [#253] a11y 基线扫描
+
+---
+
 ## 2026-05-07 续² Sprint 1 #250 CI lint 落地 → 7/8 关闭
 
 ### 今日完成（续²，#250）
