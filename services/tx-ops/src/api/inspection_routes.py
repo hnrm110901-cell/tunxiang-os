@@ -395,16 +395,19 @@ async def submit_inspection(
         record = _serialize_row(row)
         log.info("inspection_submitted", report_id=report_id, store_id=str(record["store_id"]), tenant_id=x_tenant_id)
 
-        # 旁路事件发射：巡店报告提交（草稿→已提交）
+        # 旁路事件发射：巡店报告提交（草稿→已提交）—— 事件类型绑定**动作**（COMPLETED）
+        # 不绑定**结果**（FAILED）。PR #266 verifier 反馈：
+        # 把"提交动作"和"巡检不合格"塞到同一事件分支会让
+        # mv_safety_compliance 与既有 safety.violation_found 双计/漏计。
+        # is_failed 作为 payload 字段交给消费者判定，与 cashier_engine PAID
+        # 永远是 PAID 的风格一致。
         overall_score = record.get("overall_score")
-        _event_type = (
-            SafetyInspectionEventType.INSPECTION_FAILED
-            if overall_score is not None and float(overall_score) < 60
-            else SafetyInspectionEventType.INSPECTION_COMPLETED
+        is_failed = (
+            overall_score is not None and float(overall_score) < 60
         )
         asyncio.create_task(
             emit_event(
-                event_type=_event_type,
+                event_type=SafetyInspectionEventType.INSPECTION_COMPLETED,
                 tenant_id=x_tenant_id,
                 stream_id=report_id,
                 payload={
@@ -413,6 +416,7 @@ async def submit_inspection(
                     "inspector_id": str(record.get("inspector_id", "")),
                     "inspection_date": str(record.get("inspection_date", "")),
                     "overall_score": overall_score,
+                    "is_failed": is_failed,  # 消费者据此决定是否触发整改单
                     "action_items_count": len(record.get("action_items") or []),
                 },
                 store_id=str(record.get("store_id", "")),

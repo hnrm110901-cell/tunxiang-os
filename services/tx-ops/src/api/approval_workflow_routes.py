@@ -485,7 +485,28 @@ async def cancel_instance(
         ),
         {"id": instance_id, "now": now},
     )
+    # PR #266 verifier 修复：commit 必须在 emit_event 之前，否则
+    # 事件指向的状态变更可能尚未落库
+    await db.commit()
     log.info("approval_instance_cancelled", instance_id=instance_id, tenant_id=x_tenant_id)
+
+    # 旁路事件发射：审批撤回（PR #266 verifier 反馈：原 PR body 声称
+    # CANCELLED 4 状态接入但 cancel_instance 路由未 emit_event，硬不一致）
+    asyncio.create_task(
+        emit_event(
+            event_type=ApprovalEventType.CANCELLED,
+            tenant_id=x_tenant_id,
+            stream_id=instance_id,
+            payload={
+                "instance_id": instance_id,
+                "previous_status": "pending",
+                "cancelled_at": now.isoformat(),
+            },
+            source_service="tx-ops",
+            metadata={"trigger": "initiator_cancel"},
+        )
+    )
+
     return {"ok": True, "data": {"instance_id": instance_id, "result": "cancelled"}}
 
 
