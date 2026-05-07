@@ -9,6 +9,7 @@
   - 在线时走正常 SQLAlchemy 流程（不受影响）
 """
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
@@ -17,6 +18,8 @@ import structlog
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import OrderEventType
 from shared.ontology.src.entities import Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
 
@@ -330,12 +333,6 @@ class OrderService:
         await self.db.flush()
         return {"order_id": order_id, "discount_fen": discount_fen, "final_fen": new_final}
 
-    async def settle_order(self, order_id: str) -> dict:
-        await self._set_tenant()
-        result = await self.db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
-        )
-
     # ─── 结算 ───
 
     async def settle_order(
@@ -410,13 +407,12 @@ class OrderService:
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
         await self.db.flush()
-        return {
-            "order_id": order_id,
-            "order_no": order.order_no,
-            "final_amount_fen": order.final_amount_fen,
-            "settled_at": order.completed_at.isoformat(),
-        }
-        logger.info("order_settled", order_no=order.order_no, final_fen=order.final_amount_fen)
+
+        logger.info(
+            "order_settled",
+            order_no=order.order_no,
+            final_fen=order.final_amount_fen,
+        )
 
         # 触发归因检查（fire-and-forget，不阻断结算流程）
         if order.customer_id:
@@ -427,6 +423,24 @@ class OrderService:
                 order_amount_yuan=round((order.final_amount_fen or 0) / 100, 2),
                 completed_at=order.completed_at,
             )
+
+        # CLAUDE.md §15 事件总线：旁路写入 ORDER.PAID（PR #265 verifier 修复
+        # 原死代码 `return` 之后 emit_event 不可达，settle 完全不发结算事件 → §15 漏单）
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.PAID,
+                tenant_id=str(self.tenant_id),
+                stream_id=str(order.id),
+                payload={
+                    "order_no": order.order_no,
+                    "final_amount_fen": order.final_amount_fen,
+                    "completed_at": order.completed_at.isoformat(),
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"path": "order_service.settle_order"},
+            )
+        )
 
         return {
             "order_id": order_id,
@@ -451,6 +465,25 @@ class OrderService:
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
         await self.db.flush()
+
+        # CLAUDE.md §15 事件总线：旁路写入 ORDER.CANCELLED
+        # （PR #265 verifier 反馈：cancel_order 缺 emit_event 是 §15 漏洞）
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CANCELLED,
+                tenant_id=str(self.tenant_id),
+                stream_id=str(order.id),
+                payload={
+                    "order_no": order.order_no,
+                    "cancel_reason": reason,
+                    "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"path": "order_service.cancel_order"},
+            )
+        )
+
         return {"order_id": order_id, "status": "cancelled"}
 
     async def get_order(self, order_id: str) -> dict | None:
