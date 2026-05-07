@@ -854,6 +854,87 @@ def _preview_lines_from_config(
             for _ in range(count):
                 lines.append({"type": "blank"})
 
+        elif etype == "inverted_header":
+            # 反色文字（catalog: 美化增强）— 前端渲染用 inverted 标记
+            raw = elem.content or ctx.get("store_name", "")
+            import re
+
+            rendered = re.sub(
+                r"\{\{(\w+)\}\}",
+                lambda m: str(ctx.get(m.group(1), m.group(0))),
+                raw,
+            )
+            lines.append(
+                {
+                    "type": "text",
+                    "content": rendered,
+                    "align": elem.align or "center",
+                    "bold": True,
+                    "size": elem.size or "double_height",
+                    "inverted": True,
+                }
+            )
+
+        elif etype == "styled_separator":
+            # 装饰分隔线（catalog: 美化增强）— style: dots/ornament/double/single
+            style = getattr(elem, "style", None) or "single"
+            char_map = {"dots": "·", "ornament": "❀", "double": "=", "single": "-"}
+            lines.append({"type": "separator", "char": char_map.get(style, "-")})
+
+        elif etype == "box_section":
+            # 盒型边框文字（catalog: 美化增强）— style: single/double，lines: [str]
+            box_lines = getattr(elem, "lines", None) or []
+            for raw in box_lines:
+                import re
+
+                rendered = re.sub(
+                    r"\{\{(\w+)\}\}",
+                    lambda m: str(ctx.get(m.group(1), m.group(0))),
+                    raw,
+                )
+                lines.append(
+                    {
+                        "type": "text",
+                        "content": rendered,
+                        "align": elem.align or "center",
+                        "bold": False,
+                        "size": "normal",
+                        "boxed": True,
+                    }
+                )
+
+        elif etype == "logo_image":
+            # Logo 图片（catalog: 多媒体）— preview 占位符，前端按 image_base64 渲染
+            lines.append(
+                {
+                    "type": "image",
+                    "image_base64": getattr(elem, "image_base64", "") or "",
+                    "align": elem.align or "center",
+                    "max_width_dots": getattr(elem, "max_width_dots", None) or 384,
+                }
+            )
+
+        elif etype == "underlined_text":
+            # 下划线文字（catalog: 美化增强）
+            raw = elem.content or ""
+            import re
+
+            rendered = re.sub(
+                r"\{\{(\w+)\}\}",
+                lambda m: str(ctx.get(m.group(1), m.group(0))),
+                raw,
+            )
+            lines.append(
+                {
+                    "type": "text",
+                    "content": rendered,
+                    "align": elem.align or "center",
+                    "bold": elem.bold or False,
+                    "size": "normal",
+                    "underlined": True,
+                }
+            )
+
     return lines
 
 

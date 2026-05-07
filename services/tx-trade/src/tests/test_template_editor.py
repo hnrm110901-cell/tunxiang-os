@@ -553,6 +553,75 @@ class TestElementsCatalog:
         assert "自定义" in categories
 
 
+class TestPreviewNewElementTypes:
+    """preview 接口需为 catalog 新增的 5 种 element 出对应预览行（防静默丢失）。"""
+
+    @pytest.fixture
+    def client(self):
+        from api.template_editor_routes import router
+        from fastapi import FastAPI
+
+        app = FastAPI()
+        app.include_router(router)
+        return TestClient(app)
+
+    def _post_preview(self, client, element):
+        return client.post(
+            "/api/v1/receipt-templates/preview",
+            json={"config": {"paper_width": 80, "elements": [element]}},
+            headers={"X-Tenant-ID": str(uuid.uuid4())},
+        )
+
+    def test_inverted_header_preview(self, client):
+        resp = self._post_preview(
+            client,
+            {"id": "e1", "type": "inverted_header", "content": "{{store_name}}", "align": "center"},
+        )
+        assert resp.status_code == 200
+        lines = resp.json()["data"]["preview_lines"]
+        assert len(lines) == 1
+        assert lines[0]["type"] == "text"
+        assert lines[0]["inverted"] is True
+        assert lines[0]["content"] == "好味道火锅"
+
+    def test_styled_separator_preview(self, client):
+        for style, expected_char in [("dots", "·"), ("ornament", "❀"), ("double", "=")]:
+            resp = self._post_preview(client, {"id": "e1", "type": "styled_separator", "style": style})
+            lines = resp.json()["data"]["preview_lines"]
+            assert lines[0]["type"] == "separator"
+            assert lines[0]["char"] == expected_char
+
+    def test_box_section_preview(self, client):
+        resp = self._post_preview(
+            client,
+            {"id": "e1", "type": "box_section", "lines": ["{{store_name}}", "感谢光临"], "style": "double"},
+        )
+        lines = resp.json()["data"]["preview_lines"]
+        assert len(lines) == 2
+        assert lines[0]["content"] == "好味道火锅"
+        assert lines[1]["content"] == "感谢光临"
+        assert all(line.get("boxed") for line in lines)
+
+    def test_logo_image_preview(self, client):
+        resp = self._post_preview(
+            client,
+            {"id": "e1", "type": "logo_image", "image_base64": "iVBORw0KGgo=", "max_width_dots": 256},
+        )
+        lines = resp.json()["data"]["preview_lines"]
+        assert lines[0]["type"] == "image"
+        assert lines[0]["max_width_dots"] == 256
+
+    def test_underlined_text_preview(self, client):
+        resp = self._post_preview(
+            client,
+            {"id": "e1", "type": "underlined_text", "content": "扫码评价"},
+        )
+        lines = resp.json()["data"]["preview_lines"]
+        assert lines[0]["type"] == "text"
+        assert lines[0]["underlined"] is True
+        assert lines[0]["content"] == "扫码评价"
+
+
 class TestElementSizeValidation:
     """ElementDef.size 类型与 element type 必须匹配（防 silent fallback）。"""
 
