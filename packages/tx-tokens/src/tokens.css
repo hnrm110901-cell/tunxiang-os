@@ -87,6 +87,10 @@
   --tx-store-body: 18px;
   --tx-store-caption: 16px;
   --tx-store-kds-timer: 32px;   /* KDS 倒计时 */
+  --tx-store-kds-title: 32px;   /* KDS 桌号/订单号（v1.0：3 米外阅读）*/
+  --tx-store-kds-zone: 28px;    /* KDS 区域/档口标题 */
+  --tx-store-kds-item: 20px;    /* KDS 菜品行（戴老花镜厨师）*/
+  --tx-store-kds-vip: 16px;     /* KDS VIP / 状态徽标 */
 
   /* ===== 触控安全区（Store 终端）===== */
   --tx-tap-min: 48px;

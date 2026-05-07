@@ -1,5 +1,5 @@
 .ticket {
-  width: 240px;
+  width: 280px;
   flex-shrink: 0;
   background: var(--tx-bg-1);
   border-radius: var(--tx-radius-md);
@@ -34,9 +34,10 @@
 }
 
 .tableNo {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: var(--tx-store-kds-title);
+  font-weight: 800;
   color: var(--tx-text-1);
+  font-variant-numeric: tabular-nums;
 }
 
 .overdue .tableNo {
@@ -50,27 +51,32 @@
 }
 
 .vipBadge {
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 4px;
   background: #D4AF37;
   color: #fff;
-  font-size: 12px;
+  font-size: var(--tx-store-kds-vip);
   font-weight: 800;
   letter-spacing: 0.05em;
 }
 
+/* 关键操作 — v1.0 宪法 §3.4：≥72×72px */
 .rushBtn {
-  padding: 4px 10px;
-  border-radius: var(--tx-radius-sm);
+  padding: 0 18px;
+  border-radius: var(--tx-radius-md);
   background: var(--tx-danger);
   color: #fff;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  min-height: var(--tx-tap-min);
+  min-height: var(--tx-tap-lg);
+  min-width: var(--tx-tap-lg);
   display: flex;
   align-items: center;
+  justify-content: center;
+  border: none;
+  transition: transform var(--tx-transition-fast), opacity var(--tx-transition-fast);
 }
 
 .overdue .rushBtn {
@@ -79,11 +85,12 @@
 
 .rushBtn:active {
   opacity: 0.75;
+  transform: scale(0.97);
 }
 
 /* ─── 倒计时 ─── */
 .countdown {
-  font-size: 32px;
+  font-size: var(--tx-store-kds-timer);
   font-weight: 800;
   line-height: 1;
   text-align: center;
@@ -119,7 +126,7 @@
 }
 
 .itemName {
-  font-size: 20px;
+  font-size: var(--tx-store-kds-item);
   font-weight: 500;
   color: var(--tx-text-1);
   line-height: 1.3;
@@ -134,7 +141,7 @@
 }
 
 .itemSpec {
-  font-size: 14px;
+  font-size: var(--tx-store-caption);
   font-weight: 400;
   color: var(--tx-text-2);
   margin-left: 4px;
@@ -163,7 +170,7 @@
 }
 
 .itemQty {
-  font-size: 18px;
+  font-size: var(--tx-store-kds-item);
   font-weight: 700;
   color: var(--tx-text-2);
   white-space: nowrap;
@@ -188,7 +195,7 @@
 }
 
 .swipeHint {
-  font-size: 13px;
+  font-size: var(--tx-store-caption);
   color: var(--tx-text-3);
 }
 
@@ -197,7 +204,7 @@
 }
 
 .orderId {
-  font-size: 13px;
+  font-size: var(--tx-store-caption);
   color: var(--tx-text-3);
   font-variant-numeric: tabular-nums;
 }
