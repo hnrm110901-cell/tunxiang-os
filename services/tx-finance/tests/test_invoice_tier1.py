@@ -84,8 +84,8 @@ class TestInvoiceGoldenTaxPhase4:
         mock_invoice.invoice_type = "electronic"
         mock_invoice.invoice_title = "徐记海鲜有限公司"
         mock_invoice.tax_number = "91430000XXXXXXXXXX"
-        mock_invoice.amount = Decimal("1000.00")
-        mock_invoice.tax_amount = Decimal("60.00")
+        mock_invoice.amount_fen = 100000  # CLAUDE.md §15 金额用分整数
+        mock_invoice.tax_fen = 6000
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
         extra = {
@@ -296,17 +296,17 @@ class TestInvoiceValidationTier1:
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
 
-        # 相差 0.01 元 = 在容忍范围内（不应抛出异常）
-        svc._validate_amount(
-            invoice_amount=Decimal("100.00"),
-            order_amount=Decimal("100.01"),
+        # 相差 1 分 = 在容忍范围内（不应抛出异常）— CLAUDE.md §15 金额用分整数
+        svc._validate_amount_fen(
+            invoice_amount_fen=10000,
+            order_amount_fen=10001,
         )
 
-        # 相差 0.02 元 = 超出容忍范围（应抛出异常）
+        # 相差 2 分 = 超出容忍范围（应抛出异常）
         with pytest.raises(InvoiceAmountMismatchError):
-            svc._validate_amount(
-                invoice_amount=Decimal("100.00"),
-                order_amount=Decimal("100.02"),
+            svc._validate_amount_fen(
+                invoice_amount_fen=10000,
+                order_amount_fen=10002,
             )
 
     def test_tax_number_format_validation(self):

@@ -8,8 +8,9 @@ CREATE TABLE invoices (
     invoice_type VARCHAR(20) NOT NULL,  -- vat_special/vat_normal/electronic
     invoice_title VARCHAR(100),
     tax_number VARCHAR(50),
-    amount NUMERIC(10,2) NOT NULL,
-    tax_amount NUMERIC(10,2),
+    -- 金额一律存"分"整数（CLAUDE.md §15 + §17 Tier1）
+    amount_fen BIGINT NOT NULL,
+    tax_fen BIGINT,
     invoice_no VARCHAR(50),
     invoice_code VARCHAR(20),
     platform VARCHAR(20) DEFAULT 'nuonuo',
@@ -29,13 +30,12 @@ CREATE TABLE invoices (
 
 import uuid
 from datetime import datetime
-from decimal import Decimal
 from typing import Optional
 
 from sqlalchemy import (
+    BigInteger,
     Column,
     DateTime,
-    Numeric,
     String,
     Text,
     func,
@@ -63,8 +63,9 @@ class Invoice(Base):
     invoice_title: Optional[str] = Column(String(100))
     tax_number: Optional[str] = Column(String(50))
 
-    amount: Decimal = Column(Numeric(10, 2), nullable=False)
-    tax_amount: Optional[Decimal] = Column(Numeric(10, 2))
+    # 金额一律存"分"（int），CLAUDE.md §15 金额用分整数 + §17 Tier1 全电发票零容忍
+    amount_fen: int = Column(BigInteger, nullable=False)
+    tax_fen: Optional[int] = Column(BigInteger)
 
     # 诺诺返回的发票号码 / 发票代码
     invoice_no: Optional[str] = Column(String(50))
@@ -85,4 +86,7 @@ class Invoice(Base):
     created_at: datetime = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     def __repr__(self) -> str:
-        return f"<Invoice id={self.id} order_id={self.order_id} status={self.status} amount={self.amount}>"
+        return (
+            f"<Invoice id={self.id} order_id={self.order_id} status={self.status} "
+            f"amount_fen={self.amount_fen}>"
+        )

@@ -10,7 +10,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Any, Optional
 
 import structlog
@@ -22,8 +22,31 @@ from shared.adapters.nuonuo.src.invoice_client import NuonuoInvoiceClient
 
 logger = structlog.get_logger()
 
-# 发票金额允许的最大偏差（元），防止金额异常
-_AMOUNT_TOLERANCE = Decimal("0.01")
+# 发票金额允许的最大偏差：1 分（CLAUDE.md §15 金额用分整数）
+_AMOUNT_TOLERANCE_FEN = 1
+
+# ── 元 ↔ 分边界换算 helper（金额规范 §15）─────────────────────────────────────
+# 调用规则：API/外部系统（如诺诺）边界用元字符串；存储与内部算术一律 fen int。
+
+
+def _yuan_to_fen(yuan: Decimal) -> int:
+    """元 Decimal → 分 int（金额必须为正，红冲走另路径取负）。
+
+    用 ROUND_HALF_EVEN 处理 3+ 位小数边界（金税四期对账标准）。
+    """
+    if not isinstance(yuan, Decimal):
+        yuan = Decimal(str(yuan))
+    if yuan <= 0:
+        raise ValueError(f"金额必须 > 0，got {yuan}")
+    fen = (yuan * 100).quantize(Decimal("1"), rounding=ROUND_HALF_EVEN)
+    return int(fen)
+
+
+def _fen_to_yuan_str(fen: Optional[int]) -> Optional[str]:
+    """分 int → 元字符串两位小数（API 响应 + 诺诺 payload 边界）。None 透传。"""
+    if fen is None:
+        return None
+    return f"{Decimal(fen) / Decimal(100):.2f}"
 
 
 class InvoiceAmountMismatchError(ValueError):
@@ -58,12 +81,13 @@ class InvoiceService:
             raise InvoiceNotFoundError(f"发票 {invoice_id} 不存在或不属于租户 {tenant_id}")
         return invoice
 
-    def _validate_amount(self, invoice_amount: Decimal, order_amount: Decimal) -> None:
-        """校验发票金额与订单金额，防止异常开票。"""
-        diff = abs(invoice_amount - order_amount)
-        if diff > _AMOUNT_TOLERANCE:
+    def _validate_amount_fen(self, invoice_amount_fen: int, order_amount_fen: int) -> None:
+        """校验发票金额与订单金额（fen 整数比较），防止异常开票。容差 1 分。"""
+        diff = abs(invoice_amount_fen - order_amount_fen)
+        if diff > _AMOUNT_TOLERANCE_FEN:
             raise InvoiceAmountMismatchError(
-                f"发票金额 {invoice_amount} 与订单金额 {order_amount} 相差 {diff}，超出允许偏差"
+                f"发票金额 {invoice_amount_fen} 分 与订单金额 {order_amount_fen} 分 "
+                f"相差 {diff} 分，超出允许偏差 {_AMOUNT_TOLERANCE_FEN} 分"
             )
 
     def _build_nuonuo_payload(
@@ -75,16 +99,17 @@ class InvoiceService:
         goods_list = extra.get("goods_list", [])
         if not goods_list:
             # 无商品明细时生成简单单行明细
+            # 诺诺 payload 边界：金额用元字符串两位小数（外部系统约定）
             goods_list = [
                 {
                     "goodsName": extra.get("goods_name", "餐饮消费"),
                     "num": "1",
                     "unit": "次",
                     "specType": "",
-                    "price": str(invoice.amount),
-                    "amount": str(invoice.amount),
+                    "price": _fen_to_yuan_str(invoice.amount_fen),
+                    "amount": _fen_to_yuan_str(invoice.amount_fen),
                     "taxRate": extra.get("tax_rate", "0.06"),
-                    "taxAmount": str(invoice.tax_amount or Decimal("0")),
+                    "taxAmount": _fen_to_yuan_str(invoice.tax_fen or 0),
                     "invoiceLineProperty": "0",  # 0=正常行
                 }
             ]
@@ -118,17 +143,24 @@ class InvoiceService:
 
         Args:
             order_id: 关联订单 ID
-            invoice_info: 抬头信息，需含 invoice_type、invoice_title、amount 等
+            invoice_info: 抬头信息，需含 invoice_type、invoice_title、amount（元）等
             tenant_id: 租户 ID（显式传入，RLS 双保险）
             db: 已绑定 tenant_id 的 DB session
-            order_amount: 订单实付金额，用于金额校验（可选）
+            order_amount: 订单实付金额（元 Decimal），用于金额校验（可选）
 
         Returns:
-            已持久化的 Invoice 实例
+            已持久化的 Invoice 实例（金额字段 amount_fen / tax_fen 为 fen int）
         """
-        amount = Decimal(str(invoice_info["amount"]))
+        # API 边界元 → 内部 fen（CLAUDE.md §15 金额规范）
+        amount_fen = _yuan_to_fen(Decimal(str(invoice_info["amount"])))
         if order_amount is not None:
-            self._validate_amount(amount, order_amount)
+            self._validate_amount_fen(amount_fen, _yuan_to_fen(Decimal(str(order_amount))))
+
+        tax_fen: Optional[int] = None
+        if invoice_info.get("tax_amount") is not None:
+            tax_yuan = Decimal(str(invoice_info["tax_amount"]))
+            # 税额可以为 0（_yuan_to_fen 拒绝 ≤ 0，所以 0 单独处理）
+            tax_fen = 0 if tax_yuan == 0 else _yuan_to_fen(tax_yuan)
 
         request_id = f"TX-{uuid.uuid4().hex[:16].upper()}"
         invoice = Invoice(
@@ -137,10 +169,8 @@ class InvoiceService:
             invoice_type=invoice_info.get("invoice_type", "electronic"),
             invoice_title=invoice_info.get("invoice_title"),
             tax_number=invoice_info.get("tax_number"),
-            amount=amount,
-            tax_amount=(
-                Decimal(str(invoice_info["tax_amount"])) if invoice_info.get("tax_amount") is not None else None
-            ),
+            amount_fen=amount_fen,
+            tax_fen=tax_fen,
             platform_request_id=request_id,
             status="pending",
         )
@@ -211,10 +241,10 @@ class InvoiceService:
                     "goodsName": "餐饮消费",
                     "num": "1",
                     "unit": "次",
-                    "price": str(invoice.amount),
-                    "amount": str(invoice.amount),
+                    "price": _fen_to_yuan_str(invoice.amount_fen),
+                    "amount": _fen_to_yuan_str(invoice.amount_fen),
                     "taxRate": "0.06",
-                    "taxAmount": str(invoice.tax_amount or Decimal("0")),
+                    "taxAmount": _fen_to_yuan_str(invoice.tax_fen or 0),
                     "invoiceLineProperty": "0",
                 }
             ],
@@ -339,10 +369,10 @@ class InvoiceService:
                     "goodsName": "餐饮消费（红冲）",
                     "num": "-1",
                     "unit": "次",
-                    "price": str(invoice.amount),
-                    "amount": str(-invoice.amount),
+                    "price": _fen_to_yuan_str(invoice.amount_fen),
+                    "amount": _fen_to_yuan_str(-invoice.amount_fen),
                     "taxRate": "0.06",
-                    "taxAmount": str(-(invoice.tax_amount or Decimal("0"))),
+                    "taxAmount": _fen_to_yuan_str(-(invoice.tax_fen or 0)),
                     "invoiceLineProperty": "2",  # 2=折扣行
                 }
             ],
@@ -383,7 +413,12 @@ def _invoice_kind(invoice_type: str) -> str:
 
 
 def _invoice_to_dict(invoice: Invoice) -> dict[str, Any]:
-    """将 Invoice ORM 对象序列化为响应字典。"""
+    """将 Invoice ORM 对象序列化为响应字典。
+
+    金额双发：
+      - "amount" / "tax_amount": 元字符串（向后兼容旧 API 消费者）
+      - "amount_fen" / "tax_fen": 分整数（金税四期对账 + 新客户端）
+    """
     return {
         "id": str(invoice.id),
         "tenant_id": str(invoice.tenant_id),
@@ -391,8 +426,10 @@ def _invoice_to_dict(invoice: Invoice) -> dict[str, Any]:
         "invoice_type": invoice.invoice_type,
         "invoice_title": invoice.invoice_title,
         "tax_number": invoice.tax_number,
-        "amount": str(invoice.amount),
-        "tax_amount": str(invoice.tax_amount) if invoice.tax_amount is not None else None,
+        "amount": _fen_to_yuan_str(invoice.amount_fen),
+        "tax_amount": _fen_to_yuan_str(invoice.tax_fen),
+        "amount_fen": invoice.amount_fen,
+        "tax_fen": invoice.tax_fen,
         "invoice_no": invoice.invoice_no,
         "invoice_code": invoice.invoice_code,
         "platform": invoice.platform,

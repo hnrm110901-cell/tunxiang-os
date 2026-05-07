@@ -218,9 +218,11 @@ class TestInvoiceToDictSerialization:
         assert out["tax_fen"] is None
 
 
-# ── 6. 迁移文件存在 + 可 import + revision 链对接 v402 ─────────────────────────
+# ── 6. 迁移文件存在 + revision 链对接 v402（AST 解析，不依赖 alembic 运行时）───
 class TestMigrationFile:
     def test_v403_invoice_amount_fen_migration_present(self):
+        import ast
+
         repo_root = Path(__file__).resolve().parents[4]
         mig_path = (
             repo_root
@@ -231,14 +233,33 @@ class TestMigrationFile:
         )
         assert mig_path.exists(), f"迁移文件 {mig_path} 必须存在"
 
-        spec = importlib.util.spec_from_file_location("v403_invoice_amount_fen", mig_path)
-        assert spec is not None and spec.loader is not None
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        # AST 解析避免依赖 alembic / sqlalchemy 运行时
+        tree = ast.parse(mig_path.read_text(encoding="utf-8"))
 
-        assert mod.revision == "v403", f"revision 必须是 'v403'，got {mod.revision!r}"
-        assert mod.down_revision == "v402", (
-            f"down_revision 必须接 'v402'，got {mod.down_revision!r}"
+        assigned: dict[str, str] = {}
+        functions: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                if isinstance(node.value, ast.Constant):
+                    assigned[node.target.id] = node.value.value
+            elif isinstance(node, ast.Assign):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Name) and isinstance(node.value, ast.Constant):
+                        assigned[tgt.id] = node.value.value
+            elif isinstance(node, ast.FunctionDef):
+                functions.add(node.name)
+
+        assert assigned.get("revision") == "v403", (
+            f"revision 必须是 'v403'，got {assigned.get('revision')!r}"
         )
-        assert hasattr(mod, "upgrade") and callable(mod.upgrade), "缺 upgrade()"
-        assert hasattr(mod, "downgrade") and callable(mod.downgrade), "缺 downgrade()"
+        assert assigned.get("down_revision") == "v402", (
+            f"down_revision 必须接 'v402'，got {assigned.get('down_revision')!r}"
+        )
+        assert "upgrade" in functions, "缺 upgrade()"
+        assert "downgrade" in functions, "缺 downgrade()"
+
+        # 守门：迁移文件正文必须含 amount_fen 列名（防漂移到错误字段）
+        body = mig_path.read_text(encoding="utf-8")
+        assert "amount_fen" in body
+        assert "tax_fen" in body
+        assert "BigInteger" in body
