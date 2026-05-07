@@ -1,3 +1,29 @@
+## 2026-05-07 21:37 · Sprint 2 起步 3/10 关闭 + a11y 基线 / focus / 工具链落地
+
+### 完成状态
+- [x] #253 a11y 基线扫描（regex scanner + 报告 + Top 30 + 路线图）
+- [x] #256 焦点环 :focus-visible 全终端
+- [x] #261 DEVLOG/progress 更新脚本 + pre-commit hook
+- [ ] #254 / #255 / #257 / #258 / #259 / #260 / #262 等待
+
+### 关键决策
+- **决策 15：a11y 走 regex 静态扫描而非 axe-core + Playwright** — 后者需逐 app 启动 dev server，本会话条件不允许；regex 覆盖 90% 高频静态规则，M3 阶段集成完整动态扫描
+- **决策 16：focus-visible 用 CSS 而非 JS 检测** — 浏览器原生 :focus-visible 已成熟，比 :focus polyfill 更稳定
+- **决策 17：Admin 端不单独写 focus 样式** — AntD ConfigProvider colorPrimary 已自动适配焦点态，避免重复
+- **决策 18：DEVLOG/progress 脚本用 bash 不用 Node** — 不依赖额外工具，团队任何 shell 都能跑
+
+### 下一步
+- 推 #254 aria-label 全覆盖（基于 a11y baseline 26 error 起步）
+- 或 #257 voice_order Agent（Tier 1 backend，需 TDD）
+- 或 commit 当前 Sprint 2 工作
+
+### 已知风险
+- a11y baseline 498 数字偏高（339 input-no-label 是 info 级，可能误报，需后续细化规则）
+- focus.css 在 web-pos 与 ZButton 等 design-system 组件可能视觉冲突（嵌套元素同时聚焦），已在 CSS 内做减弱处理
+- update-devlog.sh stdin 模式在 macOS POSIX bash 与 zsh 略有差异，本会话验证只在 zsh 跑通
+
+---
+
 ## 2026-05-07 23:30 · Sprint 1 完结 8/8 + 闸门 hardcoded-color 4112 → 69
 
 ### 完成状态

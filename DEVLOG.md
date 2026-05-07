@@ -1,3 +1,39 @@
+## 2026-05-07 Sprint 2 #253/#256/#261 落地 → 3/10 关闭
+
+### 今日完成（Sprint 2 起步）
+- **#253 [S2-01] a11y 基线扫描 — 已落地**
+  - `scripts/a11y/scan.mjs`（lint-ui 风格 regex 扫描器，0 新依赖）
+  - `docs/a11y-baseline-2026-05.md` 报告（**498 违规跨 14/16 app**）
+  - 7 类规则：img-no-alt(26 error) / div-clickable(69) / anchor-no-href(64) / input-no-label(339 info) / 其他 0
+  - `pnpm a11y:scan` 入口
+- **#256 [S2-04] :focus-visible 全终端样式 — 已落地**
+  - `packages/tx-touch/src/styles/focus.css` (新文件)
+  - 三 Store app main.tsx 引入
+  - Admin 走 AntD ConfigProvider 自动适配（colorPrimary 焦点态）
+  - 暗色背景 + Forced Colors 双适配
+- **#261 [S2-09] DEVLOG/progress 更新脚本 — 已落地**
+  - `scripts/update-devlog.sh` (3 模式：interactive / stdin / file)
+  - `scripts/update-progress.sh` (分钟级 timestamp)
+  - `scripts/install-hooks.sh` 安装 pre-commit 提示 hook（不阻塞）
+
+### 数据变化
+- 新增脚本：4 个（scan.mjs / update-devlog.sh / update-progress.sh / install-hooks.sh）
+- 新增 CSS：1 个（focus.css）
+- 新增 docs：1 个（a11y-baseline-2026-05.md，498 违规清单 + Top 30）
+- 修改 main.tsx：3 处（pos/kds/crew）
+- 关闭 issue：#253 / #256 / #261 = 3 个
+- 根 package.json scripts：+1（a11y:scan）
+- Sprint 2 进度：**3 / 10 = 30% 关闭**
+
+### 遗留问题
+- Sprint 2 剩 7 个：#254 (aria-label 全覆盖) / #255 (Tab focus 梳理) / #257 (voice_order Agent T1) / #258 (attendance_compliance Agent) / #259 (pinjin Tier 1 测试 T1) / #260 (现场联调 — 需硬件) / #262 (M1 闸门评审 — 待 Sprint 2 完结)
+
+### 明日计划
+- 推 #254 aria-label 全覆盖（基于 #253 baseline 报告，机械修复 26 error 优先）
+- 或 #257 voice_order Agent 补全（Tier 1 TDD）
+
+---
+
 ## 2026-05-07 续³ Sprint 1 #251 落地 → 8/8 = 100% 关闭 🎉
 
 ### 今日完成（续³，#251）
