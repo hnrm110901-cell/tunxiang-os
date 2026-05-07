@@ -20,7 +20,7 @@ from typing import Any, Optional, Union
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -58,6 +58,20 @@ class ElementDef(BaseModel):
     barcode_type: Optional[str] = None
 
     model_config = {"extra": "allow"}
+
+    @model_validator(mode="after")
+    def _validate_size_per_type(self) -> "ElementDef":
+        # qrcode 的 size 是模块大小（1-16 整数），其它元素的 size 是 _SIZE_BYTES 的枚举字符串。
+        # 不按 type 校验会让 silent fallback 掩盖错误（_SIZE_BYTES.get(int, default) → key miss → 默认值）。
+        if self.size is None:
+            return self
+        if self.type == "qrcode":
+            if not isinstance(self.size, int) or isinstance(self.size, bool) or not 1 <= self.size <= 16:
+                raise ValueError("qrcode element 'size' 必须是 1-16 之间的整数")
+        else:
+            if not isinstance(self.size, str):
+                raise ValueError(f"{self.type} element 'size' 必须是字符串（如 'normal' / 'double_height'）")
+        return self
 
 
 class TemplateConfig(BaseModel):

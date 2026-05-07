@@ -553,6 +553,43 @@ class TestElementsCatalog:
         assert "自定义" in categories
 
 
+class TestElementSizeValidation:
+    """ElementDef.size 类型与 element type 必须匹配（防 silent fallback）。"""
+
+    def test_text_element_with_int_size_rejected(self):
+        from api.template_editor_routes import ElementDef
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="size"):
+            ElementDef(id="e1", type="store_name", size=6)
+
+    def test_qrcode_with_str_size_rejected(self):
+        from api.template_editor_routes import ElementDef
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="size"):
+            ElementDef(id="e1", type="qrcode", size="double_height")
+
+    def test_qrcode_int_in_range_accepted(self):
+        from api.template_editor_routes import ElementDef
+
+        ed = ElementDef(id="e1", type="qrcode", size=6)
+        assert ed.size == 6
+
+    def test_qrcode_int_out_of_range_rejected(self):
+        from api.template_editor_routes import ElementDef
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="size"):
+            ElementDef(id="e1", type="qrcode", size=99)
+
+    def test_text_element_with_str_size_accepted(self):
+        from api.template_editor_routes import ElementDef
+
+        ed = ElementDef(id="e1", type="store_name", size="double_height")
+        assert ed.size == "double_height"
+
+
 # ════════════════════════════════════════════════
 # 4. CRUD API 端点测试（mock async_session_factory）
 # ════════════════════════════════════════════════
