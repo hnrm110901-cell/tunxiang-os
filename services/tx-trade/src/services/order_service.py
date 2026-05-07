@@ -9,6 +9,7 @@
   - 在线时走正常 SQLAlchemy 流程（不受影响）
 """
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Optional
@@ -17,12 +18,15 @@ import structlog
 from sqlalchemy import select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import OrderEventType
 from shared.ontology.src.entities import Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
 
 from ..models.enums import OrderType, TableStatus
 from ..models.tables import Table
 from .attribution_hook import fire_order_attribution
+from .state_machine import InvalidTransitionError, transition_order
 
 if TYPE_CHECKING:
     from edge.sync_engine.src.offline_sync_service import OfflineSyncService  # noqa: F401
@@ -36,11 +40,6 @@ def _gen_order_no() -> str:
 
 
 class OrderService:
-    def __init__(self, db: AsyncSession, tenant_id: str):
-        self.db = db
-        self.tenant_id = uuid.UUID(tenant_id)
-        self._tenant_id_str = tenant_id
-
     """收银核心服务
 
     离线模式：
@@ -55,8 +54,14 @@ class OrderService:
         tenant_id: str,
         offline_sync_service: Optional[Any] = None,
     ) -> None:
+        # PR #265 round-3 verifier 修复：原版双 __init__（line 42-46 + 56-64）
+        # 第二个覆盖第一个，导致 _tenant_id_str 在真实业务路径未初始化，
+        # _set_tenant() 调用 self._tenant_id_str 抛 AttributeError；
+        # 测试用 svc._tenant_id_str = str(svc.tenant_id) 临时 patch 兜过去。
+        # 现合并为单一 __init__，统一初始化所有实例属性。
         self.db = db
         self.tenant_id = uuid.UUID(tenant_id)
+        self._tenant_id_str = tenant_id
         self._offline_sync: Optional[Any] = offline_sync_service
 
     async def _set_tenant(self) -> None:
@@ -329,12 +334,6 @@ class OrderService:
         await self.db.flush()
         return {"order_id": order_id, "discount_fen": discount_fen, "final_fen": new_final}
 
-    async def settle_order(self, order_id: str) -> dict:
-        await self._set_tenant()
-        result = await self.db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
-        )
-
     # ─── 结算 ───
 
     async def settle_order(
@@ -397,24 +396,32 @@ class OrderService:
             }
 
         # ── 在线正常路径 ──────────────────────────────────────────────────
-        result = await self.db.execute(select(Order).where(Order.id == uuid.UUID(order_id)))
+        # PR #265 round-3 verifier 修复：原版漏调 _set_tenant()，RLS 未注入
+        # app.tenant_id → 跨租户 settle 风险；与 cancel_order 的 _set_tenant
+        # 调用对齐
+        await self._set_tenant()
+        result = await self.db.execute(
+            select(Order)
+            .where(Order.id == uuid.UUID(order_id))
+            .where(Order.tenant_id == self.tenant_id)  # 显式 tenant 过滤双保险
+        )
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
         if order.status == OrderStatus.completed.value:
             raise ValueError("Order already settled")
-        order.status = OrderStatus.completed.value
+        # P0-3: 走状态机守卫（兼容现状：confirmed/pending/preparing/ready/served → completed 都允许）
+        transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
         await self.db.flush()
-        return {
-            "order_id": order_id,
-            "order_no": order.order_no,
-            "final_amount_fen": order.final_amount_fen,
-            "settled_at": order.completed_at.isoformat(),
-        }
-        logger.info("order_settled", order_no=order.order_no, final_fen=order.final_amount_fen)
+
+        logger.info(
+            "order_settled",
+            order_no=order.order_no,
+            final_fen=order.final_amount_fen,
+        )
 
         # 触发归因检查（fire-and-forget，不阻断结算流程）
         if order.customer_id:
@@ -425,6 +432,24 @@ class OrderService:
                 order_amount_yuan=round((order.final_amount_fen or 0) / 100, 2),
                 completed_at=order.completed_at,
             )
+
+        # CLAUDE.md §15 事件总线：旁路写入 ORDER.PAID（PR #265 verifier 修复
+        # 原死代码 `return` 之后 emit_event 不可达，settle 完全不发结算事件 → §15 漏单）
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.PAID,
+                tenant_id=str(self.tenant_id),
+                stream_id=str(order.id),
+                payload={
+                    "order_no": order.order_no,
+                    "final_amount_fen": order.final_amount_fen,
+                    "completed_at": order.completed_at.isoformat(),
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"path": "order_service.settle_order"},
+            )
+        )
 
         return {
             "order_id": order_id,
@@ -443,11 +468,31 @@ class OrderService:
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
-        order.status = OrderStatus.cancelled.value
+        # P0-3: 走状态机守卫，已结账订单不能再取消（必须走退款路径）
+        transition_order(order, OrderStatus.cancelled)
         order.order_metadata = {**(order.order_metadata or {}), "cancel_reason": reason}
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
         await self.db.flush()
+
+        # CLAUDE.md §15 事件总线：旁路写入 ORDER.CANCELLED
+        # （PR #265 verifier 反馈：cancel_order 缺 emit_event 是 §15 漏洞）
+        asyncio.create_task(
+            emit_event(
+                event_type=OrderEventType.CANCELLED,
+                tenant_id=str(self.tenant_id),
+                stream_id=str(order.id),
+                payload={
+                    "order_no": order.order_no,
+                    "cancel_reason": reason,
+                    "cancelled_at": datetime.now(timezone.utc).isoformat(),
+                },
+                store_id=str(order.store_id) if order.store_id else None,
+                source_service="tx-trade",
+                metadata={"path": "order_service.cancel_order"},
+            )
+        )
+
         return {"order_id": order_id, "status": "cancelled"}
 
     async def get_order(self, order_id: str) -> dict | None:

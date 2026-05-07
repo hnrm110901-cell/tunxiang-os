@@ -25,6 +25,7 @@ from shared.ontology.src.enums import OrderStatus
 from ..models.enums import TableStatus
 from ..models.tables import Table
 from ..repositories.order_repository import OrderRepository
+from .state_machine import transition_order
 
 logger = structlog.get_logger(__name__)
 
@@ -228,9 +229,9 @@ class CashierService:
         if amount_fen < (order.final_amount_fen or 0):
             raise ValueError(f"支付金额 {amount_fen} 不足，应付 {order.final_amount_fen}")
 
-        # 更新订单状态
+        # 更新订单状态 — P0-3: 走状态机守卫
         now = datetime.now(timezone.utc)
-        order.status = OrderStatus.completed.value
+        transition_order(order, OrderStatus.completed)
         order.completed_at = now
 
         # 释放桌台
