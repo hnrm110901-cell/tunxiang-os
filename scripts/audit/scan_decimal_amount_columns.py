@@ -22,14 +22,20 @@ from pathlib import Path
 
 # ─── 启发式规则 ────────────────────────────────────────────────────────────────
 
-# 疑似金额的字段名关键词（正则）
+# 疑似金额的字段名关键词（正则）— 扩展自 PR #264 verifier 反馈：
+# overhead/payable/receivable/refund/rebate/commission/payment/salary/wage/bonus/
+# allocated/expense/payroll/owed/due/reimburse 都是常见金额字段名
 AMOUNT_PATTERN = re.compile(
-    r"(amount|price|cost|balance|total|fee|charge|discount|deposit|tax|net|gross|sum|premium)",
+    r"(amount|price|cost|balance|total|fee|charge|discount|deposit|tax|net|gross|"
+    r"sum|premium|overhead|allocated|payable|receivable|refund|rebate|commission|"
+    r"payment|salary|wage|bonus|expense|payroll|owed|due|reimburse|profit|revenue|"
+    r"income|payout|cashback)",
     re.IGNORECASE,
 )
 
-# 白名单：字段名含 rate 且 scale <= 4 的百分比字段不报警
-RATE_PATTERN = re.compile(r"rate", re.IGNORECASE)
+# 白名单：字段名含 rate/ratio/pct/percent（百分比/比例字段，非金额）
+# 收紧自 PR #264 verifier 反馈："rate" 单词太宽泛
+RATE_PATTERN = re.compile(r"(rate|ratio|pct|percent)", re.IGNORECASE)
 
 # 只对 scale = 2 的报 high，其他报 warning
 HIGH_SEVERITY_SCALE = 2
@@ -107,8 +113,14 @@ def _severity(scale: int | None) -> str:
 
 
 def _should_skip_rate_field(column_name: str, scale: int | None) -> bool:
-    """税率/百分比字段白名单：字段名含 rate 且 scale <= 4 则跳过。"""
-    if RATE_PATTERN.search(column_name) and scale is not None and scale <= 4:
+    """税率/百分比字段白名单：字段名含 rate/ratio/pct/percent **且** scale >= 4 则跳过。
+
+    收紧自 PR #264 verifier 反馈：
+      - 旧规则 `scale <= 4` 太宽，会把 `deposit_ratio Numeric(5,2)` 误白名单
+      - 新规则 `scale >= 4`：真税率 (Numeric(5,4)) 仍跳过，
+        scale=2 的"看似比例实际可能是金额"的 ratio 字段需人工 review
+    """
+    if RATE_PATTERN.search(column_name) and scale is not None and scale >= 4:
         return True
     return False
 
@@ -130,6 +142,50 @@ class _ViolationVisitor(ast.NodeVisitor):
     def visit_Assign(self, node: ast.Assign) -> None:
         for target in node.targets:
             self._check_assignment_target(target, node.value, node.lineno)
+        self.generic_visit(node)
+
+    def visit_Call(self, node: ast.Call) -> None:
+        """处理 Table() 内的字面列名：Column("amount", Numeric(10, 2), ...)。
+
+        verifier #264 反馈：原版只走 visit_Assign，无法捕获 SQLAlchemy Core
+        Table() / __table_args__ 中以位置参数形式定义的列。
+        """
+        func = node.func
+        func_name: str | None = None
+        if isinstance(func, ast.Name):
+            func_name = func.id
+        elif isinstance(func, ast.Attribute):
+            func_name = func.attr
+
+        if func_name == "Column" and len(node.args) >= 2:
+            first_arg = node.args[0]
+            if isinstance(first_arg, ast.Constant) and isinstance(first_arg.value, str):
+                column_name = first_arg.value
+                # 在第 2+ 位置参数中找 Numeric(...)
+                numeric_call: ast.Call | None = None
+                for arg in node.args[1:]:
+                    if _is_numeric_call(arg):
+                        numeric_call = arg  # type: ignore[assignment]
+                        break
+                if numeric_call is not None:
+                    precision, scale = _extract_numeric_args(numeric_call)
+                    if AMOUNT_PATTERN.search(column_name) and not _should_skip_rate_field(
+                        column_name, scale
+                    ):
+                        type_args = (
+                            f"Numeric({precision}, {scale})"
+                            if precision is not None
+                            else "Numeric(...)"
+                        )
+                        self.violations.append(
+                            Violation(
+                                file=self.source_path,
+                                line=node.lineno,
+                                column_name=column_name,
+                                type_args=type_args,
+                                severity=_severity(scale),
+                            )
+                        )
         self.generic_visit(node)
 
     def _check_assignment_target(
@@ -202,14 +258,38 @@ def scan_file(path: Path, root: Path) -> list[Violation]:
 
 
 def scan_directory(root: Path) -> list[Violation]:
-    """扫描 root/*/src/models/*.py，返回所有违规，按 file+line 排序。"""
-    all_violations: list[Violation] = []
+    """递归扫描 services/ 与 shared/ 下的 .py 文件，返回所有违规。
 
-    # 匹配 services/*/src/models/*.py（递归）
-    pattern = "*/src/models/*.py"
-    for model_file in sorted(root.glob(pattern)):
-        violations = scan_file(model_file, root.parent)
-        all_violations.extend(violations)
+    verifier #264 反馈：原版用 `glob("*/src/models/*.py")` 非递归，漏扫：
+    - 深路径（services/tx-brain/src/ontology/models.py）
+    - shared/ontology/ 模型
+    - SQLAlchemy Core Table() 写法（services/*/src/services/*.py 中的 delivery_ops_service）
+    """
+    all_violations: list[Violation] = []
+    seen: set[tuple[str, int, str]] = set()  # 去重 (file, line, column_name)
+
+    # 递归扫 .py 全文件，但限定在与 ORM 相关的目录下
+    candidate_globs = [
+        "**/src/models/*.py",          # 标准 ORM 模型目录
+        "**/src/models/**/*.py",       # 嵌套目录
+        "**/src/services/*.py",        # SQLAlchemy Core Table() 出现位置
+        "**/src/services/**/*.py",
+        "**/src/ontology/**/*.py",     # tx-brain/src/ontology
+    ]
+    parent_root = root.parent if root.parent != root else root
+    for pattern in candidate_globs:
+        for model_file in sorted(root.rglob(pattern.split("/", 1)[1] if pattern.startswith("**/") else pattern)):
+            try:
+                violations = scan_file(model_file, parent_root)
+            except ValueError:
+                # path.relative_to 失败时（root.parent 为 / 等极端情况）兜底
+                violations = scan_file(model_file, model_file.parent)
+            for v in violations:
+                key = (v.file, v.line, v.column_name)
+                if key in seen:
+                    continue
+                seen.add(key)
+                all_violations.append(v)
 
     all_violations.sort(key=lambda v: (v.file, v.line))
     return all_violations

@@ -49,8 +49,11 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         # ── tx-finance ──────────────────────────────────────────────────
         ("services/tx-finance/src/models/cost_snapshot.py", 56, "raw_material_cost"),
         ("services/tx-finance/src/models/cost_snapshot.py", 57, "labor_cost_allocated"),
+        # 新增（PR #264 verifier 反馈，关键词扩展后捕获）：
+        ("services/tx-finance/src/models/cost_snapshot.py", 58, "overhead_allocated"),
         ("services/tx-finance/src/models/cost_snapshot.py", 59, "total_cost"),
         ("services/tx-finance/src/models/cost_snapshot.py", 62, "selling_price"),
+        # 待 P0-1 修复后删除（PR #271 fix/p0-1-invoice-fen）：
         ("services/tx-finance/src/models/invoice.py", 66, "amount"),
         ("services/tx-finance/src/models/invoice.py", 67, "tax_amount"),
         ("services/tx-finance/src/models/voucher.py", 110, "total_amount"),
@@ -66,13 +69,15 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         ("services/tx-member/src/models/stored_value_account.py", 174, "gift_balance_before"),
         ("services/tx-member/src/models/stored_value_account.py", 180, "gift_balance_after"),
         # ── tx-trade ────────────────────────────────────────────────────
+        # 新增（rate 白名单收紧 scale>=4 后捕获，需人工 review 是否真金额）：
+        ("services/tx-trade/src/models/banquet_ai.py", 90, "food_cost_rate"),
         ("services/tx-trade/src/models/banquet_contract.py", 39, "deposit_ratio"),
         ("services/tx-trade/src/models/chef_performance_daily.py", 22, "dish_amount"),
-        # 待 P0-1 修复后删除：
+        # 待专项 PR 修复后删除：
         ("services/tx-trade/src/models/discount_audit_log.py", 43, "original_amount"),
         ("services/tx-trade/src/models/discount_audit_log.py", 44, "final_amount"),
         ("services/tx-trade/src/models/discount_audit_log.py", 45, "discount_amount"),
-        # 待 P0-2 修复后删除：
+        # 待 P0-2 修复后删除（PR #272 fix/p0-2-wine-storage-fen）：
         ("services/tx-trade/src/models/wine_storage.py", 61, "storage_price"),
         ("services/tx-trade/src/models/wine_storage.py", 92, "price_at_trans"),
     ]
@@ -115,24 +120,22 @@ def test_no_new_decimal_amount_violations(scan_results: frozenset) -> None:
 
 
 def test_baseline_is_current_reality(scan_results: frozenset) -> None:
-    """辅助测试：检测 KNOWN_BASELINE 中已被修复的条目（提醒删除 baseline 行）。
+    """守门：检测 KNOWN_BASELINE 中已被修复的"幽灵条目"，强制清理。
 
-    此测试仅警告，不阻断 CI（用 xfail 会掩盖信息，改为 warning 打印）。
-    当 P0-1/P0-2 PR 修复后，对应条目将不再出现在扫描结果，
-    此时 baseline 中存在"幽灵条目"，需手动清理。
+    PR #264 verifier 反馈：原版只 print 不 fail，baseline 漂移会被遗忘。
+    现改为硬 fail —— 修复违规后必须同步删除 KNOWN_BASELINE 对应行，
+    保证 baseline 永远是当前真实状态的镜像（双向严格守门）。
     """
     fixed_but_in_baseline = KNOWN_BASELINE - scan_results
     if fixed_but_in_baseline:
-        # 打印提示，但不 fail —— 鼓励清理 baseline
         fixed_list = "\n".join(
             f"  {file}:{line} {col}"
             for file, line, col in sorted(fixed_but_in_baseline)
         )
-        pytest.warns(
-            UserWarning,
-            match=".*",
-        ) if False else None  # noqa: SIM210
-        print(
-            f"\n[INFO] {len(fixed_but_in_baseline)} 个 baseline 条目已被修复，"
-            f"请从 KNOWN_BASELINE 中删除：\n{fixed_list}\n"
+        pytest.fail(
+            f"\n\n[Tier1 Baseline 漂移] {len(fixed_but_in_baseline)} 个 KNOWN_BASELINE 条目已被修复，"
+            f"必须从 baseline 中删除以保持守门有效：\n{fixed_list}\n"
+            f"\n修复方法：在本测试文件 KNOWN_BASELINE 中删除上述 tuple，重跑测试。\n"
+            f"详见：tests/tier1/test_no_decimal_amount_tier1.py 顶部"
+            f"《如何递减 baseline》注释。"
         )
