@@ -14,16 +14,22 @@ interface BluetoothRemoteGATTServer { connected: boolean; connect(): Promise<Blu
 interface BluetoothRemoteGATTService { getCharacteristic(uuid: string): Promise<BluetoothRemoteGATTCharacteristic>; }
 interface BluetoothRemoteGATTCharacteristic { writeValue(value: BufferSource): Promise<void>; writeValueWithResponse(value: BufferSource): Promise<void>; }
 
-/** 安卓 Kotlin 层注入的原生接口 */
+/** 安卓 Kotlin 层注入的原生接口（V4 sprint D5b 2026-05-07：补 3 方法对齐 CLAUDE.md §七 11 JS API）*/
 interface NativeTXBridge {
   print(content: string): void;
+  /** V4 新增：富文本打印（带字号/粗体），区别于 raw ESC/POS print() */
+  printText(text: string, fontSize?: number, bold?: boolean): void;
   openCashBox(): void;
   startScale(): void;
+  /** V4 新增：停止称重监听，与 startScale() 配对 */
+  stopScale(): void;
   onScaleData(callback: string): void;
   scan(): void;
   onScanResult(callback: string): void;
   getDeviceInfo(): string;
   getMacMiniUrl(): string;
+  /** V4 新增：心跳上报（OTA v094 + 设备健康），由 mac-station ota_routes 接收 */
+  reportHeartbeat(): void;
 }
 
 declare global {
