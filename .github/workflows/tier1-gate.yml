@@ -16,6 +16,8 @@ on:
       - 'services/**/tests/**/*tier1*.py'
       - 'services/**/src/tests/**/*tier1*.py'
       - 'tests/tier1/**'
+      # 审计扫描脚本（PR #264 verifier 反馈）：改 scanner 必须重跑 baseline 守门测试
+      - 'scripts/audit/**'
       # Tier 1 路径 — CLAUDE.md § 17 列表：
       # 订单状态机 + 支付 Saga + 存酒/押金 + POS 数据 + 全电发票 +
       # CRDT 冲突 + 三条硬约束 + RLS
