@@ -217,7 +217,7 @@ async def test_system_connectivity(
 
 async def _test_pinzhi(tenant_id: str, cfg: dict) -> dict:
     """品智：调用 get_store_info 验证 token + base_url。"""
-    from shared.adapters.pinzhi.src.adapter import PinzhiAdapter
+    from shared.adapters.pinzhi_pos.src.adapter import PinzhiAdapter
 
     cfg_parsed = PinzhiConfig(**cfg)
     if not cfg_parsed.base_url or not cfg_parsed.app_secret:

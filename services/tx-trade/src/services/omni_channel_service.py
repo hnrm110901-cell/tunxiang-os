@@ -745,7 +745,7 @@ class OmniChannelService:
                 }
             )
         elif platform == "eleme":
-            from shared.adapters.eleme.src.adapter import ElemeAdapter
+            from shared.adapters.eleme_open_platform.src.adapter import ElemeAdapter
 
             return ElemeAdapter(
                 config={
@@ -754,7 +754,7 @@ class OmniChannelService:
                 }
             )
         elif platform == "douyin":
-            from shared.adapters.douyin.src.adapter import DouyinAdapter
+            from shared.adapters.douyin_open_platform.src.adapter import DouyinAdapter
 
             return DouyinAdapter(
                 config={

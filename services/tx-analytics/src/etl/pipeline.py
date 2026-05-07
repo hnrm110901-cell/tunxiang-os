@@ -20,10 +20,10 @@ from typing import Any
 import structlog
 from sqlalchemy import select, text
 
-from shared.adapters.pinzhi.src.adapter import PinzhiAdapter
-from shared.adapters.pinzhi.src.inventory_sync import PinzhiInventorySync
-from shared.adapters.pinzhi.src.member_sync import PinzhiMemberSync
-from shared.adapters.pinzhi.src.order_sync import PinzhiOrderSync
+from shared.adapters.pinzhi_pos.src.adapter import PinzhiAdapter
+from shared.adapters.pinzhi_pos.src.inventory_sync import PinzhiInventorySync
+from shared.adapters.pinzhi_pos.src.member_sync import PinzhiMemberSync
+from shared.adapters.pinzhi_pos.src.order_sync import PinzhiOrderSync
 from shared.ontology.src.database import async_session_factory
 from shared.ontology.src.entities import (
     Customer,

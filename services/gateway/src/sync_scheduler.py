@@ -127,9 +127,9 @@ async def _write_sync_log(
 
 async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
     """全量拉取指定商户所有门店的菜品，返回统计信息。"""
-    from shared.adapters.pinzhi.src.dish_sync import PinzhiDishSync
-    from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.dish_sync import PinzhiDishSync
+    from shared.adapters.pinzhi_pos.src.factory import PinzhiAdapterFactory
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
 
     log = logger.bind(merchant_code=merchant_code, sync_type="dishes")
     tenant_id = _get_tenant_id(merchant_code)
@@ -169,9 +169,9 @@ async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
 async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
     """全量拉取指定商户所有门店的桌台，UPSERT 写入数据库。"""
 
-    from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
-    from shared.adapters.pinzhi.src.table_sync import PinzhiTableSync
+    from shared.adapters.pinzhi_pos.src.factory import PinzhiAdapterFactory
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.table_sync import PinzhiTableSync
 
     log = logger.bind(merchant_code=merchant_code, sync_type="tables")
     tenant_id = _get_tenant_id(merchant_code)
@@ -206,9 +206,9 @@ async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
 
 async def _sync_employees_for_merchant(merchant_code: str, db: Any) -> dict:
     """全量拉取指定商户所有门店的员工，UPSERT 写入数据库。"""
-    from shared.adapters.pinzhi.src.employee_sync import PinzhiEmployeeSync
-    from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.employee_sync import PinzhiEmployeeSync
+    from shared.adapters.pinzhi_pos.src.factory import PinzhiAdapterFactory
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
 
     log = logger.bind(merchant_code=merchant_code, sync_type="employees")
     tenant_id = _get_tenant_id(merchant_code)
@@ -241,9 +241,9 @@ async def _sync_employees_for_merchant(merchant_code: str, db: Any) -> dict:
 
 async def _sync_orders_incremental_for_merchant(merchant_code: str) -> dict:
     """增量拉取指定商户当日订单（调用已有 order_sync 模块）。"""
-    from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
-    from shared.adapters.pinzhi.src.order_sync import PinzhiOrderSync
+    from shared.adapters.pinzhi_pos.src.factory import PinzhiAdapterFactory
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.order_sync import PinzhiOrderSync
 
     log = logger.bind(merchant_code=merchant_code, sync_type="orders_incremental")
     merchant_cfg = MERCHANT_CONFIG[merchant_code]
@@ -287,9 +287,9 @@ async def _sync_orders_incremental_for_merchant(merchant_code: str) -> dict:
 
 async def _sync_members_incremental_for_merchant(merchant_code: str, db: Any) -> dict:
     """增量拉取指定商户会员变更（调用已有 member_sync 模块）。"""
-    from shared.adapters.pinzhi.src.factory import PinzhiAdapterFactory
-    from shared.adapters.pinzhi.src.member_sync import PinzhiMemberSync
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.factory import PinzhiAdapterFactory
+    from shared.adapters.pinzhi_pos.src.member_sync import PinzhiMemberSync
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
 
     log = logger.bind(merchant_code=merchant_code, sync_type="members_incremental")
     merchant_cfg = MERCHANT_CONFIG[merchant_code]

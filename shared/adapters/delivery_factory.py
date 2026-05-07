@@ -10,10 +10,10 @@ from typing import Dict
 import structlog
 
 from .delivery_platform_base import DeliveryPlatformAdapter
-from .douyin_adapter import DouyinDeliveryAdapter
-from .eleme_adapter import ElemeDeliveryAdapter
+from .douyin_delivery_adapter import DouyinDeliveryAdapter
+from .eleme_delivery_adapter import ElemeDeliveryAdapter
 from .grabfood.src.adapter import GrabFoodDeliveryAdapter
-from .meituan_adapter import MeituanDeliveryAdapter
+from .meituan_delivery_adapter import MeituanDeliveryAdapter
 from .wechat_delivery_adapter import WeChatDeliveryAdapter
 
 logger = structlog.get_logger()

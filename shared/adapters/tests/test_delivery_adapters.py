@@ -19,9 +19,9 @@ from shared.adapters.delivery_platform_base import (
     DeliveryPlatformAdapter,
     DeliveryPlatformError,
 )
-from shared.adapters.douyin_adapter import DOUYIN_STATUS_MAP, DouyinDeliveryAdapter
-from shared.adapters.eleme_adapter import ELEME_STATUS_MAP, ElemeDeliveryAdapter
-from shared.adapters.meituan_adapter import MEITUAN_STATUS_MAP, MeituanDeliveryAdapter
+from shared.adapters.douyin_delivery_adapter import DOUYIN_STATUS_MAP, DouyinDeliveryAdapter
+from shared.adapters.eleme_delivery_adapter import ELEME_STATUS_MAP, ElemeDeliveryAdapter
+from shared.adapters.meituan_delivery_adapter import MEITUAN_STATUS_MAP, MeituanDeliveryAdapter
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  工厂测试
