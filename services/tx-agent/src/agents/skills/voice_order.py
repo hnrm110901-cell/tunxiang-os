@@ -200,6 +200,7 @@ class VoiceOrderAgent(SkillAgent):
             "parse_order_intent",
             "match_dishes",
             "confirm_and_order",
+            "process_voice_order",
             "get_stats",
         ]
 
@@ -209,6 +210,7 @@ class VoiceOrderAgent(SkillAgent):
             "parse_order_intent": self._parse_order_intent,
             "match_dishes": self._match_dishes,
             "confirm_and_order": self._confirm_and_order,
+            "process_voice_order": self._process_voice_order,
             "get_stats": self._get_stats,
         }
         handler = dispatch.get(action)
@@ -299,13 +301,18 @@ class VoiceOrderAgent(SkillAgent):
                     action = act
                     break
 
-        # 检测数量
-        quantity = 1
+        # 检测数量（regex 优先，兼容 "100 份" / "三份" / "两瓶"）
+        quantity: float = 1
         unit = "份"
-        for q_word, q_val in _QUANTITY_WORDS.items():
-            if q_word in text:
-                quantity = q_val
-                break
+        import re as _re
+        qty_match = _re.search(r"(\d+)", text)
+        if qty_match:
+            quantity = int(qty_match.group(1))
+        else:
+            for q_word, q_val in _QUANTITY_WORDS.items():
+                if q_word in text:
+                    quantity = q_val
+                    break
 
         for u in _UNIT_KEYWORDS:
             if u in text:
@@ -319,8 +326,11 @@ class VoiceOrderAgent(SkillAgent):
                 weight_spec = f"{q_val}斤"
                 break
 
-        # 提取菜名（移除数量词、动作词、单位词后的核心词）
+        # 提取菜名（移除数量词、动作词、单位词、阿拉伯数字、语气填充词后的核心词）
         dish_text = text
+        # 先 strip 阿拉伯数字（兼容 100 / 50 / 3 等）
+        import re as _re2
+        dish_text = _re2.sub(r"\d+", "", dish_text)
         for kw_list in _ACTION_KEYWORDS.values():
             for kw in kw_list:
                 dish_text = dish_text.replace(kw, "")
@@ -328,7 +338,7 @@ class VoiceOrderAgent(SkillAgent):
             dish_text = dish_text.replace(q_word, "")
         for u in _UNIT_KEYWORDS:
             dish_text = dish_text.replace(u, "")
-        for filler in ["的", "了", "啊", "呢", "吧", "嘛", "哦", "呀", " "]:
+        for filler in ["的", "了", "啊", "呢", "吧", "嘛", "哦", "呀", "那", "个", "这", " "]:
             dish_text = dish_text.replace(filler, "")
 
         dish_name = dish_text.strip()
@@ -389,31 +399,43 @@ class VoiceOrderAgent(SkillAgent):
         )
 
     def _fuzzy_match(self, query: str, menu_items: list[dict], top_n: int) -> list[dict]:
-        """模糊匹配菜品"""
+        """模糊匹配菜品（精确 → 包含 → 拼音 → 字符 overlap 多层 fallback）"""
         scored: list[dict] = []
+        # 字符 overlap 用：去除指代/语气词
+        FILLER_CHARS = set("那个的了啊呢吧嘛哦呀这一二三 ")
+        query_chars = set(query) - FILLER_CHARS
 
         for item in menu_items:
             name = item.get("name", "")
             score = 0.0
+            match_type = "pinyin"
 
             # 精确匹配
             if query == name:
                 score = 1.0
+                match_type = "exact"
             # 包含匹配
             elif query in name or name in query:
                 score = 0.85
+                match_type = "contains"
             else:
-                # 拼音模糊匹配
-                score = _pinyin_similarity(query, name)
-
-            if score > 0.3:
-                scored.append(
-                    {
-                        **item,
-                        "score": round(score, 3),
-                        "match_type": "exact" if score == 1.0 else "contains" if score >= 0.85 else "pinyin",
-                    }
+                # 拼音 similarity
+                pinyin_score = _pinyin_similarity(query, name)
+                # 字符 overlap fallback（处理 "辣的鱼" / "那个鱼" 等含有原菜名 1-2 字符的指代）
+                name_chars = set(name)
+                char_overlap = (
+                    len(query_chars & name_chars) / max(1, len(query_chars))
+                    if query_chars else 0.0
                 )
+                score = max(pinyin_score, char_overlap)
+                match_type = "char" if char_overlap > pinyin_score else "pinyin"
+
+            if score > 0.15:
+                scored.append({
+                    **item,
+                    "score": round(score, 3),
+                    "match_type": match_type,
+                })
 
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored[:top_n]
@@ -484,6 +506,289 @@ class VoiceOrderAgent(SkillAgent):
             },
             reasoning=f"语音点餐已确认: {len(order_items)} 道菜，合计 ¥{total_fen / 100:.2f}",
             confidence=0.95,
+        )
+
+    # ── Action: 端到端语音点餐处理（v1.0 Tier 1） ──────────────────
+    async def _process_voice_order(self, params: dict) -> AgentResult:
+        """端到端处理语音点餐：解析 → 匹配 → 沽清/数量校验 → 输出 A2UI Surface
+
+        三条硬约束 UI 表达（v1.0 宪法 §1.4）：
+          - 食安合规：沽清菜拒绝 + 推荐替代
+          - 客户体验：模糊匹配返回候选让用户确认
+          - 毛利底线：数量异常二次确认（防误点）
+        """
+        import uuid as _uuid
+        text: str = params.get("text", "").strip()
+        menu_items: list[dict] = params.get("menu_items", [])
+        table_id: str = params.get("table_id", "")
+        EXCESSIVE_QTY = 10  # 数量异常阈值
+
+        if not text or not menu_items or not table_id:
+            return AgentResult(
+                success=False,
+                action="process_voice_order",
+                error="缺少必填参数（text / menu_items / table_id）",
+                reasoning="参数校验失败",
+            )
+
+        # Step 1: 解析意图
+        intents = self._extract_intent(text)
+        if not intents:
+            return self._build_error_surface(
+                action="process_voice_order",
+                title="无法识别点菜意图",
+                message=f"'{text}' 未匹配到点菜动作，请再说一次",
+            )
+
+        # Step 2: 对每个意图项做匹配 + 沽清/数量检查
+        sold_out_items = []
+        excessive_qty_items = []
+        ambiguous_items = []
+        confirmed_items = []
+        warnings = []
+
+        for intent in intents:
+            if intent.get("action") != "add":
+                continue
+            dish_query = intent.get("dish", "")
+            quantity = intent.get("quantity", 1)
+            if not dish_query:
+                continue
+
+            matches = self._fuzzy_match(dish_query, menu_items, top_n=3)
+            if not matches:
+                warnings.append(f"未找到匹配菜品：{dish_query}")
+                continue
+
+            best = matches[0]
+
+            # 食安合规：沽清菜
+            if best.get("sold_out"):
+                # 推荐同类替代（非沽清）
+                same_cat = [m for m in menu_items
+                            if m.get("category") == best.get("category")
+                            and not m.get("sold_out")
+                            and m.get("dish_id") != best.get("dish_id")]
+                alternatives = same_cat[:3] if same_cat else [
+                    m for m in menu_items if not m.get("sold_out")
+                ][:3]
+                sold_out_items.append({
+                    "requested": best,
+                    "alternatives": alternatives,
+                })
+                continue
+
+            # 客户体验：弱匹配（score < 0.85）→ 弹候选确认
+            if best["score"] < 0.85:
+                ambiguous_items.append({
+                    "query": dish_query,
+                    "candidates": matches[:3],
+                })
+                continue
+
+            # 毛利底线：数量异常
+            if quantity > EXCESSIVE_QTY:
+                excessive_qty_items.append({
+                    "dish": best,
+                    "quantity": quantity,
+                })
+                warnings.append(f"数量异常：'{best['name']}' 请求 {quantity} 份（>{EXCESSIVE_QTY}），需经理确认")
+                continue
+
+            confirmed_items.append({
+                **best,
+                "quantity": quantity,
+                "unit": intent.get("unit", "份"),
+                "modifiers": intent.get("modifiers", []),
+            })
+
+        # Step 3: 决定路径并构造 A2UI Surface
+        requires_confirmation = bool(sold_out_items or ambiguous_items or excessive_qty_items)
+
+        if sold_out_items:
+            # 沽清：警告 + 推荐替代
+            so = sold_out_items[0]
+            alternatives = so["alternatives"]
+            surface = self._build_sold_out_surface(so["requested"], alternatives)
+            return AgentResult(
+                success=True,
+                action="process_voice_order",
+                data={
+                    "a2ui_surface": surface,
+                    "rejected": True,
+                    "reason": "sold_out",
+                    "requested_dish": so["requested"]["name"],
+                    "alternatives": alternatives,
+                    "warnings": warnings,
+                    "requires_confirmation": True,
+                },
+                reasoning=f"食安合规：'{so['requested']['name']}' 已沽清，推荐 {len(alternatives)} 个替代菜",
+                confidence=0.92,
+                inference_layer="edge",
+            )
+
+        if ambiguous_items:
+            ai = ambiguous_items[0]
+            surface = self._build_candidate_surface(ai["query"], ai["candidates"])
+            return AgentResult(
+                success=True,
+                action="process_voice_order",
+                data={
+                    "a2ui_surface": surface,
+                    "candidates": ai["candidates"],
+                    "candidate_count": len(ai["candidates"]),
+                    "warnings": warnings,
+                    "requires_confirmation": True,
+                },
+                reasoning=f"客户体验：'{ai['query']}' 匹配多个候选 {len(ai['candidates'])} 项，需用户确认",
+                confidence=ai["candidates"][0]["score"],
+                inference_layer="edge",
+            )
+
+        if excessive_qty_items:
+            eq = excessive_qty_items[0]
+            surface = self._build_excessive_qty_surface(eq["dish"], eq["quantity"])
+            return AgentResult(
+                success=True,
+                action="process_voice_order",
+                data={
+                    "a2ui_surface": surface,
+                    "excessive": True,
+                    "dish": eq["dish"]["name"],
+                    "requested_quantity": eq["quantity"],
+                    "warnings": warnings,
+                    "requires_confirmation": True,
+                },
+                reasoning=f"客户体验/毛利保护：'{eq['dish']['name']}' 数量 {eq['quantity']} 异常，需二次确认",
+                confidence=0.88,
+                inference_layer="edge",
+            )
+
+        # 标准路径：构造 OrderConfirm 卡片
+        total_fen = sum(int(it.get("price_fen", 0) * it.get("quantity", 1)) for it in confirmed_items)
+        surface = self._build_order_confirm_surface(confirmed_items, total_fen)
+        return AgentResult(
+            success=True,
+            action="process_voice_order",
+            data={
+                "a2ui_surface": surface,
+                "items": confirmed_items,
+                "total_fen": total_fen,
+                "table_id": table_id,
+                "warnings": warnings,
+                "requires_confirmation": False,
+            },
+            reasoning=f"标准点餐：解析 {len(confirmed_items)} 道菜，合计 ¥{total_fen / 100:.2f}，三条硬约束通过",
+            confidence=0.95,
+            inference_layer="edge",
+        )
+
+    # ── A2UI Surface 构造器 ──────────────────────────────
+    @staticmethod
+    def _surface_id() -> str:
+        import uuid as _uuid
+        return f"voice-order-{_uuid.uuid4().hex[:8]}"
+
+    def _build_order_confirm_surface(self, items: list[dict], total_fen: int) -> dict:
+        sid = self._surface_id()
+        return {
+            "surfaceId": sid,
+            "components": [
+                {"id": f"{sid}-card", "type": "card",
+                 "properties": {"severity": "info", "title": "确认点餐"}},
+                {"id": f"{sid}-list", "type": "list", "parent": f"{sid}-card",
+                 "properties": {"items": [
+                     {"label": f"{it['name']} ×{it['quantity']}",
+                      "value": f"¥{it.get('price_fen', 0) * it.get('quantity', 1) / 100:.2f}"}
+                     for it in items
+                 ]}},
+                {"id": f"{sid}-total", "type": "text", "parent": f"{sid}-card",
+                 "properties": {"content": f"合计 ¥{total_fen / 100:.2f}", "size": "lg"}},
+                {"id": f"{sid}-cancel", "type": "button",
+                 "properties": {"label": "取消", "variant": "ghost", "action": "voice_order.cancel"}},
+                {"id": f"{sid}-confirm", "type": "button",
+                 "properties": {"label": "确认下单", "variant": "primary", "action": "voice_order.confirm"}},
+            ],
+        }
+
+    def _build_sold_out_surface(self, requested: dict, alternatives: list[dict]) -> dict:
+        sid = self._surface_id()
+        return {
+            "surfaceId": sid,
+            "components": [
+                {"id": f"{sid}-card", "type": "card",
+                 "properties": {"severity": "warning", "title": f"⚠ {requested['name']} 已沽清"}},
+                {"id": f"{sid}-msg", "type": "text", "parent": f"{sid}-card",
+                 "properties": {"content": f"很抱歉，{requested['name']} 已售完。为您推荐："}},
+                {"id": f"{sid}-alts", "type": "list", "parent": f"{sid}-card",
+                 "properties": {"items": [
+                     {"label": alt["name"],
+                      "value": f"¥{alt.get('price_fen', 0) / 100:.2f}",
+                      "action": f"voice_order.choose:{alt['dish_id']}"}
+                     for alt in alternatives
+                 ]}},
+                {"id": f"{sid}-cancel", "type": "button",
+                 "properties": {"label": "取消", "variant": "ghost", "action": "voice_order.cancel"}},
+            ],
+        }
+
+    def _build_candidate_surface(self, query: str, candidates: list[dict]) -> dict:
+        sid = self._surface_id()
+        return {
+            "surfaceId": sid,
+            "components": [
+                {"id": f"{sid}-card", "type": "card",
+                 "properties": {"severity": "info", "title": f"请选择您要的菜品（来自 '{query}'）"}},
+                {"id": f"{sid}-list", "type": "list", "parent": f"{sid}-card",
+                 "properties": {"items": [
+                     {"label": c["name"],
+                      "value": f"¥{c.get('price_fen', 0) / 100:.2f}",
+                      "action": f"voice_order.choose:{c['dish_id']}"}
+                     for c in candidates
+                 ]}},
+                {"id": f"{sid}-cancel", "type": "button",
+                 "properties": {"label": "取消", "variant": "ghost", "action": "voice_order.cancel"}},
+            ],
+        }
+
+    def _build_excessive_qty_surface(self, dish: dict, quantity: int) -> dict:
+        sid = self._surface_id()
+        return {
+            "surfaceId": sid,
+            "components": [
+                {"id": f"{sid}-card", "type": "card",
+                 "properties": {"severity": "warning", "title": f"⚠ 数量异常确认"}},
+                {"id": f"{sid}-msg", "type": "text", "parent": f"{sid}-card",
+                 "properties": {
+                     "content": f"您要点 {dish['name']} ×{quantity}（合计 ¥{dish.get('price_fen', 0) * quantity / 100:.2f}），数量较多，请确认是否正确",
+                 }},
+                {"id": f"{sid}-cancel", "type": "button",
+                 "properties": {"label": "取消", "variant": "ghost", "action": "voice_order.cancel"}},
+                {"id": f"{sid}-confirm", "type": "button",
+                 "properties": {"label": f"确认 ×{quantity}", "variant": "danger", "action": "voice_order.confirm"}},
+            ],
+        }
+
+    def _build_error_surface(self, *, action: str, title: str, message: str) -> AgentResult:
+        sid = self._surface_id()
+        surface = {
+            "surfaceId": sid,
+            "components": [
+                {"id": f"{sid}-card", "type": "card",
+                 "properties": {"severity": "warning", "title": title}},
+                {"id": f"{sid}-msg", "type": "text", "parent": f"{sid}-card",
+                 "properties": {"content": message}},
+                {"id": f"{sid}-cancel", "type": "button",
+                 "properties": {"label": "取消", "variant": "ghost", "action": "voice_order.cancel"}},
+            ],
+        }
+        return AgentResult(
+            success=True,  # Agent 调度成功，只是结果是"无法处理"
+            action=action,
+            data={"a2ui_surface": surface, "warnings": [message], "requires_confirmation": True},
+            reasoning=f"识别失败：{title} — {message}",
+            confidence=0.3,
+            inference_layer="edge",
         )
 
     # ── Action: 语音点餐统计 ──────────────────────────────
