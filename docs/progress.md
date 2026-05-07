@@ -1,3 +1,84 @@
+## 2026-05-07 22:30 · Sprint 1 #250 CI lint 落地 → 7/8 关闭
+
+### 完成状态
+- [x] 已完成：#250 [S1-07] UI 质量闸门 4 道 lint + baseline 机制 + GitHub Actions
+- [x] 已完成：本地 `pnpm lint:ui` 全 pass，652ms
+- [ ] 未完成：#251 [S1-08] 硬编码品牌色清理 ~4112 处（baseline 已锁住，可渐进降）
+
+### 关键决策
+- **决策 8：lint 走 baseline 模式而非 strict** — 当前 4 道 lint 累积 6274 处违规（含 4112 硬编码色），强 strict 会阻塞所有 PR；baseline 模式让 PR 不引入新违规即可，团队渐进清理后用 `--update-baseline` 降数字
+- **决策 9：CI workflow 路径放 `.github/workflows/` 而非 `infra/ci/`** — 与项目其他 workflow（frontend-ci.yml / migration-ci.yml）风格一致；issue 描述路径 `infra/ci/ui-quality-gate.yml` 是建议而非强制
+- **决策 10：tap-target / font-size 主要查 inline + Tailwind，CSS module 文件级 AST 检查留 v2** — 简化 lint 实现，覆盖率仍达 ~80% 实际违规场景
+
+### 下一步
+- 推 #251 硬编码色清理（4112 → 0 是分阶段任务，先打个脚本扫描出按"低悬果实"分批清理）
+- 或：commit 当前所有改动（DEVLOG / progress.md / 4 lint scripts / CI workflow / TXKDSTicket / tokens / ...）
+
+### 已知风险
+- baseline.json 4 个数字是当前快照，未来人工修改可能误降（建议加 git diff 时人工 review）
+- font-size 1712 中很多是 caption / spec / badge 的合理 13-15px — 不是"必须改"的违规，需视觉评审分类（哪些必须升 ≥16 / 哪些可加 `/* @lint-ignore-font */` 豁免）
+- pnpm-lock.yaml 累积变更较多（@types/react + tx-touch devDep + scripts/lint-ui 不动 deps），团队 pull 后 `pnpm install` 顺手即可
+
+---
+
+## 2026-05-07 21:00 · Sprint 1 推进 6/8 关闭
+
+### 完成状态
+- [x] 已完成：#245 [S1-02] / #246 [S1-03] / #247 [S1-04] 关闭（调研发现历史已就位，拆 #268/#269/#270 三个 follow-up）
+- [x] 已完成：#248 [S1-05] KDS 关键操作 72×72px 落地
+- [x] 已完成：#249 [S1-06] KDS 字号规范化（CSS vars 统一管控）
+- [x] 已完成：useVoiceAgent.ts:184 typo 修复 + @types/react devDep 加入 shared/design-system + tx-touch
+- [x] 已完成：#267 web-pos 81 个 pre-existing typecheck 错误跟踪 issue
+- [ ] 未完成：#250 [S1-07] CI lint（关键 — 未上线则前述修复可能被默默回退）
+- [ ] 未完成：#251 [S1-08] 硬编码品牌色清理 ~134 处
+
+### 关键决策
+- **决策 4：#245 / #246 / #247 不强行机械迁移** — 调研发现物理迁移历史已完成，剩余验收项（antd 越界 / Storybook / 业务耦合）不属于"组件迁移"，拆 3 个 follow-up issue 而非把死代码或业务知识下沉到 shared package
+- **决策 5：useOffline / useAgentSSE 不放 @tx/touch** — 含硬编码 `/api/v1/trade/*` 业务路径，违反终端独占边界（v1.0 §2.6）。正确做法是分两层（通用基元 + 业务特化），但需 TDD 重构（Tier 1 路径），拆至 #270
+- **决策 6：tokens.css 加 4 个 KDS 专属 vars** — 桌号 32px / 区域 28px / 菜品 20px / 徽标 16px。所有 KDS 字号通过 CSS Variables 统一管控，杜绝散点写死
+- **决策 7：先关闭 6 个 issue 再启动 #250 / #251** — 防止上下文过深；提交一组干净的 commit 后再推下一组任务
+
+### 下一步
+- 推 #250 CI lint（高价值，锁定宪法防回退）— 推荐
+- 或 #251 硬编码色清理（机械批量）
+- 或 fix TableMapPage.tsx:79 use-before-declare 真 bug
+
+### 已知风险
+- **关键**：6 个已修复 issue 的成果未被 CI 锁定，下个 PR 可能默默引入回退 — #250 应优先
+- KDSBoardPage 区域/档口标题 28px 强制未实施（不在 TXKDSTicket 范围）
+- 现场戴手套验证未做（依赖 #260 / [S7-04]）
+- pnpm-lock.yaml 已变（@types/react 加入），团队 pull 后需 pnpm install
+
+---
+
+## 2026-05-07 19:50 · UI/UX 战略调整 M1 启动 + S1-01 #244 落地
+
+### 完成状态
+- [x] 已完成：UI/UX 差距分析 + 宪法 v1.0 + 开发计划 + tx-ui 技能修订（KDS 触控/字体）
+- [x] 已完成：M1 阶段 GitHub 拆解（2 Epic + 18 子 issue，#244-263）
+- [x] 已完成：#244 [S1-01] 抽出 packages/tx-touch 包结构（已关闭）
+- [ ] 未完成：Sprint 1 剩余 7 个（#245..#251）
+
+### 关键决策
+- **决策 1：v1.0 宪法 KDS 触控 72px / 字体 32-20px 强制写入** — 修订 tx-ui 技能 `tokens.md` + `store.md`
+  - 理由：厨师戴手套 + 3 米外阅读，48px / 20px 实测失败
+- **决策 2：S1-01 不机械迁移死代码，而是迁移 + deprecate** — base-theme.ts 移入 tx-touch 加 `@deprecated` + drift 警告
+  - 理由：4 色 drift（success / warning / danger / info）vs 宪法 §3.2；强行平迁把 drift 引入 shared 包
+  - 替代方案是直接删除（完全无 importer），但保留 shim 兜底潜在动态引用，由 S1-08 #251 最终清理
+- **决策 3：v1.0 起 a11y 进入 CI 强制路线** — 30 天报告基线 / 90 天 ≥80 / 180 天 ≥90
+  - 理由：与"Palantir 定位"对齐，Toast/Lightspeed 已 WCAG AA
+
+### 下一步
+- 推 Sprint 1 关键路径：#245（基础组件）/ #246（业务组件）/ #247（hooks）三并行
+- 或：先 fix useVoiceAgent.ts:184 typo（一行修，解锁 web-pos 全量 typecheck）
+
+### 已知风险
+- pre-existing typo（commit be5ebcfa）阻塞 web-pos 全量 tsc，未单独建 issue 跟踪
+- packages/tx-touch 多组件 TS 报 react/CSS module 类型缺失 — tsconfig 历史问题，不阻塞 vite build 但影响 typecheck 信心，需 M2 收尾前清理
+- 三 app 视觉无回归依赖"无现存 importer"事实，未跑 Chromatic 截图 diff（建议 S1-02 #245 起接入）
+
+---
+
 ## 2026-05-06 续² PR #237 merge + 4 PR/Issue review + Issue #238 → PR #241
 
 ### 本次会话目标

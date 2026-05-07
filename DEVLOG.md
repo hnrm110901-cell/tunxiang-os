@@ -1,3 +1,115 @@
+## 2026-05-07 续² Sprint 1 #250 CI lint 落地 → 7/8 关闭
+
+### 今日完成（续²，#250）
+- **#250 [S1-07] CI 质量闸门 — 已落地**
+  - `scripts/lint-ui/{walk,no-antd-in-store,hardcoded-color,tap-target,font-size,all}.mjs` 6 个脚本
+  - `scripts/lint-ui/baseline.json` 4 个 lint 基线锁定
+  - `scripts/lint-ui/README.md` 用法 + 路线
+  - `.github/workflows/ui-quality-gate.yml` GitHub Action
+  - 根 `package.json` 加 `lint:ui` + 4 个独立 lint 入口
+  - **三模式机制**：baseline（默认 / 防回退）/ --strict（清零后切换）/ --update-baseline（清理 PR 合并后用）
+
+### 验证结果
+- `pnpm lint:ui` 本地跑通：**652ms** < 30s 上限 ✅
+- 4/4 baseline 模式通过：no-antd-in-store=3 / hardcoded-color=4112 / tap-target=447 / font-size=1712
+- font-size 实测 1711 ≤ baseline 1712（说明刚才 #249 修订 KDS 字号已经从 baseline 降了 1 处 — lint 自动捕获到）
+
+### 数据变化
+- 新增脚本：8 个文件（6 .mjs + 1 .json + 1 .md）
+- 新增 workflow：1 个（`.github/workflows/ui-quality-gate.yml`）
+- 修改：根 `package.json` +5 scripts
+- Sprint 1 进度：**7 / 8 = 87.5% 关闭**（剩 #251 硬编码色清理）
+
+### 遗留
+- **#251 [S1-08]** 仍未启动 — 4112 处硬编码色批量清理，需脚本辅助
+- baseline 数字虽已锁定但仍远高于"0"目标：M2/M3 阶段需把 4 道 lint 都切到 --strict
+- `font-size` 在 packages/tx-touch 多组件 module.css 仍有 13-15px 写死（caption/spec/badge），需另开跟踪 issue
+
+### 明日计划
+- 推 #251 [S1-08] 硬编码色清理（机械批量，可脚本化降 baseline）
+- 或：先 commit 当前一波改动（避免本地未提交工作积累过多）
+
+---
+
+## 2026-05-07 续 Sprint 1 推进至 6/8 关闭
+
+### 今日完成（续，#244 后到收工）
+- **#245 [S1-02] / #246 [S1-03] / #247 [S1-04] 关闭** — 调研发现 5+4 组件 + 3 通用 hook 历史已就位，三 app 已切换 @tx/touch；剩余验收项不属于"组件迁移"本身，拆为独立 follow-up：
+  - **#268** Store 终端 AntD 越界清理：TableManagement 1093 行重写为 TXTouch
+  - **#269** packages/tx-touch Storybook 基础设施
+  - **#270** useOffline / useAgentSSE 通用化（DI 重构，Tier 1 需 TDD）
+- **#267** web-pos typecheck 81 个 pre-existing 错误跟踪（@types/react fix 后浮出）
+- **#248 [S1-05] KDS 关键操作触控升 72px — 已落地**
+  - `packages/tx-tokens/src/tokens.css` 新增 4 个 KDS CSS vars（kds-title/kds-zone/kds-item/kds-vip）
+  - `TXKDSTicket.module.css` `.rushBtn` 48px → **72×72px** + padding/font/active scale 全部对齐
+  - 卡片宽度 240 → 280px 适配
+- **#249 [S1-06] KDS 字体规范实装 — 已落地**
+  - 桌号 20px → 32px 粗体 + tabular-nums
+  - itemQty 18px → 20px / itemSpec 14px → 16px / vipBadge 12px → 16px / swipeHint 13px → 16px / orderId 13px → 16px
+  - 所有 KDS 字号现走 CSS Variables 统一管控
+- **useVoiceAgent.ts:184 typo 修复**（pre-existing, commit be5ebcfa）
+- **`@types/react` devDep** 加入 shared/design-system + packages/tx-touch（解锁 react 模块解析）
+
+### 数据变化
+- 新增 GitHub issue：4 个（#267 / #268 / #269 / #270）
+- 关闭 GitHub issue：5 个（#244 / #245 / #246 / #247 / #248 / #249）
+- Sprint 1 进度：**6 / 8 = 75% 关闭**
+- 改动 token 文件：`packages/tx-tokens/src/tokens.css` +4 行
+- 改动组件文件：`TXKDSTicket.module.css` 9 处字号 / 触控修订
+- 改动包配置：`shared/design-system/package.json` + `packages/tx-touch/package.json` 各加 2 个 devDep
+
+### 遗留问题
+- **#250 [S1-07] CI lint** 未启动（关键：未上线则前述 6 个 issue 的修复可能被未来 PR 默默回退）
+- **#251 [S1-08] 硬编码品牌色清理** 未启动（~134 处）
+- **#267** web-pos 81 个 pre-existing typecheck 错误（其中 1 个 use-before-declare 真 bug 在 TableMapPage.tsx:79）
+- KDSBoardPage 区域/档口标题 28px 强制（#249 延伸，不在 TXKDSTicket 范围）— 待新 issue
+- TXKDSTicket.rushIcon 12px badge 字号未升 16px（图标性质，待视觉评审）
+- 现场戴手套 / 厨房 2 米外阅读验证 — 由 #260 [S2-08] 尝在一起现场联调或 [S7-04] 尚宫厨现场 KDS 验证
+
+### 明日计划
+- 推 **#250 [S1-07] CI lint**（高价值 — 锁住 v1.0 宪法防回退）
+- 或 **#251 [S1-08] 硬编码品牌色清理**（机械工作，可批量脚本化）
+- 或先 fix `TableMapPage.tsx:79 loadTables` use-before-declare 真 bug
+
+---
+
+## 2026-05-07 UI/UX 战略调整 M1 启动 + Sprint 1 #244 落地
+
+### 今日完成
+- **战略文档三件套生成**（`docs/`）
+  - `ui-ux-gap-analysis-2026-05.md` — 已完成架构盘点 + 行业对标 + P0/P1/P2/P3 差距明细
+  - `ui-ux-constitution-v1.md` — UI/UX 宪法 v1.0（439 行 / 10 章 + 附录 A 列出 v1.0 vs 旧版 10 项变更）
+  - `ui-ux-development-plan-2026-q3-q4.md` — 7 个月 14 Sprint 392 人天明细（M1/M2/M3 三闸门）
+- **tx-ui 技能就地修订**（`.claude/skills/tx-ui/references/`）
+  - `tokens.md` — 新增 KDS 字体强制规则（订单号 32px / 标题 24-28px / 菜品行 20px / 倒计时 32px）
+  - `store.md` — 新增 KDS 触控 72px + CI 拒绝阈值条款
+- **GitHub issue 拆解**（M1 阶段 18 子 + 2 Epic = 20 个）
+  - Sprint 1：[#252 Epic] + #244..251（8 子）
+  - Sprint 2：[#263 Epic] + #253..262（10 子）
+- **#244 [S1-01] 抽出 packages/tx-touch 包结构 — 已关闭**
+  - 调研发现 packages/tx-touch 实际已存在且大部分基础设施就位，9 组件 + 3 hooks 三 app 已切换
+  - `apps/web-pos/src/design-system/base-theme.ts` 是零 importer 的死代码（232 行，4 色 drift vs 宪法 §3.2）
+  - 实际操作：迁 base-theme.ts 到 `packages/tx-touch/src/styles/`，加 `@deprecated` header + drift 标注；旧路径改 deprecation shim；`packages/tx-touch/src/index.ts` 加 export
+  - 修改 3 文件 typecheck 0 错；视觉 0 回归（无现存 importer）
+
+### 数据变化
+- 新增包文件：`packages/tx-touch/src/styles/base-theme.ts`（232 行，含 drift 警告）
+- 修改文件：`packages/tx-touch/src/index.ts`（+1 export 行）/ `apps/web-pos/src/design-system/base-theme.ts`（232 行真身 → 9 行 shim）
+- 新增 docs：3 文档共约 1100 行
+- 新增 / 修改 GitHub issue：20 个
+
+### 遗留问题
+- `apps/web-pos/src/hooks/useVoiceAgent.ts:184` 预先存在的 typo bug（extra `*/`，commit be5ebcfa 引入），阻塞 web-pos 全量 typecheck — 建议另开 fix issue
+- base-theme.ts 4 色 drift（success / warning / danger / info）对齐宪法值 — 由 S1-08 #251 同步处理
+- deprecation shim 移除 — 由 S1-08 #251 同步处理
+
+### 明日计划
+- 推进 Sprint 1 关键路径：#245 / #246 / #247 三个组件迁移并行（前置已通）
+- 或：先开 useVoiceAgent typo fix 单独 PR（5 分钟，解锁 web-pos typecheck）
+- DEVLOG/progress 闭环更新机制（S2-09 #261）可顺手做
+
+---
+
 ## 2026-05-06 续² PR #237 merge + 4 PR/Issue review + Issue #238 → PR #241
 
 ### 今日完成（续²，#236 merge 后到收工）
