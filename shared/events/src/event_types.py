@@ -320,6 +320,8 @@ DOMAIN_STREAM_MAP: dict[str, str] = {
     "sales_coach": "tx_sales_coach_events",
     # 加盟管理域（Wave I 新增 / v240 franchisees + franchise_fee_bills + franchise_settlements）
     "franchise": "tx_franchise_events",
+    # 审批工单域（P0-7 新增，tx-ops/approval_workflow_routes）
+    "approval": "tx_approval_events",
     # 兼容旧域
     "trade": "trade_events",
     "supply": "supply_events",
@@ -378,6 +380,8 @@ DOMAIN_STREAM_TYPE_MAP: dict[str, str] = {
     "sales_coach": "sales_coach",
     # 加盟管理域（Wave I 新增）— stream_id = franchisee_id / bill_id / settlement_id
     "franchise": "franchise",
+    # 审批工单域（P0-7 新增）
+    "approval": "approval",
 }
 
 # ──────────────────────────────────────────────────────────────────────
@@ -426,6 +430,22 @@ class SafetyInspectionEventType(str, Enum):
     CRITICAL_ITEM_FAILED = "safety.critical_item.failed"  # 关键项不合格（高优先级告警）
     INGREDIENT_EXPIRED = "safety.ingredient.expired"
     CORRECTION_OVERDUE = "safety.correction.overdue"  # 整改超期未完成
+    INSPECTION_ACKNOWLEDGED = "safety.inspection.acknowledged"  # 门店确认巡店报告（P0-7 新增）
+
+
+class ApprovalEventType(str, Enum):
+    """审批工单事件 — 审批流状态机（P0-7 新增，tx-ops/approval_workflow_routes）
+
+    覆盖审批实例全生命周期：
+      发起(INITIATED) → 通过(APPROVED) / 驳回(REJECTED) / 撤回(CANCELLED)
+
+    stream_id = instance_id，stream_type = approval
+    """
+
+    INITIATED = "approval.initiated"  # 审批实例发起
+    APPROVED = "approval.approved"  # 审批通过（末节点 approve）
+    REJECTED = "approval.rejected"  # 审批驳回（任一节点 reject）
+    CANCELLED = "approval.cancelled"  # 审批撤回（发起人撤回）
 
 
 class CampaignEventType(str, Enum):
@@ -783,6 +803,8 @@ ALL_EVENT_ENUMS = (
     CreditEventType,
     # 食安巡检域（v157 新增）
     SafetyInspectionEventType,
+    # 审批工单域（P0-7 新增）
+    ApprovalEventType,
     # 营销活动域（v157 新增）
     CampaignEventType,
     # 盘亏处理审批闭环（v370 新增）
@@ -847,8 +869,9 @@ __all__ = [
     "DepositEventType",
     "WineStorageEventType",
     "CreditEventType",
-    # 食安巡检 / 营销活动 / 知识库
+    # 食安巡检 / 审批工单 / 营销活动 / 知识库
     "SafetyInspectionEventType",
+    "ApprovalEventType",
     "CampaignEventType",
     "KnowledgeEventType",
     # 增长中枢 / 菜谱方案 / 适配器
