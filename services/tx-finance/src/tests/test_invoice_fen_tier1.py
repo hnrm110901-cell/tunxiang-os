@@ -105,17 +105,44 @@ class TestYuanFenBoundaryHelpers:
 
         assert _yuan_to_fen(Decimal("0.30")) == 30
         assert _yuan_to_fen(Decimal("0.1") + Decimal("0.2")) == 30
-        # 三位小数应在边界 round half-even 处理（金额场景餐饮一般两位即可）
-        assert _yuan_to_fen(Decimal("9.999")) == 1000  # ROUND_HALF_EVEN
+        # 9.999 → ROUND_HALF_UP → 1000（与金税四期/诺诺四舍五入惯例一致）
+        assert _yuan_to_fen(Decimal("9.999")) == 1000
 
-    def test_yuan_to_fen_rejects_negative_or_zero(self):
-        """金额必须 > 0；红冲走另外的 negation 路径，不通过此 helper"""
+    def test_yuan_to_fen_uses_round_half_up_not_half_even(self):
+        """ROUND_HALF_UP（四舍五入，税务标准）vs ROUND_HALF_EVEN（银行家舍入）边界判别。
+
+        关键判别：
+          - HALF_UP:   0.005 → 0.01（即 1 fen），  0.015 → 0.02（即 2 fen）
+          - HALF_EVEN: 0.005 → 0.00（向偶数舍）， 0.015 → 0.02（向偶数舍）
+
+        金税四期/诺诺接口约定 HALF_UP；HALF_EVEN 在 .005 边界会与税务系统差 1 分，
+        累计后触发对账偏差稽查（PR #264 verifier 反馈）。
+        """
+        from services.invoice_service import _yuan_to_fen
+
+        # HALF_UP: 0.005 → 1 fen（HALF_EVEN 会得 0）
+        assert _yuan_to_fen(Decimal("0.005")) == 1, "ROUND_HALF_UP 必须把 0.005 进位到 1 分"
+        # HALF_UP: 0.025 → 3 fen（HALF_EVEN 会得 2，向偶数舍）
+        assert _yuan_to_fen(Decimal("0.025")) == 3, "ROUND_HALF_UP 必须把 0.025 进位到 3 分"
+
+    def test_yuan_to_fen_rejects_negative(self):
+        """金额不能为负；红冲走另外的 negation 路径，不通过此 helper"""
+        from services.invoice_service import _yuan_to_fen
+
+        with pytest.raises(ValueError):
+            _yuan_to_fen(Decimal("-1.00"))
+
+    def test_yuan_to_fen_rejects_zero_by_default(self):
         from services.invoice_service import _yuan_to_fen
 
         with pytest.raises(ValueError):
             _yuan_to_fen(Decimal("0"))
-        with pytest.raises(ValueError):
-            _yuan_to_fen(Decimal("-1.00"))
+
+    def test_yuan_to_fen_accepts_zero_when_explicit(self):
+        """免税商品 tax_amount=0 路径，必须 allow_zero=True 显式表达意图"""
+        from services.invoice_service import _yuan_to_fen
+
+        assert _yuan_to_fen(Decimal("0"), allow_zero=True) == 0
 
     def test_fen_to_yuan_str_two_decimals(self):
         from services.invoice_service import _fen_to_yuan_str
@@ -218,7 +245,43 @@ class TestInvoiceToDictSerialization:
         assert out["tax_fen"] is None
 
 
-# ── 6. 迁移文件存在 + revision 链对接 v402（AST 解析，不依赖 alembic 运行时）───
+# ── 6. 红冲金额一致性（金税四期：差 1 分必退）─────────────────────────────────
+class TestRedFlushAmountIntegrity:
+    """红冲必须严格等于原蓝字金额负值，差 1 分都会被税务系统拒绝退票。
+
+    PR #271 verifier 反馈补充：原测试只覆盖 fen 算术 int 类型，
+    缺红冲场景的金额一致性断言。
+    """
+
+    def test_red_flush_amount_strictly_negates_original(self):
+        from services.invoice_service import _fen_to_yuan_str
+
+        original_fen = 12345
+        original_str = _fen_to_yuan_str(original_fen)  # "123.45"
+        red_str = _fen_to_yuan_str(-original_fen)  # "-123.45"
+        # 严格反号：去掉负号字符后必须 byte-equal
+        assert red_str.lstrip("-") == original_str
+        # fen int 求和归零（不退化为 float）
+        total = original_fen + (-original_fen)
+        assert total == 0
+        assert isinstance(total, int)
+
+    def test_red_flush_zero_tax_path(self):
+        """tax_fen=None 红冲不能崩"""
+        from services.invoice_service import _fen_to_yuan_str
+
+        # 模拟 invoice.tax_fen 为 None：负数化时用 `-(invoice.tax_fen or 0)` → -0 = 0
+        assert _fen_to_yuan_str(-(None or 0)) == "0.00"
+
+    def test_red_flush_one_fen_precision(self):
+        """1 分边界：原 0.01 元 → 红冲 -0.01 元，绝不能因精度变成 0.00"""
+        from services.invoice_service import _fen_to_yuan_str
+
+        assert _fen_to_yuan_str(1) == "0.01"
+        assert _fen_to_yuan_str(-1) == "-0.01"
+
+
+# ── 7. 迁移文件存在 + revision 链对接 v402（AST 解析，不依赖 alembic 运行时）───
 class TestMigrationFile:
     def test_v403_invoice_amount_fen_migration_present(self):
         import ast

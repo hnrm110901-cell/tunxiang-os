@@ -10,7 +10,7 @@
 
 import uuid
 from datetime import datetime, timezone
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import Any, Optional
 
 import structlog
@@ -29,16 +29,20 @@ _AMOUNT_TOLERANCE_FEN = 1
 # 调用规则：API/外部系统（如诺诺）边界用元字符串；存储与内部算术一律 fen int。
 
 
-def _yuan_to_fen(yuan: Decimal) -> int:
+def _yuan_to_fen(yuan: Decimal, *, allow_zero: bool = False) -> int:
     """元 Decimal → 分 int（金额必须为正，红冲走另路径取负）。
 
-    用 ROUND_HALF_EVEN 处理 3+ 位小数边界（金税四期对账标准）。
+    用 ROUND_HALF_UP（四舍五入）处理 3+ 位小数边界——
+    与金税四期 / 诺诺接口惯例一致；避免 ROUND_HALF_EVEN（银行家舍入）
+    在 .005 边界上与税务系统不一致触发对账偏差累计稽查（PR #264 verifier 反馈）。
+
+    allow_zero: 默认拒绝 0；显式置 True 时允许 0（如免税商品 tax_amount=0）。
     """
     if not isinstance(yuan, Decimal):
         yuan = Decimal(str(yuan))
-    if yuan <= 0:
-        raise ValueError(f"金额必须 > 0，got {yuan}")
-    fen = (yuan * 100).quantize(Decimal("1"), rounding=ROUND_HALF_EVEN)
+    if yuan < 0 or (yuan == 0 and not allow_zero):
+        raise ValueError(f"金额必须 > 0（或显式 allow_zero=True），got {yuan}")
+    fen = (yuan * 100).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
     return int(fen)
 
 
@@ -159,8 +163,8 @@ class InvoiceService:
         tax_fen: Optional[int] = None
         if invoice_info.get("tax_amount") is not None:
             tax_yuan = Decimal(str(invoice_info["tax_amount"]))
-            # 税额可以为 0（_yuan_to_fen 拒绝 ≤ 0，所以 0 单独处理）
-            tax_fen = 0 if tax_yuan == 0 else _yuan_to_fen(tax_yuan)
+            # 税额可以为 0（免税商品）— 用 allow_zero=True 显式表达
+            tax_fen = _yuan_to_fen(tax_yuan, allow_zero=True)
 
         request_id = f"TX-{uuid.uuid4().hex[:16].upper()}"
         invoice = Invoice(
