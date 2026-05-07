@@ -149,9 +149,12 @@ class TestServiceLayerUsesGuard:
         result_mock.scalar_one_or_none.return_value = fake_order
         db.execute.return_value = result_mock
 
-        from services.order_service import OrderService  # type: ignore[import-not-found]
+        from services.tx_trade.src.services.order_service import OrderService  # type: ignore[import-not-found]
 
         svc = OrderService(db, str(uuid.uuid4()))
+        # OrderService 有两个 __init__ 重复定义（已知历史 bug），后者覆盖前者，
+        # _tenant_id_str 需手动补齐，本测试只关注守卫拦截，不验证 RLS 设置。
+        svc._tenant_id_str = str(svc.tenant_id)
 
         with pytest.raises((InvalidTransitionError, ValueError)) as exc_info:
             await svc.settle_order(str(fake_order.id))
@@ -179,9 +182,10 @@ class TestServiceLayerUsesGuard:
         result_mock.scalar_one_or_none.return_value = fake_order
         db.execute.return_value = result_mock
 
-        from services.order_service import OrderService  # type: ignore[import-not-found]
+        from services.tx_trade.src.services.order_service import OrderService  # type: ignore[import-not-found]
 
         svc = OrderService(db, str(uuid.uuid4()))
+        svc._tenant_id_str = str(svc.tenant_id)
 
         with pytest.raises((InvalidTransitionError, ValueError)):
             await svc.cancel_order(str(fake_order.id))
