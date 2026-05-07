@@ -38,10 +38,10 @@ sys.path.insert(0, str(ROOT))
 # tx-analytics 目录名含连字符，Python 无法直接 import，需将其 src 目录加入 path
 sys.path.insert(0, str(ROOT / "services" / "tx-analytics" / "src"))
 
-from shared.adapters.pinzhi.src.adapter import PinzhiAdapter
-from shared.adapters.pinzhi.src.dish_sync import PinzhiDishSync
-from shared.adapters.pinzhi.src.employee_sync import PinzhiEmployeeSync
-from shared.adapters.pinzhi.src.table_sync import PinzhiTableSync
+from shared.adapters.pinzhi_pos.src.adapter import PinzhiAdapter
+from shared.adapters.pinzhi_pos.src.dish_sync import PinzhiDishSync
+from shared.adapters.pinzhi_pos.src.employee_sync import PinzhiEmployeeSync
+from shared.adapters.pinzhi_pos.src.table_sync import PinzhiTableSync
 from shared.ontology.src.database import async_session_factory, init_db
 from etl.pipeline import ETLPipeline
 from etl.tenant_config import get_tenant_config_by_id
