@@ -37,6 +37,8 @@ from ..models.wine_storage import (
     WineTakeRequest,
     WineTransferRequest,
     WineWriteOffRequest,
+    _fen_to_yuan_str,
+    _yuan_to_fen,
 )
 
 logger = structlog.get_logger(__name__)
@@ -90,7 +92,9 @@ def _serialize_record(row: dict, transactions: Optional[list] = None) -> dict:
         else row["storage_date"],
         "expiry_date": expiry_date.isoformat() if isinstance(expiry_date, date) else expiry_date,
         "status": row["status"],
-        "storage_price": str(row["storage_price"]) if row.get("storage_price") is not None else None,
+        # 金额双发：元字符串向后兼容 + fen int 给金税四期对账（CLAUDE.md §15）
+        "storage_price_fen": _fen_to_yuan_str(row.get("storage_price_fen")),
+        "storage_price_fen": row.get("storage_price_fen"),
         "notes": row.get("notes"),
         "created_by": row.get("created_by"),
         "created_at": row["created_at"].isoformat()
@@ -113,7 +117,9 @@ def _serialize_transaction(row: dict) -> dict:
         "record_id": str(row["record_id"]),
         "trans_type": row["trans_type"],
         "quantity": row["quantity"],
-        "price_at_trans": str(row["price_at_trans"]) if row.get("price_at_trans") is not None else None,
+        # 金额双发：元字符串向后兼容 + fen int（CLAUDE.md §15）
+        "price_at_trans_fen": _fen_to_yuan_str(row.get("price_at_trans_fen")),
+        "price_at_trans_fen": row.get("price_at_trans_fen"),
         "table_id": row.get("table_id"),
         "order_id": row.get("order_id"),
         "operated_by": row.get("operated_by"),
@@ -149,14 +155,14 @@ async def store_wine(
                  bottle_code, wine_name, wine_brand, wine_spec,
                  quantity, remaining_quantity, unit,
                  storage_date, expiry_date, status,
-                 storage_price, notes, created_by,
+                 storage_price_fen, notes, created_by,
                  created_at, updated_at)
             VALUES
                 (:id::UUID, :tid::UUID, :store_id, :table_id,
                  :member_id::UUID, :bottle_code, :wine_name, :wine_brand, :wine_spec,
                  :quantity, :quantity, :unit,
                  :storage_date, :expiry_date, 'stored',
-                 :storage_price, :notes, :created_by,
+                 :storage_price_fen, :notes, :created_by,
                  :now, :now)
         """
         ),
@@ -174,7 +180,7 @@ async def store_wine(
             "unit": body.unit,
             "storage_date": body.storage_date,
             "expiry_date": body.expiry_date,
-            "storage_price": str(body.storage_price) if body.storage_price is not None else None,
+            "storage_price_fen": _yuan_to_fen(body.storage_price),
             "notes": body.notes,
             "created_by": body.created_by,
             "now": now,
@@ -187,12 +193,12 @@ async def store_wine(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
                 (gen_random_uuid(), :tid::UUID, :record_id::UUID, :store_id, 'store_in',
-                 :quantity, :price_at_trans, :table_id, NULL,
+                 :quantity, :price_at_trans_fen, :table_id, NULL,
                  :operated_by, :now, NULL, :notes,
                  :now, :now)
         """
@@ -202,7 +208,7 @@ async def store_wine(
             "record_id": str(record_id),
             "store_id": body.store_id,
             "quantity": body.quantity,
-            "price_at_trans": str(body.storage_price) if body.storage_price is not None else None,
+            "price_at_trans_fen": _yuan_to_fen(body.storage_price),
             "table_id": body.table_id,
             "operated_by": body.created_by,
             "now": now,
@@ -321,7 +327,7 @@ async def list_wine_storage(
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
                    storage_date, expiry_date, status,
-                   storage_price, notes, created_by,
+                   storage_price_fen, notes, created_by,
                    created_at, updated_at
             FROM wine_storage_records
             WHERE {where_clause}
@@ -373,7 +379,7 @@ async def wine_storage_stats(
                     AS active_count,
                 COALESCE(SUM(remaining_quantity) FILTER (WHERE status IN ('stored', 'partial_taken')), 0)
                     AS total_remaining_quantity,
-                COALESCE(SUM(storage_price) FILTER (WHERE status IN ('stored', 'partial_taken')), 0)
+                COALESCE(SUM(storage_price_fen) FILTER (WHERE status IN ('stored', 'partial_taken')), 0)
                     AS total_storage_value,
                 COUNT(*) FILTER (
                     WHERE status IN ('stored', 'partial_taken')
@@ -398,7 +404,8 @@ async def wine_storage_stats(
         "data": {
             "active_count": row["active_count"],
             "total_remaining_quantity": row["total_remaining_quantity"],
-            "total_storage_value": str(row["total_storage_value"]),
+            "total_storage_value": _fen_to_yuan_str(row["total_storage_value"]),
+            "total_storage_value_fen": int(row["total_storage_value"]) if row["total_storage_value"] is not None else 0,
             "expiring_soon_count": row["expiring_soon_count"],
             "expired_count": row["expired_count"],
             "written_off_count": row["written_off_count"],
@@ -420,7 +427,7 @@ async def list_wine_by_table(
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
                    storage_date, expiry_date, status,
-                   storage_price, notes, created_by,
+                   storage_price_fen, notes, created_by,
                    created_at, updated_at
             FROM wine_storage_records
             WHERE tenant_id = :tid::UUID
@@ -477,7 +484,7 @@ async def list_wine_by_member(
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
                    storage_date, expiry_date, status,
-                   storage_price, notes, created_by,
+                   storage_price_fen, notes, created_by,
                    created_at, updated_at
             FROM wine_storage_records
             WHERE {where_clause}
@@ -515,7 +522,7 @@ async def get_wine_storage_detail(
                    bottle_code, wine_name, wine_brand, wine_spec,
                    quantity, remaining_quantity, unit,
                    storage_date, expiry_date, status,
-                   storage_price, notes, created_by,
+                   storage_price_fen, notes, created_by,
                    created_at, updated_at
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
@@ -530,7 +537,7 @@ async def get_wine_storage_detail(
     trans_r = await db.execute(
         text(
             """
-            SELECT id, record_id, trans_type, quantity, price_at_trans,
+            SELECT id, record_id, trans_type, quantity, price_at_trans_fen,
                    table_id, order_id, operated_by, operated_at,
                    approved_by, notes, created_at
             FROM wine_storage_transactions
@@ -603,7 +610,7 @@ async def take_wine(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
@@ -703,7 +710,7 @@ async def extend_wine_storage(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
@@ -717,7 +724,7 @@ async def extend_wine_storage(
             "tid": tenant_id,
             "record_id": record_id,
             "store_id": row["store_id"],
-            "fee": str(body.fee) if body.fee is not None else None,
+            "fee": _yuan_to_fen(body.fee),
             "operated_by": body.operated_by,
             "now": now,
             "notes": body.notes or f"续存至 {body.new_expiry_date}",
@@ -801,7 +808,7 @@ async def transfer_wine(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
@@ -829,7 +836,7 @@ async def transfer_wine(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
@@ -918,7 +925,7 @@ async def write_off_wine(
             """
             INSERT INTO wine_storage_transactions
                 (id, tenant_id, record_id, store_id, trans_type,
-                 quantity, price_at_trans, table_id, order_id,
+                 quantity, price_at_trans_fen, table_id, order_id,
                  operated_by, operated_at, approved_by, notes,
                  created_at, updated_at)
             VALUES
