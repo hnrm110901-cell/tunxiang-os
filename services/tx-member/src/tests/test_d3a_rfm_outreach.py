@@ -465,12 +465,9 @@ def test_model_router_registers_rfm_outreach_message_as_simple():
             "..",
             "..",
             "..",
-            "services",
-            "tunxiang-api",
-            "src",
             "shared",
-            "core",
-            "model_router.py",
+            "ai_providers",
+            "task_router.py",
         )
         if not os.path.exists(path):
             pytest.skip("model_router.py 路径不存在")

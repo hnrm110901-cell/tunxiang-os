@@ -1,7 +1,8 @@
 """域路由代理 — Strangler Fig 模式，全域切换到新微服务
 
 M4a: Gateway 路由 100% 切换到 tunxiang-os 域微服务。
-旧 tunxiang 单体作为 fallback 保留，可通过 LEGACY_API_URL 配置。
+通用 legacy 回退机制（LEGACY_API_URL）保留，用于未来迁移过渡场景。
+（R1 dedup 2026-05-06: 旧 tunxiang-api 单体已删除，LEGACY_URL 当前应留空。）
 """
 
 import os
@@ -69,7 +70,7 @@ DOMAIN_ROUTES = {
     "devforge": os.getenv("TX_DEVFORGE_URL", "http://localhost:8017"),
     # Forge 外部 ISV 应用市场（tx-forge:8013）
     # 与 tx-devforge（内部研发平台 :8017）严格区分
-    # 端口：8013 容器内（Docker DNS 隔离，与 tunxiang-api/tx-predict 同号不冲突）
+    # 端口：8013 容器内（Docker DNS 隔离，与 tx-predict 同号不冲突）
     "forge": os.getenv("TX_FORGE_URL", "http://localhost:8013"),
 }
 

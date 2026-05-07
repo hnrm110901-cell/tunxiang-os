@@ -11,7 +11,7 @@ import structlog
 from ..base import AgentResult, SkillAgent
 
 try:
-    from services.tunxiang_api.src.shared.core.model_router import model_router
+    from shared.ai_providers.task_router import model_router
 except ImportError:
     model_router = None  # 独立测试时无跨服务依赖
 

@@ -31,7 +31,7 @@ import structlog
 from ..base import AgentResult, SkillAgent
 
 try:
-    from services.tunxiang_api.src.shared.core.model_router import model_router as _global_router
+    from shared.ai_providers.task_router import model_router as _global_router
 except ImportError:
     _global_router = None
 
