@@ -2,12 +2,13 @@
 
 | 字段 | 值 |
 |---|---|
-| 状态 | Accepted (2026-05-07) |
+| 状态 | Accepted (2026-05-07) — 同步于 D1 hot/cool 边界 sign-off（异步确认，无独立 ADR sign-off ceremony） |
 | 日期 | 2026-05-07 |
 | 决策者 | lichun（创始人） |
 | 提议者 | Claude Code（基于 V4 sprint Pre-D1 audit + 第一性原理推导） |
 | 关联 PR | #239 sprint-0-dedup（含 V4 sprint plan v2）/ #240 V4 sprint draft |
-| 关联文档 | [v4-pre-d1-audit.md](../architecture/v4-pre-d1-audit.md) / [v4-d1-hot-cool-path-boundary.md](../architecture/v4-d1-hot-cool-path-boundary.md) / [.omc/plans/v4-architecture-alignment.md](../../.omc/plans/v4-architecture-alignment.md) |
+| 关联文档 | [v4-pre-d1-audit.md](../architecture/v4-pre-d1-audit.md) / [v4-d1-hot-cool-path-boundary.md](../architecture/v4-d1-hot-cool-path-boundary.md) / `.omc/plans/v4-architecture-alignment.md`¹ |
+| ¹ | 该 plan 文档当前 live 在 `chore/sprint-0-dedup` 分支（PR #239）；merge 到 main 后链接生效 |
 | 替代 | CLAUDE.md V3 §三 "一套 React Web App，多端运行" + V3 §十三 第 1 条 "禁止在 Kotlin/Swift 层写业务逻辑" |
 
 ---
@@ -90,15 +91,13 @@ Mac mini (mac-station) 单一真相源
 
 iPad 高端店调性 → 一套 React 跨端 → **iPad 走 cool path**。
 
-### 3.2 Palantir 自己也是混合架构
+### 3.2 Palantir Ontology 思想支持 hot/cool 分层
 
-| Palantir 产品 | 技术栈 | 为什么 |
-|---|---|---|
-| Foundry | Web (TypeScript + React) | 数据分析师是 cool path |
-| Apollo | Native desktop + Web 混合 | 部署运维是 hot path |
-| Gotham | Native + Web 混合 | 情报分析师 hot + cool 混合 |
+Palantir 的核心方法论是 **"按业务语义建模而非按技术栈划界"**——Ontology 是业务对象的不可变定义，工具栈（Foundry / Apollo / Gotham 等）按使用者角色和操作模式选择，而非"全公司一套技术栈"。
 
-Palantir 的 Ontology 思想 = "**按业务语义建模而非按技术栈划界**"。屯象学 Palantir 不是学"Web first"，是学**按 hot/cool path 把技术栈对齐到业务现实**。
+屯象学 Palantir 不是学"Web first"或"Native first"，是学**按 hot/cool path 把技术栈对齐到业务现实**：收银员 hot path 是按键肌肉记忆型操作（性能为王），运营管理 cool path 是分析决策型操作（灵活迭代为王），两者技术栈不对齐到业务，长期必出问题。
+
+> 注：Palantir 各产品 UI 层具体是 Web 还是 Native 没有公开一手来源；本节论据建立在 Ontology 思想本身（公开可查），不依赖于产品技术栈断言。
 
 ### 3.3 Mac mini 真相源 = 数据正确性的根
 
@@ -121,7 +120,7 @@ V4 修正：mac-station PG 是**单一**真相源，Room 仅做 4h 缓冲。CRDT
 
 - **android-pos / android-shell / web-pos 三方需要重构**：~9 工程日（V4 sprint plan v2 / 7d → 9d 含 D5b 4 缺口屏）
 - **双轨债**：web-pos 现有 hot path 5 屏 React 副本必须 D7 删除（避免长期维护两套）
-- **Sunmi SDK 真接入工作量**：android-pos 当前 SunmiPrinter / SunmiCashBox 是骨架 stub，D4 必须 cherry-pick shell 的 AIDL + ServiceConnection 真绑（~270 LOC）
+- **Sunmi SDK 真接入工作量**：android-pos 当前 SunmiPrinter / SunmiCashBox 是骨架 stub，D4 必须 cherry-pick shell 的 AIDL + ServiceConnection 真绑（~270 LOC，来源：[v4-pre-d1-audit.md §四](../architecture/v4-pre-d1-audit.md) — TXBridge.kt 247 行 + IWoyouService.aidl 13 行 + ICallback.aidl 9 行）
 - **CLAUDE.md V3 教条要废止**：§三 "一套 React 跨端" + §十三 第 1 条 "禁止 Kotlin 写业务" 都改
 
 ### 4.3 中性
@@ -140,13 +139,21 @@ V4 修正：mac-station PG 是**单一**真相源，Room 仅做 4h 缓冲。CRDT
 - Compose 维护成本经评估超过节省的迭代时间（如徐记部署 1 个月内 hot path 改 > 3 次）
 - 创始人发现 hot/cool 边界在实际运营中模糊不清（业务持续要求"this should be hot but also cool"）
 
-回滚成本：删除 android-pos 5 屏 Compose（~2046 LOC + Repository 改造），改回 web-pos React 渲染。
+回滚成本（按 V4 sprint 进度阶段）：
+
+| 阶段 | 回滚路径 | 复杂度 |
+|---|---|---|
+| D1-D5 阶段 | `git revert` 本 ADR + CLAUDE.md 修订 commit；android-pos 5 屏 Compose 已存在不需重建 | 低（仅文档回滚）|
+| D6 真机回归后 | 同上 + 业务上选择继续用 web-pos 现有 hot path React 副本（D7 删除前仍存在）| 中 |
+| **D7 删除后**（关键）| 必须先 `git revert` D7 删除 commit（恢复 web-pos hot path React 副本）+ 再 `git revert` 本 ADR + CLAUDE.md 修订 + 选择性删除 android-pos Compose 业务 | **高**——这是回滚窗口的硬截止；D7 之后回滚成本翻倍 |
+
+**实操结论**：回滚窗口实际上是 **D6 结果阴性时**——D6 通过 → D7 删除前 → 立即决策回滚或继续。D7 删除 commit 不执行就不存在"回滚 web-pos 删除"问题。
 
 ---
 
 ## 六、不在本 ADR 范围
 
-- **post-W12 tx-agent 子模块合并**（sprint-0-dedup R4 立项，独立 plan：`.omc/plans/post-w12-tx-agent-merger.md`）
+- **post-W12 tx-agent 子模块合并**（sprint-0-dedup R4 立项，独立 plan：`.omc/plans/post-w12-tx-agent-merger.md`¹）
 - **mDNS 局域网发现实装细节**（V4 sprint D4 主战场，独立技术决策）
 - **CRDT 冲突解析具体算法**（CLAUDE.md §十七 Tier 1 + edge/sync-engine 实装层面）
 - **iPad / Windows POS shell 命运**（windows-pos-shell 非本 sprint 范围，留待 post-W12 决策）
@@ -159,4 +166,8 @@ V4 修正：mac-station PG 是**单一**真相源，Room 仅做 4h 缓冲。CRDT
 - V4 sprint plan：`.omc/plans/v4-architecture-alignment.md`（sprint-0-dedup PR #239 含）
 - D1 audit：`docs/architecture/v4-pre-d1-audit.md`
 - D1 边界 sign-off：`docs/architecture/v4-d1-hot-cool-path-boundary.md`
-- sprint-0-dedup R3 升级原因：`.omc/plans/sprint-0-dedup.md` §R3
+- sprint-0-dedup R3 升级原因：`.omc/plans/sprint-0-dedup.md` §R3¹
+
+---
+
+¹ 标记 `.omc/plans/*` 的链接当前 live 在 `chore/sprint-0-dedup` 分支（PR #239），merge 到 main 后链接生效。
