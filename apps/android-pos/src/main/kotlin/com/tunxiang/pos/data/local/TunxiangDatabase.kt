@@ -23,7 +23,7 @@ import com.tunxiang.pos.data.local.entity.*
         LocalDishCache::class,
         SyncQueueEntry::class,
     ],
-    version = 1,
+    version = 2,           // V4 sprint D2 (2026-05-07): added expires_at/source/synced_at to 5 entities
     exportSchema = true,
 )
 abstract class TunxiangDatabase : RoomDatabase() {
