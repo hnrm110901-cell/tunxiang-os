@@ -88,7 +88,8 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                 )
                 r = row.fetchone()
                 if r and r.avg_ticket:
-                    actuals["avg_ticket_fen"] = float(r.avg_ticket)
+                    # _fen 字段必须 int（CLAUDE.md §10/§15）；round 防 Decimal 截断
+                    actuals["avg_ticket_fen"] = int(round(r.avg_ticket))
             except SQLAlchemyError:
                 pass
         if "table_turnover_rate" in kpi_keys:
