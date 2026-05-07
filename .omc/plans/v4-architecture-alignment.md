@@ -306,3 +306,129 @@
 ## 七、一句话
 
 > 屯象 V4 架构对齐 = **承认 hot/cool path 不该用同一种技术栈**。这一周买回的不是代码，是 6 个月后徐记海鲜不退货的概率。
+
+---
+
+## 附录 A · Pre-D1 资产 Audit（2026-05-07）
+
+> 在 V4 sprint 正式启动（D1）之前对 pos / shell / web-pos 做的只读盘点，结果直接修订本 plan 的工时与步骤。
+
+### A.1 android-pos Hot Path 完成度
+
+| 屏 | 行数 | @Composable | 外部调用 | 业务实装 |
+|---|---:|---:|---:|---|
+| OrderScreen | 406 | 3 | 10 | ✅ 充实 |
+| TableMapScreen | 316 | 2 | 6 | ✅ |
+| SettleScreen | 462 | 4 | 6 | ✅ |
+| ShiftScreen | 428 | 4 | 4 | ✅ |
+| DailyCloseScreen | 434 | 3 | 5 | ✅ |
+| WebViewScreen（fallback）| 140 | 1 | 0 | ⚠️ 占位，需增强 |
+
+5 屏 Compose 业务**已充实**，但**调用方仍走 Room + 云端**（违路线 C，待 D2/D3 改造）。
+
+### A.2 android-pos Sunmi SDK 接入（关键缺口）
+
+| 类 | 行数 | Sunmi import | 状态 |
+|---|---:|---:|---|
+| **SunmiPrinter** | 309 | **0** | 🔴 注释明说 "In production, this would be IWoyouService" — **未接 SDK** |
+| **SunmiCashBox** | 68 | **0** | 🔴 主路径未接 SDK，走 ESC/POS fallback |
+| SunmiScanner | 132 | 2 | 🟢 真接 SDK |
+| SunmiScale | 110 | 2 | 🟢 真接 SDK |
+
+**结论**：打印 + 钱箱 = 骨架 stub，扫码 + 称重 = 真实装。D4 必须把 shell 的 IWoyouService 真接入迁过来。
+
+### A.3 android-shell 抢救清单（V3 真货）
+
+| 资产 | 内容 |
+|---|---|
+| TXBridge.kt（247 行）| ServiceConnection + BroadcastReceiver + 11 JS API + Sunmi 服务真绑 |
+| MainActivity.kt（100 行）| WebView 全屏 + Bridge 注入 + Sunmi 生命周期 |
+| **AIDL 文件 ⭐** | `aidl/woyou/aidlservice/jiuiv5/IWoyouService.aidl` + `ICallback.aidl`（Sunmi SDK 关键接入文件，pos 没有）|
+
+### A.4 OTA v094 已在 main 分支 ✅
+
+OTA v094 (commit `d54f05b4`, 2026-04-01) 实装分布在：
+
+| 位置 | 行数 | 用途 |
+|---|---:|---|
+| `shared/db-migrations/versions/v094_ota_management.py` | 112 | `app_versions`（含灰度 rollout_pct + 租户专属）+ `ota_check_logs` |
+| `services/tx-org/src/api/ota_routes.py` | 295 | 云端 5 端点：发布/列表/最新版/撤回/进度 |
+| `edge/mac-station/src/ota_routes.py` | 151 | 边缘检查端点（1h 本地缓存）|
+
+**OTA 后端已就绪 → 本 plan 不再需要单独 D-OTA 步骤**（节省 0.5d）。
+
+### A.5 web-pos React Cool Path 完成度
+
+✅ 已有：menu(4) / dish(2) / coupon(3) / dashboard(1) / report(5) / training(5) / agent(3)
+
+🔴 **缺口（V4 sprint 内补，+2d，2026-05-07 创始人决策）**：
+- `marketing` 0 文件
+- `campaign` 0 文件
+- `food_safety` 0 文件
+- `cross-brand` 0 文件
+
+⚠️ 单文件（薄弱）：sop / setting / decision
+
+### A.6 双轨债 — web-pos 的 hot path 副本
+
+`apps/web-pos` 同时存在 hot path 5 屏的 React 实装：
+
+| Hot Path 屏 | React (web-pos) | Native (android-pos) |
+|---|---:|---:|
+| Cashier / Order | 2 + 10 files | ✅ |
+| OpenTable / FloorMap | 2 files | ✅ TableMapScreen |
+| Handover | 2 files | ✅ ShiftScreen |
+| Settlement / DepositPos / Discount | 3+ files | ✅ SettleScreen |
+| DailySettlement | 1 file | ✅ DailyCloseScreen |
+
+**创始人决策（2026-05-07）：D7 直接删 web-pos hot path 副本，不冻结**——避免双轨永久回流风险。
+
+---
+
+## 附录 B · 工时与步骤修订（基于附录 A 的 Audit）
+
+| 项 | 原 plan | 修订 | 净变 |
+|---|---:|---:|---:|
+| D-OTA（独立步骤）| +0.5d | ❌ 删除（A.4 已落 main）| **-0.5d** |
+| D4 cherry-pick 范围 | 0.5d | 1d（含 AIDL 2 文件 + IWoyouService 真接入到 SunmiPrinter/SunmiCashBox）| **+0.5d** |
+| **D5b**（新增）：补 4 个 cool path 缺口屏 | — | **2d** | **+2d** |
+| D7 删 web-pos hot path 副本 | 已含但未细化 | 明确动作 + 验证 | 0 |
+| **总计** | 7d | **9d** | **+2d** |
+
+### 修订后节奏
+
+```
+D1   边界决策 + 完成度 verify              (1d, hard gate)
+D2   Repository 改造（Room → Mac mini）    (1d)
+D3   SyncManager 改造 + mac-station 发现   (1d)
+D4   TXBridge AIDL cherry-pick + Sunmi
+     真接入（SunmiPrinter / SunmiCashBox） (1d)  ← 含 AIDL 2 文件迁移 + IWoyouService 实绑
+D5   CLAUDE.md §三/七/十二/十三 修订
+     + ADR-001-hybrid-architecture         (1d)
+D5b  补 4 cool path 缺口屏（marketing /
+     campaign / food_safety / cross-brand）(2d)  ← 新增
+D6   Tier 1 全链路真机回归（W8 验收）       (1d)
+D7   删 shell + 删 web-pos hot path 副本
+     + 收尾                                (1d)
+
+总：9 工程日 + 2 缓冲日 = 11 日历日（约 1.5 周）
+```
+
+---
+
+## 附录 C · D7 web-pos hot path 副本删除清单（细化）
+
+D7 必须删除（基于 A.6 双轨清单）：
+
+| 文件类 | 路径 | 删除依据 |
+|---|---|---|
+| Cashier / Order 类 | `apps/web-pos/src/pages/CashierPage.tsx` + `OrderPage.tsx` + `OrderHistoryPage.tsx` + `OrderActionPanel.tsx` 等 12 文件 | hot path 走 Compose Native |
+| Table 类 | `OpenTablePage.tsx` + `FloorMapPage.tsx` | hot path 走 TableMapScreen |
+| Handover | `HandoverPage.tsx`（2 文件）| hot path 走 ShiftScreen |
+| Settlement 类 | `DepositPosPage.tsx` + `DiscountAuditPage.tsx` + 3 文件 | hot path 走 SettleScreen |
+| DailySettlement | `DailySettlementPage.tsx` | hot path 走 DailyCloseScreen |
+
+**D7 验收**：
+- [ ] grep `apps/web-pos/src/pages/Cashier|Order|Settle|Handover|DailySettlement` → 0 匹配
+- [ ] web-pos build 仍成功（删除后 router 同步清理）
+- [ ] iPad WKWebView 加载 web-pos 仅显示 cool path（hot path 自动 redirect 到 android-pos HTTP）
