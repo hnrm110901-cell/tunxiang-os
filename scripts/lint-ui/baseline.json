@@ -1,0 +1,19 @@
+{
+  "_comment": "v1.0 宪法 lint 基线（2026-05-07 抓取）。各项数字 = 当前累积违规数。",
+  "_rules": [
+    "本文件由 scripts/lint-ui/<script>.mjs --update-baseline 自动生成",
+    "CI 默认 baseline 模式：违规数 > 基线 → fail；<= 基线 → pass（informational）",
+    "团队清理违规后，运行 --update-baseline 降低基线值，pre-merge",
+    "目标：所有项最终 = 0（严格模式），由 #251 / #268 等专项 issue 推进"
+  ],
+  "_followup": {
+    "no-antd-in-store": "#268 TableManagement antd 重写",
+    "hardcoded-color": "#251 [S1-08] 硬编码品牌色清理",
+    "tap-target": "包含 base-theme.ts 已 deprecated 的 44px legacy（S1-08 #251 同步移除 shim 时降）",
+    "font-size": "需扩展跟踪 issue（packages/tx-touch 多组件 caption/spec/badge 仍用 13-15px 写死）"
+  },
+  "no-antd-in-store": 3,
+  "hardcoded-color": 4112,
+  "tap-target": 447,
+  "font-size": 1712
+}

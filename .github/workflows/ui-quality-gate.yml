@@ -1,0 +1,67 @@
+name: UI Quality Gate
+
+# v1.0 宪法（docs/ui-ux-constitution-v1.md §6）锁定 4 道 UI 质量闸门：
+#   1. no-antd-in-store    — Store 终端禁用 AntD
+#   2. hardcoded-color     — 禁止硬编码品牌/语义色
+#   3. tap-target          — Store 触控目标 ≥ 48px / 关键 ≥ 72px
+#   4. font-size           — Store 终端字体 ≥ 16px / KDS 强化
+#
+# 模式：baseline.json 比对违规数。PR 引入新违规即 fail。
+# 团队渐进清理后用 `node scripts/lint-ui/<x>.mjs --update-baseline` 降基线。
+# 终极目标：所有 baseline = 0（严格模式），由 #251 / #268 等专项 issue 推进。
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'apps/web-pos/**'
+      - 'apps/web-kds/**'
+      - 'apps/web-crew/**'
+      - 'packages/tx-touch/**'
+      - 'packages/tx-tokens/**'
+      - 'shared/design-system/**'
+      - 'scripts/lint-ui/**'
+      - '.github/workflows/ui-quality-gate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web-pos/**'
+      - 'apps/web-kds/**'
+      - 'apps/web-crew/**'
+      - 'packages/tx-touch/**'
+      - 'packages/tx-tokens/**'
+      - 'shared/design-system/**'
+      - 'scripts/lint-ui/**'
+      - '.github/workflows/ui-quality-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  lint-ui:
+    name: UI Quality Gate (baseline mode)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      # 4 道闸门并联（任一 fail 整体 fail）
+      - name: lint:no-antd-in-store
+        run: node scripts/lint-ui/no-antd-in-store.mjs
+
+      - name: lint:hardcoded-color
+        run: node scripts/lint-ui/hardcoded-color.mjs
+
+      - name: lint:tap-target
+        run: node scripts/lint-ui/tap-target.mjs
+
+      - name: lint:font-size
+        run: node scripts/lint-ui/font-size.mjs
+
+      - name: 汇总（lint:ui）
+        run: node scripts/lint-ui/all.mjs
+        if: always()

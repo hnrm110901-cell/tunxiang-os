@@ -10,6 +10,11 @@
     "dev:admin": "pnpm --filter web-admin dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
+    "lint:ui": "node scripts/lint-ui/all.mjs",
+    "lint:no-antd-in-store": "node scripts/lint-ui/no-antd-in-store.mjs",
+    "lint:hardcoded-color": "node scripts/lint-ui/hardcoded-color.mjs",
+    "lint:tap-target": "node scripts/lint-ui/tap-target.mjs",
+    "lint:font-size": "node scripts/lint-ui/font-size.mjs",
     "test": "pnpm -r test"
   },
   "engines": {
