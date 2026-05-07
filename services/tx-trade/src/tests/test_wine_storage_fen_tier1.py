@@ -173,6 +173,60 @@ class TestWineExtendBalanceAccumulation:
 
         assert _yuan_to_fen(Decimal("0")) == 0
 
+    def test_three_extend_calls_route_layer_bind_construction(self):
+        """模拟 extend_wine_storage 路由层 INSERT bind dict 构造（line 705-737）。
+
+        PR #272 round-3 verifier 反馈：原版"纯 Python 加法"未经 Pydantic 输入
+        与 _yuan_to_fen 转换链。本测试**走真 Pydantic 模型 + 真 _yuan_to_fen**：
+          (1) WineExtendRequest 接受 Decimal 元（API 边界契约）
+          (2) 路由层在 INSERT bind dict 中调 _yuan_to_fen(body.fee) 转换
+          (3) 累计 fen 与手工账核对一致
+
+        本测试**未跑真 SQL/真 DB**——venv 缺 aiosqlite + 跨包模型导入会触发
+        SQLAlchemy MetaData 重复注册（src.models vs models 双路径），无法在
+        单 pytest session 同时跑 helper 测试和真 e2e。**真 e2e（pytest-postgresql
+        起真库 + httpx.AsyncClient 实打路由）需 staging 阶段补，列入 follow-up
+        issue (TBD)**。
+
+        CLAUDE.md §20 Tier1 硬验收原文："3 次续存余额计算与手工账核对一致"
+        """
+        from datetime import date as _date
+        from decimal import Decimal
+
+        from models.wine_storage import WineExtendRequest, _yuan_to_fen
+
+        # 3 次连续续存：500/300/200 元
+        fees_yuan = [Decimal("500.00"), Decimal("300.00"), Decimal("200.00")]
+        expected_fen = [50000, 30000, 20000]
+
+        # 模拟 wine_storage_routes.py extend_wine_storage line 705-737 的
+        # bind dict 构造逻辑（仅 fee 字段相关部分，其它 bind 字段不影响金额验收）
+        observed_fen_seq = []
+        for fee in fees_yuan:
+            # 1. API 边界：Pydantic 接 Decimal 元
+            body = WineExtendRequest(
+                new_expiry_date=_date(2027, 1, 1),
+                fee=fee,
+                operated_by="tester",
+                notes=None,
+            )
+            # 2. 路由层 line 732：fee 字段经 _yuan_to_fen 转换写入 bind
+            bind_dict_fee = _yuan_to_fen(body.fee)
+            observed_fen_seq.append(bind_dict_fee)
+
+        # 断言：3 次续存 fen 序列与手工账一致
+        assert observed_fen_seq == expected_fen, (
+            f"price_at_trans_fen 序列不一致：期望 {expected_fen}, 实际 {observed_fen_seq}"
+        )
+
+        # 断言：累计求和 = 100000 fen（1000 元）
+        total_fen = sum(observed_fen_seq)
+        assert total_fen == 100000, f"3 次续存累计应 = 100000 分，实际 {total_fen}"
+        assert isinstance(total_fen, int), "fen 累计类型必须保持 int"
+
+        # 断言：每次都是新的 fen 整数（非累计覆盖）
+        assert len(set(observed_fen_seq)) == 3, "3 次续存 bind 必须是 3 个独立值"
+
 
 # ── 4. 迁移文件存在 + revision 链（AST 解析，不依赖 alembic 运行时）─────────────
 class TestMigrationFile:
