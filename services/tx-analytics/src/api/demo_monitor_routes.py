@@ -131,9 +131,9 @@ async def _check_merchant_health(merchant_code: str, tenant_id: str) -> dict:
             checks.append({"name": "tables", "count": 0, "ok": False})
             overall_ok = False
 
-    # 简化数据质量评分：5项检查，各20分
+    # 简化数据质量评分：5项检查，各20分（仅已知 check 名称参与评分；未知 check 不得分，避免静默"白送"）
     _MIN_COUNTS = {"stores": 1, "dishes": 10, "members": 5, "orders_90d": 20, "tables": 5}
-    quality_score = sum(20 for c in checks if c["count"] >= _MIN_COUNTS.get(c["name"], 0))
+    quality_score = sum(20 for c in checks if c["name"] in _MIN_COUNTS and c["count"] >= _MIN_COUNTS[c["name"]])
 
     status = "error" if all(not c["ok"] for c in checks) else ("degraded" if not overall_ok else "healthy")
 

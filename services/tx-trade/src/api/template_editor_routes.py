@@ -20,7 +20,7 @@ from typing import Any, Optional, Union
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -58,6 +58,20 @@ class ElementDef(BaseModel):
     barcode_type: Optional[str] = None
 
     model_config = {"extra": "allow"}
+
+    @model_validator(mode="after")
+    def _validate_size_per_type(self) -> "ElementDef":
+        # qrcode 的 size 是模块大小（1-16 整数），其它元素的 size 是 _SIZE_BYTES 的枚举字符串。
+        # 不按 type 校验会让 silent fallback 掩盖错误（_SIZE_BYTES.get(int, default) → key miss → 默认值）。
+        if self.size is None:
+            return self
+        if self.type == "qrcode":
+            if not isinstance(self.size, int) or isinstance(self.size, bool) or not 1 <= self.size <= 16:
+                raise ValueError("qrcode element 'size' 必须是 1-16 之间的整数")
+        else:
+            if not isinstance(self.size, str):
+                raise ValueError(f"{self.type} element 'size' 必须是字符串（如 'normal' / 'double_height'）")
+        return self
 
 
 class TemplateConfig(BaseModel):
@@ -839,6 +853,87 @@ def _preview_lines_from_config(
             count = max(1, min(10, elem.count or 1))
             for _ in range(count):
                 lines.append({"type": "blank"})
+
+        elif etype == "inverted_header":
+            # 反色文字（catalog: 美化增强）— 前端渲染用 inverted 标记
+            raw = elem.content or ctx.get("store_name", "")
+            import re
+
+            rendered = re.sub(
+                r"\{\{(\w+)\}\}",
+                lambda m: str(ctx.get(m.group(1), m.group(0))),
+                raw,
+            )
+            lines.append(
+                {
+                    "type": "text",
+                    "content": rendered,
+                    "align": elem.align or "center",
+                    "bold": True,
+                    "size": elem.size or "double_height",
+                    "inverted": True,
+                }
+            )
+
+        elif etype == "styled_separator":
+            # 装饰分隔线（catalog: 美化增强）— style: dots/ornament/double/single
+            style = getattr(elem, "style", None) or "single"
+            char_map = {"dots": "·", "ornament": "❀", "double": "=", "single": "-"}
+            lines.append({"type": "separator", "char": char_map.get(style, "-")})
+
+        elif etype == "box_section":
+            # 盒型边框文字（catalog: 美化增强）— style: single/double，lines: [str]
+            box_lines = getattr(elem, "lines", None) or []
+            for raw in box_lines:
+                import re
+
+                rendered = re.sub(
+                    r"\{\{(\w+)\}\}",
+                    lambda m: str(ctx.get(m.group(1), m.group(0))),
+                    raw,
+                )
+                lines.append(
+                    {
+                        "type": "text",
+                        "content": rendered,
+                        "align": elem.align or "center",
+                        "bold": False,
+                        "size": "normal",
+                        "boxed": True,
+                    }
+                )
+
+        elif etype == "logo_image":
+            # Logo 图片（catalog: 多媒体）— preview 占位符，前端按 image_base64 渲染
+            lines.append(
+                {
+                    "type": "image",
+                    "image_base64": getattr(elem, "image_base64", "") or "",
+                    "align": elem.align or "center",
+                    "max_width_dots": getattr(elem, "max_width_dots", None) or 384,
+                }
+            )
+
+        elif etype == "underlined_text":
+            # 下划线文字（catalog: 美化增强）
+            raw = elem.content or ""
+            import re
+
+            rendered = re.sub(
+                r"\{\{(\w+)\}\}",
+                lambda m: str(ctx.get(m.group(1), m.group(0))),
+                raw,
+            )
+            lines.append(
+                {
+                    "type": "text",
+                    "content": rendered,
+                    "align": elem.align or "center",
+                    "bold": elem.bold or False,
+                    "size": "normal",
+                    "underlined": True,
+                }
+            )
 
     return lines
 
