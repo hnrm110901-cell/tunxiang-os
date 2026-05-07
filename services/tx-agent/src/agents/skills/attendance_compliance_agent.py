@@ -159,6 +159,7 @@ class AttendanceComplianceAgent(SkillAgent):
             "daily_compliance_scan",
             "monthly_overtime_scan",
             "generate_compliance_report",
+            "analyze_attendance_anomalies",
         ]
 
     def get_action_config(self, action: str) -> ActionConfig:
@@ -191,6 +192,7 @@ class AttendanceComplianceAgent(SkillAgent):
             "daily_compliance_scan": self._daily_scan,
             "monthly_overtime_scan": self._monthly_overtime,
             "generate_compliance_report": self._compliance_report,
+            "analyze_attendance_anomalies": self._analyze_anomalies,
         }
         handler = dispatch.get(action)
         if handler is None:
@@ -296,4 +298,214 @@ class AttendanceComplianceAgent(SkillAgent):
             data=data,
             reasoning=f"合规报告生成完成: {month} 月合规得分 {score}/100",
             confidence=0.85,
+        )
+
+    # ── Action: analyze_attendance_anomalies — 6 类标准考勤异常 ──────────
+    # 按 #258 / S2-06 issue 验收：迟到 / 早退 / 旷工 / 超时 / 未休 / 连续无休
+    # 规则引擎层：所有判断走纯规则；异常解释 + 处置建议留 Claude 接入点（M2）
+
+    @staticmethod
+    def _hhmm_to_min(hhmm: Optional[str]) -> Optional[int]:
+        """'09:30' → 570（一天分钟数）"""
+        if not hhmm:
+            return None
+        try:
+            h, m = hhmm.split(":")
+            return int(h) * 60 + int(m)
+        except (ValueError, AttributeError):
+            return None
+
+    @staticmethod
+    def _remedy(severity: str, anomaly_type: str) -> str:
+        """处置建议路由"""
+        if severity == "critical":
+            return "需 HR 介入（劳动法风险）"
+        if severity == "warning":
+            return "需经理审批" if anomaly_type in ("late", "early_leave", "overtime") else "需补卡"
+        return "自动忽略（轻微）"
+
+    async def _analyze_anomalies(self, params: dict) -> AgentResult:
+        """6 类考勤异常规则引擎扫描
+
+        params:
+          scan_date: str (YYYY-MM-DD)
+          records: [{employee_id, name, scheduled_start, scheduled_end,
+                     clock_in, clock_out, date?}]
+          rules: { late_threshold_min, early_leave_threshold_min,
+                   max_overtime_min, max_continuous_days }
+          holiday_dates: [str]  法定节假日日期列表
+        """
+        scan_date: str = params.get("scan_date", str(date.today()))
+        records: list[dict] = params.get("records", [])
+        rules: dict = params.get("rules", {})
+        holiday_dates: list[str] = params.get("holiday_dates", [])
+
+        late_threshold = rules.get("late_threshold_min", 5)
+        early_threshold = rules.get("early_leave_threshold_min", 5)
+        max_overtime = rules.get("max_overtime_min", 180)  # 法定 36h/月 ≈ 单日 3h
+        max_continuous = rules.get("max_continuous_days", 6)
+
+        anomalies: list[dict] = []
+
+        # ── 单日异常（迟到 / 早退 / 旷工 / 超时 / 未休）──
+        for r in records:
+            emp_id = r.get("employee_id", "")
+            name = r.get("name", "")
+            sched_start = self._hhmm_to_min(r.get("scheduled_start"))
+            sched_end = self._hhmm_to_min(r.get("scheduled_end"))
+            clock_in = self._hhmm_to_min(r.get("clock_in"))
+            clock_out = self._hhmm_to_min(r.get("clock_out"))
+            rec_date = r.get("date") or scan_date
+
+            # 旷工：排班但完全没打卡
+            if sched_start is not None and clock_in is None and clock_out is None:
+                anomalies.append({
+                    "type": "absent",
+                    "severity": "critical",
+                    "employee_id": emp_id, "name": name, "date": rec_date,
+                    "scheduled_start": r.get("scheduled_start"),
+                    "scheduled_end": r.get("scheduled_end"),
+                    "remedy": self._remedy("critical", "absent"),
+                    "explanation": f"{name} 当日排班 {r.get('scheduled_start')}-{r.get('scheduled_end')} 但无打卡记录",
+                })
+                continue  # 旷工后不再 check 其他
+
+            # 迟到
+            if sched_start is not None and clock_in is not None:
+                delay = clock_in - sched_start
+                if delay > late_threshold:
+                    severity = "critical" if delay > 60 else "warning"
+                    anomalies.append({
+                        "type": "late",
+                        "severity": severity,
+                        "employee_id": emp_id, "name": name, "date": rec_date,
+                        "scheduled_start": r.get("scheduled_start"),
+                        "clock_in": r.get("clock_in"),
+                        "delay_min": delay,
+                        "remedy": self._remedy(severity, "late"),
+                        "explanation": f"{name} 迟到 {delay} 分钟（排班 {r.get('scheduled_start')}，实到 {r.get('clock_in')}）",
+                    })
+
+            # 早退
+            if sched_end is not None and clock_out is not None:
+                short = sched_end - clock_out
+                if short > early_threshold:
+                    severity = "critical" if short > 60 else "warning"
+                    anomalies.append({
+                        "type": "early_leave",
+                        "severity": severity,
+                        "employee_id": emp_id, "name": name, "date": rec_date,
+                        "scheduled_end": r.get("scheduled_end"),
+                        "clock_out": r.get("clock_out"),
+                        "short_min": short,
+                        "remedy": self._remedy(severity, "early_leave"),
+                        "explanation": f"{name} 早退 {short} 分钟（排班 {r.get('scheduled_end')}，实走 {r.get('clock_out')}）",
+                    })
+
+            # 超时加班
+            if clock_in is not None and clock_out is not None and sched_end is not None:
+                actual_overtime = clock_out - sched_end
+                if actual_overtime > max_overtime:
+                    anomalies.append({
+                        "type": "overtime",
+                        "severity": "critical" if actual_overtime > max_overtime + 60 else "warning",
+                        "employee_id": emp_id, "name": name, "date": rec_date,
+                        "scheduled_end": r.get("scheduled_end"),
+                        "clock_out": r.get("clock_out"),
+                        "overtime_min": actual_overtime,
+                        "max_overtime_min": max_overtime,
+                        "remedy": self._remedy("warning", "overtime"),
+                        "explanation": f"{name} 加班 {actual_overtime} 分钟，超过法定 {max_overtime} 分钟",
+                    })
+
+            # 未休法定节假日
+            if rec_date in holiday_dates and sched_start is not None and clock_in is not None:
+                anomalies.append({
+                    "type": "missing_holiday_rest",
+                    "severity": "warning",
+                    "employee_id": emp_id, "name": name, "date": rec_date,
+                    "holiday_date": rec_date,
+                    "remedy": self._remedy("warning", "missing_holiday_rest"),
+                    "explanation": f"{name} 在法定节假日 {rec_date} 仍上班，需安排补休或加班费",
+                })
+
+        # ── 连续工作天数（按员工聚合）──
+        by_emp: dict[str, list[str]] = {}
+        for r in records:
+            emp_id = r.get("employee_id", "")
+            rec_date = r.get("date") or scan_date
+            clock_in = r.get("clock_in")
+            if clock_in:  # 只算实际打卡日
+                by_emp.setdefault(emp_id, []).append(rec_date)
+
+        for emp_id, dates in by_emp.items():
+            sorted_dates = sorted(dates)
+            consecutive = 1
+            max_consec = 1
+            for i in range(1, len(sorted_dates)):
+                # 简化：按字符串日期判断连续（不处理跨月，足够 demo）
+                d_prev = sorted_dates[i - 1]
+                d_curr = sorted_dates[i]
+                # 比较日期间隔：要求 d_curr == d_prev + 1
+                from datetime import datetime, timedelta
+                try:
+                    p = datetime.strptime(d_prev, "%Y-%m-%d").date()
+                    c = datetime.strptime(d_curr, "%Y-%m-%d").date()
+                    if (c - p).days == 1:
+                        consecutive += 1
+                        max_consec = max(max_consec, consecutive)
+                    else:
+                        consecutive = 1
+                except ValueError:
+                    consecutive = 1
+
+            if max_consec > max_continuous:
+                emp_name = next((r.get("name", "") for r in records if r.get("employee_id") == emp_id), "")
+                anomalies.append({
+                    "type": "continuous_work",
+                    "severity": "critical",
+                    "employee_id": emp_id, "name": emp_name,
+                    "consecutive_days": max_consec,
+                    "max_continuous_days": max_continuous,
+                    "remedy": self._remedy("critical", "continuous_work"),
+                    "explanation": f"{emp_name} 连续工作 {max_consec} 天（>法定 {max_continuous} 天上限），违反劳动法",
+                })
+
+        # ── 汇总 ──
+        by_severity = {"info": 0, "warning": 0, "critical": 0}
+        by_type: dict[str, int] = {}
+        for a in anomalies:
+            by_severity[a["severity"]] = by_severity.get(a["severity"], 0) + 1
+            by_type[a["type"]] = by_type.get(a["type"], 0) + 1
+
+        summary = {
+            "total": len(anomalies),
+            "by_severity": by_severity,
+            "by_type": by_type,
+            "scan_date": scan_date,
+            "records_count": len(records),
+        }
+
+        logger.info(
+            "attendance_anomalies_analyzed",
+            tenant_id=self.tenant_id,
+            store_id=self.store_id,
+            scan_date=scan_date,
+            total=len(anomalies),
+            critical=by_severity.get("critical", 0),
+        )
+
+        return AgentResult(
+            success=True,
+            action="analyze_attendance_anomalies",
+            data={
+                "anomalies": anomalies,
+                "summary": summary,
+            },
+            reasoning=(
+                f"扫描 {len(records)} 条考勤记录，发现 {len(anomalies)} 处异常（"
+                f"critical={by_severity['critical']}, warning={by_severity['warning']}, info={by_severity['info']}）"
+            ),
+            confidence=0.92,
+            inference_layer="edge",
         )
