@@ -151,7 +151,8 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                 r = row.fetchone()
                 if r and r.order_count and r.order_count > 0:
                     if "avg_ticket_fen" in kpi_keys:
-                        actuals["avg_ticket_fen"] = float(r.avg_ticket or 0)
+                        # _fen 字段必须 int（CLAUDE.md §10/§15 金额规范）；用 round 防 SQL AVG Decimal 截断丢 0.01 元
+                        actuals["avg_ticket_fen"] = int(round(r.avg_ticket or 0))
             except SQLAlchemyError as exc:
                 logger.warning(
                     "merchant_targets_actuals_query_failed", kpi="avg_ticket_fen", tenant_id=tenant_id, error=str(exc)

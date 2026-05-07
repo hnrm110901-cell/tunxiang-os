@@ -305,9 +305,10 @@ class ContributionScoreService:
                 },
             )
             avg_result = avg_row.mappings().first()
-            avg_revenue = float(avg_result["avg_revenue_fen"] or 1) if avg_result else 1.0
+            # _fen 字段必须 int（CLAUDE.md §10/§15）；下游 max+division 不需要 float
+            avg_revenue = int(round(avg_result["avg_revenue_fen"] or 1)) if avg_result else 1
 
-            score = (emp_revenue / max(avg_revenue, 1.0)) * 100.0
+            score = (emp_revenue / max(avg_revenue, 1)) * 100.0
             return round(min(100.0, max(0.0, score)), 1)
 
         except (ProgrammingError, DBAPIError) as exc:

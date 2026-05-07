@@ -1018,8 +1018,10 @@ class PayrollEngine:
         curr_tax = int(curr_row["total_tax_fen"] or 0)
         curr_max = int(curr_row["max_gross_fen"] or 0)
         curr_min = int(curr_row["min_gross_fen"] or 0)
-        curr_median = float(curr_row["median_gross_fen"] or 0)
-        curr_avg = float(curr_row["avg_gross_fen"] or 0)
+        # 薪资 _fen 字段必须 int（CLAUDE.md §10/§15）；round 防 Decimal 截断 0.01 元
+        # ⚠️ 薪资计算路径，与 §17 财务结算 / 全电发票 同 Tier 1 财务域
+        curr_median = int(round(curr_row["median_gross_fen"] or 0))
+        curr_avg = int(round(curr_row["avg_gross_fen"] or 0))
 
         prev_headcount = int(prev_row["headcount"] or 0)
         prev_gross = int(prev_row["total_gross_fen"] or 0)

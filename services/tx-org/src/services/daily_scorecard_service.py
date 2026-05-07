@@ -616,7 +616,8 @@ class DailyScorecardService:
                     pass  # 降级使用默认桌数
 
                 result["turnover_rate"] = round(order_count / max(table_count, 1), 2)
-                result["avg_ticket_fen"] = float(r["avg_ticket"] or 0)
+                # _fen 字段必须 int（CLAUDE.md §10/§15）；round 防 Decimal 截断
+                result["avg_ticket_fen"] = int(round(r["avg_ticket"] or 0))
         except (ProgrammingError, DBAPIError) as exc:
             log.warning("scorecard.waiter_orders_unavailable", error=str(exc))
 

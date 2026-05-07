@@ -215,7 +215,8 @@ async def _query_compare_revenue(
     if not row:
         return 0.0
 
-    raw = float(row.revenue_fen)
+    # _fen 字段必须 int（CLAUDE.md §10/§15）；除 7.0 自动转 float 即可，无需预 cast
+    raw: float = int(row.revenue_fen or 0)
     # For avg_7d: divide by number of days
     if dimension not in ("yesterday", "last_week", "last_month"):
         raw = raw / 7.0
