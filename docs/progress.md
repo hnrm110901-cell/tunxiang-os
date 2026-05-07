@@ -1,3 +1,25 @@
+## 2026-05-07 21:49 · Sprint 2 #254 aria-label 落地 → 4/10 关闭
+
+### 完成状态
+- [x] #254 aria-label 全覆盖（scanner 升级 + baseline 锁定 + 1 处真修复）
+- [x] lint:a11y 进入 CI 闸门体系（5 道）
+- [x] a11y 基线扫描准确度大幅提升（多行 JSX 支持）
+
+### 关键决策
+- **决策 19：scanner 升级为 multi-line 而非保持简单** — 原 single-line 在 JSX 多行元素上 26 处 false positive 同时漏报 300+ 真违规，准确度优于易用性
+- **决策 20：div-clickable 372 留 M2 渐进降** — 每处需 case-by-case 判断（改 button OR 加 role+tabIndex+onKeyDown），不机械修复
+- **决策 21：a11y 进 lint-ui baseline 体系而非独立** — 团队心智模型一致，CI 一次跑全 5 闸门
+
+### 下一步
+- commit + push 当前 Sprint 2 #254 工作
+- 进入 #257 voice_order Agent OR #259 pinjin Tier 1 测试
+
+### 已知风险
+- 多行 JSX 元素扫描器仍可能漏 attr-spread `{...props}` 注入的 aria（无法静态分析）
+- 372 div-clickable 数字大，团队 commit 修复需建立"每周降 N 个"节奏
+
+---
+
 ## 2026-05-07 21:37 · Sprint 2 起步 3/10 关闭 + a11y 基线 / focus / 工具链落地
 
 ### 完成状态

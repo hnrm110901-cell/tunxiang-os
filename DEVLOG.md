@@ -1,3 +1,34 @@
+## 2026-05-07 Sprint 2 #254 落地 → 4/10 关闭
+
+### 今日完成（续，#254）
+- **#254 [S2-02] aria-label 全覆盖 — 已落地**
+  - Scanner 多行 JSX 升级：`extractElementOpenTag()` 跨行扫描，处理嵌套 {} / 引号
+  - 5 规则升级为 multiline：img-no-alt / button-no-label / icon-button-no-label / div-clickable / anchor-no-href
+  - **img-no-alt 26 → 0**（原全是 false positive，团队做对了）
+  - **div-clickable 69 → 372**（漏报 303 处真违规暴露）
+  - **anchor-no-href 64 → 106**（漏报 42 处暴露）
+  - **button-no-label 0 → 1 → 0**（DishDetail 翻页指示器 1 处真修，加 aria-label + aria-current + type）
+  - 加 `--check` baseline 模式 + `--update-baseline`
+  - `pnpm lint:a11y` 入口进入 lint-ui 闸门体系
+  - `.github/workflows/ui-quality-gate.yml` 加 a11y step（5 道闸门）
+
+### 数据变化
+- a11y baseline.json 加 7 个键（4 项 = 0 / div-clickable=372 / anchor-no-href=106 / input-no-label=339）
+- 总违规 498 → 817（暴露 +319 真违规，准确度提升）
+- 修改文件：scan.mjs / baseline.json / package.json / workflow / DishDetail.tsx
+- Sprint 2 进度：**4 / 10 = 40% 关闭**
+
+### 遗留问题
+- 372 div-clickable + 106 anchor-no-href 留 M2 渐进降
+- 339 input-no-label 留 M3 渐进降
+- 未做 i18n 文案外置 / 未做 TXTouch 强制 aria-label（separate scope）
+
+### 明日计划
+- 推 #257 voice_order Agent（Tier 1 backend）
+- 或 #259 pinjin Tier 1 测试（尝在一起首店上线必经路径）
+
+---
+
 ## 2026-05-07 Sprint 2 #253/#256/#261 落地 → 3/10 关闭
 
 ### 今日完成（Sprint 2 起步）
