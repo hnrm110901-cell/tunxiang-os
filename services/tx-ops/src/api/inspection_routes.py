@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import date
 from typing import Any, Dict, List, Optional
@@ -24,6 +25,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import SafetyInspectionEventType
 from shared.ontology.src.database import get_db
 
 router = APIRouter(prefix="/api/v1/ops/inspections", tags=["ops-inspections"])
@@ -391,6 +394,33 @@ async def submit_inspection(
         await db.commit()
         record = _serialize_row(row)
         log.info("inspection_submitted", report_id=report_id, store_id=str(record["store_id"]), tenant_id=x_tenant_id)
+
+        # 旁路事件发射：巡店报告提交（草稿→已提交）
+        overall_score = record.get("overall_score")
+        _event_type = (
+            SafetyInspectionEventType.INSPECTION_FAILED
+            if overall_score is not None and float(overall_score) < 60
+            else SafetyInspectionEventType.INSPECTION_COMPLETED
+        )
+        asyncio.create_task(
+            emit_event(
+                event_type=_event_type,
+                tenant_id=x_tenant_id,
+                stream_id=report_id,
+                payload={
+                    "report_id": report_id,
+                    "store_id": str(record.get("store_id", "")),
+                    "inspector_id": str(record.get("inspector_id", "")),
+                    "inspection_date": str(record.get("inspection_date", "")),
+                    "overall_score": overall_score,
+                    "action_items_count": len(record.get("action_items") or []),
+                },
+                store_id=str(record.get("store_id", "")),
+                source_service="tx-ops",
+                metadata={"trigger": "inspector_submit"},
+            )
+        )
+
         return {"ok": True, "data": record}
     except HTTPException:
         raise
@@ -456,6 +486,26 @@ async def acknowledge_inspection(
         log.info(
             "inspection_acknowledged", report_id=report_id, acknowledged_by=body.acknowledged_by, tenant_id=x_tenant_id
         )
+
+        # 旁路事件发射：门店确认巡店报告（已提交→已确认）
+        asyncio.create_task(
+            emit_event(
+                event_type=SafetyInspectionEventType.INSPECTION_ACKNOWLEDGED,
+                tenant_id=x_tenant_id,
+                stream_id=report_id,
+                payload={
+                    "report_id": report_id,
+                    "store_id": str(record.get("store_id", "")),
+                    "acknowledged_by": body.acknowledged_by,
+                    "ack_notes": body.ack_notes,
+                    "overall_score": record.get("overall_score"),
+                },
+                store_id=str(record.get("store_id", "")),
+                source_service="tx-ops",
+                metadata={"trigger": "store_acknowledge"},
+            )
+        )
+
         return {"ok": True, "data": record}
     except HTTPException:
         raise

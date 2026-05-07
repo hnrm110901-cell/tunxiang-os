@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -27,6 +28,9 @@ import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
+
+from shared.events.src.emitter import emit_event
+from shared.events.src.event_types import ApprovalEventType
 
 log = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/ops/approvals", tags=["ops-approvals"])
@@ -261,6 +265,26 @@ async def create_instance(
         )
         instance["deadline_at"] = deadline.isoformat()
 
+    # 旁路事件发射：审批实例发起
+    asyncio.create_task(
+        emit_event(
+            event_type=ApprovalEventType.INITIATED,
+            tenant_id=x_tenant_id,
+            stream_id=str(instance.get("id", "")),
+            payload={
+                "instance_id": str(instance.get("id", "")),
+                "business_type": body.business_type,
+                "business_id": body.business_id,
+                "title": body.title,
+                "initiator_id": body.initiator_id,
+                "amount_fen": body.amount_fen,
+                "total_steps": instance.get("total_steps"),
+            },
+            source_service="tx-ops",
+            metadata={"business_type": body.business_type},
+        )
+    )
+
     return {"ok": True, "data": instance}
 
 
@@ -369,6 +393,47 @@ async def act_on_instance(
         raise safe_http_exception(404, "资源不存在", exc) from exc
     except ValueError as exc:
         raise safe_http_exception(422, "请求格式错误", exc) from exc
+
+    # 旁路事件发射：审批通过或驳回（仅终态才发射）
+    final_status = result.get("status") if isinstance(result, dict) else None
+    if final_status == "approved":
+        asyncio.create_task(
+            emit_event(
+                event_type=ApprovalEventType.APPROVED,
+                tenant_id=x_tenant_id,
+                stream_id=instance_id,
+                payload={
+                    "instance_id": instance_id,
+                    "approver_id": body.approver_id,
+                    "approver_name": body.approver_name,
+                    "comment": body.comment,
+                    "business_type": result.get("business_type", ""),
+                    "business_id": result.get("business_id", ""),
+                    "amount_fen": result.get("amount_fen"),
+                },
+                source_service="tx-ops",
+                metadata={"action": "approve"},
+            )
+        )
+    elif final_status == "rejected":
+        asyncio.create_task(
+            emit_event(
+                event_type=ApprovalEventType.REJECTED,
+                tenant_id=x_tenant_id,
+                stream_id=instance_id,
+                payload={
+                    "instance_id": instance_id,
+                    "approver_id": body.approver_id,
+                    "approver_name": body.approver_name,
+                    "comment": body.comment,
+                    "business_type": result.get("business_type", ""),
+                    "business_id": result.get("business_id", ""),
+                    "amount_fen": result.get("amount_fen"),
+                },
+                source_service="tx-ops",
+                metadata={"action": "reject"},
+            )
+        )
 
     return {"ok": True, "data": result}
 
