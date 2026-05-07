@@ -43,6 +43,9 @@ export { useLongPress } from './hooks/useLongPress';
 export { useSwipe } from './hooks/useSwipe';
 export { useHaptic } from './hooks/useHaptic';
 
+// ─── 兼容遗留 inline-style API（deprecated，新代码请走 @tx/tokens CSS Variables） ─
+export { TX, TXT, BTN, INPUT, TAG, LAYOUT } from './styles/base-theme';
+
 // ─── Styles 路径（消费方自行 import）────────────────────────────
 // import '@tx/tokens/src/tokens.css';     ← Token（必须，在 tx-touch 之前引入）
 // import '@tx/touch/src/styles/reset.css';
