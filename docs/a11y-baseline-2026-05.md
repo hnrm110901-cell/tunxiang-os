@@ -4,248 +4,248 @@
 > 不替代完整 axe-core + 浏览器测试，但覆盖 90% 高频静态 a11y 违规。
 > 重跑：`pnpm a11y:scan`。
 
-## 总账：498 处违规跨 16 个 app
+## 总账：817 处违规跨 16 个 app
 
 ## 按 app 分布
 
 | App | 违规数 |
 |-----|-------|
-| apps/web-admin | 248 |
-| apps/web-pos | 85 |
-| apps/web-crew | 59 |
-| apps/web-hub | 31 |
-| apps/h5-self-order | 18 |
-| apps/web-kds | 17 |
-| apps/web-reception | 11 |
-| shared/design-system | 9 |
+| apps/web-admin | 389 |
+| apps/web-crew | 170 |
+| apps/web-pos | 132 |
+| apps/web-hub | 44 |
+| apps/web-kds | 22 |
+| apps/web-reception | 17 |
+| shared/design-system | 11 |
 | apps/web-tv-menu | 8 |
-| apps/web-forge | 5 |
+| apps/h5-self-order | 8 |
+| apps/web-forge | 6 |
+| packages/tx-touch | 4 |
 | apps/web-wecom-sidebar | 2 |
 | apps/web-forge-admin | 2 |
-| packages/tx-touch | 2 |
-| apps/web-devforge | 1 |
+| apps/web-devforge | 2 |
 
 ## 按检查项分类
 
 | Rule | Severity | 数量 | 说明 |
 |------|---------|-----|------|
-| `img-no-alt` | error | 26 | <img> 缺 alt 属性（屏幕阅读器无法描述） |
-| `button-no-label` | warning | 0 | icon-only <button> 疑似缺 aria-label |
+| `img-no-alt` | error | 0 | <img> 缺 alt 属性（屏幕阅读器无法描述） |
+| `button-no-label` | warning | 0 | icon-only <button> 疑似缺 aria-label / 无文字 children |
 | `icon-button-no-label` | warning | 0 | <IconButton> / icon-only TXButton 疑似缺 aria-label |
-| `div-clickable` | warning | 69 | <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex） |
-| `anchor-no-href` | warning | 64 | <a> 有 onClick 但无 href（键盘不可达） |
+| `div-clickable` | warning | 372 | <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex + onKeyDown） |
+| `anchor-no-href` | warning | 106 | <a> 有 onClick 但无 href（键盘不可达） |
 | `input-no-label` | info | 339 | <input> 疑似缺 aria-label / 关联 label（type=submit/button 除外） |
 | `empty-button` | error | 0 | <button></button> 完全空内容（屏幕阅读器无法宣读） |
 
 ## Top 30 违规（按 severity → app → rule 排序）
 
-### 1. `img-no-alt` (error) — apps/h5-self-order/src/components/DishCard.tsx:34
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 2. `img-no-alt` (error) — apps/h5-self-order/src/pages/Cart.tsx:127
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 3. `img-no-alt` (error) — apps/h5-self-order/src/pages/DishDetail.tsx:75
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 4. `img-no-alt` (error) — apps/h5-self-order/src/pages/FeedbackPage.tsx:163
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 5. `img-no-alt` (error) — apps/h5-self-order/src/pages/FeedbackPage.tsx:223
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 6. `img-no-alt` (error) — apps/h5-self-order/src/pages/OrderConfirmPage.tsx:201
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 7. `img-no-alt` (error) — apps/h5-self-order/src/templates/HotpotTemplate.tsx:256
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 8. `img-no-alt` (error) — apps/h5-self-order/src/templates/HotpotTemplate.tsx:395
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 9. `img-no-alt` (error) — apps/h5-self-order/src/templates/QuickServiceTemplate.tsx:206
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 10. `img-no-alt` (error) — apps/h5-self-order/src/templates/QuickServiceTemplate.tsx:274
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 11. `img-no-alt` (error) — apps/h5-self-order/src/templates/TeaTemplate.tsx:267
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 12. `img-no-alt` (error) — apps/h5-self-order/src/templates/TeaTemplate.tsx:361
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 13. `img-no-alt` (error) — apps/web-admin/src/components/receipt-editor/PropertyPanel.tsx:893
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 14. `img-no-alt` (error) — apps/web-admin/src/components/receipt-editor/ReceiptCanvas.tsx:560
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 15. `img-no-alt` (error) — apps/web-admin/src/pages/member/BadgeManagePage.tsx:322
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 16. `img-no-alt` (error) — apps/web-admin/src/pages/service/CustomerServiceWorkbench.tsx:482
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 17. `img-no-alt` (error) — apps/web-crew/src/pages/IssueReportPage.tsx:282
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 18. `img-no-alt` (error) — apps/web-kds/src/pages/DigitalMenuBoardPage.tsx:119
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 19. `img-no-alt` (error) — apps/web-kds/src/pages/DigitalMenuBoardPage.tsx:432
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 20. `img-no-alt` (error) — apps/web-pos/src/components/ComboSelectorSheet.tsx:202
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 21. `img-no-alt` (error) — apps/web-pos/src/components/a2ui/A2UIRenderer.tsx:369
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 22. `img-no-alt` (error) — apps/web-tv-menu/src/components/DishCard.tsx:125
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 23. `img-no-alt` (error) — apps/web-wecom-sidebar/src/components/CustomerProfile.tsx:57
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 24. `img-no-alt` (error) — shared/design-system/src/biz/DishCard/DishCard.tsx:66
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 25. `img-no-alt` (error) — shared/design-system/src/biz/DishImage/DishImage.tsx:122
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 26. `img-no-alt` (error) — shared/design-system/src/biz/SpecSheet/SpecSheet.tsx:135
-
-```
-<img
-```
-→ <img> 缺 alt 属性（屏幕阅读器无法描述）
-
-### 27. `div-clickable` (warning) — apps/h5-self-order/src/components/CartBar.tsx:26
+### 1. `div-clickable` (warning) — apps/h5-self-order/src/components/CartBar.tsx:26
 
 ```
 <div className={styles.totalSection} onClick={onViewCart}>
 ```
-→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex）
+→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex + onKeyDown）
 
-### 28. `div-clickable` (warning) — apps/h5-self-order/src/pages/MenuBrowse.tsx:245
+### 2. `div-clickable` (warning) — apps/h5-self-order/src/components/DishCard.tsx:28
+
+```
+<div
+```
+→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex + onKeyDown）
+
+### 3. `div-clickable` (warning) — apps/h5-self-order/src/pages/MenuBrowse.tsx:245
 
 ```
 <div key={rec.dishId} className="tx-pressable" onClick={() => navigate(`/dish/${rec.dishId}`)} style={{ minWidth: 140, padding: 10, borderRadius: 'var(--tx-radius-md)', background: 'var(--tx-bg-card)'
 ```
-→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex）
+→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex + onKeyDown）
 
-### 29. `anchor-no-href` (warning) — apps/web-admin/src/pages/analytics/hq/StorePerformanceMatrix.tsx:310
+### 4. `div-clickable` (warning) — apps/h5-self-order/src/templates/TeaTemplate.tsx:340
+
+```
+<div
+```
+→ <div onClick> / <span onClick> 无 role（应改 <button> 或加 role="button" + tabIndex + onKeyDown）
+
+### 5. `anchor-no-href` (warning) — apps/web-admin/src/pages/analytics/hq/StorePerformanceMatrix.tsx:310
 
 ```
 <a onClick={() => {
 ```
 → <a> 有 onClick 但无 href（键盘不可达）
 
-### 30. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/FinanceAuditPage.tsx:432
+### 6. `anchor-no-href` (warning) — apps/web-admin/src/pages/analytics/hq/StorePerformanceMatrix.tsx:395
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 7. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/AgreementUnitPage.tsx:472
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 8. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/EInvoicePage.tsx:312
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 9. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/FinanceAuditPage.tsx:432
 
 ```
 <a onClick={() => setDetailRecord(record)}>查看详情</a>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 10. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/PayrollPage.tsx:387
+
+```
+<a key="view" onClick={() => handleViewDetail(record)}>详情</a>,
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 11. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/PayrollPage.tsx:400
+
+```
+<a key="paid" style={{ color: txColors.success }} onClick={() => handleMarkPaid(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 12. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/PayrollPage.tsx:553
+
+```
+extra={<a onClick={() => handleEdit(cfg)}>编辑</a>}
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 13. `anchor-no-href` (warning) — apps/web-admin/src/pages/finance/TaxManagePage.tsx:656
+
+```
+<a key="edit" onClick={() => handleEdit(r)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 14. `anchor-no-href` (warning) — apps/web-admin/src/pages/franchise/FranchiseContractPage.tsx:280
+
+```
+<a key="detail" onClick={() => Modal.info({
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 15. `anchor-no-href` (warning) — apps/web-admin/src/pages/franchise/FranchiseContractPage.tsx:295
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 16. `anchor-no-href` (warning) — apps/web-admin/src/pages/franchise/FranchiseContractPage.tsx:584
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 17. `anchor-no-href` (warning) — apps/web-admin/src/pages/growth/CampaignManagePage.tsx:284
+
+```
+<a key="stats" onClick={() => handleViewStats(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 18. `anchor-no-href` (warning) — apps/web-admin/src/pages/growth/CampaignManagePage.tsx:287
+
+```
+<a key="notify" onClick={() => handleOpenNotify(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 19. `anchor-no-href` (warning) — apps/web-admin/src/pages/growth/CampaignManagePage.tsx:293
+
+```
+<a key="activate" style={{ color: txColors.success }} onClick={() => handleActivate(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 20. `anchor-no-href` (warning) — apps/web-admin/src/pages/growth/CampaignManagePage.tsx:305
+
+```
+<a key="end" style={{ color: txColors.danger }} onClick={() => handleEnd(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 21. `anchor-no-href` (warning) — apps/web-admin/src/pages/growth/GroupDealPage.tsx:181
+
+```
+<a onClick={() => showDetail(record.id)}>{record.name}</a>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 22. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/agent/AgentSettingsPage.tsx:62
+
+```
+<a key="edit" onClick={() => alert('编辑权限配置')}>编辑</a>,
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 23. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/growth/CrossBrandPage.tsx:127
+
+```
+<a style={{ color: INFO_BLUE }} onClick={() => openDrawer(id)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 24. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/growth/GrowthDashboardPage.tsx:1129
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 25. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/growth/JourneyAttributionPage.tsx:317
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 26. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/supply/SupplierPortalPage.tsx:308
+
+```
+<a key="view" onClick={() => handleViewDetail(record)}>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 27. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/supply/SupplierPortalPage.tsx:620
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 28. `anchor-no-href` (warning) — apps/web-admin/src/pages/hq/trade/BanquetTemplatePage.tsx:862
+
+```
+<a
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 29. `anchor-no-href` (warning) — apps/web-admin/src/pages/hr/AlertAggregationPage.tsx:249
+
+```
+<a onClick={() => message.info(`跳转门店画像: ${r.store_id}`)}>查看画像</a>
+```
+→ <a> 有 onClick 但无 href（键盘不可达）
+
+### 30. `anchor-no-href` (warning) — apps/web-admin/src/pages/hr/CertificationPage.tsx:350
+
+```
+<a onClick={() => openDetail(r.id)}>详情</a>
 ```
 → <a> 有 onClick 但无 href（键盘不可达）
 

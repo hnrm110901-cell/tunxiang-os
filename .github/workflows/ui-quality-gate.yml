@@ -62,6 +62,9 @@ jobs:
       - name: lint:font-size
         run: node scripts/lint-ui/font-size.mjs
 
+      - name: lint:a11y
+        run: node scripts/a11y/scan.mjs --check
+
       - name: 汇总（lint:ui）
         run: node scripts/lint-ui/all.mjs
         if: always()

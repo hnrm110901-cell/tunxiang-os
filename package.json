@@ -15,6 +15,7 @@
     "lint:hardcoded-color": "node scripts/lint-ui/hardcoded-color.mjs",
     "lint:tap-target": "node scripts/lint-ui/tap-target.mjs",
     "lint:font-size": "node scripts/lint-ui/font-size.mjs",
+    "lint:a11y": "node scripts/a11y/scan.mjs --check",
     "a11y:scan": "node scripts/a11y/scan.mjs",
     "test": "pnpm -r test"
   },

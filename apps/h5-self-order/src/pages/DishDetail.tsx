@@ -101,6 +101,9 @@ export default function DishDetail() {
             {dish.images.map((_, idx) => (
               <button
                 key={idx}
+                type="button"
+                aria-label={`查看第 ${idx + 1} 张图片`}
+                aria-current={activeImage === idx ? 'true' : undefined}
                 onClick={() => setActiveImage(idx)}
                 style={{
                   width: activeImage === idx ? 20 : 8, height: 8,

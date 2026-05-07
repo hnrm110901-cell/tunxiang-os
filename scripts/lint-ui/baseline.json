@@ -15,5 +15,12 @@
   "no-antd-in-store": 3,
   "hardcoded-color": 69,
   "tap-target": 447,
-  "font-size": 1711
+  "font-size": 1711,
+  "a11y-img-no-alt": 0,
+  "a11y-button-no-label": 0,
+  "a11y-icon-button-no-label": 0,
+  "a11y-div-clickable": 372,
+  "a11y-anchor-no-href": 106,
+  "a11y-input-no-label": 339,
+  "a11y-empty-button": 0
 }
