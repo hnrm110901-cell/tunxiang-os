@@ -1,3 +1,28 @@
+## 2026-05-07 Sprint 2 #255 Admin Cmd+K → 8/10
+
+### 今日完成（续，#255）
+- **#255 [S2-03] Admin Cmd+K 命令面板 — 已落地**
+  - `apps/web-admin/src/components/AdminCommandPalette.tsx` (主组件，AntD Modal+Input+List)
+  - `apps/web-admin/src/hooks/useAdminCommandPalette.ts` (状态+键盘+命令注册)
+  - 全局 Ctrl/Cmd+K 触发，↑↓ Enter Esc 键盘导航
+  - Top 20 命令注册（导航 17 + 系统 2，按产品域）
+  - 拼音 + 中文 + 英文 keywords 模糊匹配
+  - role=option / aria-selected / aria-label 标准
+
+### 数据变化
+- 新增 2 文件 + App.tsx 集成 1 处
+- Sprint 2 进度：**8 / 10 = 80% 关闭**
+- 4 终端 Cmd+K 体验统一
+
+### 遗留
+- 完整 Tab 顺序逐页梳理 / PR 键盘录屏 / axe-core keyboard 动态扫描 / 命令自动生成 → separate issue
+
+### 明日计划
+- Sprint 2 自动化部分全完，仅剩 #260 / #262 需现场或评审
+- 可暂停或推进 M1 闸门评审准备
+
+---
+
 ## 2026-05-07 Sprint 2 #259 pinzhi Tier 1 测试 6/6 通过 → 7/10
 
 ### 今日完成（续，#259）
