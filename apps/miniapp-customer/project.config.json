@@ -1,5 +1,5 @@
 {
-  "description": "屯象OS 顾客端微信小程序",
+  "description": "屯象OS 顾客端微信小程序 v1 [DEPRECATED 2026-05-06, 新功能请用 miniapp-customer-v2]",
   "packOptions": {
     "ignore": [],
     "include": []

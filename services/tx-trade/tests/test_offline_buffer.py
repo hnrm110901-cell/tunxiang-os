@@ -11,9 +11,11 @@ import sys
 
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../edge/mac-mini"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../edge/mac-station/src"))
 
-from offline_buffer import OfflineBuffer
+# R2 dedup (2026-05-06): 文件 mac-mini/offline_buffer.py 重命名为 mac-station/src/order_offline_buffer.py
+# 类名 OfflineBuffer 保留不变（避免连锁改测试断言）。
+from order_offline_buffer import OfflineBuffer
 
 # ─── 测试夹具 ───
 

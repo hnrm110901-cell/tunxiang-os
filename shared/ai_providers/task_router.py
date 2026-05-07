@@ -1,10 +1,24 @@
-"""屯象OS 统一模型路由层
+"""屯象OS 任务路由层（业务任务分级 → 模型 ID 查表）
 
-所有 AI 模型调用必须通过此层，不允许直接调用 API。
+R1 dedup (2026-05-06): 从 services/tunxiang-api/src/shared/core/model_router.py
+迁移而来。tunxiang-api 是早期 MVP 单体服务，已在 R1 中删除；其唯一被外部
+依赖的就是这个 ModelRouter 业务任务分级查表。
+
+定位：
+  - 这是"业务任务分级"层（task_type → complexity → model_id）
+  - 与 shared/ai_providers/router.py 的 MultiProviderRouter（多 provider 路由 +
+    熔断 + 故障转移）是**两个正交关注点**：
+      task_router  : 业务知识（哪类任务用哪个模型档位）
+      MultiRouter  : 基础设施（实际调用 + provider 选择 + cost 追踪）
+
 职责：
-1. 根据任务类型路由到合适的模型
-2. 统一成本追踪和调用日志
+1. 根据任务类型路由到合适的模型档位
+2. 统一成本追踪和调用日志（轻量内存统计）
 3. 为未来模型切换预留接口（Core ML 边缘推理等）
+
+调用方（6 skill）：
+  services/tx-agent/src/agents/skills/{table_dispatch,enterprise_activation,
+    cost_diagnosis,review_summary,growth_attribution,smart_customer_service}.py
 """
 
 from enum import Enum

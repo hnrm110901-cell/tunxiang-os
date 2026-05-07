@@ -459,12 +459,9 @@ def test_model_router_registers_dish_dynamic_pricing_as_moderate():
         "..",
         "..",
         "..",
-        "services",
-        "tunxiang-api",
-        "src",
         "shared",
-        "core",
-        "model_router.py",
+        "ai_providers",
+        "task_router.py",
     )
     if not os.path.exists(path):
         pytest.skip("model_router.py 不存在")

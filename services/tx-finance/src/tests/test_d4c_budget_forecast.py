@@ -568,7 +568,7 @@ class TestV281Migration:
 
 class TestModelRouterRegistration:
     def test_budget_forecast_registered_as_complex(self):
-        router_src = (ROOT / "services" / "tunxiang-api" / "src" / "shared" / "core" / "model_router.py").read_text(
+        router_src = (ROOT / "shared" / "ai_providers" / "task_router.py").read_text(
             encoding="utf-8"
         )
         assert '"budget_forecast_analysis": TaskComplexity.COMPLEX' in router_src
