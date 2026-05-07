@@ -181,7 +181,7 @@ export function useVoiceAgent(options: UseVoiceAgentOptions = {}): UseVoiceAgent
         try {
           recognition.start();
           setListening(true);
-        } catch { /* Speech API not ready, safe to ignore */ */ }
+        } catch { /* Speech API not ready, safe to ignore */ }
       }
     };
 
