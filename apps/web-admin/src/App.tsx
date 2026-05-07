@@ -12,6 +12,7 @@ import { txAdminTheme } from '@tx/tokens';
 import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { LangProvider, useLang } from './i18n/LangContext';
 import { ShellHQ } from './shell/ShellHQ';
+import { AdminCommandPalette } from './components/AdminCommandPalette';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DailyPlanPage } from './pages/DailyPlanPage';
@@ -244,6 +245,7 @@ function AppContent() {
   return (
     <ConfigProvider theme={txAdminTheme} locale={antLocale}>
     <BrowserRouter>
+      <AdminCommandPalette />
       <ShellHQ onLogout={logout}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
