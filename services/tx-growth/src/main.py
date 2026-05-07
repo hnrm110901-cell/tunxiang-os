@@ -934,6 +934,15 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
+
+# 审计 S-02 闭环：校验 gateway 注入的 X-Internal-JWT，把受信 claims 写入
+# request.state；env TX_INTERNAL_JWT_SECRET 未配时 skip 不破坏现状。
+# 必须在 CORSMiddleware 之后 add（FastAPI 后 add 的在内层；CORS preflight
+# OPTIONS 走外层 CORS 直接返 200，不经 JWT 校验）。
+# 详见 docs/security/internal-jwt-rollout.md
+from shared.security.src.internal_jwt_middleware import InternalJwtMiddleware
+
+app.add_middleware(InternalJwtMiddleware)
 app.include_router(campaign_router)
 app.include_router(coupon_router)  # /api/v1/growth/coupons（优惠券核销）
 app.include_router(growth_campaign_router)  # /api/v1/growth/campaigns（新标准路径）
