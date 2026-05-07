@@ -395,19 +395,22 @@ async def submit_inspection(
         record = _serialize_row(row)
         log.info("inspection_submitted", report_id=report_id, store_id=str(record["store_id"]), tenant_id=x_tenant_id)
 
-        # 旁路事件发射：巡店报告提交（草稿→已提交）—— 事件类型绑定**动作**（COMPLETED）
-        # 不绑定**结果**（FAILED）。PR #266 verifier 反馈：
-        # 把"提交动作"和"巡检不合格"塞到同一事件分支会让
-        # mv_safety_compliance 与既有 safety.violation_found 双计/漏计。
-        # is_failed 作为 payload 字段交给消费者判定，与 cashier_engine PAID
-        # 永远是 PAID 的风格一致。
+        # 旁路事件发射：巡店报告提交（草稿→已提交）
+        # PR #266 round-3 修复：revert round-2 的"动作 vs 结果"设计变更。
+        # 原 round-1 verifier 给的"双计漏计"理由不成立——shared/events/src/
+        # projectors/safety_compliance.py 只订阅 safety.inspection_done +
+        # safety.violation_found，根本不消费 .completed/.failed 事件。
+        # 同时 sibling safety_inspection_router.py:477-479 仍是二选一模式，
+        # 同域两路由必须保持一致；revert 后两路由统一按 score<60 二选一发。
         overall_score = record.get("overall_score")
-        is_failed = (
-            overall_score is not None and float(overall_score) < 60
+        _event_type = (
+            SafetyInspectionEventType.INSPECTION_FAILED
+            if overall_score is not None and float(overall_score) < 60
+            else SafetyInspectionEventType.INSPECTION_COMPLETED
         )
         asyncio.create_task(
             emit_event(
-                event_type=SafetyInspectionEventType.INSPECTION_COMPLETED,
+                event_type=_event_type,
                 tenant_id=x_tenant_id,
                 stream_id=report_id,
                 payload={
@@ -416,7 +419,6 @@ async def submit_inspection(
                     "inspector_id": str(record.get("inspector_id", "")),
                     "inspection_date": str(record.get("inspection_date", "")),
                     "overall_score": overall_score,
-                    "is_failed": is_failed,  # 消费者据此决定是否触发整改单
                     "action_items_count": len(record.get("action_items") or []),
                 },
                 store_id=str(record.get("store_id", "")),

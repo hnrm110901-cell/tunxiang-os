@@ -490,8 +490,9 @@ async def cancel_instance(
     await db.commit()
     log.info("approval_instance_cancelled", instance_id=instance_id, tenant_id=x_tenant_id)
 
-    # 旁路事件发射：审批撤回（PR #266 verifier 反馈：原 PR body 声称
-    # CANCELLED 4 状态接入但 cancel_instance 路由未 emit_event，硬不一致）
+    # 旁路事件发射：审批撤回（PR #266 round-2 反馈补 emit_event；
+    # round-3 修：previous_status 读真实状态而非硬编码 "pending"，
+    # 防未来若放宽校验后 payload 撒谎）
     asyncio.create_task(
         emit_event(
             event_type=ApprovalEventType.CANCELLED,
@@ -499,7 +500,7 @@ async def cancel_instance(
             stream_id=instance_id,
             payload={
                 "instance_id": instance_id,
-                "previous_status": "pending",
+                "previous_status": inst["status"],  # 当前 422 校验保 pending
                 "cancelled_at": now.isoformat(),
             },
             source_service="tx-ops",

@@ -3,9 +3,10 @@
 验收：5 类关键状态变更发射 emit_event，对应差距文档 Part E §7 + Part C §C.8
 
 覆盖范围：
-  1. 巡店报告提交（submit）→ SafetyInspectionEventType.INSPECTION_COMPLETED + is_failed=False
-  2. 巡店报告提交低分（score < 60）→ INSPECTION_COMPLETED + payload.is_failed=True
-     （PR #266 verifier 修复：事件类型绑定动作不绑定结果）
+  1. 巡店报告提交（submit, score >= 60）→ INSPECTION_COMPLETED
+  2. 巡店报告提交低分（score < 60）→ INSPECTION_FAILED
+     （PR #266 round-3 revert：sibling safety_inspection_router 也是二选一模式，
+     同域两路由必须一致；round-1 verifier "双计漏计" 反馈基于错前提，已证伪）
   3. 门店确认巡店报告（acknowledge）→ SafetyInspectionEventType.INSPECTION_ACKNOWLEDGED
   4. 审批实例发起（create_instance）→ ApprovalEventType.INITIATED
   5. 审批动作—通过（act approve, final status=approved）→ ApprovalEventType.APPROVED
@@ -247,23 +248,23 @@ class TestInspectionSubmitEmitsEvent:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 2. 巡店提交低分 → INSPECTION_COMPLETED + payload.is_failed=True
-#    （PR #266 verifier 反馈：事件类型绑定动作 COMPLETED，不绑定结果 FAILED；
-#     消费者从 payload.is_failed 判定是否触发整改单）
+# 2. 巡店提交低分 → INSPECTION_FAILED (score < 60)
+#    （round-3 revert round-2 的 COMPLETED+is_failed 设计 — 与 sibling
+#     safety_inspection_router 保持二选一模式一致）
 # ─────────────────────────────────────────────────────────────────────────────
 
 
 class TestInspectionSubmitFailedEvent:
-    """场景：巡店发现严重问题（总分 45），系统应发射 COMPLETED + payload.is_failed=True。"""
+    """场景：巡店发现严重问题（总分 45），系统应发射 INSPECTION_FAILED。"""
 
     @pytest.mark.asyncio
-    async def test_submit_inspection_emits_completed_with_is_failed_when_score_below_60(
+    async def test_submit_inspection_emits_failed_event_when_score_below_60(
         self,
         fake_emit,
         emitted_events: List[Dict[str, Any]],
         monkeypatch,
     ):
-        """submit_inspection(score=45) → emit INSPECTION_COMPLETED + payload.is_failed=True"""
+        """submit_inspection(score=45) → emit INSPECTION_FAILED"""
         import uuid
 
         from src.api import inspection_routes as ir
@@ -310,13 +311,9 @@ class TestInspectionSubmitFailedEvent:
 
         assert len(emitted_events) >= 1
         evt = emitted_events[0]
-        # PR #266 verifier 修复：事件类型固定 COMPLETED（动作）；
-        # 不合格判定走 payload.is_failed 字段（结果）
-        assert evt["event_type"] == SafetyInspectionEventType.INSPECTION_COMPLETED, (
-            f"提交动作应发 INSPECTION_COMPLETED（动作），实际 {evt['event_type']}"
-        )
-        assert evt["payload"]["is_failed"] is True, (
-            f"score=45 < 60 时 payload.is_failed 必须为 True"
+        # round-3 revert：与 sibling safety_inspection_router 保持二选一模式一致
+        assert evt["event_type"] == SafetyInspectionEventType.INSPECTION_FAILED, (
+            f"score=45 < 60 应发 INSPECTION_FAILED，实际 {evt['event_type']}"
         )
         assert evt["tenant_id"] == TENANT_ID
 
