@@ -1,3 +1,63 @@
+## 2026-05-06 续 多 clone 物理统一 + WorkBuddy 抢救（14 archive 分支 / 268+ commits）
+
+### 今日完成（续）
+- **Documents/GitHub clone 物理 decom（"4 阶段"）：**
+  - Phase A 检查 origin 命名冲突 — 全无冲突
+  - Phase B 推 3 unique-work branches 到 `origin/archive/*`（**162+ commits 救出**）：
+    - `archive/claude/distracted-cerf-fbdf7e` (10 commits — TOCTOU/JSONB/RLS v311/P0-05/-07/-08)
+    - `archive/claude/intelligent-bassi-1b7bd7` (77 commits — PR #139 Tier1 门禁迭代/audit_outbox flaky 修)
+    - `archive/wip/from-documents-clone-2026-05-04` (75 commits — 17 文件备份+ruff/Tier1)
+  - Phase C 删 8 local branches（5 个 patch-id=main / 3 已 archive）
+  - Phase D 迁非 git 工件到 canonical 后 `rm -rf`：
+    - `.env` 6 个 secrets（WECOM 4 + ANTHROPIC 2）
+    - `.claude/agent-memory/refactor-master/`（整个目录）
+    - `.claude/agent-memory/strict-code-reviewer/`（整个目录）
+    - `.claude/agent-memory/security-audit-expert/{project_security_conventions, vulnerability_patterns}.md`
+    - 合并 `security-audit-expert/MEMORY.md`（去除 broken 引用 + 加真实 conventions/vulnerabilities）
+    - 释放 140 MB 磁盘
+
+- **WorkBuddy 抢救（"3 级"）—— 11 archive 分支 + 1 feature 分支 / 101+ commits + 30+ 文件：**
+  - **一级 main feature**：`feat/workbuddy-omni-channel-p0-p5` = 25 commits — 全渠道聚合 P0-P5（v398/399/400 migrations + 4 adapter Amap/Taobao/Douyin/Eleme + OrderHub + InventorySync + ChannelHealthAgent + 跨平台对账 + 4 web-admin 页面 + Tier 1 测试）
+  - **二级 branch archives** — 9 分支 76 commits → `archive/workbuddy/*`（distracted-cerf-fbdf7e 10 / intelligent-bassi-1b7bd7 10 / quizzical-tu 9 / nice-morse 6 / b03-c04 5 / suspicious-volhard 5 / pg2-utcnow 4 / agitated-merkle 1 / interesting-swanson 1）
+  - **三级 locked worktree dirty rescue** — 4 死掉的 zombie worktree 抢出 ~30 文件未 commit 工作 → `archive/workbuddy/locked-rescue-*`（ERP 适配器/物流+小红书/tx-civic conftest/tx-devforge conftest）
+
+- **跳过的（含原因）：**
+  - 3 分支已通过 rebase 进 main（`feat/p0-compose-consolidation-rebase` 28 commits 等）
+  - 4 个空 zombie worktree（无 dirty 无 ahead）
+  - 3 个活跃 session 的 worktree（5 dirty 文件正在写，下次抢救）
+
+### 关键决策
+- **选项 4（混合）vs 1（彻底）vs 3（流程统一）** — Phase 0 盘点发现 Documents/GitHub 162+ + WorkBuddy 268+ 本地 commits，"清理"前必须先抢救。WorkBuddy 8 个 locked + 5 active session 不能贸然 decom。落选项 4：留 canonical+WorkBuddy，decom 最简单的 Documents/GitHub
+- **patch-id 比对捕获已 rebase 进 main 的"冗余"分支** — `feat/p0-compose-consolidation-rebase` 28 commit 标题 `diff` 与 main 上 6ebc8f71 起 28 个完全一致，整支已合并，`push` 纯冗余。同样判出 `agitated-jones-a6f505` / `rls-31-tables-v388fix` / `feat/sync-pull-since-ts-pg4` / `fix/ci-fail-fast-false`
+- **`archive/workbuddy/*` 命名空间** vs Documents/GitHub 用 `archive/<orig>` — workbuddy/ 前缀防同名冲突（`claude/distracted-cerf-fbdf7e` 在两 clone 都存在但 SHA 不同）+ 保来源标识
+- **locked worktree 不阻止 commit** — git "locked" 只阻止 worktree-level remove/move/prune，commit/push 全可。证实 8 个"locked"实际是 2026-05-03 死掉 3 天的 zombie session（lock 文件 mtime + dirty 文件 mtime + 5 active claude-3p 的 cwd 全在别处）
+- **Push by SHA（非 symbolic name）** — 防活跃 session 中途 commit 漂移：`git push origin <SHA>:refs/heads/<NEW>`，捕获 archive 时点的快照
+- **代理 fallback 第二次救场** — reclaude:56227 又整轮 502；切 `HTTPS_PROXY=http://127.0.0.1:7890 + git -c http.version=HTTP/1.1` 后批量 push 全成功。**代理 fallback 自动化基础设施立项**第三次验证
+
+### 数据变化
+- **clone 数**：3 → 2（删 Documents/GitHub）
+- **GitHub 新增 14 archive 分支 + 1 feature 分支**：
+  - `archive/claude/distracted-cerf-fbdf7e` / `archive/claude/intelligent-bassi-1b7bd7` / `archive/wip/from-documents-clone-2026-05-04`
+  - `feat/workbuddy-omni-channel-p0-p5`
+  - `archive/workbuddy/{claude/{distracted-cerf-fbdf7e, intelligent-bassi-1b7bd7, quizzical-tu-5768cf, nice-morse-2edb72, b03-c04-gap-fix, suspicious-volhard-9623f0, agitated-merkle-ec23b9, interesting-swanson-c84208}, feat/pg2-utcnow-round3}`
+  - `archive/workbuddy/locked-rescue-{a8aaf12cca7d4b924, acedfe0a80d975a92, ae733ca564ec871aa, af1ba7fc230c67928}`
+- **总抢救 268+ commits + 30+ 文件**（Documents 162+ / WorkBuddy 76 commits + 30+ 文件）
+- **canonical 多了**：`.env`(403 字节，6 secrets 不进 git) + 4 项 agent-memory（refactor-master / strict-code-reviewer / 2 security-audit-expert *.md）
+- **释放 140 MB 磁盘**（Documents/GitHub clone）
+
+### 遗留问题
+- **WorkBuddy 仍存在** — 5 active session 在 5 worktree 跑（suspicious-volhard / intelligent-bassi / nice-morse / elegant-sammet / ecstatic-chebyshev）；3 个有新 dirty 文件（archive 后又出现）
+- **下次抢救目标**：3 active session 收尾后做 dirty rescue（5 文件 / 3 worktree）
+- **WorkBuddy 物理 decom 第二轮可考虑** — 但需多日 triage（268+ commits 需逐项判定）；用户决策
+- **代理 fallback 自动化** — 立项需求第三次验证（5/5 / 9/9 push 都因 reclaude 整轮 502 需手切 ClashX）
+
+### 明日计划
+- 等 3 active session 收尾后做最后一轮 WorkBuddy dirty rescue
+- 用户决定是否进入 WorkBuddy 物理 decom 第二轮
+- 否则切回 Track D 测试修复 / Task #14 / Task #23
+
+---
+
 ## 2026-05-06 main CI 修复 merge + 三 clone 同步 + Track D 启动（PR #233 / #234）
 
 ### 今日完成
