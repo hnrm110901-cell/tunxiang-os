@@ -191,13 +191,20 @@ class WineWriteOffRequest(BaseModel):
 
 
 class WineStorageTransactionResponse(BaseModel):
-    """存酒流水响应"""
+    """存酒流水响应
+
+    金额字段对齐 ORM 列名 price_at_trans_fen（fen int），同时输出
+    price_at_trans_yuan 元字符串供前端展示（PR #272 verifier 修复：
+    原 price_at_trans: Decimal 与 ORM 列名不匹配，from_attributes=True
+    会静默返回 None 丢失金额）。
+    """
 
     id: str
     record_id: str
     trans_type: str
     quantity: int
-    price_at_trans: Optional[Decimal]
+    price_at_trans_fen: Optional[int] = None
+    price_at_trans_yuan: Optional[str] = None
     table_id: Optional[str]
     order_id: Optional[str]
     operated_by: Optional[str]
@@ -211,7 +218,12 @@ class WineStorageTransactionResponse(BaseModel):
 
 
 class WineStorageResponse(BaseModel):
-    """存酒主记录响应（含计算字段）"""
+    """存酒主记录响应（含计算字段）
+
+    金额字段对齐 ORM 列名 storage_price_fen（fen int）+ 输出 storage_price_yuan
+    元字符串供前端（PR #272 verifier 修复：原 storage_price: Decimal 与
+    ORM 列名不匹配，from_attributes=True 会静默丢失金额）。
+    """
 
     id: str
     tenant_id: str
@@ -228,7 +240,8 @@ class WineStorageResponse(BaseModel):
     storage_date: date
     expiry_date: Optional[date]
     status: str
-    storage_price: Optional[Decimal]
+    storage_price_fen: Optional[int] = None
+    storage_price_yuan: Optional[str] = None
     notes: Optional[str]
     created_by: Optional[str]
     created_at: datetime

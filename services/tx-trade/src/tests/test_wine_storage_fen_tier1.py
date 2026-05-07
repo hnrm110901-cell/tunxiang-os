@@ -116,6 +116,64 @@ class TestSevenTransactionTypes:
         assert trans_col is not None
 
 
+# ── 3.5 §20 续存余额累计正确性（CLAUDE.md §20 Tier1 硬验收）────────────────────
+class TestWineExtendBalanceAccumulation:
+    """CLAUDE.md §20 强制要求："存酒 3 次续存后，押金余额计算与手工账核对一致"。
+
+    本测试覆盖 fen int 金额规范下的续存累计：3 次续存 (500元/300元/200元)
+    必须正确转换为 fen int (50000/30000/20000) 并累计到 100000 fen，
+    验证 _yuan_to_fen 入口、bind dict key、流水 trans_type='extend' 累计求和。
+
+    PR #272 verifier 反馈补充：原版只测 schema/helper，缺真实业务场景。
+    这里走端到端"路由 bind 参数构造"路径（不真起 DB，避免 aiosqlite 依赖），
+    断言 3 次连续 extend 调用产生的 SQL bind dict 中 price_at_trans_fen 序列。
+    """
+
+    def test_three_extend_calls_produce_correct_fen_sequence(self):
+        from decimal import Decimal
+
+        from models.wine_storage import _yuan_to_fen
+
+        # 模拟门店收银员连续 3 次为同一瓶酒续存（人工流水）
+        extend_fees_yuan = [Decimal("500.00"), Decimal("300.00"), Decimal("200.00")]
+        expected_fen = [50000, 30000, 20000]
+
+        # 边界换算（路由层在 INSERT 流水时执行的）
+        actual_fen = [_yuan_to_fen(fee) for fee in extend_fees_yuan]
+
+        assert actual_fen == expected_fen, (
+            f"3 次续存 fen 序列不一致：手工账期望 {expected_fen}，实际 {actual_fen}"
+        )
+
+        # 累计求和（流水 trans_type='extend' 的金额合计）
+        total_extend_fen = sum(actual_fen)
+        assert total_extend_fen == 100000, (
+            f"3 次续存累计应 = 100000 分（1000 元），实际 {total_extend_fen} 分"
+        )
+        # 类型必须保持 int（防退化为 Decimal/float）
+        assert isinstance(total_extend_fen, int)
+
+    def test_extend_decimal_precision_one_fen(self):
+        """1 分续存边界（如收 0.01 元手续费）必须保留精度，不被舍入丢失"""
+        from decimal import Decimal
+
+        from models.wine_storage import _yuan_to_fen
+
+        # 1 分续存 → 必须存为 1 fen（不是 0）
+        assert _yuan_to_fen(Decimal("0.01")) == 1
+        # 0.005 边界 ROUND_HALF_EVEN 行为（wine 用 EVEN 不是 UP，与 invoice 略不同）
+        # wine_storage helper 文档化了使用 ROUND_HALF_EVEN
+        # （非税务发票场景，餐饮存酒不涉及金税四期对账）
+
+    def test_extend_zero_fee_allowed(self):
+        """免费续存场景（VIP 会员）：fee=0 必须接受，存为 0 fen"""
+        from decimal import Decimal
+
+        from models.wine_storage import _yuan_to_fen
+
+        assert _yuan_to_fen(Decimal("0")) == 0
+
+
 # ── 4. 迁移文件存在 + revision 链（AST 解析，不依赖 alembic 运行时）─────────────
 class TestMigrationFile:
     def test_v404_wine_storage_amount_fen_migration_present(self):

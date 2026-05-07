@@ -92,8 +92,11 @@ def _serialize_record(row: dict, transactions: Optional[list] = None) -> dict:
         else row["storage_date"],
         "expiry_date": expiry_date.isoformat() if isinstance(expiry_date, date) else expiry_date,
         "status": row["status"],
-        # 金额双发：元字符串向后兼容 + fen int 给金税四期对账（CLAUDE.md §15）
-        "storage_price_fen": _fen_to_yuan_str(row.get("storage_price_fen")),
+        # 金额双发：元字符串向后兼容 + fen int（CLAUDE.md §15）
+        # PR #272 verifier 反馈：原版两条都用 _fen 键，dict 后者覆盖前者导致元串丢失
+        # 现严格分 `_yuan` / `_fen` 双键
+        "storage_price": _fen_to_yuan_str(row.get("storage_price_fen")),
+        "storage_price_yuan": _fen_to_yuan_str(row.get("storage_price_fen")),
         "storage_price_fen": row.get("storage_price_fen"),
         "notes": row.get("notes"),
         "created_by": row.get("created_by"),
@@ -118,7 +121,9 @@ def _serialize_transaction(row: dict) -> dict:
         "trans_type": row["trans_type"],
         "quantity": row["quantity"],
         # 金额双发：元字符串向后兼容 + fen int（CLAUDE.md §15）
-        "price_at_trans_fen": _fen_to_yuan_str(row.get("price_at_trans_fen")),
+        # PR #272 verifier 修复：避免 dict key 重复覆盖
+        "price_at_trans": _fen_to_yuan_str(row.get("price_at_trans_fen")),
+        "price_at_trans_yuan": _fen_to_yuan_str(row.get("price_at_trans_fen")),
         "price_at_trans_fen": row.get("price_at_trans_fen"),
         "table_id": row.get("table_id"),
         "order_id": row.get("order_id"),
