@@ -170,7 +170,7 @@ class TestTier1GateWorkflow:
     def test_paths_include_pos_adapters(self, source):
         """CLAUDE.md § 17：POS 数据写入 Tier 1 — 6 大 adapter"""
         for adapter in (
-            "shared/adapters/pinzhi/",
+            "shared/adapters/pinzhi_pos/",
             "shared/adapters/aiqiwei/",
             "shared/adapters/meituan/",
         ):

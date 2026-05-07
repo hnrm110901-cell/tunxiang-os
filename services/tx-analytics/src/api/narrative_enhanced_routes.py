@@ -80,7 +80,8 @@ async def _query_today_metrics(
     revenue_fen = int(order_row.revenue_fen) if order_row else 0
     order_count = int(order_row.order_count) if order_row else 0
     guest_count = int(order_row.guest_count) if order_row else 0
-    avg_order_fen = int(order_row.avg_order_fen) if order_row else 0
+    # _fen 字段必须 int（CLAUDE.md §10/§15）；SQL `SUM/COUNT::float` 返回 float，需 round 防截断（与 PR #241 修法一致）
+    avg_order_fen = int(round(order_row.avg_order_fen or 0)) if order_row else 0
     discount_rate = float(order_row.discount_rate) if order_row else 0.0
     void_order_rate = float(order_row.void_order_rate) if order_row else 0.0
 

@@ -36,8 +36,8 @@ except ImportError:
     sys.exit(2)
 
 try:
-    from shared.adapters.pinzhi.src.merchants import MERCHANT_CONFIG
-    from shared.adapters.pinzhi.src.signature import generate_sign
+    from shared.adapters.pinzhi_pos.src.merchants import MERCHANT_CONFIG
+    from shared.adapters.pinzhi_pos.src.signature import generate_sign
 except ImportError as exc:
     print(f"ERROR: 加载 pinzhi 模块失败 — {exc}", file=sys.stderr)
     sys.exit(2)
