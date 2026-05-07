@@ -23,6 +23,7 @@ from shared.ontology.src.enums import OrderStatus
 from ..models.enums import OrderType, TableStatus
 from ..models.tables import Table
 from .attribution_hook import fire_order_attribution
+from .state_machine import InvalidTransitionError, transition_order
 
 if TYPE_CHECKING:
     from edge.sync_engine.src.offline_sync_service import OfflineSyncService  # noqa: F401
@@ -403,7 +404,8 @@ class OrderService:
             raise ValueError(f"Order not found: {order_id}")
         if order.status == OrderStatus.completed.value:
             raise ValueError("Order already settled")
-        order.status = OrderStatus.completed.value
+        # P0-3: 走状态机守卫（兼容现状：confirmed/pending/preparing/ready/served → completed 都允许）
+        transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)
@@ -443,7 +445,8 @@ class OrderService:
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"Order not found: {order_id}")
-        order.status = OrderStatus.cancelled.value
+        # P0-3: 走状态机守卫，已结账订单不能再取消（必须走退款路径）
+        transition_order(order, OrderStatus.cancelled)
         order.order_metadata = {**(order.order_metadata or {}), "cancel_reason": reason}
         if order.table_number:
             await self._release_table(str(order.store_id), order.table_number)

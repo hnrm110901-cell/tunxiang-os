@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.entities import Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
 
+from .state_machine import transition_order
+
 logger = structlog.get_logger()
 
 
@@ -252,8 +254,10 @@ async def merge_orders(
 
         merged_amount += sec_order.total_amount_fen
 
-        # 副单标记取消
-        sec_order.status = OrderStatus.cancelled.value
+        # 副单标记取消 — P0-3: 走状态机守卫（已 completed 副单 line 245 已拦截，
+        # 这里 sec_order.status 落在 pending/confirmed/preparing/ready/served，
+        # 都是合法 → cancelled 转换）
+        transition_order(sec_order, OrderStatus.cancelled)
         sec_order.order_metadata = {
             **(sec_order.order_metadata or {}),
             "merged_into": primary_id,

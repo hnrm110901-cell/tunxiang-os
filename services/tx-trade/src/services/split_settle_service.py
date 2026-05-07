@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.entities import Order, OrderItem
 from shared.ontology.src.enums import OrderStatus
 
+from .state_machine import transition_order
+
 logger = structlog.get_logger()
 
 
@@ -413,7 +415,8 @@ class SplitSettleService:
         from ..models.tables import Table
 
         order = await self._get_order(order_id)
-        order.status = OrderStatus.completed.value
+        # P0-3: 走状态机守卫
+        transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
 
         # 释放桌台

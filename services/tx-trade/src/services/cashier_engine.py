@@ -25,7 +25,9 @@ from ..models.enums import TableStatus
 from ..models.tables import Table
 from .state_machine import (
     TABLE_STATES,
+    InvalidTransitionError,
     can_table_transition,
+    transition_order,
 )
 
 logger = structlog.get_logger()
@@ -408,7 +410,9 @@ class CashierEngine:
         new_final = new_total - order.discount_amount_fen
         order.total_amount_fen = new_total
         order.final_amount_fen = new_final
-        order.status = OrderStatus.confirmed.value
+        # P0-3: 仅 pending → confirmed 走 transition（已 confirmed/preparing/... 加菜时幂等不动）
+        if order.status == OrderStatus.pending.value:
+            transition_order(order, OrderStatus.confirmed)
 
         await self.db.flush()
         logger.info(
@@ -805,8 +809,8 @@ class CashierEngine:
                 }
             )
 
-        # 更新订单状态
-        order.status = OrderStatus.completed.value
+        # 更新订单状态 — P0-3: 走状态机守卫
+        transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
 
         # 释放桌台
@@ -930,7 +934,8 @@ class CashierEngine:
         if order.status == OrderStatus.cancelled.value:
             raise ValueError("订单已取消")
 
-        order.status = OrderStatus.cancelled.value
+        # P0-3: 走状态机守卫
+        transition_order(order, OrderStatus.cancelled)
         order.order_metadata = {
             **(order.order_metadata or {}),
             "cancel_reason": reason,

@@ -19,6 +19,7 @@ from shared.ontology.src.enums import OrderStatus
 
 from ..models.enums import PaymentMethod, PaymentStatus
 from ..models.payment import Payment
+from .state_machine import transition_order
 
 logger = structlog.get_logger()
 
@@ -183,7 +184,8 @@ async def _apply_payment_and_maybe_complete(
     completed_now = False
     if need > 0 and new_total >= need:
         if order.status != OrderStatus.completed.value:
-            order.status = OrderStatus.completed.value
+            # P0-3: 走状态机守卫
+            transition_order(order, OrderStatus.completed)
             order.completed_at = datetime.now(timezone.utc)
             completed_now = True
         await db.flush()
