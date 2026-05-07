@@ -38,6 +38,13 @@ class TunxiangPOSApp : Application(), Configuration.Provider {
         // V4 sprint D2 (2026-05-07): proper Migration replaces destructive fallback
         // (fallbackToDestructiveMigration would silently drop all data on schema change,
         // unacceptable for hot path Tier 1 surfaces).
+        //
+        // ⚠️ MIGRATION FAILURE PROTOCOL (W1 review 2026-05-07):
+        // If MIGRATION_1_2 throws (e.g. table name mismatch, column type clash),
+        // Room throws IllegalStateException here — App will crash on every boot
+        // (no data loss but POS is dead). Emergency recovery on-site:
+        //   adb shell pm clear com.tunxiang.pos   (wipes DB, requires re-onboard)
+        // D6 真机回归 MUST include a migration failure drill on 商米 T2.
         database = Room.databaseBuilder(
             applicationContext,
             TunxiangDatabase::class.java,
@@ -50,6 +57,14 @@ class TunxiangPOSApp : Application(), Configuration.Provider {
         // V4 sprint D2 (2026-05-07): mac-station local API as truth source per CLAUDE.md §八 路线 C.
         // Resolution order: SharedPreferences override (set by D4 mDNS discovery) →
         // BuildConfig fallback (cloud TX_CORE_BASE_URL during pre-D4 transition).
+        //
+        // ⚠️ KNOWN LIMITATION (B2 review 2026-05-07): baseUrl is resolved ONCE at
+        // process start and frozen into the ApiClient instance. D4 mDNS discovery
+        // writes to SharedPreferences but this instance will NOT pick it up until
+        // App restart. D3 MUST rework ApiClient to support runtime baseUrl override
+        // (e.g. via OkHttp Interceptor reading prefs each request) before
+        // SyncManager target switch is wired up — otherwise D3 联调第一天会因为
+        // "mac-station URL 写进去了但 ApiClient 还在用旧地址" 消耗大量排查时间.
         apiClient = ApiClient(
             baseUrl = resolveApiBaseUrl(),
             context = applicationContext

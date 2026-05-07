@@ -88,7 +88,10 @@ data class LocalOrder(
     val expiresAt: Long? = null,                 // Cache expiry timestamp ms (4h TTL for read-cache)
 
     @ColumnInfo(name = "source")
-    val source: String = "remote",               // "remote" / "local-pending" / "local-synced"
+    val source: String = "local-pending",        // "remote" / "local-pending" / "local-synced"
+                                                 // Default = "local-pending" because LocalOrder is a write-table:
+                                                 // any new row is by definition created locally; mac-station sync
+                                                 // success will rewrite to "remote" or "local-synced".
 
     @ColumnInfo(name = "synced_at")
     val syncedAt: Long? = null,                  // Last successful sync timestamp ms
