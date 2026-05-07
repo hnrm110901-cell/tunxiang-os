@@ -1,3 +1,67 @@
+## 2026-05-06 续² PR #237 merge + 4 PR/Issue review + Issue #238 → PR #241
+
+### 今日完成（续²，#236 merge 后到收工）
+- **PR #237 merge → main**（commit `305f47e4`）— code review on #236 跟进
+  - P0：`ElementDef.size` 加 `model_validator(mode="after")` 按 type 校验，防 silent fallback（PR #234 Union 引入的回归）
+  - P1：`demo_monitor _MIN_COUNTS` 加白名单守卫，修 PR #233 dict 重构语义漂移
+  - P1-B（自审第二轮发现）：`_preview_lines_from_config` 补 5 个新 element 类型（inverted_header / styled_separator / box_section / logo_image / underlined_text），catalog 已加但 preview 漏处理 → 静默丢弃
+  - 5+5 新测试，`test_template_editor` 52 → 62 全绿
+
+- **PR #236 merge → main**（commit `0fee73b7`）— DEVLOG/progress.md 续记多 clone 统一 + WorkBuddy 抢救
+
+- **`code-reviewer` agent 跑过 4 项**：#236 / #237 / #238 / #239（别人的 dedup PR）
+  - 找到 2 P0 / 6 P1 / 3 P2，**1 false positive**（"DEVLOG 14 archive 无来源" 实际已列），1 个真 P0（PR #239 删 `pos_sync_routes.py` 4 路由无迁移说明）
+
+- **4 PR/Issue 联动执行（1→4 顺序）**：
+  1. **#239 P0 评论**：建设性发问 R1 删 `tunxiang-api/api/v1/pos_sync_routes.py` 4 路由（`/api/v1/integrations/pos-sync/{backfill,status,sync-today,sync-menu}`）的迁移路径，列 4 种可能（真死代码 / 外部 POS SDK / 运维 only / 应迁 tx-trade），不阻断
+  2. **#237 补 P1-B**（commit `1a7d1b3a`）：preview 5 个新 element + 5 个新测试
+  3. **Issue #238 扩展**：reviewer 标 2 处实际是 5+ 处真违规
+  4. **#236 self-review comment**：澄清 reviewer 误判 + 联动产出说明
+
+- **PR #241 OPEN**（`Closes #238`）— `_fen` 字段全用 int 对齐 §10/§15 金额规范
+  - 7 处 `float(...)` 违规 / 6 文件 / 3 服务（tx-analytics / tx-brain / tx-org）
+  - 含 `payroll_engine_v3.py` 薪资计算路径，注释标 ⚠️ Tier 1 候选（与全电发票/财务结算同财务域）
+  - 三类修法：5 处直接存储 → `int(round(...))`；1 处除法分母（contribution_score）→ int + max+division；1 处冗余 cast（narrative `revenue_fen`）→ 移除 + null 守卫
+  - lint clean，`int(round(...))` 用 `round()` 防 SQL `AVG()` Decimal 截断丢 0.01 元
+
+- **WorkBuddy 同步两次**：先 `d6fe8829`（#235 后），再 `0fee73b7`（#236 后）。第二次代理双 502，回退本地 file:// fetch + `git update-ref` 实现
+
+### 关键决策
+- **review 验证再行动**：reviewer agent 找的不全对（"14 archive 无来源"是误判），逐项 grep / blame / 读上下文验真才动手 — 防错改 + 防扩范围
+- **PR #237 修法分层**：reviewer 找的真 P0+P1 立即修 + 同 PR 内自审又找出真 P1-B（preview 漏 5 元素）顺手补；reviewer 找的 P1-A（validator 抽常量）按 §3 surgical 跳过（三处相似才抽象）
+- **#238 7 处违规分 3 类处理而非一刀切 `int()`**：
+  1. 直接存 dict 的 `_fen` → `int(round(...))`（防 Decimal 截断 0.01 元）
+  2. 用作除法分母（contribution_score）→ int + Python 3 true division 自动处 float
+  3. 冗余 cast（narrative `revenue_fen` 后接 `/7.0`）→ 移除多余 `float()` + 加 null 守卫
+- **payroll Tier 1 升级不擅自决定**：在 commit / PR 描述加 ⚠️ Tier 1 候选注释，是否实升 Tier 1 标准（需 TDD + 真实餐厅场景测试）由创始人决策
+- **#239 P0 用 question 框架不阻断**：作者明确说 tunxiang-api 是 "MVP 删除"，但漏写 pos_sync 4 路由归宿。给 4 种可能让作者勾选，不直接拒批
+- **代理 fallback 第 4 次救场**：reclaude:56227 ↔ ClashX:7890 + HTTP/1.1 切换；本地 file:// 同盘 fetch 在两代理双失效时救命；**自动化基础设施立项需求** 已第 4 次验证
+
+### 数据变化
+- **GitHub 今日 4 PR merged**：#233 / #234 / #235 / #236 / #237 → main commits `eaa57141` / `9660492c` / `d6fe8829` / `0fee73b7` / `305f47e4`（5 个）
+- **OPEN**：PR #241（_fen int 修复，等 review）+ PR #239（别人的 dedup，等回我的 comment）
+- **Issue #238**：从 2 处违规扩展到 5+ 处真违规（含薪资 P0），PR #241 merge 后自动关闭
+- **代码评审产出**：1 errand correction + 3 真 bug 修复 + 1 跨 PR comment + 4 项 followup 全部闭环
+
+### 遗留问题
+- **WorkBuddy 第二轮 dirty rescue** — 3 个 active session 写的 5 dirty 文件，等 session 收尾
+- **WorkBuddy 物理 decom 第二轮** — 多日 triage，需创始人决策
+- **代理 fallback 自动化** — 立项需求第 4 次验证，仍手动切换
+- **lint 规则防 `_fen = float(...)` 再发** — Issue #238 提到的 mypy plugin / pre-commit hook，未做
+- **archive/workbuddy/locked-rescue-* 含 __pycache__** — `git add -A` 误带（PR #236 已知风险），未清
+- **同名分支歧义** — `archive/claude/{distracted-cerf-fbdf7e, intelligent-bassi-1b7bd7}` 在 Documents 与 WorkBuddy 是不同 SHA，团队 cherry-pick 时需 patch-id 比对
+- **Track D 长尾** — 1246 项 pre-existing 测试 bug，今日动 1 个文件，剩 80%+ 是架构级过时
+- **Reviewer 标但跳过的小项** — #237 P1-A validator 抽常量 / P1-C test sys.path hack / P2 SAMPLE_CONTEXT _yuan 浮点（按 surgical / pre-existing / display-only 跳过）
+
+### 明日计划
+- 等 PR #241 / #239 / Task #14 #23 review/team/DBA 进展
+- 若空闲 + 用户授权：
+  - 切回 Track D 攻 cross-test pollution 调研（解锁多文件最大杠杆）
+  - 加 lint 规则防 `_fen = float()` 再发
+  - WorkBuddy 第二轮 dirty rescue（条件触发）
+
+---
+
 ## 2026-05-06 续 多 clone 物理统一 + WorkBuddy 抢救（14 archive 分支 / 268+ commits）
 
 ### 今日完成（续）

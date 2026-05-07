@@ -1,3 +1,38 @@
+## 2026-05-06 续² PR #237 merge + 4 PR/Issue review + Issue #238 → PR #241
+
+### 本次会话目标
+1. Merge PR #236（DEVLOG）+ PR #237（code review followup）
+2. 跑 code-reviewer agent 审 4 项（#236 / #237 / #238 / #239），按发现执行 1→4 修复
+3. 修 Issue #238 中 5+ 处真违规（含 payroll P0）
+
+### 完成状态
+- [x] PR #237 merge → main `305f47e4`（ElementDef validator + _MIN_COUNTS 守卫 + preview 5 元素）
+- [x] PR #236 merge → main `0fee73b7`（DEVLOG 续：多 clone 统一 + WorkBuddy 抢救）
+- [x] code-reviewer agent 审 4 项 — 找 2 P0 / 6 P1 / 3 P2，1 false positive
+- [x] 1→4 联动执行：#239 P0 comment / #237 补 P1-B / #238 扩展 / #236 self-review
+- [x] PR #241 OPEN — `_fen` 字段全用 int（7 处违规跨 6 文件 3 服务，含 payroll Tier 1 候选）
+- [x] WorkBuddy 同步两次（`d6fe8829` + `0fee73b7`），第二次代理双 502 走本地 file:// fetch 救场
+
+### 关键决策
+- **review 不盲信**：reviewer agent 标的项必须 grep / blame / 读上下文验真才动手；本会话发现 1 个误判（DEVLOG 14 archive 分支实际已列），按设计的 P2（DEVLOG/progress 重复）跳过
+- **payroll Tier 1 不擅自升级**：只加注释标 ⚠️ Tier 1 候选，是否升 Tier 1 标准（需 TDD + 真实餐厅场景测试）由创始人决策；本 PR 只做最小修复
+- **#238 7 处分 3 类处理**：直接存储 → `int(round(...))` 防 Decimal 截断 / 除法分母 → int + Python 3 true division / 冗余 cast → 移除 + null 守卫
+- **#239 P0 用 question 框架**：作者明确说 tunxiang-api 是 "MVP 删除"，但漏写 pos_sync 4 路由归宿。给 4 种可能让作者勾选，不直接拒批
+- **代理 fallback 第 4 次救场**：reclaude:56227 ↔ ClashX:7890 + HTTP/1.1 切换；同盘 file:// fetch 在双代理失效时救命
+
+### 下一步
+- 等 PR #241 / PR #239 / Task #14 #23 进展
+- 若空闲 + 用户授权：cross-test pollution 调研 / lint 规则防 `_fen = float()` 再发 / WorkBuddy 第二轮 dirty rescue（条件触发）
+
+### 已知风险
+- **Track D 1246 项 pre-existing 测试 bug** 仍剩 80%+ 是架构级过时，需按文件重写 ~1k LOC
+- **代理 fallback 仍手动**（第 4 次验证立项需求）
+- **archive/workbuddy/locked-rescue-* 含 __pycache__**（`git add -A` 误带）
+- **同名分支歧义**（Documents 与 WorkBuddy 同名 archive 不同 SHA，团队 cherry-pick 需 patch-id 比对）
+- **WorkBuddy 5 dirty 文件未抢救**（active session 写中，等收尾）
+
+---
+
 ## 2026-05-06 续  多 clone 物理统一 + WorkBuddy 抢救（14 archive 分支 / 268+ commits）
 
 ### 本次会话目标
