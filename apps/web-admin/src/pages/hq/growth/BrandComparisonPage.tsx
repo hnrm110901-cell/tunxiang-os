@@ -15,6 +15,7 @@ import { GridComponent, TooltipComponent, LegendComponent, RadarComponent } from
 import { CanvasRenderer } from 'echarts/renderers';
 import { useApi } from '../../../hooks/useApi';
 import type { BrandDashboardStats, StoreAttribution } from '../../../api/growthHubApi';
+import { txColors } from '@tx/tokens';
 
 echarts.use([BarChart, RadarChart, GridComponent, TooltipComponent, LegendComponent, RadarComponent, CanvasRenderer]);
 
@@ -26,7 +27,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 const WARNING_ORANGE = '#faad14';
 const DANGER_RED = '#ff4d4f';

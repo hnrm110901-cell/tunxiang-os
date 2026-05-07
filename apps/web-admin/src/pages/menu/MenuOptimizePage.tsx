@@ -33,6 +33,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -134,7 +135,7 @@ const ACTION_CONFIG: Record<string, { color: string; label: string }> = {
 const PAGE_BG = '#0d1e28';
 const CARD_BG = '#1a2a33';
 const BORDER_COLOR = '#2a3a44';
-const ACCENT = '#FF6B35';
+const ACCENT = txColors.primary;
 
 const darkCardStyle: React.CSSProperties = {
   background: CARD_BG,

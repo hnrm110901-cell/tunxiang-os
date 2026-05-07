@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -378,7 +379,7 @@ function DishRow({ dish, rank, onSoldout, isSoldout }: DishRowProps) {
       {/* 排名 */}
       <span
         style={{
-          color: rank <= 3 ? '#FF6B35' : '#6B7280',
+          color: rank <= 3 ? txColors.primary : '#6B7280',
           fontSize: 14,
           fontWeight: 700,
           width: 22,
@@ -423,7 +424,7 @@ function DishRow({ dish, rank, onSoldout, isSoldout }: DishRowProps) {
 
       {/* 价格/成本/毛利 */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, gap: 1 }}>
-        <span style={{ color: '#FF6B35', fontSize: 14, fontWeight: 700 }}>
+        <span style={{ color: txColors.primary, fontSize: 14, fontWeight: 700 }}>
           ¥{fenToYuan(dish.price)}
         </span>
         <span style={{ color: '#6B7280', fontSize: 12 }}>
@@ -594,7 +595,7 @@ export function MenuEngineeringPage() {
       >
         <h1 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>菜单工程分析</h1>
         {loading && (
-          <span style={{ color: '#FF6B35', fontSize: 13 }}>加载中...</span>
+          <span style={{ color: txColors.primary, fontSize: 13 }}>加载中...</span>
         )}
       </div>
 
@@ -614,7 +615,7 @@ export function MenuEngineeringPage() {
                 cursor:     'pointer',
                 fontSize:   15,
                 fontWeight: period === p ? 700 : 400,
-                background: period === p ? '#FF6B35' : '#1F2937',
+                background: period === p ? txColors.primary : '#1F2937',
                 color:      period === p ? '#fff'    : '#9CA3AF',
                 flexShrink: 0,
               }}
@@ -708,7 +709,7 @@ export function MenuEngineeringPage() {
                   cursor:       'pointer',
                   fontSize:     13,
                   fontWeight:   sortKey === tab.key ? 700 : 400,
-                  background:   sortKey === tab.key ? '#FF6B35' : '#1F2937',
+                  background:   sortKey === tab.key ? txColors.primary : '#1F2937',
                   color:        sortKey === tab.key ? '#fff'    : '#9CA3AF',
                 }}
               >

@@ -8,6 +8,7 @@ import type { Category, DishItem } from '@/api/menuApi';
 import { DishCard, CategoryNav, MenuSearch } from '@tx-ds/biz';
 import type { DishData } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ---- 类型 ---- */
 
@@ -249,7 +250,7 @@ export default function QueuePreOrderPage() {
   const displayDishes = searchResults ?? dishes.filter((d) => !activeCat || d.categoryId === activeCat);
 
   // ---- 排队状态色 ----
-  const statusColor = entry?.status === 'called' ? '#0F6E56' : '#FF6B35';
+  const statusColor = entry?.status === 'called' ? txColors.success : txColors.primary;
   const statusText = entry?.status === 'called' ? '已叫号，请尽快前往' : '排队等位中';
 
   return (
@@ -380,11 +381,11 @@ export default function QueuePreOrderPage() {
               fontSize: 13,
               color: 'var(--tx-text-secondary, #5F5E5A)',
             }}>
-              已选 <span style={{ fontWeight: 700, color: 'var(--tx-brand, #FF6B35)' }}>{localCartCount}</span> 道菜
+              已选 <span style={{ fontWeight: 700, color: `var(--tx-brand, ${txColors.primary})` }}>{localCartCount}</span> 道菜
             </div>
             <div style={{
               fontSize: 20, fontWeight: 700,
-              color: 'var(--tx-brand, #FF6B35)',
+              color: `var(--tx-brand, ${txColors.primary})`,
             }}>
               {formatPrice(Math.round(localCartTotalYuan * 100))}
             </div>
@@ -396,7 +397,7 @@ export default function QueuePreOrderPage() {
             disabled={saving}
             style={{
               padding: '0 28px', height: 48, borderRadius: 24,
-              background: saving ? '#ccc' : 'var(--tx-brand, #FF6B35)',
+              background: saving ? '#ccc' : `var(--tx-brand, ${txColors.primary})`,
               color: '#fff', fontSize: 16, fontWeight: 700,
               border: 'none', cursor: saving ? 'default' : 'pointer',
               transition: 'background 0.2s',

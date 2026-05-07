@@ -56,14 +56,15 @@ import {
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 
 // ─── 常量 ──────────────────────────────────────────────────────
 
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
 const TX_DANGER = '#CF1322';
 
 // ─── 类型 ──────────────────────────────────────────────────────
@@ -745,7 +746,7 @@ function polarToCartesian(cx: number, cy: number, r: number, angleDeg: number) {
   return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
 }
 
-const PIE_COLORS = ['#FF6B35', '#0F6E56', '#185FA5', '#BA7517', '#8B5CF6', '#EC4899'];
+const PIE_COLORS = [txColors.primary, txColors.success, txColors.info, txColors.warning, '#8B5CF6', '#EC4899'];
 
 function CostAnalysisTab() {
   const [bomList, setBomList] = useState<BomRecord[]>([]);

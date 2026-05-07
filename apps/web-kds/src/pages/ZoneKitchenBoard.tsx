@@ -16,6 +16,7 @@ import { warmUpAudio } from '../utils/audio';
 import { OrderTicketCard } from '@tx-ds/biz';
 import type { OrderTicketData } from '@tx-ds/biz';
 import { RemakeOverlay } from '../components/RemakeOverlay';
+import { txColors } from '@tx/tokens';
 
 // ─── 区域类型 ───
 
@@ -236,7 +237,7 @@ export function ZoneKitchenBoard() {
       {/* 超时告警条 */}
       {timeoutAlerts.length > 0 && (
         <div style={{
-          background: '#A32D2D', padding: '10px 20px',
+          background: txColors.danger, padding: '10px 20px',
           display: 'flex', alignItems: 'center', gap: 12,
           animation: 'zkb-pulse 1.5s infinite',
         }}>
@@ -268,7 +269,7 @@ export function ZoneKitchenBoard() {
         {/* 行1: 标题 + 区域 Tab + 连接状态 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-            <span style={{ fontWeight: 'bold', fontSize: 24, color: '#FF6B35' }}>分区看板</span>
+            <span style={{ fontWeight: 'bold', fontSize: 24, color: txColors.primary }}>分区看板</span>
             {/* 区域 Tab */}
             <div style={{ display: 'flex', gap: 6 }}>
               {(['all', 'vip', 'hall'] as Zone[]).map(z => {
@@ -297,11 +298,11 @@ export function ZoneKitchenBoard() {
             {wsEnabled && (
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
-                fontSize: 16, color: connected ? '#0F6E56' : '#A32D2D',
+                fontSize: 16, color: connected ? txColors.success : txColors.danger,
               }}>
                 <span style={{
                   width: 10, height: 10, borderRadius: '50%',
-                  background: connected ? '#0F6E56' : '#A32D2D',
+                  background: connected ? txColors.success : txColors.danger,
                   display: 'inline-block',
                   animation: connected ? undefined : 'zkb-pulse 1.5s infinite',
                 }} />
@@ -309,15 +310,15 @@ export function ZoneKitchenBoard() {
               </span>
             )}
             {!wsEnabled && (
-              <span style={{ fontSize: 16, color: '#BA7517' }}>离线模式</span>
+              <span style={{ fontSize: 16, color: txColors.warning }}>离线模式</span>
             )}
           </div>
 
           {/* 全局统计 */}
           <div style={{ display: 'flex', gap: 28, fontSize: 18 }}>
-            <span>待制作 <b style={{ color: '#BA7517', fontSize: 26, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length}</b></span>
+            <span>待制作 <b style={{ color: txColors.warning, fontSize: 26, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length}</b></span>
             <span>制作中 <b style={{ color: '#1890ff', fontSize: 26, fontFamily: 'JetBrains Mono, monospace' }}>{cooking.length}</b></span>
-            <span>已完成 <b style={{ color: '#0F6E56', fontSize: 26, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b></span>
+            <span>已完成 <b style={{ color: txColors.success, fontSize: 26, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b></span>
           </div>
         </div>
 
@@ -334,7 +335,7 @@ export function ZoneKitchenBoard() {
                   </span>
                 )}
                 {stat.timeout > 0 && (
-                  <span style={{ color: '#A32D2D', marginLeft: 6, fontWeight: 'bold' }}>
+                  <span style={{ color: txColors.danger, marginLeft: 6, fontWeight: 'bold' }}>
                     超时{stat.timeout}
                   </span>
                 )}
@@ -346,7 +347,7 @@ export function ZoneKitchenBoard() {
 
       {/* 三列看板 */}
       <div style={{ flex: 1, display: 'flex', gap: 2, overflow: 'hidden' }}>
-        <ZoneBoardColumn title="待制作" count={pending.length} color="#BA7517" bgColor="#1a1a00">
+        <ZoneBoardColumn title="待制作" count={pending.length} color={txColors.warning} bgColor="#1a1a00">
           {pending.map(t => (
             <OrderTicketCard
               key={t.id}
@@ -372,7 +373,7 @@ export function ZoneKitchenBoard() {
           ))}
         </ZoneBoardColumn>
 
-        <ZoneBoardColumn title="已完成" count={done.length} color="#0F6E56" bgColor="#001a00">
+        <ZoneBoardColumn title="已完成" count={done.length} color={txColors.success} bgColor="#001a00">
           {done.map(t => (
             <ZoneDoneCard key={t.id} ticket={t} />
           ))}
@@ -450,7 +451,7 @@ function ZoneDoneCard({ ticket: t }: { ticket: KDSTicket }) {
   return (
     <div style={{
       background: '#111', borderRadius: 12, padding: 12,
-      borderLeft: '6px solid #0F6E56', opacity: 0.75,
+      borderLeft: `6px solid ${txColors.success}`, opacity: 0.75,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -459,7 +460,7 @@ function ZoneDoneCard({ ticket: t }: { ticket: KDSTicket }) {
           <span style={{ fontSize: 16, color: '#555' }}>#{t.orderNo}</span>
         </div>
         <span style={{
-          fontSize: 20, color: '#0F6E56',
+          fontSize: 20, color: txColors.success,
           fontFamily: 'JetBrains Mono, monospace', fontWeight: 'bold',
         }}>
           {totalMin}'

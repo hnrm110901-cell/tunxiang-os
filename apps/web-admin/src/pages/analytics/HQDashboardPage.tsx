@@ -19,6 +19,7 @@ import { ConfigProvider, Select, Spin, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import RealtimeDashboard from '../../components/RealtimeDashboard';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token（驾驶舱暗色） ────────────────────────────────────────────────
 const T = {
@@ -28,12 +29,12 @@ const T = {
   border: '#333',
   text1: '#e6e6e6',
   text2: '#999',
-  brand: '#FF6B35',
+  brand: txColors.primary,
   brandMuted: 'rgba(255,107,53,0.15)',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
   gold: '#FFD700',
   silver: '#C0C0C0',
   bronze: '#CD7F32',
@@ -444,9 +445,9 @@ function AlertPanel({ alerts, isNewAlert }: AlertPanelProps) {
   }
 
   const levelStyle: Record<AlertItem['level'], { bg: string; border: string; icon: string }> = {
-    error:   { bg: 'rgba(163,45,45,0.18)',  border: '#A32D2D', icon: '🚨' },
-    warning: { bg: 'rgba(186,117,23,0.15)', border: '#BA7517', icon: '⚠️' },
-    info:    { bg: 'rgba(24,95,165,0.15)',  border: '#185FA5', icon: 'ℹ️' },
+    error:   { bg: 'rgba(163,45,45,0.18)',  border: txColors.danger, icon: '🚨' },
+    warning: { bg: 'rgba(186,117,23,0.15)', border: txColors.warning, icon: '⚠️' },
+    info:    { bg: 'rgba(24,95,165,0.15)',  border: txColors.info, icon: 'ℹ️' },
   };
 
   return (
@@ -616,7 +617,7 @@ export function HQDashboardPage() {
 
   return (
     <ConfigProvider theme={{
-      token: { colorPrimary: '#FF6B35', colorSuccess: '#0F6E56', colorWarning: '#BA7517', colorError: '#A32D2D' },
+      token: { colorPrimary: txColors.primary, colorSuccess: txColors.success, colorWarning: txColors.warning, colorError: txColors.danger },
     }}>
       {/* 全局样式注入 */}
       <style>{`
@@ -649,7 +650,7 @@ export function HQDashboardPage() {
         .hq-dash-scroll::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
       `}</style>
 
-      <Spin spinning={dataLoading} tip="加载中..." style={{ color: '#FF6B35' }}>
+      <Spin spinning={dataLoading} tip="加载中..." style={{ color: txColors.primary }}>
       <div
         ref={containerRef}
         style={{

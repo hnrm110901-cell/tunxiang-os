@@ -55,6 +55,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -112,7 +113,7 @@ interface ScheduledTask {
 // ─── 常量 ───
 
 const REPORT_OPTIONS: ReportOption[] = [
-  { key: 'daily_revenue', label: '日营业报表', icon: <FileTextOutlined />, description: '每日营业额、订单量、客单价', color: '#FF6B35' },
+  { key: 'daily_revenue', label: '日营业报表', icon: <FileTextOutlined />, description: '每日营业额、订单量、客单价', color: txColors.primary },
   { key: 'monthly_pnl', label: '月度损益', icon: <FileExcelOutlined />, description: '月度收入/支出/利润汇总', color: '#1677ff' },
   { key: 'member_data', label: '会员数据', icon: <FileTextOutlined />, description: '会员画像、消费偏好、RFM 分层', color: '#52c41a' },
   { key: 'dish_sales', label: '菜品销量', icon: <FileExcelOutlined />, description: '菜品销量排行、毛利分析', color: '#722ed1' },
@@ -252,7 +253,7 @@ function QuickExportTab() {
               size="small"
               onClick={() => { setSelectedType(opt.key); setGenerating(false); setProgress(0); }}
               style={{
-                borderColor: selectedType === opt.key ? '#FF6B35' : undefined,
+                borderColor: selectedType === opt.key ? txColors.primary : undefined,
                 borderWidth: selectedType === opt.key ? 2 : 1,
                 cursor: 'pointer',
               }}
@@ -271,7 +272,7 @@ function QuickExportTab() {
       {/* 参数配置 */}
       {selectedType && (
         <Card
-          title={<Space><ThunderboltOutlined style={{ color: '#FF6B35' }} />参数配置 — {selected?.label}</Space>}
+          title={<Space><ThunderboltOutlined style={{ color: txColors.primary }} />参数配置 — {selected?.label}</Space>}
           style={{ marginBottom: 24 }}
         >
           <Form layout="vertical">
@@ -341,7 +342,7 @@ function QuickExportTab() {
                 <Progress
                   percent={progress}
                   status={progress === 100 ? 'success' : 'active'}
-                  strokeColor={progress === 100 ? '#52c41a' : '#FF6B35'}
+                  strokeColor={progress === 100 ? '#52c41a' : txColors.primary}
                   format={(p) => (p === 100 ? '完成' : `${p}%`)}
                 />
                 {progress === 100 && (
@@ -772,7 +773,7 @@ export function ExportCenterPage() {
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 24 }}>
         <Title level={4} style={{ margin: 0 }}>
-          <CloudDownloadOutlined style={{ color: '#FF6B35', marginRight: 8 }} />
+          <CloudDownloadOutlined style={{ color: txColors.primary, marginRight: 8 }} />
           数据导出中心
         </Title>
         <Text type="secondary">统一管理报表导出、历史记录与定时任务</Text>

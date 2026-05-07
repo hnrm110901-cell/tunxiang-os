@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * review-reward/index.tsx — 评价激励系统
  *
@@ -19,7 +20,7 @@ import { txRequest } from '../../utils/request'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   gold: '#C5A347',
   success: '#34C759',
   bgDeep: '#0B1A20',
@@ -237,7 +238,7 @@ export default function ReviewRewardPage() {
           </View>
 
           <View style={{ background: `rgba(24,95,165,0.08)`, borderRadius: '16rpx', padding: '24rpx', marginBottom: '24rpx' }}>
-            <Text style={{ fontSize: '26rpx', color: '#185FA5', display: 'block', marginBottom: '8rpx' }}>💡 AI 评价摘要</Text>
+            <Text style={{ fontSize: '26rpx', color: txColors.info, display: 'block', marginBottom: '8rpx' }}>💡 AI 评价摘要</Text>
             <Text style={{ fontSize: '26rpx', color: C.text1, lineHeight: '40rpx' }}>{summary.ai_summary}</Text>
           </View>
 

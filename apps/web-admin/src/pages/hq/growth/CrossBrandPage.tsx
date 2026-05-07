@@ -10,6 +10,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useApi } from '../../../hooks/useApi';
+import { txColors } from '@tx/tokens';
 import type {
   CrossBrandOpportunity,
   CrossBrandProfile,
@@ -29,7 +30,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 const WARNING_ORANGE = '#faad14';
 const DANGER_RED = '#ff4d4f';

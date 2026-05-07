@@ -9,6 +9,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
 import { startScan, isAndroidPOS, printReceipt } from '../bridge/TXBridge';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -381,7 +382,7 @@ export default function ScanPayPage() {
             minHeight: 48,
             background: 'transparent',
             border: 'none',
-            color: '#FF6B35',
+            color: txColors.primary,
             fontSize: 24,
             cursor: 'pointer',
             display: 'flex',
@@ -405,7 +406,7 @@ export default function ScanPayPage() {
             padding: '6px 16px',
             fontSize: 22,
             fontWeight: 700,
-            color: '#FF6B35',
+            color: txColors.primary,
           }}
         >
           {amountDisplay}
@@ -439,7 +440,7 @@ export default function ScanPayPage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 48,
-                border: '2px solid #FF6B35',
+                border: `2px solid ${txColors.primary}`,
               }}
             >
               📱
@@ -466,7 +467,7 @@ export default function ScanPayPage() {
               }}
             >
               <div style={{ fontSize: 16, color: '#9DB4B2', marginBottom: 4 }}>收款金额</div>
-              <div style={{ fontSize: 40, fontWeight: 700, color: '#FF6B35' }}>
+              <div style={{ fontSize: 40, fontWeight: 700, color: txColors.primary }}>
                 {amountDisplay}
               </div>
             </div>
@@ -479,7 +480,7 @@ export default function ScanPayPage() {
                   alignItems: 'center',
                   gap: 10,
                   background: '#112228',
-                  border: '2px solid #FF6B35',
+                  border: `2px solid ${txColors.primary}`,
                   borderRadius: 12,
                   padding: '0 16px',
                   minHeight: 56,
@@ -538,7 +539,7 @@ export default function ScanPayPage() {
                   style={{
                     flex: 1,
                     minHeight: 52,
-                    background: '#FF6B35',
+                    background: txColors.primary,
                     border: 'none',
                     borderRadius: 10,
                     color: '#fff',
@@ -564,7 +565,7 @@ export default function ScanPayPage() {
                 height: 80,
                 borderRadius: '50%',
                 border: '6px solid #1a2a33',
-                borderTopColor: '#FF6B35',
+                borderTopColor: txColors.primary,
                 animation: 'txSpin 0.9s linear infinite',
               }}
             />
@@ -657,7 +658,7 @@ export default function ScanPayPage() {
               <div style={{ fontSize: 28, fontWeight: 700, color: '#22c55e', marginBottom: 8 }}>
                 收款成功
               </div>
-              <div style={{ fontSize: 36, fontWeight: 700, color: '#FF6B35' }}>
+              <div style={{ fontSize: 36, fontWeight: 700, color: txColors.primary }}>
                 {amountDisplay}
               </div>
             </div>
@@ -799,7 +800,7 @@ export default function ScanPayPage() {
                 style={{
                   flex: 1,
                   minHeight: 56,
-                  background: '#FF6B35',
+                  background: txColors.primary,
                   border: 'none',
                   borderRadius: 12,
                   color: '#fff',
@@ -877,7 +878,7 @@ export default function ScanPayPage() {
                 width: '100%',
                 minHeight: 56,
                 background: '#0B1A20',
-                border: '2px solid #FF6B35',
+                border: `2px solid ${txColors.primary}`,
                 borderRadius: 10,
                 color: '#fff',
                 fontSize: 20,
@@ -929,7 +930,7 @@ export default function ScanPayPage() {
                 style={{
                   flex: 2,
                   minHeight: 52,
-                  background: manualCode.trim().length >= 6 ? '#FF6B35' : '#3a2a1a',
+                  background: manualCode.trim().length >= 6 ? txColors.primary : '#3a2a1a',
                   border: 'none',
                   borderRadius: 10,
                   color: manualCode.trim().length >= 6 ? '#fff' : '#664433',

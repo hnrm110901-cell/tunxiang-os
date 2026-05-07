@@ -71,6 +71,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -152,7 +153,7 @@ interface ABTest {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 const TAG_COLORS: Record<FlagTag, string> = {
-  '核心': '#FF6B35',
+  '核心': txColors.primary,
   '实验': '#722ED1',
   'Beta': '#1890FF',
   '已废弃': '#8C8C8C',
@@ -181,7 +182,7 @@ const ACTION_COLORS: Record<LogAction, string> = {
   '启用': '#52C41A',
   '禁用': '#FF4D4F',
   '灰度开始': '#1890FF',
-  '全量发布': '#FF6B35',
+  '全量发布': txColors.primary,
   '回滚': '#FAAD14',
 };
 
@@ -211,8 +212,8 @@ function SimpleBarChart({ labelA, labelB, valueA, valueB, metric }: BarChartProp
   return (
     <svg width={svgWidth} height={chartHeight + 40} viewBox={`0 0 ${svgWidth} ${chartHeight + 40}`}>
       {/* A 组柱 */}
-      <rect x={xA} y={chartHeight - heightA} width={barWidth} height={heightA} rx={4} fill="#FF6B35" opacity={0.85} />
-      <text x={xA + barWidth / 2} y={chartHeight - heightA - 8} textAnchor="middle" fontSize={13} fontWeight="bold" fill="#FF6B35">
+      <rect x={xA} y={chartHeight - heightA} width={barWidth} height={heightA} rx={4} fill={txColors.primary} opacity={0.85} />
+      <text x={xA + barWidth / 2} y={chartHeight - heightA - 8} textAnchor="middle" fontSize={13} fontWeight="bold" fill={txColors.primary}>
         {valueA}
       </text>
       <text x={xA + barWidth / 2} y={chartHeight + 18} textAnchor="middle" fontSize={12} fill="#595959">
@@ -366,7 +367,7 @@ function FeatureFlagsTab() {
               刷新
             </Button>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+              style={{ background: txColors.primary, borderColor: txColors.primary }}>
               新建开关
             </Button>
           </Space>
@@ -443,7 +444,7 @@ function FeatureFlagsTab() {
         onOk={handleCreate}
         okText="创建"
         cancelText="取消"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
@@ -583,7 +584,7 @@ function GrayRulesTab() {
         <Progress
           percent={r.progress}
           size="small"
-          strokeColor={r.status === 'rolled_back' ? '#FF4D4F' : '#FF6B35'}
+          strokeColor={r.status === 'rolled_back' ? '#FF4D4F' : txColors.primary}
           status={r.status === 'completed' ? 'success' : r.status === 'rolled_back' ? 'exception' : 'active'}
         />
       ),
@@ -612,7 +613,7 @@ function GrayRulesTab() {
               </Button>
             )}
             <Popconfirm title="确认全量发布？" onConfirm={() => handleAction(r, 'full_release')}>
-              <Button size="small" type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              <Button size="small" type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}
                 icon={<RocketOutlined />}>
                 全量
               </Button>
@@ -640,7 +641,7 @@ function GrayRulesTab() {
     <div>
       <Row justify="end" style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+          style={{ background: txColors.primary, borderColor: txColors.primary }}>
           创建灰度规则
         </Button>
       </Row>
@@ -669,13 +670,13 @@ function GrayRulesTab() {
             )}
             {stepCurrent < 2 && (
               <Button type="primary" onClick={() => setStepCurrent(s => s + 1)}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+                style={{ background: txColors.primary, borderColor: txColors.primary }}>
                 下一步
               </Button>
             )}
             {stepCurrent === 2 && (
               <Button type="primary" onClick={handleCreateSubmit}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+                style={{ background: txColors.primary, borderColor: txColors.primary }}>
                 创建
               </Button>
             )}
@@ -924,7 +925,7 @@ function ABTestTab() {
     <div>
       <Row justify="end" style={{ marginBottom: 16 }}>
         <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateOpen(true)}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+          style={{ background: txColors.primary, borderColor: txColors.primary }}>
           创建实验
         </Button>
       </Row>
@@ -972,7 +973,7 @@ function ABTestTab() {
                           B组领先 +{((test.metric_b - test.metric_a) / test.metric_a * 100).toFixed(1)}%
                         </Text>
                       ) : test.metric_a > test.metric_b ? (
-                        <Text style={{ fontSize: 12, color: '#FF6B35' }}>
+                        <Text style={{ fontSize: 12, color: txColors.primary }}>
                           A组领先 +{((test.metric_a - test.metric_b) / test.metric_b * 100).toFixed(1)}%
                         </Text>
                       ) : (
@@ -997,7 +998,7 @@ function ABTestTab() {
         onOk={handleCreate}
         okText="创建实验"
         cancelText="取消"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         destroyOnClose
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
@@ -1053,7 +1054,7 @@ export function FeatureFlagPage() {
   return (
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <Space align="center" style={{ marginBottom: 20 }}>
-        <FlagOutlined style={{ fontSize: 24, color: '#FF6B35' }} />
+        <FlagOutlined style={{ fontSize: 24, color: txColors.primary }} />
         <Title level={3} style={{ margin: 0 }}>灰度发布管理</Title>
       </Space>
 

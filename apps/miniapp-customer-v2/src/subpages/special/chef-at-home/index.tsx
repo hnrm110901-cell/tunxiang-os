@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * chef-at-home/index.tsx — 大厨到家
  *
@@ -16,7 +17,7 @@ import { txRequest } from '../../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   primaryFaint: 'rgba(255,107,53,0.12)',
   bgDeep: '#0B1A20',

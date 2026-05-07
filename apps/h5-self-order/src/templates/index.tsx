@@ -11,6 +11,7 @@
  */
 import { lazy, Suspense } from 'react';
 import { useOrderStore } from '@/store/useOrderStore';
+import { txColors } from '@tx/tokens';
 
 const HotpotTemplate = lazy(() => import('./HotpotTemplate'));
 const QuickServiceTemplate = lazy(() => import('./QuickServiceTemplate'));
@@ -38,7 +39,7 @@ function TemplateFallback() {
       <div style={{ textAlign: 'center' }}>
         <div
           style={{
-            width: 32, height: 32, border: '3px solid var(--tx-brand, #FF6B35)',
+            width: 32, height: 32, border: `3px solid var(--tx-brand, ${txColors.primary})`,
             borderTopColor: 'transparent', borderRadius: '50%',
             animation: 'spin 0.8s linear infinite', margin: '0 auto 12px',
           }}

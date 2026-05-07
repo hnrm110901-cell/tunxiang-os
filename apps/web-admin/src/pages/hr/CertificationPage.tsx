@@ -43,6 +43,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -327,7 +328,7 @@ export default function CertificationPage() {
         if (!r.expires_at) return '-';
         const soon = isExpiringSoon(r.expires_at);
         return (
-          <span style={soon ? { color: '#BA7517', fontWeight: 600 } : undefined}>
+          <span style={soon ? { color: txColors.warning, fontWeight: 600 } : undefined}>
             {dayjs(r.expires_at).format('YYYY-MM-DD')}
             {soon && <WarningOutlined style={{ marginLeft: 4 }} />}
           </span>
@@ -356,7 +357,7 @@ export default function CertificationPage() {
             </Popconfirm>
           )}
           <Popconfirm title="确认删除此认证记录？" onConfirm={() => handleDelete(r.id)}>
-            <a style={{ color: '#A32D2D' }}>删除</a>
+            <a style={{ color: txColors.danger }}>删除</a>
           </Popconfirm>
         </Space>
       ),
@@ -382,7 +383,7 @@ export default function CertificationPage() {
       dataIndex: 'expires_at',
       key: 'expires_at',
       render: (v: string) => (
-        <span style={{ color: '#BA7517', fontWeight: 600 }}>
+        <span style={{ color: txColors.warning, fontWeight: 600 }}>
           {dayjs(v).format('YYYY-MM-DD')}
         </span>
       ),
@@ -478,29 +479,29 @@ export default function CertificationPage() {
               statistic={{
                 title: '总认证数',
                 value: dash.total,
-                icon: <SafetyCertificateOutlined style={{ color: '#185FA5' }} />,
+                icon: <SafetyCertificateOutlined style={{ color: txColors.info }} />,
               }}
             />
             <StatisticCard
               statistic={{
                 title: '已通过',
                 value: dash.passed,
-                valueStyle: { color: '#0F6E56' },
+                valueStyle: { color: txColors.success },
               }}
             />
             <StatisticCard
               statistic={{
                 title: '未通过',
                 value: dash.failed,
-                valueStyle: { color: '#A32D2D' },
+                valueStyle: { color: txColors.danger },
               }}
             />
             <StatisticCard
               statistic={{
                 title: '即将过期',
                 value: dash.expiring_soon,
-                valueStyle: { color: '#BA7517' },
-                icon: <WarningOutlined style={{ color: '#BA7517' }} />,
+                valueStyle: { color: txColors.warning },
+                icon: <WarningOutlined style={{ color: txColors.warning }} />,
               }}
             />
             <StatisticCard
@@ -680,7 +681,7 @@ export default function CertificationPage() {
                   <span
                     style={
                       isExpiringSoon(detail.expires_at)
-                        ? { color: '#BA7517', fontWeight: 600 }
+                        ? { color: txColors.warning, fontWeight: 600 }
                         : undefined
                     }
                   >

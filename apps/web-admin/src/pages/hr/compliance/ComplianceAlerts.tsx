@@ -17,6 +17,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export default function ComplianceAlerts() {
       render: (_, r) => (
         <Space>
           {r.severity === 'critical' && (
-            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: '#A32D2D', animation: 'pulse 1.5s infinite' }} />
+            <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: txColors.danger, animation: 'pulse 1.5s infinite' }} />
           )}
           {r.title}
         </Space>
@@ -148,7 +149,7 @@ export default function ComplianceAlerts() {
           )}
           {(r.status === 'open' || r.status === 'acknowledged') && (
             <a
-              style={{ color: '#0F6E56' }}
+              style={{ color: txColors.success }}
               onClick={() => {
                 setActionAlertId(r.id);
                 setActionType('resolve');

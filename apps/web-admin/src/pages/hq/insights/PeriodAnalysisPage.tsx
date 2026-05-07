@@ -7,6 +7,7 @@
 import { useEffect, useState } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { apiGet } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -82,7 +83,7 @@ function getToday(): string {
 }
 
 const PERIOD_COLORS: Record<string, string> = {
-  '早餐': '#BA7517', '午餐': '#FF6B35', '下午茶': '#185FA5', '晚餐': '#A32D2D', '夜宵': '#7C3AED',
+  '早餐': txColors.warning, '午餐': txColors.primary, '下午茶': txColors.info, '晚餐': txColors.danger, '夜宵': '#7C3AED',
 };
 
 // ─── 主组件 ──────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ export function PeriodAnalysisPage() {
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 600, color: '#1E2A3A' }}>餐段分析</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: txColors.navy }}>餐段分析</div>
           <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>按时段分析营收结构、客流高峰、热销菜品</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -179,7 +180,7 @@ export function PeriodAnalysisPage() {
                 ].map(kpi => (
                   <div key={kpi.label} style={{ background: '#fff', padding: '8px 12px', textAlign: 'center' }}>
                     <div style={{ fontSize: 11, color: '#9CA3AF' }}>{kpi.label}</div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1E2A3A' }}>{kpi.value}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: txColors.navy }}>{kpi.value}</div>
                   </div>
                 ))}
               </div>
@@ -189,7 +190,7 @@ export function PeriodAnalysisPage() {
                 <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>热销 TOP {p.topDishes.length}</div>
                 {p.topDishes.map((d, i) => (
                   <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
-                    <span><span style={{ color: i < 3 ? '#FF6B35' : '#9CA3AF', fontWeight: 600, marginRight: 6 }}>{i + 1}</span>{d.name}</span>
+                    <span><span style={{ color: i < 3 ? txColors.primary : '#9CA3AF', fontWeight: 600, marginRight: 6 }}>{i + 1}</span>{d.name}</span>
                     <span style={{ color: '#6B7280' }}>{d.count}份 · {fen2yuan(d.revenueFen)}</span>
                   </div>
                 ))}

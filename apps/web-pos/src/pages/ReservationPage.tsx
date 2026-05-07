@@ -11,6 +11,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useReservationStore } from '../store/reservationStore';
 import type { Reservation, ReservationStatus, MealPeriod, TablePref } from '../api/reservationApi';
+import { txColors } from '@tx/tokens';
 
 // ─── StoreId 获取 ──────────────────────────────────────────────────────────────
 const STORE_ID: string =
@@ -102,7 +103,7 @@ const C = {
   } as React.CSSProperties,
 
   btnPrimary: {
-    background: '#FF6B35',
+    background: txColors.primary,
     color: '#fff',
   } as React.CSSProperties,
 
@@ -283,7 +284,7 @@ function ReservationListPanel({
               key={s}
               style={{
                 ...C.filterChip,
-                background: active ? '#FF6B35' : 'rgba(255,255,255,0.06)',
+                background: active ? txColors.primary : 'rgba(255,255,255,0.06)',
                 color: active ? '#fff' : 'rgba(255,255,255,0.65)',
               }}
               onClick={() => onFilterChange(s)}
@@ -335,7 +336,7 @@ function ReservationRow({ r, active, onSelect }: { r: Reservation; active: boole
         ...C.card,
         margin: '4px 12px',
         background: active ? '#1A3340' : '#112B36',
-        borderColor: active ? '#FF6B35' : 'transparent',
+        borderColor: active ? txColors.primary : 'transparent',
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -377,7 +378,7 @@ function ReservationIndex() {
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
-          { label: '今日预订', value: todayCount, color: '#FF6B35' },
+          { label: '今日预订', value: todayCount, color: txColors.primary },
           { label: '待接待', value: activeCount, color: '#27AE60' },
           { label: '本月累计', value: total, color: '#2D9CDB' },
         ].map((stat) => (

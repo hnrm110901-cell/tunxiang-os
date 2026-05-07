@@ -38,6 +38,7 @@ import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -248,7 +249,7 @@ function OutletArchiveTab() {
       dataIndex: 'today_revenue_fen',
       search: false,
       render: (_, record) => (
-        <span style={{ fontWeight: 600, color: '#FF6B35' }}>
+        <span style={{ fontWeight: 600, color: txColors.primary }}>
           {fenToYuan(record.today_revenue_fen)}
         </span>
       ),
@@ -426,7 +427,7 @@ function RevenueStatsTab() {
               value={totalRevenue / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#FF6B35', fontWeight: 700 }}
+              valueStyle={{ color: txColors.primary, fontWeight: 700 }}
             />
           </Card>
         </Col>
@@ -481,7 +482,7 @@ function RevenueStatsTab() {
                     <Tag>{outlet.outlet_code}</Tag>
                   </Space>
                   <Space size="large">
-                    <span style={{ color: '#FF6B35', fontWeight: 700, fontSize: 16 }}>
+                    <span style={{ color: txColors.primary, fontWeight: 700, fontSize: 16 }}>
                       {fenToYuan(outlet.today_revenue_fen)}
                     </span>
                     <span style={{ color: '#5F5E5A', fontSize: 14 }}>
@@ -527,7 +528,7 @@ function RevenueStatsTab() {
             <Card
               title={
                 <Space>
-                  <ShopOutlined style={{ color: '#FF6B35' }} />
+                  <ShopOutlined style={{ color: txColors.primary }} />
                   <span>{outlet.name}</span>
                   <Tag color={statusMap[outlet.status]?.color === 'success' ? 'green' : 'default'}>
                     {statusMap[outlet.status]?.label}
@@ -542,7 +543,7 @@ function RevenueStatsTab() {
                     value={outlet.today_revenue_fen / 100}
                     precision={2}
                     prefix="¥"
-                    valueStyle={{ fontSize: 20, color: '#FF6B35' }}
+                    valueStyle={{ fontSize: 20, color: txColors.primary }}
                   />
                 </Col>
                 <Col span={12}>
@@ -611,7 +612,7 @@ function OrderDetailTab() {
       dataIndex: 'subtotal_fen',
       search: false,
       render: (_, record) => (
-        <span style={{ fontWeight: 600, color: '#FF6B35' }}>
+        <span style={{ fontWeight: 600, color: txColors.primary }}>
           {fenToYuan(record.subtotal_fen)}
         </span>
       ),
@@ -668,7 +669,7 @@ function OrderDetailTab() {
                 {filteredOrders.reduce((s, o) => s + o.item_count, 0)}件
               </ProTable.Summary.Cell>
               <ProTable.Summary.Cell index={4}>
-                <span style={{ fontWeight: 700, color: '#FF6B35' }}>
+                <span style={{ fontWeight: 700, color: txColors.primary }}>
                   {fenToYuan(filteredOrders.reduce((s, o) => s + o.subtotal_fen, 0))}
                 </span>
               </ProTable.Summary.Cell>
@@ -751,7 +752,7 @@ export default function FoodCourtManagePage() {
         }}>
           <div>
             <div style={{ fontSize: 12, color: '#5F5E5A' }}>今日广场总收入</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#FF6B35' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: txColors.primary }}>
               {fenToYuan(totalRevenue)}
             </div>
           </div>
@@ -765,7 +766,7 @@ export default function FoodCourtManagePage() {
           <div style={{ width: 1, height: 36, background: '#E8E6E1' }} />
           <div>
             <div style={{ fontSize: 12, color: '#5F5E5A' }}>营业档口</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#0F6E56' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: txColors.success }}>
               {MOCK_OUTLETS.filter((o) => o.status === 'active').length}个
             </div>
           </div>

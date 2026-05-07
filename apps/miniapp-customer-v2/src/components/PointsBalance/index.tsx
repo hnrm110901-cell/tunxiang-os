@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * PointsBalance — member points display card
  *
@@ -111,7 +112,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
           <Text style={{ fontSize: '26rpx', lineHeight: '1' }}>✦</Text>
           <Text
             style={{
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: '26rpx',
               fontWeight: '600',
             }}
@@ -134,7 +135,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
         >
           <Text
             style={{
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: '28rpx',
               fontWeight: '600',
             }}
@@ -143,7 +144,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
           </Text>
           <Text
             style={{
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: '28rpx',
               lineHeight: '1',
             }}
@@ -219,7 +220,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
         <Text style={{ color: '#9EB5C0', fontSize: '26rpx' }}>可兑换</Text>
         <Text
           style={{
-            color: '#FF6B35',
+            color: txColors.primary,
             fontSize: '26rpx',
             fontWeight: '600',
           }}
@@ -250,7 +251,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
               }}
             >
               还需{' '}
-              <Text style={{ color: '#FF6B35', fontWeight: '600' }}>
+              <Text style={{ color: txColors.primary, fontWeight: '600' }}>
                 {remaining?.toLocaleString()}
               </Text>{' '}
               积分

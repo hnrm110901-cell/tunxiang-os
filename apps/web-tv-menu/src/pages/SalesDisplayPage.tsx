@@ -5,6 +5,7 @@
  * 60秒自动刷新
  */
 import { useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ======================== 类型 ======================== */
 interface SalesOverview {
@@ -75,7 +76,7 @@ const MOCK_DATA: SalesData = {
     { method: '支付宝', percent: 30, color: '#1677FF' },
     { method: '现金', percent: 10, color: '#FFD700' },
     { method: '银行卡', percent: 10, color: '#C0C0C0' },
-    { method: '会员余额', percent: 5, color: '#FF6B35' },
+    { method: '会员余额', percent: 5, color: txColors.primary },
   ],
   hourly_revenue: [
     { hour: 10, amount: 1200 },
@@ -199,8 +200,8 @@ function LineChart({ data }: { data: HourlyRevenue[] }) {
     <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
       <defs>
         <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FF6B35" stopOpacity={0.4} />
-          <stop offset="100%" stopColor="#FF6B35" stopOpacity={0.02} />
+          <stop offset="0%" stopColor={txColors.primary} stopOpacity={0.4} />
+          <stop offset="100%" stopColor={txColors.primary} stopOpacity={0.02} />
         </linearGradient>
       </defs>
       {/* 网格线 */}
@@ -221,10 +222,10 @@ function LineChart({ data }: { data: HourlyRevenue[] }) {
       {/* 面积 */}
       <path d={areaPath} fill="url(#areaGrad)" />
       {/* 折线 */}
-      <path d={linePath} fill="none" stroke="#FF6B35" strokeWidth={2.5} strokeLinejoin="round" />
+      <path d={linePath} fill="none" stroke={txColors.primary} strokeWidth={2.5} strokeLinejoin="round" />
       {/* 点 */}
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#FF6B35" />
+        <circle key={i} cx={p.x} cy={p.y} r={3} fill={txColors.primary} />
       ))}
       {/* X轴标签 */}
       {points.filter((_, i) => i % 2 === 0).map((p, i) => (
@@ -320,7 +321,7 @@ export default function SalesDisplayPage() {
     flexShrink: 0,
     height: 80,
     background: 'linear-gradient(90deg, #3d1200 0%, #2a0e00 50%, #3d1200 100%)',
-    borderBottom: '2px solid #FF6B35',
+    borderBottom: `2px solid ${txColors.primary}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -402,7 +403,7 @@ export default function SalesDisplayPage() {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 40 }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35', letterSpacing: 2 }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: txColors.primary, letterSpacing: 2 }}>
             今日营业数据
           </div>
           <div style={{
@@ -422,7 +423,7 @@ export default function SalesDisplayPage() {
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
             <span style={{ fontSize: 24, color: '#9e7a55', fontWeight: 600 }}>今日营收</span>
             <span style={{
-              fontSize: 120, fontWeight: 900, color: '#FF6B35', lineHeight: 1,
+              fontSize: 120, fontWeight: 900, color: txColors.primary, lineHeight: 1,
               fontVariantNumeric: 'tabular-nums',
               textShadow: '0 0 40px rgba(255, 107, 53, 0.5)',
             }}>
@@ -523,7 +524,7 @@ export default function SalesDisplayPage() {
                       <span style={{ fontSize: 14, color: '#666', fontVariantNumeric: 'tabular-nums' }}>{order.time}</span>
                       <span style={{ fontSize: 16, color: '#ccc' }}>{order.items}</span>
                     </div>
-                    <span style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontSize: 18, fontWeight: 700, color: txColors.primary, fontVariantNumeric: 'tabular-nums' }}>
                       {'\u00A5'}{order.amount}
                     </span>
                   </div>

@@ -29,6 +29,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
+import { txColors } from '@tx/tokens';
 import {
   BranchesOutlined,
   ExclamationCircleOutlined,
@@ -41,11 +42,11 @@ const { Title } = Typography;
 
 const TX_THEME = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
@@ -59,7 +60,7 @@ const TX_THEME = {
 // ── 渠道显示配置 ───────────────────────────────────────────────────────────────
 
 const CHANNEL_CONFIG: Record<string, { label: string; color: string }> = {
-  meituan: { label: '美团外卖', color: '#FF6B35' },
+  meituan: { label: '美团外卖', color: txColors.primary },
   eleme:   { label: '饿了么',   color: '#00AEF3' },
   douyin:  { label: '抖音外卖', color: '#2C2C2A' },
   wechat:  { label: '微信',     color: '#07C160' },
@@ -201,7 +202,7 @@ const BindingOverviewTab: React.FC = () => {
     yField: 'count',
     seriesField: 'type',
     isGroup: true,
-    color: ['#FF6B35', '#A32D2D', '#B4B2A9'],
+    color: [txColors.primary, txColors.danger, '#B4B2A9'],
     label: {
       position: 'middle' as const,
       style: { fill: '#FFFFFF', fontSize: 12 },
@@ -229,11 +230,11 @@ const BindingOverviewTab: React.FC = () => {
       {/* 汇总卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card bordered={false} style={{ background: '#FFF3ED', borderRadius: 6 }}>
+          <Card bordered={false} style={{ background: txColors.primaryLight, borderRadius: 6 }}>
             <Statistic
               title="全渠道有效绑定"
               value={stats?.total_active_bindings ?? '-'}
-              valueStyle={{ color: '#FF6B35', fontWeight: 600 }}
+              valueStyle={{ color: txColors.primary, fontWeight: 600 }}
             />
           </Card>
         </Col>
@@ -242,7 +243,7 @@ const BindingOverviewTab: React.FC = () => {
             <Statistic
               title="待处理冲突"
               value={stats?.total_conflicts ?? '-'}
-              valueStyle={{ color: '#A32D2D', fontWeight: 600 }}
+              valueStyle={{ color: txColors.danger, fontWeight: 600 }}
               suffix={
                 stats && stats.total_conflicts > 0 ? (
                   <ExclamationCircleOutlined style={{ fontSize: 14, marginLeft: 4 }} />
@@ -290,7 +291,7 @@ const BindingOverviewTab: React.FC = () => {
                 <Row>
                   <Col span={12}>
                     <div style={{ fontSize: 12, color: '#5F5E5A' }}>有效绑定</div>
-                    <div style={{ fontSize: 20, fontWeight: 600, color: '#0F6E56' }}>
+                    <div style={{ fontSize: 20, fontWeight: 600, color: txColors.success }}>
                       {stat?.active_count ?? 0}
                     </div>
                   </Col>
@@ -306,7 +307,7 @@ const BindingOverviewTab: React.FC = () => {
                       style={{
                         fontSize: 16,
                         fontWeight: 600,
-                        color: (stat?.conflict_count ?? 0) > 0 ? '#A32D2D' : '#B4B2A9',
+                        color: (stat?.conflict_count ?? 0) > 0 ? txColors.danger : '#B4B2A9',
                       }}
                     >
                       {stat?.conflict_count ?? 0}
@@ -433,7 +434,7 @@ const ConflictResolveTab: React.FC = () => {
       width: 90,
       search: false,
       render: () => (
-        <Badge status="error" text={<span style={{ color: '#A32D2D' }}>冲突</span>} />
+        <Badge status="error" text={<span style={{ color: txColors.danger }}>冲突</span>} />
       ),
     },
     {
@@ -445,7 +446,7 @@ const ConflictResolveTab: React.FC = () => {
           key="resolve"
           type="link"
           size="small"
-          style={{ color: '#FF6B35', padding: 0 }}
+          style={{ color: txColors.primary, padding: 0 }}
           onClick={() => handleOpenResolve(record)}
         >
           解决冲突
@@ -474,7 +475,7 @@ const ConflictResolveTab: React.FC = () => {
         ]}
         headerTitle={
           <span style={{ color: '#2C2C2A', fontWeight: 600 }}>
-            <ExclamationCircleOutlined style={{ color: '#A32D2D', marginRight: 6 }} />
+            <ExclamationCircleOutlined style={{ color: txColors.danger, marginRight: 6 }} />
             待处理冲突列表
           </span>
         }
@@ -490,7 +491,7 @@ const ConflictResolveTab: React.FC = () => {
         confirmLoading={resolving}
         okText="确认保留"
         cancelText="取消"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={520}
       >
         {resolveModal.conflict && (
@@ -521,7 +522,7 @@ const ConflictResolveTab: React.FC = () => {
                 },
               ]}
             />
-            <p style={{ marginTop: 12, color: '#BA7517', fontSize: 12 }}>
+            <p style={{ marginTop: 12, color: txColors.warning, fontSize: 12 }}>
               未被选择的 Customer ID 绑定将标记为「已解绑」，操作不可逆。
             </p>
           </div>
@@ -549,7 +550,7 @@ const GoldenIDManagePage: React.FC = () => {
       key: 'conflicts',
       label: (
         <span>
-          <ExclamationCircleOutlined style={{ color: '#A32D2D' }} />
+          <ExclamationCircleOutlined style={{ color: txColors.danger }} />
           冲突解决
         </span>
       ),
@@ -562,7 +563,7 @@ const GoldenIDManagePage: React.FC = () => {
       <div style={{ padding: 24, background: '#F8F7F5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 20 }}>
           <Title level={4} style={{ margin: 0, color: '#2C2C2A' }}>
-            <BranchesOutlined style={{ color: '#FF6B35', marginRight: 8 }} />
+            <BranchesOutlined style={{ color: txColors.primary, marginRight: 8 }} />
             全渠道 Golden ID 管理
           </Title>
           <span style={{ color: '#5F5E5A', fontSize: 13 }}>

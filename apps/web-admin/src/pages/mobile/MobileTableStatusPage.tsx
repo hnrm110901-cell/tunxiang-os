@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -47,9 +48,9 @@ function generateMockTables(storeId: string): TableItem[] {
 
 const STATUS_CONFIG: Record<TableStatus, { label: string; color: string; bg: string; textColor: string }> = {
   idle:     { label: '空闲', color: '#B4B2A9', bg: '#F0EDE6', textColor: '#5F5E5A' },
-  occupied: { label: '占用', color: '#FF6B35', bg: '#FFF3ED', textColor: '#E55A28' },
-  billing:  { label: '埋单', color: '#0F6E56', bg: '#ECFDF5', textColor: '#0F6E56' },
-  reserved: { label: '预订', color: '#185FA5', bg: '#EFF6FF', textColor: '#185FA5' },
+  occupied: { label: '占用', color: txColors.primary, bg: txColors.primaryLight, textColor: txColors.primaryActive },
+  billing:  { label: '埋单', color: txColors.success, bg: '#ECFDF5', textColor: txColors.success },
+  reserved: { label: '预订', color: txColors.info, bg: '#EFF6FF', textColor: txColors.info },
 };
 
 const REFRESH_INTERVAL = 30000; // 30秒
@@ -195,9 +196,9 @@ export function MobileTableStatusPage() {
         }}>
           {([
             ['空闲', stats.idle, '#B4B2A9'],
-            ['占用', stats.occupied, '#FF6B35'],
-            ['埋单', stats.billing, '#0F6E56'],
-            ['预订', stats.reserved, '#185FA5'],
+            ['占用', stats.occupied, txColors.primary],
+            ['埋单', stats.billing, txColors.success],
+            ['预订', stats.reserved, txColors.info],
           ] as [string, number, string][]).map(([label, count, color]) => (
             <div key={label} style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: 18, fontWeight: 700, color }}>{count}</div>
@@ -220,7 +221,7 @@ export function MobileTableStatusPage() {
             onClick={() => fetchTables(selectedStore)}
             style={{
               fontSize: 12,
-              color: '#FF6B35',
+              color: txColors.primary,
               background: 'transparent',
               border: 'none',
               cursor: 'pointer',

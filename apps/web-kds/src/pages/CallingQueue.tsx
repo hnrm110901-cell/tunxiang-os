@@ -16,6 +16,7 @@
  *   - 触控反馈：按下 scale(0.97) + 200ms transition
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 配置（从 localStorage 读取） ───
 
@@ -70,8 +71,8 @@ function formatWaitTime(calledAt: string): string {
 
 const WAIT_COLORS: Record<WaitLevel, { text: string; border: string; bg: string; badge: string }> = {
   normal:  { text: '#B0B0B0', border: '#333',    bg: '#111',    badge: '#222' },
-  warning: { text: '#E0A020', border: '#BA7517', bg: '#1a1000', badge: '#BA7517' },
-  danger:  { text: '#ff4d4f', border: '#A32D2D', bg: '#1a0505', badge: '#A32D2D' },
+  warning: { text: '#E0A020', border: txColors.warning, bg: '#1a1000', badge: txColors.warning },
+  danger:  { text: '#ff4d4f', border: txColors.danger, bg: '#1a0505', badge: txColors.danger },
 };
 
 // ─── API ───
@@ -347,7 +348,7 @@ export function CallingQueue() {
       }}>
         {/* 左：标题 + 连接状态 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#FF6B35' }}>
+          <span style={{ fontSize: 26, fontWeight: 'bold', color: txColors.primary }}>
             等叫队列
           </span>
 
@@ -355,9 +356,9 @@ export function CallingQueue() {
           {tasks.length > 0 && (
             <span style={{
               background: tasks.some(t => getWaitLevel(t.called_at) === 'danger')
-                ? '#A32D2D'
+                ? txColors.danger
                 : tasks.some(t => getWaitLevel(t.called_at) === 'warning')
-                  ? '#BA7517'
+                  ? txColors.warning
                   : '#333',
               color: '#fff',
               fontWeight: 'bold',
@@ -378,11 +379,11 @@ export function CallingQueue() {
           {config.host && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 16, color: connected ? '#0F6E56' : '#A32D2D',
+              fontSize: 16, color: connected ? txColors.success : txColors.danger,
             }}>
               <span style={{
                 width: 10, height: 10, borderRadius: '50%',
-                background: connected ? '#0F6E56' : '#A32D2D',
+                background: connected ? txColors.success : txColors.danger,
                 display: 'inline-block',
                 animation: connected ? undefined : 'calling-pulse 1.5s infinite',
               }} />
@@ -391,7 +392,7 @@ export function CallingQueue() {
           )}
 
           {noConfig && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>
+            <span style={{ fontSize: 16, color: txColors.warning }}>
               未配置（请设置 Mac mini 地址/门店/租户）
             </span>
           )}
@@ -403,7 +404,7 @@ export function CallingQueue() {
             平均等待{' '}
             <b style={{
               fontSize: 24,
-              color: avgWait >= 10 ? '#ff4d4f' : avgWait >= 5 ? '#BA7517' : '#0F6E56',
+              color: avgWait >= 10 ? '#ff4d4f' : avgWait >= 5 ? txColors.warning : txColors.success,
               fontFamily: 'JetBrains Mono, monospace',
             }}>
               {avgWait.toFixed(1)}
@@ -543,7 +544,7 @@ function CallingTaskCard({
           minWidth: 110,
           minHeight: 56,
           padding: '0 20px',
-          background: loading ? '#333' : '#0F6E56',
+          background: loading ? '#333' : txColors.success,
           color: '#fff',
           border: 'none',
           borderRadius: 10,
@@ -593,7 +594,7 @@ function ConfigHint() {
   return (
     <div style={{
       textAlign: 'center',
-      color: '#BA7517',
+      color: txColors.warning,
       fontSize: 18,
       marginTop: 80,
       lineHeight: 2,

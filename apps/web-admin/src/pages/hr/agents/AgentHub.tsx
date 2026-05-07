@@ -35,6 +35,7 @@ import {
   RobotOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -54,7 +55,7 @@ const AGENTS: AgentDef[] = [
     id: 'compliance_alert',
     name: '合规预警',
     description: '证件到期、低绩效、考勤异常自动扫描与预警推送',
-    icon: <AlertOutlined style={{ fontSize: 28, color: '#A32D2D' }} />,
+    icon: <AlertOutlined style={{ fontSize: 28, color: txColors.danger }} />,
     route: '/hr/agents/compliance-alert',
     status: 'active',
   },
@@ -62,7 +63,7 @@ const AGENTS: AgentDef[] = [
     id: 'salary_advisor',
     name: 'AI薪酬顾问',
     description: '基于岗位/区域/工龄/绩效的薪酬建议与调薪优化',
-    icon: <DollarOutlined style={{ fontSize: 28, color: '#0F6E56' }} />,
+    icon: <DollarOutlined style={{ fontSize: 28, color: txColors.success }} />,
     route: '/hr/agents/salary-advisor',
     status: 'active',
   },
@@ -70,7 +71,7 @@ const AGENTS: AgentDef[] = [
     id: 'workforce_planner',
     name: '排班优化',
     description: '基于历史客流分析排班效率，生成下周优化建议',
-    icon: <CalendarOutlined style={{ fontSize: 28, color: '#185FA5' }} />,
+    icon: <CalendarOutlined style={{ fontSize: 28, color: txColors.info }} />,
     route: '/hr/agents/workforce-planner',
     status: 'active',
   },
@@ -78,7 +79,7 @@ const AGENTS: AgentDef[] = [
     id: 'attendance_recovery',
     name: '缺勤补位',
     description: '检测缺勤自动创建缺口，匹配候选人推荐补位',
-    icon: <UserSwitchOutlined style={{ fontSize: 28, color: '#BA7517' }} />,
+    icon: <UserSwitchOutlined style={{ fontSize: 28, color: txColors.warning }} />,
     route: '/hr/agents/attendance-recovery',
     status: 'active',
   },
@@ -86,7 +87,7 @@ const AGENTS: AgentDef[] = [
     id: 'turnover_risk',
     name: '离职风险',
     description: '多维信号扫描计算员工离职风险评分与干预建议',
-    icon: <WarningOutlined style={{ fontSize: 28, color: '#A32D2D' }} />,
+    icon: <WarningOutlined style={{ fontSize: 28, color: txColors.danger }} />,
     route: '/hr/agents/turnover-risk',
     status: 'active',
   },
@@ -94,7 +95,7 @@ const AGENTS: AgentDef[] = [
     id: 'growth_coach',
     name: '成长教练',
     description: '技能差距分析、培训推荐、个性化学习路径生成',
-    icon: <RocketOutlined style={{ fontSize: 28, color: '#FF6B35' }} />,
+    icon: <RocketOutlined style={{ fontSize: 28, color: txColors.primary }} />,
     route: '/hr/agents/growth-coach',
     status: 'active',
   },

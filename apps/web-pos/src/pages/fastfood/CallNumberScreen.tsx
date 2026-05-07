@@ -12,13 +12,14 @@
  *   - 无交互按钮（纯展示屏）
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
 const C = {
   bg: '#040D12',
   card: '#0A1A24',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   success: '#10B981',
   muted: '#64748b',
   text: '#E0E0E0',

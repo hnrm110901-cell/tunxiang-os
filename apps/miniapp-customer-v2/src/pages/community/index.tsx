@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/community/index.tsx — 社区页
  *
@@ -32,7 +33,7 @@ interface Post {
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
   bg:         '#0B1A20',
   card:       '#132029',
@@ -42,7 +43,7 @@ const C = {
   text2:      '#9EB5C0',
   text3:      '#5A7A88',
   white:      '#fff',
-  heartOn:    '#FF6B35',
+  heartOn:    txColors.primary,
   heartOff:   '#5A7A88',
 } as const
 

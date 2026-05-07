@@ -11,6 +11,7 @@
  * 深色主题，所有按钮 ≥56px，字体 ≥16px
  */
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -278,11 +279,11 @@ export function BookingPrepView() {
         padding: '10px 20px', background: '#111', borderBottom: '1px solid #222',
         minHeight: 56,
       }}>
-        <span style={{ fontWeight: 'bold', fontSize: 24, color: '#FF6B35' }}>预订备餐</span>
+        <span style={{ fontWeight: 'bold', fontSize: 24, color: txColors.primary }}>预订备餐</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           {loading && <span style={{ fontSize: 16, color: '#666' }}>更新中…</span>}
           {isOffline && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>离线模式</span>
+            <span style={{ fontSize: 16, color: txColors.warning }}>离线模式</span>
           )}
         </div>
       </header>
@@ -293,7 +294,7 @@ export function BookingPrepView() {
           display: 'flex', gap: 16, padding: '16px 20px',
           borderBottom: '1px solid #1a1a1a',
         }}>
-          <StatCard label="今日预订" value={summary.today_count} unit="桌" color="#FF6B35" />
+          <StatCard label="今日预订" value={summary.today_count} unit="桌" color={txColors.primary} />
           <StatCard label="本周预订" value={summary.week_count} unit="桌" color="#1890ff" />
         </div>
 
@@ -314,7 +315,7 @@ export function BookingPrepView() {
                 <div key={d.dish_name} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{
                     width: 24, textAlign: 'center', fontSize: 16,
-                    color: i < 3 ? '#FF6B35' : '#555', fontWeight: 'bold',
+                    color: i < 3 ? txColors.primary : '#555', fontWeight: 'bold',
                   }}>{i + 1}</span>
                   <span style={{ width: 120, fontSize: 18, color: '#ddd', flexShrink: 0 }}>
                     {d.dish_name}
@@ -332,11 +333,11 @@ export function BookingPrepView() {
                     {/* 已完成条 */}
                     <div style={{
                       position: 'absolute', left: 0, top: 0, height: '100%',
-                      width: `${donePct}%`, background: '#0F6E56', borderRadius: 10,
+                      width: `${donePct}%`, background: txColors.success, borderRadius: 10,
                       transition: 'width 0.4s ease',
                     }} />
                   </div>
-                  <span style={{ fontSize: 18, color: '#0F6E56', minWidth: 60, textAlign: 'right' }}>
+                  <span style={{ fontSize: 18, color: txColors.success, minWidth: 60, textAlign: 'right' }}>
                     {doneQty}/{d.total_qty}
                   </span>
                   <span style={{ fontSize: 16, color: '#555', minWidth: 50, textAlign: 'right' }}>
@@ -361,8 +362,8 @@ export function BookingPrepView() {
         }}>
           {/* Tab */}
           <div style={{ display: 'flex', gap: 8 }}>
-            <TabButton label={`预备任务 (${pendingTasks.length})`} active={tab === 'pending'} onClick={() => setTab('pending')} color="#BA7517" />
-            <TabButton label={`已完成 (${doneTasks.length})`} active={tab === 'done'} onClick={() => setTab('done')} color="#0F6E56" />
+            <TabButton label={`预备任务 (${pendingTasks.length})`} active={tab === 'pending'} onClick={() => setTab('pending')} color={txColors.warning} />
+            <TabButton label={`已完成 (${doneTasks.length})`} active={tab === 'done'} onClick={() => setTab('done')} color={txColors.success} />
           </div>
 
           {/* 档口过滤 */}
@@ -483,7 +484,7 @@ function BookingTaskGroup({ bookingId, tasks, tab, tick: _tick, onStart, onDone 
     <div style={{
       background: '#111', borderRadius: 14,
       border: isUrgent && tab === 'pending'
-        ? '2px solid #A32D2D'
+        ? `2px solid ${txColors.danger}`
         : '1px solid #222',
       overflow: 'hidden',
       animation: isUrgent && tab === 'pending' ? 'bp-urgent-flash 1.5s infinite' : undefined,
@@ -546,7 +547,7 @@ function BookingTaskGroup({ bookingId, tasks, tab, tick: _tick, onStart, onDone 
           {allStarted && !allDone && (
             <ActionButton
               label="完成备餐"
-              color="#0F6E56"
+              color={txColors.success}
               onClick={() => {
                 tasks
                   .filter(t => t.status === 'started')
@@ -564,9 +565,9 @@ function BookingTaskGroup({ bookingId, tasks, tab, tick: _tick, onStart, onDone 
 
 function DishRow({ task }: { task: PrepTask }) {
   const statusColor: Record<string, string> = {
-    pending: '#BA7517',
+    pending: txColors.warning,
     started: '#1890ff',
-    done: '#0F6E56',
+    done: txColors.success,
   };
   const statusLabel: Record<string, string> = {
     pending: '待备',
@@ -596,7 +597,7 @@ function DishRow({ task }: { task: PrepTask }) {
         </span>
       </div>
       <span style={{
-        fontSize: 22, fontWeight: 'bold', color: '#FF6B35',
+        fontSize: 22, fontWeight: 'bold', color: txColors.primary,
         fontFamily: 'JetBrains Mono, monospace',
       }}>
         ×{task.quantity}

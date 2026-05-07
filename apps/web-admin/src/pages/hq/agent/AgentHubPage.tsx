@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Badge, Button, Card, Col, ConfigProvider, Row, Tag } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 /* ─── Agent 卡片数据 ─── */
 interface AgentCardData {
@@ -18,12 +19,12 @@ interface AgentCardData {
 }
 
 const AGENT_CARDS: AgentCardData[] = [
-  { emoji: '🎯', nameZh: '运营指挥官',   nameEn: 'Operations Commander',        agentId: 'tx-ops',       color: '#FF6B35', todayCount: 12 },
-  { emoji: '🍳', nameZh: '菜品智能体',   nameEn: 'Dish Intelligence Agent',      agentId: 'tx-menu',      color: '#0F6E56', todayCount: 7  },
+  { emoji: '🎯', nameZh: '运营指挥官',   nameEn: 'Operations Commander',        agentId: 'tx-ops',       color: txColors.primary, todayCount: 12 },
+  { emoji: '🍳', nameZh: '菜品智能体',   nameEn: 'Dish Intelligence Agent',      agentId: 'tx-menu',      color: txColors.success, todayCount: 7  },
   { emoji: '👤', nameZh: '客户大脑',     nameEn: 'Customer Intelligence Agent',  agentId: 'tx-growth',    color: '#6D3EA8', todayCount: 15 },
-  { emoji: '💰', nameZh: '收益优化师',   nameEn: 'Revenue Optimization Agent',   agentId: 'tx-analytics', color: '#BA7517', todayCount: 5  },
+  { emoji: '💰', nameZh: '收益优化师',   nameEn: 'Revenue Optimization Agent',   agentId: 'tx-analytics', color: txColors.warning, todayCount: 5  },
   { emoji: '📦', nameZh: '供应链卫士',   nameEn: 'Supply Chain Guardian',        agentId: 'tx-supply',    color: '#0D7377', todayCount: 8  },
-  { emoji: '📊', nameZh: '经营分析师',   nameEn: 'Business Intelligence Agent',  agentId: 'tx-brain',     color: '#185FA5', todayCount: 3  },
+  { emoji: '📊', nameZh: '经营分析师',   nameEn: 'Business Intelligence Agent',  agentId: 'tx-brain',     color: txColors.info, todayCount: 3  },
 ];
 
 /* ─── 决策日志类型 ─── */
@@ -86,7 +87,7 @@ function AgentCard({ card }: { card: AgentCardData }) {
         </div>
         <Badge
           count="建议模式"
-          style={{ backgroundColor: '#FF6B35', fontSize: 10, padding: '0 6px' }}
+          style={{ backgroundColor: txColors.primary, fontSize: 10, padding: '0 6px' }}
         />
       </div>
       <div style={{ fontSize: 13, color: '#666', marginBottom: 4 }}>
@@ -125,7 +126,7 @@ export function AgentHubPage() {
   }, []);
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>AI 中枢首页</h2>
 

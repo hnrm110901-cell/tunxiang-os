@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 颜色常量（Design Token）---------- */
 const C = {
@@ -14,13 +15,13 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
-  primaryActive: '#E55A28',
-  success: '#0F6E56',
+  primary: txColors.primary,
+  primaryActive: txColors.primaryActive,
+  success: txColors.success,
   successBg: 'rgba(15,110,86,0.12)',
-  warning: '#BA7517',
+  warning: txColors.warning,
   warningBg: 'rgba(186,117,23,0.12)',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   divider: '#1a2a33',
 };
 

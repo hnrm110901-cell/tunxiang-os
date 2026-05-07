@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 
@@ -49,20 +50,20 @@ const FALLBACK_TABLES: TableItem[] = [];
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
 const TABLE_STATUS_CONFIG: Record<TableStatus, { label: string; color: string; bg: string; border: string }> = {
-  available: { label: '空闲', color: '#0F6E56', bg: '#0F6E5618', border: '#0F6E5644' },
-  occupied:  { label: '使用中', color: '#FF6B35', bg: '#FF6B3518', border: '#FF6B3544' },
-  reserved:  { label: '预约', color: '#185FA5', bg: '#185FA518', border: '#185FA544' },
+  available: { label: '空闲', color: txColors.success, bg: `${txColors.success}18`, border: `${txColors.success}44` },
+  occupied:  { label: '使用中', color: txColors.primary, bg: `${txColors.primary}18`, border: `${txColors.primary}44` },
+  reserved:  { label: '预约', color: txColors.info, bg: `${txColors.info}18`, border: `${txColors.info}44` },
   cleaning:  { label: '清台中', color: '#888', bg: '#88888818', border: '#88888844' },
 };
 
 const STORE_STATUS_CONFIG: Record<StoreStatus, { label: string; color: string; bg: string }> = {
-  active:    { label: '正常营业', color: '#0F6E56', bg: '#0F6E5618' },
-  suspended: { label: '暂停营业', color: '#A32D2D', bg: '#A32D2D18' },
+  active:    { label: '正常营业', color: txColors.success, bg: `${txColors.success}18` },
+  suspended: { label: '暂停营业', color: txColors.danger, bg: `${txColors.danger}18` },
 };
 
 const STORE_TYPE_CONFIG: Record<StoreType, { label: string; color: string; bg: string }> = {
-  direct:    { label: '直营', color: '#FF6B35', bg: '#FF6B3518' },
-  franchise: { label: '加盟', color: '#185FA5', bg: '#185FA518' },
+  direct:    { label: '直营', color: txColors.primary, bg: `${txColors.primary}18` },
+  franchise: { label: '加盟', color: txColors.info, bg: `${txColors.info}18` },
 };
 
 const AREAS: TableArea[] = ['大厅', '包厢', '室外', '吧台'];
@@ -143,8 +144,8 @@ function AddStoreModal({ onClose, onAdd }: AddStoreModalProps) {
             <button key={t}
               onClick={() => setForm(f => ({ ...f, type: t }))}
               style={{
-                flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${form.type === t ? '#FF6B35' : '#2a3a44'}`,
-                background: form.type === t ? '#FF6B3522' : '#0d1e28', color: form.type === t ? '#FF6B35' : '#888',
+                flex: 1, padding: '8px 0', borderRadius: 6, border: `1px solid ${form.type === t ? txColors.primary : '#2a3a44'}`,
+                background: form.type === t ? `${txColors.primary}22` : '#0d1e28', color: form.type === t ? txColors.primary : '#888',
                 cursor: 'pointer', fontSize: 13, fontWeight: 600,
               }}
             >
@@ -160,13 +161,13 @@ function AddStoreModal({ onClose, onAdd }: AddStoreModalProps) {
           placeholder={placeholder}
           style={{
             width: '100%', padding: '8px 12px', borderRadius: 6,
-            border: `1px solid ${errors[key] ? '#A32D2D' : '#2a3a44'}`,
+            border: `1px solid ${errors[key] ? txColors.danger : '#2a3a44'}`,
             background: '#0d1e28', color: '#fff', fontSize: 14, outline: 'none',
             boxSizing: 'border-box',
           }}
         />
       )}
-      {errors[key] && <div style={{ color: '#A32D2D', fontSize: 11, marginTop: 3 }}>{errors[key]}</div>}
+      {errors[key] && <div style={{ color: txColors.danger, fontSize: 11, marginTop: 3 }}>{errors[key]}</div>}
     </div>
   );
 
@@ -196,7 +197,7 @@ function AddStoreModal({ onClose, onAdd }: AddStoreModalProps) {
           }}>取消</button>
           <button onClick={handleSubmit} disabled={submitting} style={{
             flex: 2, padding: '10px 0', borderRadius: 8, border: 'none',
-            background: submitting ? '#333' : '#FF6B35', color: submitting ? '#888' : '#fff',
+            background: submitting ? '#333' : txColors.primary, color: submitting ? '#888' : '#fff',
             cursor: submitting ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 700,
           }}>{submitting ? '提交中...' : '确认新增'}</button>
         </div>
@@ -247,7 +248,7 @@ function StoreDetailDrawer({ store, onClose }: { store: Store; onClose: () => vo
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={{ background: '#0d1e28', borderRadius: 8, padding: 14, textAlign: 'center' }}>
             <div style={{ color: '#888', fontSize: 11, marginBottom: 4 }}>今日营收</div>
-            <div style={{ color: '#FF6B35', fontSize: 18, fontWeight: 700 }}>{formatRevenue(store.today_revenue_fen)}</div>
+            <div style={{ color: txColors.primary, fontSize: 18, fontWeight: 700 }}>{formatRevenue(store.today_revenue_fen)}</div>
           </div>
           <div style={{ background: '#0d1e28', borderRadius: 8, padding: 14, textAlign: 'center' }}>
             <div style={{ color: '#888', fontSize: 11, marginBottom: 4 }}>桌台数</div>
@@ -270,9 +271,9 @@ function ConfirmModal({ store, onConfirm, onClose }: { store: Store; onConfirm: 
     }}>
       <div style={{
         background: '#1a2a33', borderRadius: 12, padding: 28, width: 360,
-        border: `1px solid ${isActive ? '#A32D2D44' : '#0F6E5644'}`,
+        border: `1px solid ${isActive ? `${txColors.danger}44` : `${txColors.success}44`}`,
       }}>
-        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: isActive ? '#A32D2D' : '#0F6E56' }}>
+        <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: isActive ? txColors.danger : txColors.success }}>
           {isActive ? '确认暂停营业' : '确认恢复营业'}
         </div>
         <div style={{ color: '#aaa', fontSize: 14, marginBottom: 24, lineHeight: 1.6 }}>
@@ -287,7 +288,7 @@ function ConfirmModal({ store, onConfirm, onClose }: { store: Store; onConfirm: 
           }}>取消</button>
           <button onClick={onConfirm} style={{
             flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
-            background: isActive ? '#A32D2D' : '#0F6E56', color: '#fff',
+            background: isActive ? txColors.danger : txColors.success, color: '#fff',
             cursor: 'pointer', fontSize: 14, fontWeight: 700,
           }}>{isActive ? '确认暂停' : '确认恢复'}</button>
         </div>
@@ -334,8 +335,8 @@ function TableEditDrawer({ table, onClose, onSave }: {
             {AREAS.map(a => (
               <button key={a} onClick={() => setForm(f => ({ ...f, area: a }))}
                 style={{
-                  padding: '5px 14px', borderRadius: 6, border: `1px solid ${form.area === a ? '#FF6B35' : '#2a3a44'}`,
-                  background: form.area === a ? '#FF6B3522' : 'transparent', color: form.area === a ? '#FF6B35' : '#888',
+                  padding: '5px 14px', borderRadius: 6, border: `1px solid ${form.area === a ? txColors.primary : '#2a3a44'}`,
+                  background: form.area === a ? `${txColors.primary}22` : 'transparent', color: form.area === a ? txColors.primary : '#888',
                   cursor: 'pointer', fontSize: 12, fontWeight: 600,
                 }}>{a}</button>
             ))}
@@ -351,8 +352,8 @@ function TableEditDrawer({ table, onClose, onSave }: {
               return (
                 <button key={s} onClick={() => setForm(f => ({ ...f, shape: s }))}
                   style={{
-                    flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${form.shape === s ? '#FF6B35' : '#2a3a44'}`,
-                    background: form.shape === s ? '#FF6B3522' : 'transparent', color: form.shape === s ? '#FF6B35' : '#888',
+                    flex: 1, padding: '6px 0', borderRadius: 6, border: `1px solid ${form.shape === s ? txColors.primary : '#2a3a44'}`,
+                    background: form.shape === s ? `${txColors.primary}22` : 'transparent', color: form.shape === s ? txColors.primary : '#888',
                     cursor: 'pointer', fontSize: 12,
                   }}>{labels[s]}</button>
               );
@@ -373,7 +374,7 @@ function TableEditDrawer({ table, onClose, onSave }: {
 
         <button onClick={() => onSave(form)} style={{
           width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
-          background: '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
+          background: txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
         }}>保存修改</button>
       </div>
     </div>
@@ -410,9 +411,9 @@ function AddTableModal({ onClose, onAdd }: { onClose: () => void; onAdd: (t: Omi
           <input value={form.number} onChange={e => setForm(f => ({ ...f, number: e.target.value }))}
             placeholder="如：A09" style={{
               width: '100%', padding: '8px 12px', borderRadius: 6,
-              border: `1px solid ${err ? '#A32D2D' : '#2a3a44'}`, background: '#0d1e28', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
+              border: `1px solid ${err ? txColors.danger : '#2a3a44'}`, background: '#0d1e28', color: '#fff', fontSize: 14, outline: 'none', boxSizing: 'border-box',
             }} />
-          {err && <div style={{ color: '#A32D2D', fontSize: 11, marginTop: 3 }}>{err}</div>}
+          {err && <div style={{ color: txColors.danger, fontSize: 11, marginTop: 3 }}>{err}</div>}
         </div>
 
         <div style={{ marginBottom: 14 }}>
@@ -421,8 +422,8 @@ function AddTableModal({ onClose, onAdd }: { onClose: () => void; onAdd: (t: Omi
             {AREAS.map(a => (
               <button key={a} onClick={() => setForm(f => ({ ...f, area: a }))}
                 style={{
-                  padding: '5px 14px', borderRadius: 6, border: `1px solid ${form.area === a ? '#FF6B35' : '#2a3a44'}`,
-                  background: form.area === a ? '#FF6B3522' : 'transparent', color: form.area === a ? '#FF6B35' : '#888',
+                  padding: '5px 14px', borderRadius: 6, border: `1px solid ${form.area === a ? txColors.primary : '#2a3a44'}`,
+                  background: form.area === a ? `${txColors.primary}22` : 'transparent', color: form.area === a ? txColors.primary : '#888',
                   cursor: 'pointer', fontSize: 12, fontWeight: 600,
                 }}>{a}</button>
             ))}
@@ -445,8 +446,8 @@ function AddTableModal({ onClose, onAdd }: { onClose: () => void; onAdd: (t: Omi
               return (
                 <button key={s} onClick={() => setForm(f => ({ ...f, shape: s }))}
                   style={{
-                    flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${form.shape === s ? '#FF6B35' : '#2a3a44'}`,
-                    background: form.shape === s ? '#FF6B3522' : 'transparent', color: form.shape === s ? '#FF6B35' : '#888',
+                    flex: 1, padding: '7px 0', borderRadius: 6, border: `1px solid ${form.shape === s ? txColors.primary : '#2a3a44'}`,
+                    background: form.shape === s ? `${txColors.primary}22` : 'transparent', color: form.shape === s ? txColors.primary : '#888',
                     cursor: 'pointer', fontSize: 12,
                   }}>{labels[s]}</button>
               );
@@ -461,7 +462,7 @@ function AddTableModal({ onClose, onAdd }: { onClose: () => void; onAdd: (t: Omi
           }}>取消</button>
           <button onClick={handleSubmit} style={{
             flex: 2, padding: '10px 0', borderRadius: 8, border: 'none',
-            background: '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
+            background: txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
           }}>确认新增</button>
         </div>
       </div>
@@ -485,20 +486,20 @@ function TableCell({ table, selected, onSelect, onClick }: {
       onClick={() => onClick(table)}
       style={{
         width: isRect ? 168 : 80, height: 80, borderRadius: isRound ? '50%' : 8,
-        background: cfg.bg, border: `2px solid ${selected ? '#FF6B35' : cfg.border}`,
+        background: cfg.bg, border: `2px solid ${selected ? txColors.primary : cfg.border}`,
         cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', gap: 3, transition: 'all 0.15s', position: 'relative',
-        boxShadow: selected ? '0 0 0 2px #FF6B3555' : 'none',
+        boxShadow: selected ? `0 0 0 2px ${txColors.primary}55` : 'none',
       }}
-      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = '#FF6B35'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = selected ? '#FF6B35' : cfg.border; }}
+      onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor = txColors.primary; }}
+      onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor = selected ? txColors.primary : cfg.border; }}
     >
       {/* 选择框 */}
       <div
         onClick={e => { e.stopPropagation(); onSelect(table.id, !selected); }}
         style={{
           position: 'absolute', top: 4, right: 4, width: 14, height: 14, borderRadius: 3,
-          border: `1.5px solid ${selected ? '#FF6B35' : '#444'}`, background: selected ? '#FF6B35' : 'transparent',
+          border: `1.5px solid ${selected ? txColors.primary : '#444'}`, background: selected ? txColors.primary : 'transparent',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -592,9 +593,9 @@ function StoreListTab() {
       {/* 统计卡片 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <StatCard title="总门店数" value={total} />
-        <StatCard title="正常营业" value={active} color="#0F6E56" />
-        <StatCard title="暂停营业" value={suspended} color="#A32D2D" />
-        <StatCard title="本月新增" value={thisMonth} color="#FF6B35" />
+        <StatCard title="正常营业" value={active} color={txColors.success} />
+        <StatCard title="暂停营业" value={suspended} color={txColors.danger} />
+        <StatCard title="本月新增" value={thisMonth} color={txColors.primary} />
       </div>
 
       {/* 筛选栏 */}
@@ -611,8 +612,8 @@ function StoreListTab() {
         <div style={{ display: 'flex', gap: 4 }}>
           {(['all', 'active', 'suspended'] as const).map(v => (
             <button key={v} onClick={() => setFilterStatus(v)} style={{
-              padding: '5px 12px', borderRadius: 6, border: `1px solid ${filterStatus === v ? '#FF6B35' : '#2a3a44'}`,
-              background: filterStatus === v ? '#FF6B3522' : 'transparent', color: filterStatus === v ? '#FF6B35' : '#888',
+              padding: '5px 12px', borderRadius: 6, border: `1px solid ${filterStatus === v ? txColors.primary : '#2a3a44'}`,
+              background: filterStatus === v ? `${txColors.primary}22` : 'transparent', color: filterStatus === v ? txColors.primary : '#888',
               cursor: 'pointer', fontSize: 12,
             }}>
               {v === 'all' ? '全部' : v === 'active' ? '营业中' : '暂停'}
@@ -623,8 +624,8 @@ function StoreListTab() {
         <div style={{ display: 'flex', gap: 4 }}>
           {(['all', 'direct', 'franchise'] as const).map(v => (
             <button key={v} onClick={() => setFilterType(v)} style={{
-              padding: '5px 12px', borderRadius: 6, border: `1px solid ${filterType === v ? '#185FA5' : '#2a3a44'}`,
-              background: filterType === v ? '#185FA522' : 'transparent', color: filterType === v ? '#185FA5' : '#888',
+              padding: '5px 12px', borderRadius: 6, border: `1px solid ${filterType === v ? txColors.info : '#2a3a44'}`,
+              background: filterType === v ? `${txColors.info}22` : 'transparent', color: filterType === v ? txColors.info : '#888',
               cursor: 'pointer', fontSize: 12,
             }}>
               {v === 'all' ? '全部' : v === 'direct' ? '直营' : '加盟'}
@@ -634,7 +635,7 @@ function StoreListTab() {
         <div style={{ flex: 1 }} />
         <button onClick={() => setShowAdd(true)} style={{
           padding: '7px 20px', borderRadius: 8, border: 'none',
-          background: '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
+          background: txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700,
         }}>+ 新增门店</button>
       </div>
 
@@ -688,7 +689,7 @@ function StoreListTab() {
                 <div>
                   <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 11, background: statusCfg.bg, color: statusCfg.color }}>{statusCfg.label}</span>
                 </div>
-                <div style={{ color: store.status === 'active' ? '#FF6B35' : '#888', fontWeight: 600, fontSize: 14 }}>
+                <div style={{ color: store.status === 'active' ? txColors.primary : '#888', fontWeight: 600, fontSize: 14 }}>
                   {formatRevenue(store.today_revenue_fen)}
                 </div>
                 <div style={{ color: '#ccc', fontSize: 13 }}>{store.table_count}</div>
@@ -699,8 +700,8 @@ function StoreListTab() {
                     background: 'transparent', color: '#aaa', cursor: 'pointer', fontSize: 11,
                   }}>详情</button>
                   <button onClick={() => setConfirmStore(store)} style={{
-                    padding: '4px 10px', borderRadius: 6, border: `1px solid ${store.status === 'active' ? '#A32D2D44' : '#0F6E5644'}`,
-                    background: 'transparent', color: store.status === 'active' ? '#A32D2D' : '#0F6E56', cursor: 'pointer', fontSize: 11,
+                    padding: '4px 10px', borderRadius: 6, border: `1px solid ${store.status === 'active' ? `${txColors.danger}44` : `${txColors.success}44`}`,
+                    background: 'transparent', color: store.status === 'active' ? txColors.danger : txColors.success, cursor: 'pointer', fontSize: 11,
                   }}>
                     {store.status === 'active' ? '暂停' : '恢复'}
                   </button>
@@ -839,12 +840,12 @@ function TableConfigTab() {
             onClick={() => setSelectedStoreId(store.id)}
             style={{
               padding: '11px 14px', borderRadius: 8, cursor: 'pointer', marginBottom: 4,
-              background: selectedStoreId === store.id ? '#FF6B3518' : '#1a2a33',
-              border: `1px solid ${selectedStoreId === store.id ? '#FF6B35' : '#2a3a44'}`,
+              background: selectedStoreId === store.id ? `${txColors.primary}18` : '#1a2a33',
+              border: `1px solid ${selectedStoreId === store.id ? txColors.primary : '#2a3a44'}`,
               transition: 'all 0.12s',
             }}
           >
-            <div style={{ fontWeight: 600, fontSize: 13, color: selectedStoreId === store.id ? '#FF6B35' : '#fff', marginBottom: 2 }}>
+            <div style={{ fontWeight: 600, fontSize: 13, color: selectedStoreId === store.id ? txColors.primary : '#fff', marginBottom: 2 }}>
               {store.name}
             </div>
             <div style={{ fontSize: 11, color: '#888' }}>{store.city} · {store.table_count}桌</div>
@@ -860,7 +861,7 @@ function TableConfigTab() {
               <div key={area} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontSize: 12 }}>
                 <span style={{ color: '#aaa' }}>{area}</span>
                 <span style={{ color: '#fff' }}>
-                  <span style={{ color: '#0F6E56' }}>{stat.available}</span>
+                  <span style={{ color: txColors.success }}>{stat.available}</span>
                   <span style={{ color: '#666' }}>/{stat.total}</span>
                 </span>
               </div>
@@ -880,15 +881,15 @@ function TableConfigTab() {
           <div style={{ display: 'flex', gap: 8 }}>
             {selectedIds.size > 0 && (
               <button onClick={() => setShowDeleteConfirm(true)} style={{
-                padding: '6px 14px', borderRadius: 8, border: '1px solid #A32D2D44',
-                background: '#A32D2D22', color: '#A32D2D', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                padding: '6px 14px', borderRadius: 8, border: `1px solid ${txColors.danger}44`,
+                background: `${txColors.danger}22`, color: txColors.danger, cursor: 'pointer', fontSize: 12, fontWeight: 600,
               }}>
                 删除选中 ({selectedIds.size})
               </button>
             )}
             <button onClick={() => setShowAdd(true)} style={{
               padding: '6px 16px', borderRadius: 8, border: 'none',
-              background: '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+              background: txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 700,
             }}>+ 新增桌台</button>
           </div>
         </div>
@@ -911,7 +912,7 @@ function TableConfigTab() {
               <button key={area} onClick={() => setActiveArea(area)} style={{
                 padding: '6px 18px', borderRadius: 6, border: 'none',
                 background: activeArea === area ? '#1a2a33' : 'transparent',
-                color: activeArea === area ? '#FF6B35' : '#888',
+                color: activeArea === area ? txColors.primary : '#888',
                 cursor: 'pointer', fontSize: 13, fontWeight: activeArea === area ? 700 : 400,
                 transition: 'all 0.12s',
               }}>
@@ -960,8 +961,8 @@ function TableConfigTab() {
           position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <div style={{ background: '#1a2a33', borderRadius: 12, padding: 28, width: 340, border: '1px solid #A32D2D44' }}>
-            <div style={{ fontSize: 17, fontWeight: 700, color: '#A32D2D', marginBottom: 12 }}>确认批量删除</div>
+          <div style={{ background: '#1a2a33', borderRadius: 12, padding: 28, width: 340, border: `1px solid ${txColors.danger}44` }}>
+            <div style={{ fontSize: 17, fontWeight: 700, color: txColors.danger, marginBottom: 12 }}>确认批量删除</div>
             <div style={{ color: '#aaa', fontSize: 14, marginBottom: 24 }}>
               即将删除 {selectedIds.size} 张桌台，此操作不可撤销。
             </div>
@@ -972,7 +973,7 @@ function TableConfigTab() {
               }}>取消</button>
               <button onClick={handleBatchDelete} style={{
                 flex: 1, padding: '10px 0', borderRadius: 8, border: 'none',
-                background: '#A32D2D', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
+                background: txColors.danger, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700,
               }}>确认删除</button>
             </div>
           </div>
@@ -1000,7 +1001,7 @@ export function StoreManagePage() {
         {([['list', '门店列表'], ['tables', '桌台配置']] as const).map(([key, label]) => (
           <button key={key} onClick={() => setActiveTab(key)} style={{
             padding: '7px 28px', borderRadius: 6, border: 'none',
-            background: activeTab === key ? '#FF6B35' : 'transparent',
+            background: activeTab === key ? txColors.primary : 'transparent',
             color: activeTab === key ? '#fff' : '#888',
             cursor: 'pointer', fontSize: 14, fontWeight: activeTab === key ? 700 : 400,
             transition: 'all 0.15s',

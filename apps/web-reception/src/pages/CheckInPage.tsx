@@ -2,6 +2,7 @@
  * 到店签到 — 搜索客户 → 确认到店 → 显示客户偏好 → 推荐桌台
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface CustomerProfile {
   id: string;
@@ -236,7 +237,7 @@ export function CheckInPage() {
                   minWidth: 140,
                   height: 56,
                   borderRadius: 'var(--tx-radius-md)',
-                  background: '#E8F5F0',
+                  background: txColors.successLight,
                   color: 'var(--tx-success)',
                   fontSize: 22,
                   fontWeight: 700,

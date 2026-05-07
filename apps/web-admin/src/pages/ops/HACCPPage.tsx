@@ -21,6 +21,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 const { Text } = Typography;
@@ -123,7 +124,7 @@ function StatsCards({ stats, loading }: StatsCardsProps) {
           <Statistic
             title={
               <Space>
-                <SafetyCertificateOutlined style={{ color: '#0F6E56' }} />
+                <SafetyCertificateOutlined style={{ color: txColors.success }} />
                 <span>本月合格率</span>
               </Space>
             }
@@ -132,10 +133,10 @@ function StatsCards({ stats, loading }: StatsCardsProps) {
             loading={loading}
             valueStyle={{
               color: stats && stats.monthly_qualified_rate >= 0.9
-                ? '#0F6E56'
+                ? txColors.success
                 : stats && stats.monthly_qualified_rate >= 0.7
-                  ? '#BA7517'
-                  : '#A32D2D',
+                  ? txColors.warning
+                  : txColors.danger,
             }}
           />
         </Card>
@@ -145,14 +146,14 @@ function StatsCards({ stats, loading }: StatsCardsProps) {
           <Statistic
             title={
               <Space>
-                <ExclamationCircleOutlined style={{ color: '#BA7517' }} />
+                <ExclamationCircleOutlined style={{ color: txColors.warning }} />
                 <span>关键失控次数</span>
               </Space>
             }
             value={stats?.ccp_failure_count ?? '--'}
             loading={loading}
             valueStyle={{
-              color: stats && stats.ccp_failure_count > 0 ? '#A32D2D' : '#0F6E56',
+              color: stats && stats.ccp_failure_count > 0 ? txColors.danger : txColors.success,
             }}
           />
         </Card>
@@ -162,14 +163,14 @@ function StatsCards({ stats, loading }: StatsCardsProps) {
           <Statistic
             title={
               <Space>
-                <WarningOutlined style={{ color: '#A32D2D' }} />
+                <WarningOutlined style={{ color: txColors.danger }} />
                 <span>逾期未完成检查</span>
               </Space>
             }
             value={stats?.overdue_count ?? '--'}
             loading={loading}
             valueStyle={{
-              color: stats && stats.overdue_count > 0 ? '#A32D2D' : '#0F6E56',
+              color: stats && stats.overdue_count > 0 ? txColors.danger : txColors.success,
             }}
             suffix={
               stats && stats.overdue_count > 0
@@ -697,8 +698,8 @@ function RecordsTab({ plans }: RecordsTabProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         {item.passed
-                          ? <CheckCircleOutlined style={{ color: '#0F6E56' }} />
-                          : <CloseCircleOutlined style={{ color: '#A32D2D' }} />
+                          ? <CheckCircleOutlined style={{ color: txColors.success }} />
+                          : <CloseCircleOutlined style={{ color: txColors.danger }} />
                         }
                         <Text strong className="text-sm">{item.name}</Text>
                       </div>

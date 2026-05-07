@@ -28,6 +28,7 @@ import { ProColumns, ProTable, StatisticCard } from '@ant-design/pro-components'
 import { Line } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -295,7 +296,7 @@ export default function EmployeeDetail() {
               yField="score"
               height={200}
               point={{ size: 4 }}
-              color="#FF6B35"
+              color={txColors.primary}
             />
           </Card>
         </Col>
@@ -341,7 +342,7 @@ export default function EmployeeDetail() {
           yField="net_yuan"
           height={200}
           point={{ size: 4 }}
-          color="#FF6B35"
+          color={txColors.primary}
         />
       </Card>
       <ProTable<SalaryRecord>

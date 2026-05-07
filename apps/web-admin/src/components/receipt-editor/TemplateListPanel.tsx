@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import type { ReactNode, MouseEvent } from 'react';
 import { receiptTemplateApi } from '../../api/receiptTemplateApi';
 import type { ReceiptTemplate } from '../../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 
 interface TemplateListPanelProps {
   storeId: string;
@@ -163,7 +164,7 @@ export function TemplateListPanel({
           }}>
             暂无模板<br />
             <span
-              style={{ color: 'var(--brand, #FF6B35)', cursor: 'pointer' }}
+              style={{ color: `var(--brand, ${txColors.primary})`, cursor: 'pointer' }}
               onClick={onNew}
             >
               点击新建
@@ -243,7 +244,7 @@ function TemplateCard({
           flex: 1,
           fontSize: 12,
           fontWeight: isActive ? 600 : 400,
-          color: isActive ? 'var(--brand, #FF6B35)' : 'var(--text-2, #ccc)',
+          color: isActive ? `var(--brand, ${txColors.primary})` : 'var(--text-2, #ccc)',
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',

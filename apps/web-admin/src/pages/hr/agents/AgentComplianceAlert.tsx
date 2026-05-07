@@ -39,6 +39,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -224,7 +225,7 @@ export default function AgentComplianceAlert() {
   return (
     <div style={{ padding: 24 }}>
       <Title level={4}>
-        <AlertOutlined style={{ marginRight: 8, color: '#A32D2D' }} />
+        <AlertOutlined style={{ marginRight: 8, color: txColors.danger }} />
         合规预警 Agent
       </Title>
 
@@ -240,7 +241,7 @@ export default function AgentComplianceAlert() {
             <Statistic
               title="待处理"
               value={stats.open}
-              valueStyle={{ color: stats.open > 0 ? '#A32D2D' : undefined }}
+              valueStyle={{ color: stats.open > 0 ? txColors.danger : undefined }}
             />
           </Card>
         </Col>
@@ -250,7 +251,7 @@ export default function AgentComplianceAlert() {
               title="处理率"
               value={stats.total > 0 ? ((stats.resolved / stats.total) * 100).toFixed(1) : 0}
               suffix="%"
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>

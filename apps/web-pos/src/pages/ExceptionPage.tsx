@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '';
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
@@ -274,14 +275,14 @@ export function ExceptionPage() {
                 {/* 操作按钮 */}
                 {e.status === 'pending' && (
                   <button type="button" onClick={() => openResolve(e)}
-                    style={{ padding: '6px 14px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, minHeight: 36 }}>
+                    style={{ padding: '6px 14px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 500, minHeight: 36 }}>
                     处理
                   </button>
                 )}
                 {e.status === 'awaiting_approval' && (
                   <div style={{ display: 'flex', gap: 4 }}>
                     <button type="button" onClick={() => handleApprove(e)}
-                      style={{ padding: '6px 12px', background: '#0F6E56', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, minHeight: 36 }}>
+                      style={{ padding: '6px 12px', background: txColors.success, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 13, fontWeight: 500, minHeight: 36 }}>
                       批准
                     </button>
                     <button type="button" onClick={() => handleReject(e)}
@@ -315,8 +316,8 @@ export function ExceptionPage() {
                       style={{
                         padding: '8px 14px', borderRadius: 8, fontSize: 14, cursor: 'pointer', minHeight: 40,
                         background: returnReason === r ? 'rgba(255,107,53,0.2)' : '#112228',
-                        border: returnReason === r ? '1px solid #FF6B35' : '1px solid #333',
-                        color: returnReason === r ? '#FF6B35' : '#ccc',
+                        border: returnReason === r ? `1px solid ${txColors.primary}` : '1px solid #333',
+                        color: returnReason === r ? txColors.primary : '#ccc',
                       }}>
                       {r}
                     </button>
@@ -352,7 +353,7 @@ export function ExceptionPage() {
               <button type="button" onClick={handleResolve} disabled={processing || (selectedEx.type === 'return_dish' && !returnReason)}
                 style={{
                   flex: 1, padding: '12px 0', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer', minHeight: 48,
-                  background: processing || (selectedEx.type === 'return_dish' && !returnReason) ? '#444' : '#FF6B35', color: '#fff',
+                  background: processing || (selectedEx.type === 'return_dish' && !returnReason) ? '#444' : txColors.primary, color: '#fff',
                   opacity: processing ? 0.6 : 1,
                 }}>
                 {processing ? '处理中...' : '确认处理'}
@@ -372,8 +373,8 @@ function FilterBtn({ label, active, onClick }: { label: string; active: boolean;
     <button type="button" onClick={onClick} style={{
       padding: '8px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer', minHeight: 44,
       background: active ? 'rgba(255,107,53,0.15)' : 'transparent',
-      border: active ? '1px solid #FF6B35' : '1px solid #333',
-      color: active ? '#FF6B35' : '#9CA3AF',
+      border: active ? `1px solid ${txColors.primary}` : '1px solid #333',
+      color: active ? txColors.primary : '#9CA3AF',
       fontWeight: active ? 600 : 400,
     }}>
       {label}

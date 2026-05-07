@@ -16,6 +16,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -33,12 +34,12 @@ interface DashboardData {
 // ─── 颜色 ────────────────────────────────────────────────────────────────────
 
 const severityColor: Record<string, string> = {
-  critical: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  critical: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
-const typeColor = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517'];
+const typeColor = [txColors.primary, txColors.info, txColors.success, txColors.warning];
 
 // ─── 组件 ────────────────────────────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ export default function ComplianceDashboard() {
             statistic={{
               title: '待处理',
               value: data.open,
-              prefix: <ExclamationCircleOutlined style={{ color: '#BA7517' }} />,
+              prefix: <ExclamationCircleOutlined style={{ color: txColors.warning }} />,
             }}
           />
         </Col>
@@ -78,7 +79,7 @@ export default function ComplianceDashboard() {
             statistic={{
               title: '严重预警',
               value: data.critical,
-              prefix: <WarningOutlined style={{ color: '#A32D2D' }} />,
+              prefix: <WarningOutlined style={{ color: txColors.danger }} />,
             }}
           />
         </Col>
@@ -87,7 +88,7 @@ export default function ComplianceDashboard() {
             statistic={{
               title: '本月已解决',
               value: data.resolved_this_month,
-              prefix: <CheckCircleOutlined style={{ color: '#0F6E56' }} />,
+              prefix: <CheckCircleOutlined style={{ color: txColors.success }} />,
             }}
           />
         </Col>
@@ -127,7 +128,7 @@ export default function ComplianceDashboard() {
               xField="count"
               yField="store_name"
               height={260}
-              color="#FF6B35"
+              color={txColors.primary}
             />
           </Card>
         </Col>
@@ -141,7 +142,7 @@ export default function ComplianceDashboard() {
           yField="count"
           height={240}
           point={{ size: 4 }}
-          color="#FF6B35"
+          color={txColors.primary}
         />
       </Card>
     </div>

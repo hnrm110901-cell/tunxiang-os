@@ -17,6 +17,7 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -35,9 +36,9 @@ interface GovernanceData {
 // ─── 工具 ────────────────────────────────────────────────────────────────────
 
 function costColor(rate: number): string {
-  if (rate > 35) return '#A32D2D';
-  if (rate > 28) return '#BA7517';
-  return '#0F6E56';
+  if (rate > 35) return txColors.danger;
+  if (rate > 28) return txColors.warning;
+  return txColors.success;
 }
 
 // ─── 组件 ────────────────────────────────────────────────────────────────────
@@ -67,7 +68,7 @@ export default function GovernanceDashboard() {
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={5}>
           <StatisticCard
-            statistic={{ title: '总人数', value: data.total_employees, prefix: <TeamOutlined style={{ color: '#FF6B35' }} /> }}
+            statistic={{ title: '总人数', value: data.total_employees, prefix: <TeamOutlined style={{ color: txColors.primary }} /> }}
           />
         </Col>
         <Col span={5}>
@@ -117,7 +118,7 @@ export default function GovernanceDashboard() {
           xField="count"
           yField="name"
           height={Math.max(200, distributionData.length * 36)}
-          color="#FF6B35"
+          color={txColors.primary}
           label={{ position: 'right' }}
         />
       </Card>
@@ -131,7 +132,7 @@ export default function GovernanceDashboard() {
               xField="efficiency"
               yField="store_name"
               height={400}
-              color="#185FA5"
+              color={txColors.info}
               label={{ position: 'right', formatter: (d: { efficiency?: number }) => `¥${d.efficiency?.toLocaleString() ?? ''}` }}
             />
           </Card>

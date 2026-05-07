@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface Item {
   id: string;
@@ -98,9 +99,9 @@ export function CourseAssignModal({ item, orderId, onAssign, onClose }: Props) {
                 key={opt.name}
                 onClick={() => !loading && handleSelect(opt.name)}
                 style={{
-                  background: isSelected ? '#FF6B35' : '#1a2a33',
+                  background: isSelected ? txColors.primary : '#1a2a33',
                   color: isSelected ? '#fff' : '#e2e8f0',
-                  border: isSelected ? '2px solid #FF6B35' : '2px solid #1a2a33',
+                  border: isSelected ? `2px solid ${txColors.primary}` : '2px solid #1a2a33',
                   borderRadius: 12,
                   padding: '16px 12px',
                   fontSize: 16,

@@ -40,6 +40,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -109,9 +110,9 @@ function statusTag(status: string) {
 function cardTypeIcon(type: string) {
   const icons: Record<string, React.ReactNode> = {
     lifetime: <CrownOutlined style={{ color: '#FFB800' }} />,
-    annual: <StarOutlined style={{ color: '#FF6B35' }} />,
-    quarterly: <GiftOutlined style={{ color: '#0F6E56' }} />,
-    monthly: <UserOutlined style={{ color: '#185FA5' }} />,
+    annual: <StarOutlined style={{ color: txColors.primary }} />,
+    quarterly: <GiftOutlined style={{ color: txColors.success }} />,
+    monthly: <UserOutlined style={{ color: txColors.info }} />,
   };
   return icons[type] || <UserOutlined />;
 }
@@ -266,7 +267,7 @@ function CardListTab() {
               percent={pct}
               showInfo={false}
               size="small"
-              strokeColor={days <= 7 ? '#A32D2D' : days <= 30 ? '#BA7517' : '#0F6E56'}
+              strokeColor={days <= 7 ? txColors.danger : days <= 30 ? txColors.warning : txColors.success}
               style={{ width: 80 }}
             />
           </Tooltip>
@@ -292,7 +293,7 @@ function CardListTab() {
       title: '自动续费',
       dataIndex: 'auto_renew',
       width: 80,
-      render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: '#0F6E56' }} /> : <CloseCircleOutlined style={{ color: '#B4B2A9' }} />,
+      render: (v: boolean) => v ? <CheckCircleOutlined style={{ color: txColors.success }} /> : <CloseCircleOutlined style={{ color: '#B4B2A9' }} />,
     },
   ];
 
@@ -386,7 +387,7 @@ function ProductConfigTab() {
   useEffect(() => { fetchProducts(); }, []);
 
   const colorMap: Record<string, string> = {
-    lifetime: '#FFB800', annual: '#FF6B35', quarterly: '#0F6E56', monthly: '#185FA5',
+    lifetime: '#FFB800', annual: txColors.primary, quarterly: txColors.success, monthly: txColors.info,
   };
 
   if (loading) return <Spin style={{ display: 'block', textAlign: 'center', paddingTop: 60 }} />;
@@ -520,8 +521,8 @@ function SalesStatsTab() {
                   title="在售付费卡"
                   value={stats.active_count}
                   suffix="张"
-                  prefix={<CheckCircleOutlined style={{ color: '#0F6E56' }} />}
-                  valueStyle={{ color: '#0F6E56' }}
+                  prefix={<CheckCircleOutlined style={{ color: txColors.success }} />}
+                  valueStyle={{ color: txColors.success }}
                 />
               </Card>
             </Col>
@@ -531,8 +532,8 @@ function SalesStatsTab() {
                   title="本月售出"
                   value={stats.sold_this_month}
                   suffix="张"
-                  prefix={<GiftOutlined style={{ color: '#FF6B35' }} />}
-                  valueStyle={{ color: '#FF6B35' }}
+                  prefix={<GiftOutlined style={{ color: txColors.primary }} />}
+                  valueStyle={{ color: txColors.primary }}
                 />
               </Card>
             </Col>
@@ -542,8 +543,8 @@ function SalesStatsTab() {
                   title="7天内到期"
                   value={stats.expiring_soon}
                   suffix="张"
-                  prefix={<ClockCircleOutlined style={{ color: stats.expiring_soon > 0 ? '#BA7517' : '#B4B2A9' }} />}
-                  valueStyle={{ color: stats.expiring_soon > 0 ? '#BA7517' : '#B4B2A9' }}
+                  prefix={<ClockCircleOutlined style={{ color: stats.expiring_soon > 0 ? txColors.warning : '#B4B2A9' }} />}
+                  valueStyle={{ color: stats.expiring_soon > 0 ? txColors.warning : '#B4B2A9' }}
                 />
               </Card>
             </Col>
@@ -552,9 +553,9 @@ function SalesStatsTab() {
                 <Statistic
                   title="累计收入"
                   value={stats.total_revenue_yuan}
-                  prefix={<DollarOutlined style={{ color: '#185FA5' }} />}
+                  prefix={<DollarOutlined style={{ color: txColors.info }} />}
                   suffix="元"
-                  valueStyle={{ color: '#185FA5' }}
+                  valueStyle={{ color: txColors.info }}
                 />
               </Card>
             </Col>
@@ -565,9 +566,9 @@ function SalesStatsTab() {
               <Card title="在售卡类型分布">
                 <Row gutter={8}>
                   {[
-                    { type: 'monthly', name: '月卡', color: '#185FA5' },
-                    { type: 'quarterly', name: '季卡', color: '#0F6E56' },
-                    { type: 'annual', name: '年卡', color: '#FF6B35' },
+                    { type: 'monthly', name: '月卡', color: txColors.info },
+                    { type: 'quarterly', name: '季卡', color: txColors.success },
+                    { type: 'annual', name: '年卡', color: txColors.primary },
                     { type: 'lifetime', name: '终身卡', color: '#FFB800' },
                   ].map(t => (
                     <Col key={t.type} span={12} style={{ marginBottom: 12 }}>
@@ -589,7 +590,7 @@ function SalesStatsTab() {
               <Card
                 title={
                   <Space>
-                    <ClockCircleOutlined style={{ color: '#BA7517' }} />
+                    <ClockCircleOutlined style={{ color: txColors.warning }} />
                     <span>7天内到期预警</span>
                     {expiring.length > 0 && <Badge count={expiring.length} />}
                   </Space>
@@ -612,7 +613,7 @@ function SalesStatsTab() {
                         }
                       >
                         <List.Item.Meta
-                          avatar={<Avatar icon={<CrownOutlined />} style={{ background: '#FF6B35' }} size="small" />}
+                          avatar={<Avatar icon={<CrownOutlined />} style={{ background: txColors.primary }} size="small" />}
                           title={<Text code>{item.card_no}</Text>}
                           description={
                             <Space>

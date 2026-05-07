@@ -16,6 +16,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -90,7 +91,7 @@ export default function ComplianceTasks() {
             </a>
           )}
           <a
-            style={{ color: '#0F6E56' }}
+            style={{ color: txColors.success }}
             onClick={() => {
               setResolveId(r.id);
               setModalVisible(true);

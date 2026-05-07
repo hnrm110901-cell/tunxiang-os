@@ -3,6 +3,7 @@
  * Sprint 3: 经营分析师 tx-brain 生成的每日简报
  */
 import { useState, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   ConfigProvider, Row, Col, Card, Statistic, Alert, Collapse, List, Button, Timeline, Tag, Space,
 } from 'antd';
@@ -70,7 +71,7 @@ export const AIDailyBriefPage = () => {
   }, []);
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24 }}>
         {/* 顶部 4 个 Statistic 卡片 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -80,7 +81,7 @@ export const AIDailyBriefPage = () => {
                 title="今日总营业额"
                 value={63890}
                 prefix="¥"
-                valueStyle={{ color: '#FF6B35', fontWeight: 700 }}
+                valueStyle={{ color: txColors.primary, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -90,7 +91,7 @@ export const AIDailyBriefPage = () => {
                 title="AI 预测达成率"
                 value={87.3}
                 suffix="%"
-                valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+                valueStyle={{ color: txColors.success, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -100,7 +101,7 @@ export const AIDailyBriefPage = () => {
                 title="需关注门店数"
                 value={2}
                 suffix="家"
-                valueStyle={{ color: '#BA7517', fontWeight: 700 }}
+                valueStyle={{ color: txColors.warning, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -110,7 +111,7 @@ export const AIDailyBriefPage = () => {
                 title="今日待处理 Agent 行动"
                 value={5}
                 suffix="条"
-                valueStyle={{ color: '#185FA5', fontWeight: 700 }}
+                valueStyle={{ color: txColors.info, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -132,7 +133,7 @@ export const AIDailyBriefPage = () => {
                   key="highlights"
                   header={
                     <span style={{ fontWeight: 600 }}>
-                      <CheckCircleOutlined style={{ color: '#0F6E56', marginRight: 6 }} />
+                      <CheckCircleOutlined style={{ color: txColors.success, marginRight: 6 }} />
                       业绩亮点
                     </span>
                   }
@@ -142,7 +143,7 @@ export const AIDailyBriefPage = () => {
                     renderItem={(item) => (
                       <List.Item>
                         <Space>
-                          <CheckCircleOutlined style={{ color: '#0F6E56' }} />
+                          <CheckCircleOutlined style={{ color: txColors.success }} />
                           <span>{item}</span>
                         </Space>
                       </List.Item>
@@ -153,7 +154,7 @@ export const AIDailyBriefPage = () => {
                   key="concerns"
                   header={
                     <span style={{ fontWeight: 600 }}>
-                      <WarningOutlined style={{ color: '#BA7517', marginRight: 6 }} />
+                      <WarningOutlined style={{ color: txColors.warning, marginRight: 6 }} />
                       需关注事项
                     </span>
                   }
@@ -167,7 +168,7 @@ export const AIDailyBriefPage = () => {
                         ]}
                       >
                         <Space>
-                          <WarningOutlined style={{ color: '#BA7517' }} />
+                          <WarningOutlined style={{ color: txColors.warning }} />
                           <span>{item.text}</span>
                         </Space>
                       </List.Item>
@@ -178,7 +179,7 @@ export const AIDailyBriefPage = () => {
                   key="risks"
                   header={
                     <span style={{ fontWeight: 600 }}>
-                      <ExclamationCircleOutlined style={{ color: '#A32D2D', marginRight: 6 }} />
+                      <ExclamationCircleOutlined style={{ color: txColors.danger, marginRight: 6 }} />
                       紧急风险
                     </span>
                   }
@@ -199,7 +200,7 @@ export const AIDailyBriefPage = () => {
                         ]}
                       >
                         <Space>
-                          <ExclamationCircleOutlined style={{ color: '#A32D2D' }} />
+                          <ExclamationCircleOutlined style={{ color: txColors.danger }} />
                           <span>{item.text}</span>
                         </Space>
                       </List.Item>
@@ -215,7 +216,7 @@ export const AIDailyBriefPage = () => {
             <Card title="Agent 行动建议" style={{ marginBottom: 16 }}>
               <Timeline
                 items={AGENT_ACTIONS.map((a) => ({
-                  color: '#FF6B35',
+                  color: txColors.primary,
                   children: (
                     <div>
                       <div style={{ fontSize: 11, color: '#888', marginBottom: 2 }}>{a.time}</div>

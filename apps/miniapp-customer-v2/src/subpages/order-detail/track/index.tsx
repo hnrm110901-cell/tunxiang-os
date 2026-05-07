@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * order-detail/track/index.tsx — 实时订单追踪页
  *
@@ -23,7 +24,7 @@ import OrderProgress from '../../../components/OrderProgress'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
   bgDeep:     '#0B1A20',
   bgCard:     '#132029',

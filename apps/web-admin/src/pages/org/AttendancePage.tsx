@@ -49,6 +49,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 dayjs.extend(isoWeek);
 
@@ -155,7 +156,7 @@ function TodayBoard({ storeId }: { storeId: string }) {
           <Statistic
             title="在岗人数"
             value={stats?.on_duty ?? '-'}
-            valueStyle={{ color: '#0F6E56' }}
+            valueStyle={{ color: txColors.success }}
           />
         </Col>
         <Col span={8}>
@@ -169,7 +170,7 @@ function TodayBoard({ storeId }: { storeId: string }) {
           <Statistic
             title="未打卡"
             value={stats?.absent ?? '-'}
-            valueStyle={{ color: '#A32D2D' }}
+            valueStyle={{ color: txColors.danger }}
           />
         </Col>
       </Row>
@@ -233,7 +234,7 @@ function EmployeeSummaryCard({
               title="缺勤天数"
               value={summary.absent_days}
               suffix="天"
-              valueStyle={summary.absent_days > 0 ? { color: '#A32D2D' } : undefined}
+              valueStyle={summary.absent_days > 0 ? { color: txColors.danger } : undefined}
             />
           </Col>
           <Col span={6}>
@@ -241,7 +242,7 @@ function EmployeeSummaryCard({
               title="迟到次数"
               value={summary.late_count}
               suffix="次"
-              valueStyle={summary.late_count > 0 ? { color: '#BA7517' } : undefined}
+              valueStyle={summary.late_count > 0 ? { color: txColors.warning } : undefined}
             />
           </Col>
           <Col span={6}>

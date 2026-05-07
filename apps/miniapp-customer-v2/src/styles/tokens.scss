@@ -4,16 +4,16 @@
 // 通过 Taro sass.resource 全局注入，所有 .scss 文件无需 import 即可直接使用
 
 // ─── 品牌色 ───────────────────────────────────────────────────────────────────
-$tx-primary: #FF6B35;
-$tx-primary-active: #E55A28;
-$tx-primary-light: #FFF3ED;
-$tx-navy: #1E2A3A;
+$tx-primary: var(--tx-primary);
+$tx-primary-active: var(--tx-primary-active);
+$tx-primary-light: var(--tx-primary-light);
+$tx-navy: var(--tx-navy);
 
 // ─── 语义色 ───────────────────────────────────────────────────────────────────
-$tx-success: #0F6E56;
-$tx-warning: #BA7517;
-$tx-danger: #A32D2D;
-$tx-info: #185FA5;
+$tx-success: var(--tx-success);
+$tx-warning: var(--tx-warning);
+$tx-danger: var(--tx-danger);
+$tx-info: var(--tx-info);
 
 // ─── 中性色 ───────────────────────────────────────────────────────────────────
 $tx-text-1: #2C2C2A;

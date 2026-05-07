@@ -3,6 +3,7 @@
  */
 import { useState } from 'react';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
+import { txColors } from '@tx/tokens';
 
 /* ---------- Types ---------- */
 interface QueueItem {
@@ -130,7 +131,7 @@ export function QueuePage() {
             display: 'grid', gridTemplateColumns: '80px 60px 80px 100px 1fr',
             padding: '12px 16px', borderBottom: '1px solid #1A3A48', alignItems: 'center',
             background: item.status === 'called' ? '#1A2A3A' : 'transparent',
-            ...(item.waitTime > 30 ? { borderLeft: '3px solid #A32D2D', background: 'rgba(163,45,45,.05)' } : {}),
+            ...(item.waitTime > 30 ? { borderLeft: `3px solid ${txColors.danger}`, background: 'rgba(163,45,45,.05)' } : {}),
           }}>
             <span style={{ fontSize: 16, fontWeight: 'bold', color: '#fff' }}>{item.number}</span>
             <span>{item.partySize}人</span>
@@ -168,7 +169,7 @@ export function QueuePage() {
         margin: '16px 0', padding: 14, borderRadius: 10,
         background: 'rgba(24,95,165,.08)', border: '1px solid rgba(24,95,165,.25)',
       }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#185FA5', marginBottom: 10 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: txColors.info, marginBottom: 10 }}>
           🤖 运营指挥官 · 叫号建议
         </div>
         {[
@@ -182,11 +183,11 @@ export function QueuePage() {
             <div>
               <span style={{ fontWeight: 600, fontSize: 14 }}>{s.no} {s.name}</span>
               <span style={{ fontSize: 12, color: '#999', marginLeft: 8 }}>{s.pax}人 · 已等{s.wait}分钟</span>
-              <div style={{ fontSize: 12, color: '#185FA5', marginTop: 2 }}>→ 推荐 {s.table}台({s.tableSize}人) · {s.desc}</div>
+              <div style={{ fontSize: 12, color: txColors.info, marginTop: 2 }}>→ 推荐 {s.table}台({s.tableSize}人) · {s.desc}</div>
             </div>
             <button {...tf.handlers} style={{
               padding: '8px 16px', borderRadius: 8, border: 'none', cursor: 'pointer',
-              background: '#FF6B35', color: '#fff', fontWeight: 600, fontSize: 13, minHeight: 44,
+              background: txColors.primary, color: '#fff', fontWeight: 600, fontSize: 13, minHeight: 44,
               ...tf.style,
             }}>立即叫号</button>
           </div>

@@ -8,6 +8,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -545,7 +546,7 @@ export function OrgPage() {
 
   const SHIFT_CONFIG = [
     { key: 'morning', label: '早班', color: '#2563EB' },
-    { key: 'midday',  label: '中班', color: '#0F6E56' },
+    { key: 'midday',  label: '中班', color: txColors.success },
     { key: 'evening', label: '晚班', color: '#7C3AED' },
   ];
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 
 interface ApiKey {
   id: string;

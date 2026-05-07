@@ -89,7 +89,7 @@
   border-radius: 6px;
 }
 
-.statusBadge.statusFree { color: #0F6E56; background: rgba(15, 110, 86, 0.15); }
+.statusBadge.statusFree { color: var(--tx-success); background: rgba(15, 110, 86, 0.15); }
 .statusBadge.statusOccupied { color: #3B82F6; background: rgba(24, 95, 165, 0.15); }
 .statusBadge.statusOvertime { color: #EF4444; background: rgba(163, 45, 45, 0.15); }
 .statusBadge.statusReserved { color: #D97706; background: rgba(186, 117, 23, 0.15); }

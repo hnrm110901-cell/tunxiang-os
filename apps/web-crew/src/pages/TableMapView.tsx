@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { StatusBar } from '@tx-ds/biz';
 import type { StatusBarItem } from '@tx-ds/biz';
 import { TurnPredictionAlert } from './TurnPredictionAlert';
+import { txColors } from '@tx/tokens';
 
 interface TableLayout {
   no: string;
@@ -33,7 +34,7 @@ interface TurnPrediction {
 
 const TABLE_COLORS = {
   free:     { bg: '#1A2A1A', border: '#30D158', text: '#30D158' },
-  occupied: { bg: '#2A1A0A', border: '#FF6B35', text: '#FF6B35' },
+  occupied: { bg: '#2A1A0A', border: txColors.primary, text: txColors.primary },
   checkout: { bg: '#2A1F00', border: '#FF9F0A', text: '#FF9F0A' },
   reserved: { bg: '#0A1A2A', border: '#1A9BE8', text: '#1A9BE8' },
   cleaning: { bg: '#1A1A1A', border: '#555',    text: '#555'    },
@@ -300,9 +301,9 @@ export function TableMapView() {
                 minHeight: 36,
                 padding: '0 12px',
                 borderRadius: 18,
-                border: `1.5px solid ${floor === f ? '#FF6B35' : '#2a3a44'}`,
+                border: `1.5px solid ${floor === f ? txColors.primary : '#2a3a44'}`,
                 background: floor === f ? 'rgba(255,107,53,0.15)' : 'transparent',
-                color: floor === f ? '#FF6B35' : '#64748b',
+                color: floor === f ? txColors.primary : '#64748b',
                 fontSize: 14,
                 fontWeight: floor === f ? 700 : 400,
                 cursor: 'pointer',
@@ -374,7 +375,7 @@ export function TableMapView() {
       }}>
         <StatusBar
           items={[
-            { label: '在台', value: occupiedCount, color: '#FF6B35' },
+            { label: '在台', value: occupiedCount, color: txColors.primary },
             { label: '空台', value: freeCount, color: '#30D158' },
             { label: '翻台率', value: turnRate, color: '#FF9F0A' },
             { label: '预订', value: floorTables.filter(t => t.status === 'reserved').length, color: '#1A9BE8' },

@@ -57,15 +57,16 @@ import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 dayjs.extend(isoWeek);
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_DANGER = '#A32D2D';
-const TX_INFO = '#185FA5';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_DANGER = txColors.danger;
+const TX_INFO = txColors.info;
 
 // ---- Types ----
 
@@ -512,7 +513,7 @@ export default function RevenueScheduleDashboard() {
                 yField="slot"
                 colorField="revenue"
                 height={320}
-                color={['#FFF3ED', '#FFB899', '#FF8555', TX_PRIMARY, '#C44A1C']}
+                color={[txColors.primaryLight, '#FFB899', txColors.primaryHover, TX_PRIMARY, '#C44A1C']}
                 meta={{
                   revenue: { alias: '营收(元)' },
                 }}

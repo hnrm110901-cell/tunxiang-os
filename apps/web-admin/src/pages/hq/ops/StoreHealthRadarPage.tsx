@@ -13,6 +13,7 @@
  * 调用 GET /api/v1/store-health/radar/*
  */
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   fetchHealthRadarSummary,
   fetchHealthRadarList,
@@ -26,16 +27,16 @@ import {
 // ─── 颜色常量 ──────────────────────────────────────────────────────────────────
 
 const GRADE_COLOR: Record<string, string> = {
-  A: '#0F6E56',  // ≥80
-  B: '#185FA5',  // ≥60
-  C: '#BA7517',  // ≥40
-  D: '#A32D2D',  // <40
+  A: txColors.success,  // ≥80
+  B: txColors.info,  // ≥60
+  C: txColors.warning,  // ≥40
+  D: txColors.danger,  // <40
 };
 
 const LEVEL_CONFIG = {
-  green:  { label: '达标',   color: '#0F6E56', bg: '#0F6E5615' },
-  yellow: { label: '预警',   color: '#BA7517', bg: '#BA751715' },
-  red:    { label: '不达标', color: '#A32D2D', bg: '#A32D2D15' },
+  green:  { label: '达标',   color: txColors.success, bg: `${txColors.success}15` },
+  yellow: { label: '预警',   color: txColors.warning, bg: `${txColors.warning}15` },
+  red:    { label: '不达标', color: txColors.danger, bg: `${txColors.danger}15` },
 } as const;
 
 type ScoreLevel = keyof typeof LEVEL_CONFIG;
@@ -106,7 +107,7 @@ function formatDimValue(key: string, value: number): string {
 function RadarChart({
   dimensions,
   size = 120,
-  color = '#FF6B35',
+  color = txColors.primary,
   showLabels = false,
 }: {
   dimensions: Record<string, number>;
@@ -234,15 +235,15 @@ function RadarChartLarge({
 
       {/* 行业基准 */}
       {benchPath && (
-        <path d={benchPath} fill="rgba(24,95,165,0.1)" stroke="#185FA5" strokeWidth={1.2} strokeDasharray="4 3" />
+        <path d={benchPath} fill="rgba(24,95,165,0.1)" stroke={txColors.info} strokeWidth={1.2} strokeDasharray="4 3" />
       )}
 
       {/* 门店数据 */}
-      <path d={dataPath} fill="rgba(255,107,53,0.2)" stroke="#FF6B35" strokeWidth={2} />
+      <path d={dataPath} fill="rgba(255,107,53,0.2)" stroke={txColors.primary} strokeWidth={2} />
       {DIMENSION_KEYS.map((key, i) => {
         const norm = normalizeDimValue(key, dimensions[key] ?? 0);
         const p = getPoint(i, norm * radius);
-        return <circle key={`d-${i}`} cx={p.x} cy={p.y} r={3.5} fill="#FF6B35" />;
+        return <circle key={`d-${i}`} cx={p.x} cy={p.y} r={3.5} fill={txColors.primary} />;
       })}
 
       {/* 标签 */}
@@ -274,7 +275,7 @@ function MiniTrendLine({
   data,
   width = 200,
   height = 40,
-  color = '#FF6B35',
+  color = txColors.primary,
 }: {
   data: { date: string; value: number }[];
   width?: number;
@@ -402,7 +403,7 @@ function StoreCard({
       {/* 7天趋势 */}
       <div style={{ fontSize: 11, color: '#999', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
         <span>7日趋势</span>
-        <span style={{ color: store.trend_7d >= 0 ? '#0F6E56' : '#A32D2D', fontWeight: 600 }}>
+        <span style={{ color: store.trend_7d >= 0 ? txColors.success : txColors.danger, fontWeight: 600 }}>
           {store.trend_7d >= 0 ? '+' : ''}{store.trend_7d}
         </span>
       </div>
@@ -415,7 +416,7 @@ function StoreCard({
               key={i}
               style={{
                 background: 'rgba(163,45,45,0.15)',
-                color: '#A32D2D',
+                color: txColors.danger,
                 fontSize: 10,
                 padding: '2px 6px',
                 borderRadius: 10,
@@ -586,7 +587,7 @@ function RiskRanking({
                   textAlign: 'center',
                   fontSize: 13,
                   fontWeight: 'bold',
-                  color: idx < 3 ? '#A32D2D' : '#666',
+                  color: idx < 3 ? txColors.danger : '#666',
                 }}>
                   {idx + 1}
                 </span>
@@ -632,7 +633,7 @@ function RiskRanking({
                       padding: '4px 10px',
                       borderRadius: 4,
                       border: 'none',
-                      background: isRectifying ? '#555' : '#A32D2D',
+                      background: isRectifying ? '#555' : txColors.danger,
                       color: '#fff',
                       fontSize: 11,
                       fontWeight: 600,
@@ -737,7 +738,7 @@ function DetailDrawer({
                   padding: '6px 16px',
                   borderRadius: 6,
                   border: 'none',
-                  background: isRectifying ? '#555' : '#A32D2D',
+                  background: isRectifying ? '#555' : txColors.danger,
                   color: '#fff',
                   fontSize: 13,
                   fontWeight: 600,
@@ -800,7 +801,7 @@ function DetailDrawer({
                     <div style={{
                       fontSize: 18,
                       fontWeight: 'bold',
-                      color: detail.trend_7d >= 0 ? '#0F6E56' : '#A32D2D',
+                      color: detail.trend_7d >= 0 ? txColors.success : txColors.danger,
                     }}>
                       {detail.trend_7d >= 0 ? '+' : ''}{detail.trend_7d}
                     </div>
@@ -810,7 +811,7 @@ function DetailDrawer({
                     <div style={{
                       fontSize: 18,
                       fontWeight: 'bold',
-                      color: detail.trend_30d >= 0 ? '#0F6E56' : '#A32D2D',
+                      color: detail.trend_30d >= 0 ? txColors.success : txColors.danger,
                     }}>
                       {detail.trend_30d >= 0 ? '+' : ''}{detail.trend_30d}
                     </div>
@@ -832,8 +833,8 @@ function DetailDrawer({
                   六维健康雷达
                 </h4>
                 <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginBottom: 8, fontSize: 11, color: '#999' }}>
-                  <span><span style={{ color: '#FF6B35' }}>●</span> 门店数据</span>
-                  <span><span style={{ color: '#185FA5' }}>- -</span> 行业基准</span>
+                  <span><span style={{ color: txColors.primary }}>●</span> 门店数据</span>
+                  <span><span style={{ color: txColors.info }}>- -</span> 行业基准</span>
                 </div>
                 <RadarChartLarge
                   dimensions={detail.dimensions as unknown as Record<string, number>}
@@ -862,7 +863,7 @@ function DetailDrawer({
                           border: 'none',
                           fontSize: 11,
                           fontWeight: 600,
-                          background: trendRange === r ? '#FF6B35' : '#0B1A20',
+                          background: trendRange === r ? txColors.primary : '#0B1A20',
                           color: trendRange === r ? '#fff' : '#999',
                           cursor: 'pointer',
                         }}
@@ -900,7 +901,7 @@ function DetailDrawer({
                             <span style={{
                               fontSize: 16,
                               fontWeight: 'bold',
-                              color: isBad ? '#A32D2D' : '#0F6E56',
+                              color: isBad ? txColors.danger : txColors.success,
                             }}>
                               {formatDimValue(dd.key, dd.value)}
                             </span>
@@ -914,7 +915,7 @@ function DetailDrawer({
                           data={trendData}
                           width={440}
                           height={32}
-                          color={isBad ? '#A32D2D' : '#0F6E56'}
+                          color={isBad ? txColors.danger : txColors.success}
                         />
                       </div>
                     );
@@ -936,7 +937,7 @@ function DetailDrawer({
                         key={i}
                         style={{
                           background: 'rgba(163,45,45,0.15)',
-                          color: '#A32D2D',
+                          color: txColors.danger,
                           fontSize: 12,
                           padding: '4px 12px',
                           borderRadius: 12,
@@ -1212,7 +1213,7 @@ export function StoreHealthRadarPage() {
                   fontSize: 12,
                   fontWeight: 600,
                   cursor: 'pointer',
-                  background: filterLevel === opt.value ? '#FF6B35' : '#0B1A20',
+                  background: filterLevel === opt.value ? txColors.primary : '#0B1A20',
                   color: filterLevel === opt.value ? '#fff' : '#999',
                 }}
               >
@@ -1233,7 +1234,7 @@ export function StoreHealthRadarPage() {
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
-              background: viewMode === 'card' ? '#FF6B35' : 'transparent',
+              background: viewMode === 'card' ? txColors.primary : 'transparent',
               color: viewMode === 'card' ? '#fff' : '#999',
             }}
           >
@@ -1248,7 +1249,7 @@ export function StoreHealthRadarPage() {
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
-              background: viewMode === 'map' ? '#FF6B35' : 'transparent',
+              background: viewMode === 'map' ? txColors.primary : 'transparent',
               color: viewMode === 'map' ? '#fff' : '#999',
             }}
           >
@@ -1265,7 +1266,7 @@ export function StoreHealthRadarPage() {
           borderRadius: 8,
           padding: '12px 16px',
           marginBottom: 16,
-          color: '#A32D2D',
+          color: txColors.danger,
           fontSize: 14,
         }}>
           数据加载失败：{error}

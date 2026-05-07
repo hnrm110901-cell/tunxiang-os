@@ -14,6 +14,7 @@ import { WeighDishSheet } from './WeighDishSheet';
 import { ComboSelectionSheet } from './ComboSelectionSheet';
 import { fetchComboDetail } from '../api/comboApi';
 import type { ComboDetail, ComboSelection } from '../api/comboApi';
+import { txColors } from '@tx/tokens';
 
 /* ---------- API 工具函数 ---------- */
 const API_BASE = (): string =>
@@ -54,15 +55,15 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  danger: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  danger: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
 /* ---------- 类型：AI 推荐 & KDS ---------- */

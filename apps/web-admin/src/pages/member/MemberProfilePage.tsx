@@ -34,6 +34,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -372,8 +373,8 @@ function SpendTrendChart({ data }: { data: { month: string; amount: number }[] }
     <svg width={W} height={H} style={{ display: 'block' }}>
       <defs>
         <linearGradient id="trendGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#FF6B35" stopOpacity={0.3} />
-          <stop offset="100%" stopColor="#FF6B35" stopOpacity={0.02} />
+          <stop offset="0%" stopColor={txColors.primary} stopOpacity={0.3} />
+          <stop offset="100%" stopColor={txColors.primary} stopOpacity={0.02} />
         </linearGradient>
       </defs>
       {/* Y-axis gridlines */}
@@ -391,10 +392,10 @@ function SpendTrendChart({ data }: { data: { month: string; amount: number }[] }
       {/* Area */}
       <path d={areaPath} fill="url(#trendGrad)" />
       {/* Line */}
-      <path d={linePath} fill="none" stroke="#FF6B35" strokeWidth={2} />
+      <path d={linePath} fill="none" stroke={txColors.primary} strokeWidth={2} />
       {/* Points */}
       {points.map((p, i) => (
-        <circle key={i} cx={p.x} cy={p.y} r={3} fill="#FF6B35" />
+        <circle key={i} cx={p.x} cy={p.y} r={3} fill={txColors.primary} />
       ))}
       {/* X-axis labels */}
       {points.map((p, i) => (
@@ -425,7 +426,7 @@ function RFMScatterChart({
   const midY = PAD.top + plotH / 2;
 
   const quadrantColors: Record<string, string> = {
-    '高频高额': '#FF6B35',
+    '高频高额': txColors.primary,
     '高频低额': '#1890ff',
     '低频高额': '#52c41a',
     '低频低额': '#999',
@@ -567,7 +568,7 @@ function GrowthAreaChart({ data }: { data: GrowthMonth[] }) {
       {/* Lines */}
       <path d={buildPath('newCount')} fill="none" stroke="#52c41a" strokeWidth={2} />
       <path d={buildPath('churnCount')} fill="none" stroke="#ff4d4f" strokeWidth={2} />
-      <path d={buildPath('netGrowth')} fill="none" stroke="#FF6B35" strokeWidth={2} strokeDasharray="6,3" />
+      <path d={buildPath('netGrowth')} fill="none" stroke={txColors.primary} strokeWidth={2} strokeDasharray="6,3" />
       {/* X labels */}
       {data.map((d, i) => (
         <text key={i} x={toX(i)} y={H - 8} textAnchor="middle" fontSize={9} fill="#999">
@@ -579,7 +580,7 @@ function GrowthAreaChart({ data }: { data: GrowthMonth[] }) {
       <text x={PAD.left + plotW - 192} y={14} fontSize={10} fill="#666">新增</text>
       <circle cx={PAD.left + plotW - 150} cy={10} r={4} fill="#ff4d4f" />
       <text x={PAD.left + plotW - 142} y={14} fontSize={10} fill="#666">流失</text>
-      <circle cx={PAD.left + plotW - 100} cy={10} r={4} fill="#FF6B35" />
+      <circle cx={PAD.left + plotW - 100} cy={10} r={4} fill={txColors.primary} />
       <text x={PAD.left + plotW - 92} y={14} fontSize={10} fill="#666">净增长</text>
     </svg>
   );
@@ -592,7 +593,7 @@ function ChannelPieChart({ data }: { data: ChannelSource[] }) {
   const cx = W / 2;
   const cy = H / 2 - 10;
   const R = 100;
-  const colors = ['#FF6B35', '#1890ff', '#52c41a', '#faad14'];
+  const colors = [txColors.primary, '#1890ff', '#52c41a', '#faad14'];
 
   let startAngle = -Math.PI / 2;
   const slices = data.map((d, i) => {
@@ -646,7 +647,7 @@ function RetentionFunnel({ data }: { data: RetentionStep[] }) {
         const opacity = 1 - i * 0.15;
         return (
           <g key={i}>
-            <rect x={x} y={y} width={bw} height={barH} rx={4} fill="#FF6B35" fillOpacity={opacity} />
+            <rect x={x} y={y} width={bw} height={barH} rx={4} fill={txColors.primary} fillOpacity={opacity} />
             <text x={70} y={y + barH / 2 + 4} textAnchor="end" fontSize={12} fill="#333">
               {d.label}
             </text>
@@ -833,8 +834,8 @@ export function MemberProfilePage() {
               <Statistic
                 title="总会员数"
                 value={stats?.total ?? 0}
-                prefix={<TeamOutlined style={{ color: '#FF6B35' }} />}
-                valueStyle={{ color: '#FF6B35' }}
+                prefix={<TeamOutlined style={{ color: txColors.primary }} />}
+                valueStyle={{ color: txColors.primary }}
               />
             </Card>
           </Col>
@@ -933,7 +934,7 @@ export function MemberProfilePage() {
                             marginBottom: 8,
                             borderRadius: 8,
                             background: selectedQuadrant === q.label ? '#fff7e6' : '#fafafa',
-                            border: selectedQuadrant === q.label ? '1px solid #FF6B35' : '1px solid #f0f0f0',
+                            border: selectedQuadrant === q.label ? `1px solid ${txColors.primary}` : '1px solid #f0f0f0',
                             cursor: 'pointer',
                           }}
                           onClick={() => handleQuadrantClick(q.label)}
@@ -1028,7 +1029,7 @@ export function MemberProfilePage() {
                   <Text strong style={{ display: 'block', marginBottom: 4 }}>最常点菜品 TOP5</Text>
                   <Space wrap>
                     {memberDetail.preference.topDishes.map((d, i) => (
-                      <Tag key={i} color={i < 3 ? '#FF6B35' : 'default'}>
+                      <Tag key={i} color={i < 3 ? txColors.primary : 'default'}>
                         {d.name} ({d.count}次)
                       </Tag>
                     ))}
@@ -1044,7 +1045,7 @@ export function MemberProfilePage() {
                 </div>
                 <div>
                   <Text strong>平均客单价: </Text>
-                  <Text style={{ color: '#FF6B35', fontSize: 16, fontWeight: 600 }}>
+                  <Text style={{ color: txColors.primary, fontSize: 16, fontWeight: 600 }}>
                     ¥{memberDetail.preference.avgSpendYuan}
                   </Text>
                 </div>
@@ -1059,7 +1060,7 @@ export function MemberProfilePage() {
               <Card title="会员历程" size="small">
                 <Timeline
                   items={memberDetail.timeline.map(t => ({
-                    color: '#FF6B35',
+                    color: txColors.primary,
                     children: (
                       <div>
                         <Text type="secondary" style={{ fontSize: 12 }}>{t.time}</Text>

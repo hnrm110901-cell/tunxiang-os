@@ -22,6 +22,7 @@ import {
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 
@@ -234,7 +235,7 @@ function BudgetTab({ stores }: BudgetTabProps) {
             status={over ? 'exception' : pct >= 80 ? 'active' : 'normal'}
             size="small"
             format={() => `${pct}%`}
-            strokeColor={over ? '#A32D2D' : pct >= 80 ? '#BA7517' : '#0F6E56'}
+            strokeColor={over ? txColors.danger : pct >= 80 ? txColors.warning : txColors.success}
           />
         </Card>
       </Col>
@@ -286,7 +287,7 @@ function BudgetTab({ stores }: BudgetTabProps) {
           showIcon
           banner
           className="mb-4"
-          style={{ borderLeft: '4px solid #A32D2D' }}
+          style={{ borderLeft: `4px solid ${txColors.danger}` }}
         />
       )}
 
@@ -294,19 +295,19 @@ function BudgetTab({ stores }: BudgetTabProps) {
         {data ? (
           <Row gutter={16}>
             {renderMetricCard(
-              '电量', <ThunderboltOutlined style={{ color: '#BA7517' }} />,
+              '电量', <ThunderboltOutlined style={{ color: txColors.warning }} />,
               data.electricity_budget_kwh, data.electricity_actual_kwh, 'kWh',
             )}
             {renderMetricCard(
-              '燃气', <FireOutlined style={{ color: '#A32D2D' }} />,
+              '燃气', <FireOutlined style={{ color: txColors.danger }} />,
               data.gas_budget_m3, data.gas_actual_m3, 'm³',
             )}
             {renderMetricCard(
-              '水量', <DropboxOutlined style={{ color: '#185FA5' }} />,
+              '水量', <DropboxOutlined style={{ color: txColors.info }} />,
               data.water_budget_ton, data.water_actual_ton, 'ton',
             )}
             {renderMetricCard(
-              '总费用', <DollarOutlined style={{ color: '#0F6E56' }} />,
+              '总费用', <DollarOutlined style={{ color: txColors.success }} />,
               data.cost_budget_fen, data.cost_actual_fen, '元',
               fenToYuan,
             )}
@@ -750,12 +751,12 @@ export function EnergyBudgetPage() {
             <Statistic
               title={
                 <Space>
-                  <ThunderboltOutlined style={{ color: '#BA7517' }} />
+                  <ThunderboltOutlined style={{ color: txColors.warning }} />
                   <span>电量监控</span>
                 </Space>
               }
               value="实时监控中"
-              valueStyle={{ fontSize: 16, color: '#0F6E56' }}
+              valueStyle={{ fontSize: 16, color: txColors.success }}
             />
           </Card>
         </Col>
@@ -764,12 +765,12 @@ export function EnergyBudgetPage() {
             <Statistic
               title={
                 <Space>
-                  <AlertOutlined style={{ color: '#A32D2D' }} />
+                  <AlertOutlined style={{ color: txColors.danger }} />
                   <span>告警规则</span>
                 </Space>
               }
               value="已配置告警"
-              valueStyle={{ fontSize: 16, color: '#185FA5' }}
+              valueStyle={{ fontSize: 16, color: txColors.info }}
             />
           </Card>
         </Col>

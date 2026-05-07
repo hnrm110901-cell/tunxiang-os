@@ -8,6 +8,7 @@ import {
 } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface AnomalyRow {
@@ -98,7 +99,7 @@ const columns: ProColumns<AnomalyRow>[] = [
   {
     title: '操作', valueType: 'option', width: 110,
     render: () => [
-      <a key="handle" style={{ color: '#FF6B35' }}>处理</a>,
+      <a key="handle" style={{ color: txColors.primary }}>处理</a>,
       <a key="ignore" style={{ color: '#999', marginLeft: 8 }}>忽略</a>,
     ],
   },
@@ -127,7 +128,7 @@ export const AnomalyDetectionPage: React.FC = () => {
   }, []);
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部 Alert + 操作按钮 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
@@ -159,7 +160,7 @@ export const AnomalyDetectionPage: React.FC = () => {
               <Statistic
                 title="严重异常"
                 value={2}
-                valueStyle={{ color: '#A32D2D' }}
+                valueStyle={{ color: txColors.danger }}
                 suffix="条"
               />
             </Card>
@@ -169,7 +170,7 @@ export const AnomalyDetectionPage: React.FC = () => {
               <Statistic
                 title="中度异常"
                 value={3}
-                valueStyle={{ color: '#BA7517' }}
+                valueStyle={{ color: txColors.warning }}
                 suffix="条"
               />
             </Card>

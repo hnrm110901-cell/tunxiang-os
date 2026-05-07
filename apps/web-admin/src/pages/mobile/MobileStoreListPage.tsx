@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -116,7 +117,7 @@ function StoreCard({ store, onClick }: { store: StoreItem; onClick: () => void }
             width: 10,
             height: 10,
             borderRadius: '50%',
-            background: store.online ? '#0F6E56' : '#B4B2A9',
+            background: store.online ? txColors.success : '#B4B2A9',
             flexShrink: 0,
             boxShadow: store.online ? '0 0 6px rgba(15,110,86,0.4)' : 'none',
           }} />
@@ -127,7 +128,7 @@ function StoreCard({ store, onClick }: { store: StoreItem; onClick: () => void }
         <span style={{
           fontSize: 11,
           fontWeight: 600,
-          color: store.online ? '#0F6E56' : '#B4B2A9',
+          color: store.online ? txColors.success : '#B4B2A9',
           background: store.online ? '#ECFDF5' : '#F0EDE6',
           padding: '3px 8px',
           borderRadius: 10,
@@ -145,7 +146,7 @@ function StoreCard({ store, onClick }: { store: StoreItem; onClick: () => void }
       <div style={{
         fontSize: 24,
         fontWeight: 700,
-        color: store.online ? '#FF6B35' : '#B4B2A9',
+        color: store.online ? txColors.primary : '#B4B2A9',
         marginBottom: 12,
         lineHeight: 1.1,
       }}>
@@ -235,12 +236,12 @@ export function MobileStoreListPage() {
           </div>
           <div style={{ width: 1, background: '#F0EDE6' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#0F6E56' }}>{onlineCount}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: txColors.success }}>{onlineCount}</div>
             <div style={{ fontSize: 11, color: '#B4B2A9' }}>在线</div>
           </div>
           <div style={{ width: 1, background: '#F0EDE6' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: offlineCount > 0 ? '#A32D2D' : '#B4B2A9' }}>{offlineCount}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: offlineCount > 0 ? txColors.danger : '#B4B2A9' }}>{offlineCount}</div>
             <div style={{ fontSize: 11, color: '#B4B2A9' }}>离线</div>
           </div>
         </div>
@@ -262,7 +263,7 @@ export function MobileStoreListPage() {
                   padding: '8px 0',
                   border: 'none',
                   borderRadius: 8,
-                  background: isActive ? '#FF6B35' : '#fff',
+                  background: isActive ? txColors.primary : '#fff',
                   color: isActive ? '#fff' : '#5F5E5A',
                   fontSize: 13,
                   fontWeight: isActive ? 600 : 400,

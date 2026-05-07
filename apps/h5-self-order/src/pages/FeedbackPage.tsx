@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { getOrderSummary, submitFeedback } from '@/api/orderApi';
 import type { OrderSummary } from '@/api/orderApi';
+import { txColors } from '@tx/tokens';
 
 /** 评价页 — 5星评分 + 菜品单独评价 + 拍照 */
 export default function FeedbackPage() {
@@ -309,10 +310,10 @@ function StarRow({ value, onChange, size }: { value: number; onChange: (v: numbe
           style={{ padding: 2, lineHeight: 1 }}
           aria-label={`${star} star`}
         >
-          <svg width={size} height={size} viewBox="0 0 24 24" fill={star <= value ? '#FF6B35' : 'none'}>
+          <svg width={size} height={size} viewBox="0 0 24 24" fill={star <= value ? txColors.primary : 'none'}>
             <path
               d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-              stroke={star <= value ? '#FF6B35' : '#666'}
+              stroke={star <= value ? txColors.primary : '#666'}
               strokeWidth="1.5"
               strokeLinecap="round"
               strokeLinejoin="round"

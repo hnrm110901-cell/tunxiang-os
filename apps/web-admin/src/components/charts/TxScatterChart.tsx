@@ -4,6 +4,7 @@
  * 品牌色 #FF6B35，深色主题适配
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface DataPoint {
   name: string;
@@ -25,7 +26,7 @@ interface Props {
   quadrantLabels?: [string, string, string, string]; // [右上, 左上, 左下, 右下]
 }
 
-const QUADRANT_COLORS = ['#0F6E56', '#185FA5', '#A32D2D', '#BA7517']; // 明星, 问号, 瘦狗, 金牛
+const QUADRANT_COLORS = [txColors.success, txColors.info, txColors.danger, txColors.warning]; // 明星, 问号, 瘦狗, 金牛
 
 export function TxScatterChart({
   data,
@@ -132,7 +133,7 @@ export function TxScatterChart({
   const midY = (yMin + yMax) / 2;
 
   const getQuadrantColor = (point: DataPoint) => {
-    if (!showQuadrants) return point.color || '#FF6B35';
+    if (!showQuadrants) return point.color || txColors.primary;
     const isRight = point.x >= midX;
     const isTop = point.y >= midY;
     if (isRight && isTop) return QUADRANT_COLORS[0];
@@ -161,10 +162,10 @@ export function TxScatterChart({
             <line x1={toSvgX(midX)} y1={pad.top} x2={toSvgX(midX)} y2={height - pad.bottom} stroke="#1a2a33" strokeDasharray="6,4" />
             <line x1={pad.left} y1={toSvgY(midY)} x2={width - pad.right} y2={toSvgY(midY)} stroke="#1a2a33" strokeDasharray="6,4" />
             {/* 象限标签 */}
-            <text x={toSvgX(midX) + (toSvgX(xHi) - toSvgX(midX)) / 2} y={pad.top + 16} textAnchor="middle" fill="#0F6E56" fontSize={12} opacity={0.6}>{quadrantLabels[0]}</text>
-            <text x={pad.left + (toSvgX(midX) - pad.left) / 2} y={pad.top + 16} textAnchor="middle" fill="#185FA5" fontSize={12} opacity={0.6}>{quadrantLabels[1]}</text>
-            <text x={pad.left + (toSvgX(midX) - pad.left) / 2} y={height - pad.bottom - 8} textAnchor="middle" fill="#A32D2D" fontSize={12} opacity={0.6}>{quadrantLabels[2]}</text>
-            <text x={toSvgX(midX) + (toSvgX(xHi) - toSvgX(midX)) / 2} y={height - pad.bottom - 8} textAnchor="middle" fill="#BA7517" fontSize={12} opacity={0.6}>{quadrantLabels[3]}</text>
+            <text x={toSvgX(midX) + (toSvgX(xHi) - toSvgX(midX)) / 2} y={pad.top + 16} textAnchor="middle" fill={txColors.success} fontSize={12} opacity={0.6}>{quadrantLabels[0]}</text>
+            <text x={pad.left + (toSvgX(midX) - pad.left) / 2} y={pad.top + 16} textAnchor="middle" fill={txColors.info} fontSize={12} opacity={0.6}>{quadrantLabels[1]}</text>
+            <text x={pad.left + (toSvgX(midX) - pad.left) / 2} y={height - pad.bottom - 8} textAnchor="middle" fill={txColors.danger} fontSize={12} opacity={0.6}>{quadrantLabels[2]}</text>
+            <text x={toSvgX(midX) + (toSvgX(xHi) - toSvgX(midX)) / 2} y={height - pad.bottom - 8} textAnchor="middle" fill={txColors.warning} fontSize={12} opacity={0.6}>{quadrantLabels[3]}</text>
           </>
         )}
 

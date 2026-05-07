@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * TxRadarChart -- 纯SVG雷达图
  * 用于员工绩效卡等场景
@@ -21,7 +22,7 @@ interface Props {
   size?: number;
 }
 
-const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517'];
+const PALETTE = [txColors.primary, txColors.info, txColors.success, txColors.warning];
 
 export function TxRadarChart({ dimensions, datasets, size = 240 }: Props) {
   if (!dimensions.length || !datasets.length) {

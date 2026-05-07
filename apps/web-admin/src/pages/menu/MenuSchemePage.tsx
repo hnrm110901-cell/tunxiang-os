@@ -49,6 +49,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 import {
   listSchemes,
   createScheme,
@@ -719,7 +720,7 @@ function StoreMenuTab() {
       dataIndex: 'effective_price_fen',
       width: 110,
       render: (v, record) => (
-        <Text strong style={{ color: record.has_override ? '#BA7517' : '#2C2C2A' }}>
+        <Text strong style={{ color: record.has_override ? txColors.warning : '#2C2C2A' }}>
           {fenToYuan(v)}
         </Text>
       ),

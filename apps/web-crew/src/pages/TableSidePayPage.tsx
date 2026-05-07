@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import DiscountPreviewSheet, { type DiscountInputItem, type DiscountCalculateResult } from './DiscountPreviewSheet';
+import { txColors } from '@tx/tokens';
 
 
 // ─── 类型 ───
@@ -213,7 +214,7 @@ export default function TableSidePayPage() {
           style={{
             minHeight: 48,
             padding: '0 24px',
-            background: '#FF6B35',
+            background: txColors.primary,
             color: '#fff',
             border: 'none',
             borderRadius: 10,
@@ -293,7 +294,7 @@ export default function TableSidePayPage() {
             minHeight: 48,
             background: 'transparent',
             border: 'none',
-            color: '#FF6B35',
+            color: txColors.primary,
             fontSize: 24,
             cursor: 'pointer',
             display: 'flex',
@@ -313,7 +314,7 @@ export default function TableSidePayPage() {
             borderRadius: 8,
             padding: '6px 14px',
             fontSize: 16,
-            color: '#FF6B35',
+            color: txColors.primary,
             fontWeight: 600,
           }}
         >
@@ -355,7 +356,7 @@ export default function TableSidePayPage() {
               }}
             >
               <div>
-                <div style={{ fontSize: 36, fontWeight: 700, color: '#FF6B35', lineHeight: 1 }}>
+                <div style={{ fontSize: 36, fontWeight: 700, color: txColors.primary, lineHeight: 1 }}>
                   ¥{fenToYuan(order.total_amount)}
                 </div>
                 <div style={{ fontSize: 16, color: '#9DB4B2', marginTop: 8 }}>消费金额</div>
@@ -408,7 +409,7 @@ export default function TableSidePayPage() {
               style={{
                 minWidth: 80,
                 minHeight: 48,
-                background: memberPhone.trim() ? '#FF6B35' : '#1a2a33',
+                background: memberPhone.trim() ? txColors.primary : '#1a2a33',
                 border: 'none',
                 borderRadius: 8,
                 color: '#fff',
@@ -449,7 +450,7 @@ export default function TableSidePayPage() {
               >
                 <span>积分：{memberInfo.points}</span>
                 {memberInfo.discount_rate < 1 && (
-                  <span style={{ color: '#FF6B35' }}>
+                  <span style={{ color: txColors.primary }}>
                     折扣：{(memberInfo.discount_rate * 10).toFixed(1)}折 →
                     ¥{fenToYuan(calcDiscountedAmount(order?.total_amount ?? 0, memberInfo.discount_rate))}
                   </span>
@@ -494,7 +495,7 @@ export default function TableSidePayPage() {
                 <div
                   style={{
                     fontSize: 14,
-                    color: '#FF6B35',
+                    color: txColors.primary,
                     marginTop: 2,
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -518,7 +519,7 @@ export default function TableSidePayPage() {
             {discountResult && discountResult.total_saved_fen > 0 ? (
               <div style={{ flexShrink: 0, textAlign: 'right' }}>
                 <div style={{ fontSize: 13, color: '#9DB4B2' }}>已优惠</div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: txColors.primary }}>
                   ¥{(discountResult.total_saved_fen / 100).toFixed(2)}
                 </div>
               </div>
@@ -620,9 +621,9 @@ export default function TableSidePayPage() {
               gap: 14,
               minHeight: 72,
               background: '#1a0800',
-              border: '2px dashed #FF6B35',
+              border: `2px dashed ${txColors.primary}`,
               borderRadius: 10,
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: 18,
               fontWeight: 700,
               cursor: 'pointer',
@@ -637,7 +638,7 @@ export default function TableSidePayPage() {
                 width: 40,
                 height: 40,
                 borderRadius: 10,
-                background: '#FF6B35',
+                background: txColors.primary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -693,7 +694,7 @@ export default function TableSidePayPage() {
             <div style={{ fontSize: 14, color: '#27AE7A', fontWeight: 600 }}>
               优惠 ¥{fenToYuan(discountResult.total_saved_fen)}
             </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: '#FF6B35' }}>
+            <div style={{ fontSize: 22, fontWeight: 800, color: txColors.primary }}>
               ¥{fenToYuan(actualAmount)}
             </div>
           </div>
@@ -708,7 +709,7 @@ export default function TableSidePayPage() {
               display: 'block',
               width: '100%',
               minHeight: 64,
-              background: settling ? '#8B4A24' : '#FF6B35',
+              background: settling ? '#8B4A24' : txColors.primary,
               border: 'none',
               borderRadius: 12,
               color: '#fff',

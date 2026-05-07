@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * 屯象OS · 色彩Token
  * 品牌色: 暖橙 #FF6B35 — v3 设计系统
@@ -6,13 +7,13 @@
 
 // ── 暖橙品牌主色阶（CTA 色，非填充色）──
 export const brand = {
-  50:  '#FFF3ED',  // CTA 轻背景
+  50:  txColors.primaryLight,  // CTA 轻背景
   100: '#FFE0CC',
   200: '#FFBD99',
   300: '#FF9966',  // — Active/Pressed
-  400: '#FF8555',  // — Hover
-  500: '#FF6B35',  // Primary — CTA 按钮 / 价格 / 活跃指示器
-  600: '#E55A28',  // — pressed
+  400: txColors.primaryHover,  // — Hover
+  500: txColors.primary,  // Primary — CTA 按钮 / 价格 / 活跃指示器
+  600: txColors.primaryActive,  // — pressed
   700: '#CC4A1A',  // — 深色背景 hover
   800: '#A33515',
   900: '#7A2510',
@@ -31,7 +32,7 @@ export const navy = {
   400: '#667F99',
   500: '#3D5A80',
   600: '#2E4666',
-  700: '#1E2A3A',  // 主标题色 — --color-navy-900
+  700: txColors.navy,  // 主标题色 — --color-navy-900
   800: '#151E2A',
   900: '#0D131C',
 } as const;

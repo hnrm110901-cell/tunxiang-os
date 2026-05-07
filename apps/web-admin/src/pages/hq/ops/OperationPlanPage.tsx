@@ -4,6 +4,7 @@
  */
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -41,9 +42,9 @@ const OPERATION_TYPE_LABELS: Record<string, string> = {
 };
 
 const RISK_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  low:      { bg: '#185FA522', text: '#185FA5', border: '#185FA5' },
-  medium:   { bg: '#BA751722', text: '#BA7517', border: '#BA7517' },
-  high:     { bg: '#A32D2D22', text: '#A32D2D', border: '#A32D2D' },
+  low:      { bg: `${txColors.info}22`, text: txColors.info, border: txColors.info },
+  medium:   { bg: `${txColors.warning}22`, text: txColors.warning, border: txColors.warning },
+  high:     { bg: `${txColors.danger}22`, text: txColors.danger, border: txColors.danger },
   critical: { bg: '#6B0F0F', text: '#FF4D4D', border: '#FF4D4D' },
 };
 
@@ -83,7 +84,7 @@ function Countdown({ expiresAt }: { expiresAt: string }) {
       fontFamily: 'monospace',
       fontSize: 14,
       fontWeight: 'bold',
-      color: display.urgent ? '#FF4D4D' : '#BA7517',
+      color: display.urgent ? '#FF4D4D' : txColors.warning,
       animation: display.urgent ? 'pulse 1s infinite' : 'none',
     }}>
       ⏱ {display.text}
@@ -125,7 +126,7 @@ function ConfirmDialog({ plan, action, onClose, onSuccess }: ConfirmDialogProps)
 
   const isConfirm = action === 'confirm';
   const label = isConfirm ? '确认执行' : '取消操作';
-  const color = isConfirm ? '#0F6E56' : '#A32D2D';
+  const color = isConfirm ? txColors.success : txColors.danger;
 
   const handleSubmit = async () => {
     setLoading(true);
@@ -163,7 +164,7 @@ function ConfirmDialog({ plan, action, onClose, onSuccess }: ConfirmDialogProps)
           风险：<RiskBadge level={plan.risk_level} />
         </p>
         {isConfirm && (
-          <p style={{ color: '#BA7517', fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+          <p style={{ color: txColors.warning, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
             此操作影响范围：{plan.impact.impact_summary}
             {!plan.impact.reversible && <><br /><strong style={{ color: '#FF4D4D' }}>⚠ 此操作不可逆</strong></>}
           </p>
@@ -225,7 +226,7 @@ function PlanDrawer({ plan, onClose, onAction }: {
           </div>
           <div>
             <span style={{ color: '#888', fontSize: 12 }}>可逆性</span>
-            <div style={{ marginTop: 4, color: plan.impact.reversible ? '#0F6E56' : '#FF4D4D', fontSize: 13 }}>
+            <div style={{ marginTop: 4, color: plan.impact.reversible ? txColors.success : '#FF4D4D', fontSize: 13 }}>
               {plan.impact.reversible ? '✓ 可撤销' : '✗ 不可逆'}
             </div>
           </div>
@@ -249,15 +250,15 @@ function PlanDrawer({ plan, onClose, onAction }: {
             { label: '影响会员', value: plan.impact.affected_members, unit: '人' },
           ].map(item => (
             <div key={item.label} style={{ textAlign: 'center', background: '#0d1e28', borderRadius: 6, padding: 12 }}>
-              <div style={{ fontSize: 22, fontWeight: 'bold', color: '#FF6B35' }}>{item.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 'bold', color: txColors.primary }}>{item.value}</div>
               <div style={{ fontSize: 11, color: '#888' }}>{item.label}（{item.unit}）</div>
             </div>
           ))}
         </div>
         {plan.impact.financial_impact_fen > 0 && (
-          <div style={{ marginTop: 12, padding: '8px 12px', background: '#BA751722', borderRadius: 6, borderLeft: '3px solid #BA7517' }}>
+          <div style={{ marginTop: 12, padding: '8px 12px', background: `${txColors.warning}22`, borderRadius: 6, borderLeft: `3px solid ${txColors.warning}` }}>
             <span style={{ color: '#888', fontSize: 12 }}>预估财务影响：</span>
-            <span style={{ color: '#BA7517', fontWeight: 600, fontSize: 15 }}>
+            <span style={{ color: txColors.warning, fontWeight: 600, fontSize: 15 }}>
               {formatFen(plan.impact.financial_impact_fen)}
             </span>
           </div>
@@ -270,8 +271,8 @@ function PlanDrawer({ plan, onClose, onAction }: {
           <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>⚠ 注意事项</div>
           {plan.impact.warnings.map((w, i) => (
             <div key={i} style={{
-              padding: '6px 10px', background: '#BA751722', borderRadius: 4,
-              color: '#BA7517', fontSize: 13, marginBottom: 6,
+              padding: '6px 10px', background: `${txColors.warning}22`, borderRadius: 4,
+              color: txColors.warning, fontSize: 13, marginBottom: 6,
             }}>
               · {w}
             </div>
@@ -284,14 +285,14 @@ function PlanDrawer({ plan, onClose, onAction }: {
         <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>
           <button onClick={() => onAction('cancel')} style={{
             flex: 1, padding: '12px', borderRadius: 8,
-            border: '1px solid #A32D2D', background: 'transparent',
-            color: '#A32D2D', cursor: 'pointer', fontWeight: 600, fontSize: 14,
+            border: `1px solid ${txColors.danger}`, background: 'transparent',
+            color: txColors.danger, cursor: 'pointer', fontWeight: 600, fontSize: 14,
           }}>
             取消操作
           </button>
           <button onClick={() => onAction('confirm')} style={{
             flex: 2, padding: '12px', borderRadius: 8,
-            border: 'none', background: '#0F6E56',
+            border: 'none', background: txColors.success,
             color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 14,
           }}>
             确认执行 →
@@ -301,8 +302,8 @@ function PlanDrawer({ plan, onClose, onAction }: {
       {plan.status !== 'pending_confirm' && (
         <div style={{
           padding: 12, borderRadius: 8, textAlign: 'center',
-          background: plan.status === 'confirmed' ? '#0F6E5622' : '#A32D2D22',
-          color: plan.status === 'confirmed' ? '#0F6E56' : '#A32D2D',
+          background: plan.status === 'confirmed' ? `${txColors.success}22` : `${txColors.danger}22`,
+          color: plan.status === 'confirmed' ? txColors.success : txColors.danger,
           fontWeight: 600,
         }}>
           {plan.status === 'confirmed' ? '✓ 已确认执行' : '✗ 已取消'}
@@ -383,7 +384,7 @@ export function OperationPlanPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
             width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
-            background: sseConnected ? '#0F6E56' : '#888',
+            background: sseConnected ? txColors.success : '#888',
             animation: sseConnected ? 'pulse 2s infinite' : 'none',
           }} />
           <span style={{ fontSize: 12, color: '#888' }}>
@@ -395,8 +396,8 @@ export function OperationPlanPage() {
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginBottom: 24 }}>
         {[
-          { label: '待确认', value: pending.length, color: '#BA7517', bg: '#BA751722' },
-          { label: '今日已确认', value: todayConfirmed, color: '#0F6E56', bg: '#0F6E5622' },
+          { label: '待确认', value: pending.length, color: txColors.warning, bg: `${txColors.warning}22` },
+          { label: '今日已确认', value: todayConfirmed, color: txColors.success, bg: `${txColors.success}22` },
           { label: '今日已取消', value: todayCancelled, color: '#888', bg: '#1a2a33' },
         ].map(card => (
           <div key={card.label} style={{
@@ -454,13 +455,13 @@ export function OperationPlanPage() {
                 <div style={{ display: 'flex', gap: 16, flexShrink: 0 }}>
                   {plan.impact.affected_stores > 0 && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: '#FF6B35', fontWeight: 700 }}>{plan.impact.affected_stores}</div>
+                      <div style={{ color: txColors.primary, fontWeight: 700 }}>{plan.impact.affected_stores}</div>
                       <div style={{ color: '#888', fontSize: 11 }}>门店</div>
                     </div>
                   )}
                   {plan.impact.financial_impact_fen > 0 && (
                     <div style={{ textAlign: 'center' }}>
-                      <div style={{ color: '#BA7517', fontWeight: 700 }}>{formatFen(plan.impact.financial_impact_fen)}</div>
+                      <div style={{ color: txColors.warning, fontWeight: 700 }}>{formatFen(plan.impact.financial_impact_fen)}</div>
                       <div style={{ color: '#888', fontSize: 11 }}>预估影响</div>
                     </div>
                   )}

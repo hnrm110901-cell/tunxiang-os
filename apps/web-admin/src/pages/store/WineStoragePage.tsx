@@ -36,6 +36,7 @@ import {
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -138,7 +139,7 @@ function TakeWineModal({
       <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="酒名">{record.wine_name}{record.wine_brand ? ` / ${record.wine_brand}` : ''}</Descriptions.Item>
         <Descriptions.Item label="当前剩余">
-          <Text strong style={{ color: '#FF6B35' }}>
+          <Text strong style={{ color: txColors.primary }}>
             {record.remaining_quantity} {record.unit}
           </Text>
         </Descriptions.Item>
@@ -397,7 +398,7 @@ function DetailDrawer({
         <Descriptions.Item label="单位">{record.unit}</Descriptions.Item>
         <Descriptions.Item label="存入数量">{record.initial_quantity}</Descriptions.Item>
         <Descriptions.Item label="剩余数量">
-          <Text strong style={{ color: '#FF6B35' }}>{record.remaining_quantity}</Text>
+          <Text strong style={{ color: txColors.primary }}>{record.remaining_quantity}</Text>
         </Descriptions.Item>
         <Descriptions.Item label="存入价值">{fenToYuan(record.unit_price_fen ? record.unit_price_fen * record.initial_quantity : null)}</Descriptions.Item>
         <Descriptions.Item label="关联台位">{record.table_name || '—'}</Descriptions.Item>
@@ -500,7 +501,7 @@ export function WineStoragePage() {
       width: 90,
       search: false,
       render: (_, r) => (
-        <Text strong style={{ color: r.remaining_quantity === 0 ? '#B4B2A9' : '#FF6B35' }}>
+        <Text strong style={{ color: r.remaining_quantity === 0 ? '#B4B2A9' : txColors.primary }}>
           {r.remaining_quantity} {r.unit}
         </Text>
       ),
@@ -524,7 +525,7 @@ export function WineStoragePage() {
           <Space size={4}>
             <Tag color={r.expiry_warning ? 'red' : 'default'}>{r.expiry_date}</Tag>
             {r.days_until_expiry !== null && r.days_until_expiry <= 7 && r.days_until_expiry >= 0 && (
-              <Badge count={`${r.days_until_expiry}天`} color="#A32D2D" />
+              <Badge count={`${r.days_until_expiry}天`} color={txColors.danger} />
             )}
           </Space>
         );
@@ -563,7 +564,7 @@ export function WineStoragePage() {
           <a key="transfer" onClick={() => setTransferRecord(r)}>转台</a>
         ),
         (r.status === 'stored' || r.status === 'partial') && (
-          <a key="writeoff" onClick={() => setWriteOffRecord(r)} style={{ color: '#A32D2D' }}>核销</a>
+          <a key="writeoff" onClick={() => setWriteOffRecord(r)} style={{ color: txColors.danger }}>核销</a>
         ),
         <a key="detail" onClick={() => setDetailRecord(r)}>详情</a>,
       ].filter(Boolean),
@@ -596,7 +597,7 @@ export function WineStoragePage() {
             value: summary?.expiring_soon_count ?? '—',
             suffix: '条',
             valueStyle: (summary?.expiring_soon_count ?? 0) > 0
-              ? { color: '#A32D2D' }
+              ? { color: txColors.danger }
               : undefined,
           }}
         />

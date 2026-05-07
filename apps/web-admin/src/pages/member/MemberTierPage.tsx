@@ -31,6 +31,7 @@ import {
 } from '@ant-design/icons';
 import { ConfigProvider } from 'antd';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -218,7 +219,7 @@ export function MemberTierPage() {
       key: 'discount',
       benefit: '折扣率',
       render: (t: Tier) => (
-        <Text strong={t.discount_rate === Math.min(...tiers.map((x) => x.discount_rate))} style={t.discount_rate === Math.min(...tiers.map((x) => x.discount_rate)) ? { color: '#FF6B35' } : {}}>
+        <Text strong={t.discount_rate === Math.min(...tiers.map((x) => x.discount_rate))} style={t.discount_rate === Math.min(...tiers.map((x) => x.discount_rate)) ? { color: txColors.primary } : {}}>
           {t.discount_rate === 1.0 ? '无折扣' : `${(t.discount_rate * 10).toFixed(1)}折`}
         </Text>
       ),
@@ -227,7 +228,7 @@ export function MemberTierPage() {
       key: 'points_multiplier',
       benefit: '积分倍率',
       render: (t: Tier) => (
-        <Text strong={t.points_multiplier === Math.max(...tiers.map((x) => x.points_multiplier))} style={t.points_multiplier === Math.max(...tiers.map((x) => x.points_multiplier)) ? { color: '#FF6B35' } : {}}>
+        <Text strong={t.points_multiplier === Math.max(...tiers.map((x) => x.points_multiplier))} style={t.points_multiplier === Math.max(...tiers.map((x) => x.points_multiplier)) ? { color: txColors.primary } : {}}>
           {t.points_multiplier}x
         </Text>
       ),
@@ -236,7 +237,7 @@ export function MemberTierPage() {
       key: 'birthday',
       benefit: '生日红包',
       render: (t: Tier) => (
-        <Text strong={t.birthday_bonus_fen === Math.max(...tiers.map((x) => x.birthday_bonus_fen))} style={t.birthday_bonus_fen === Math.max(...tiers.map((x) => x.birthday_bonus_fen)) ? { color: '#FF6B35' } : {}}>
+        <Text strong={t.birthday_bonus_fen === Math.max(...tiers.map((x) => x.birthday_bonus_fen))} style={t.birthday_bonus_fen === Math.max(...tiers.map((x) => x.birthday_bonus_fen)) ? { color: txColors.primary } : {}}>
           ¥{(t.birthday_bonus_fen / 100).toFixed(0)}
         </Text>
       ),
@@ -258,7 +259,7 @@ export function MemberTierPage() {
       key: 'benefits_count',
       benefit: '专属权益数',
       render: (t: Tier) => (
-        <Text strong={t.benefits.length === Math.max(...tiers.map((x) => x.benefits.length))} style={t.benefits.length === Math.max(...tiers.map((x) => x.benefits.length)) ? { color: '#FF6B35' } : {}}>
+        <Text strong={t.benefits.length === Math.max(...tiers.map((x) => x.benefits.length))} style={t.benefits.length === Math.max(...tiers.map((x) => x.benefits.length)) ? { color: txColors.primary } : {}}>
           {t.benefits.length} 项
         </Text>
       ),
@@ -314,11 +315,11 @@ export function MemberTierPage() {
   });
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: '20px 24px', background: '#f5f5f5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 20 }}>
           <Title level={4} style={{ margin: 0 }}>
-            <TrophyOutlined style={{ marginRight: 8, color: '#FF6B35' }} />
+            <TrophyOutlined style={{ marginRight: 8, color: txColors.primary }} />
             会员等级体系
           </Title>
           <Text type="secondary">管理等级门槛、权益配置与升降级规则</Text>

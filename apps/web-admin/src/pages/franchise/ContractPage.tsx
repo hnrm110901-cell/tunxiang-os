@@ -60,6 +60,7 @@ const { Title, Text } = Typography;
 
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ──────────────────────────────────────────────────
 
@@ -815,7 +816,7 @@ export const ContractPage: React.FC = () => {
   // ─── 渲染 ────────────────────────────────────────────────────
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <style>{`
         .tx-row-expiring { background-color: #fff7e6 !important; }
         .tx-row-expiring:hover > td { background-color: #fff1cc !important; }

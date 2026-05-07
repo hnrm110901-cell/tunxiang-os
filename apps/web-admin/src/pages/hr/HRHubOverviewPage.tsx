@@ -38,6 +38,7 @@ import {
 import { Pie } from '@ant-design/charts';
 import { useNavigate } from 'react-router-dom';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -121,7 +122,7 @@ export default function HRHubOverviewPage() {
     angleField: 'value',
     colorField: 'type',
     color: ({ type }: { type: string }) => {
-      const map: Record<string, string> = { '严重': '#A32D2D', '警告': '#BA7517', '信息': '#185FA5' };
+      const map: Record<string, string> = { '严重': txColors.danger, '警告': txColors.warning, '信息': txColors.info };
       return map[type] || '#999';
     },
     radius: 0.85,
@@ -135,7 +136,7 @@ export default function HRHubOverviewPage() {
   // ─── 辅助 ──────────────────────────────────────────────────────────────────
 
   const dangerStyle = (val: number, threshold = 0): React.CSSProperties =>
-    val > threshold ? { color: '#A32D2D' } : {};
+    val > threshold ? { color: txColors.danger } : {};
 
   return (
     <div style={{ padding: 24 }}>
@@ -273,7 +274,7 @@ export default function HRHubOverviewPage() {
                 <Text>培训完成率</Text>
                 <Progress
                   percent={data.training.completion_rate}
-                  strokeColor="#0F6E56"
+                  strokeColor={txColors.success}
                   format={(p) => `${p}%`}
                 />
               </div>
@@ -281,7 +282,7 @@ export default function HRHubOverviewPage() {
                 <Text>认证通过率</Text>
                 <Progress
                   percent={data.certification.pass_rate}
-                  strokeColor="#185FA5"
+                  strokeColor={txColors.info}
                   format={(p) => `${p}%`}
                 />
               </div>
@@ -289,7 +290,7 @@ export default function HRHubOverviewPage() {
                 <Text>建议采纳率</Text>
                 <Progress
                   percent={data.coaching.acceptance_rate}
-                  strokeColor="#BA7517"
+                  strokeColor={txColors.warning}
                   format={(p) => `${p}%`}
                 />
               </div>
@@ -299,14 +300,14 @@ export default function HRHubOverviewPage() {
           <Card title="即将到期" bodyStyle={{ padding: 16 }} style={{ borderRadius: 6 }}>
             <Space direction="vertical" size={12}>
               <div>
-                <SafetyCertificateOutlined style={{ marginRight: 8, color: '#BA7517' }} />
+                <SafetyCertificateOutlined style={{ marginRight: 8, color: txColors.warning }} />
                 <Text>认证即将过期：</Text>
                 <Text strong style={dangerStyle(data.certification.expiring_soon)}>
                   {data.certification.expiring_soon} 条
                 </Text>
               </div>
               <div>
-                <ThunderboltOutlined style={{ marginRight: 8, color: '#A32D2D' }} />
+                <ThunderboltOutlined style={{ marginRight: 8, color: txColors.danger }} />
                 <Text>高峰覆盖不足：</Text>
                 <Text strong style={dangerStyle(data.peak_guard.low_coverage)}>
                   {data.peak_guard.low_coverage} 个门店
@@ -328,7 +329,7 @@ export default function HRHubOverviewPage() {
               style={{ borderRadius: 6, cursor: 'pointer', transition: 'box-shadow 0.2s' }}
               onClick={() => navigate(item.path)}
             >
-              <div style={{ fontSize: 28, color: '#FF6B35', marginBottom: 8 }}>
+              <div style={{ fontSize: 28, color: txColors.primary, marginBottom: 8 }}>
                 {item.icon}
               </div>
               <Text strong>{item.title}</Text>

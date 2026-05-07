@@ -13,16 +13,17 @@ import { useNavigate } from 'react-router-dom';
 import { txFetchData } from '../../../api';
 import { useApi } from '../../../hooks/useApi';
 import type { JourneyTemplateAttribution, AgentSuggestionDetail, P1Distribution } from '../../../api/growthHubApi';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量（深色主题）----
 const BG_0   = '#0d1e28';
 const BG_1   = '#1a2a33';
 const BG_2   = '#223340';
-const BRAND  = '#FF6B35';
-const GREEN  = '#0F6E56';
-const RED    = '#A32D2D';
-const YELLOW = '#BA7517';
-const BLUE   = '#185FA5';
+const BRAND  = txColors.primary;
+const GREEN  = txColors.success;
+const RED    = txColors.danger;
+const YELLOW = txColors.warning;
+const BLUE   = txColors.info;
 const TEAL   = '#13c2c2';
 const PURPLE = '#722ed1';
 const TEXT_1 = '#ffffff';

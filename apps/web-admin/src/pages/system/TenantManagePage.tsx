@@ -70,6 +70,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 const { RangePicker } = DatePicker;
@@ -391,7 +392,7 @@ function TenantListTab() {
       width: 180,
       render: (_, r) => (
         <Space>
-          <Avatar size="small" style={{ backgroundColor: '#FF6B35' }}>
+          <Avatar size="small" style={{ backgroundColor: txColors.primary }}>
             {r.logo}
           </Avatar>
           <Text strong>{r.name}</Text>
@@ -548,7 +549,7 @@ function TenantListTab() {
                   <Card
                     hoverable
                     style={{
-                      borderColor: createForm.getFieldValue('plan') === plan.tier ? '#FF6B35' : undefined,
+                      borderColor: createForm.getFieldValue('plan') === plan.tier ? txColors.primary : undefined,
                       borderWidth: createForm.getFieldValue('plan') === plan.tier ? 2 : 1,
                     }}
                     onClick={() => createForm.setFieldValue('plan', plan.tier)}
@@ -643,7 +644,7 @@ function TenantListTab() {
                     <Progress
                       percent={Math.round((u.current / u.limit) * 100)}
                       format={() => `${u.current}/${u.limit === 9999 ? '∞' : u.limit}`}
-                      strokeColor={u.current / u.limit > 0.8 ? '#ff4d4f' : '#FF6B35'}
+                      strokeColor={u.current / u.limit > 0.8 ? '#ff4d4f' : txColors.primary}
                       size="small"
                     />
                   </Card>
@@ -736,7 +737,7 @@ function PlanManageTab() {
               style={{ height: '100%' }}
             >
               <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                <Title level={3} style={{ margin: 0, color: '#FF6B35' }}>{plan.price_label}</Title>
+                <Title level={3} style={{ margin: 0, color: txColors.primary }}>{plan.price_label}</Title>
               </div>
               <Descriptions column={1} size="small">
                 <Descriptions.Item label="门店上限">
@@ -936,7 +937,7 @@ export function TenantManagePage() {
             <Statistic
               title="总品牌数"
               value={stats.total}
-              prefix={<TeamOutlined style={{ color: '#FF6B35' }} />}
+              prefix={<TeamOutlined style={{ color: txColors.primary }} />}
             />
           </Card>
         </Col>

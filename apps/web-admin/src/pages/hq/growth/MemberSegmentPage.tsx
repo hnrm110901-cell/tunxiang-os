@@ -4,6 +4,7 @@
  * API: /api/v1/member/rfm/distribution, /rfm/:level/members, /tags, /segments
  */
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Card,
   Row,
@@ -42,11 +43,11 @@ import {
 } from '../../../api/memberGrowthApi';
 
 const COLOR = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  error: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  error: txColors.danger,
+  info: txColors.info,
 };
 
 const fmtYuan = (fen: number) =>
@@ -54,12 +55,12 @@ const fmtYuan = (fen: number) =>
 
 // ────────── 预设标签颜色 ──────────
 const TAG_COLORS = [
-  { label: '红色', value: '#A32D2D' },
-  { label: '橙色', value: '#FF6B35' },
-  { label: '绿色', value: '#0F6E56' },
-  { label: '蓝色', value: '#185FA5' },
+  { label: '红色', value: txColors.danger },
+  { label: '橙色', value: txColors.primary },
+  { label: '绿色', value: txColors.success },
+  { label: '蓝色', value: txColors.info },
   { label: '紫色', value: '#7B2D8E' },
-  { label: '金色', value: '#BA7517' },
+  { label: '金色', value: txColors.warning },
   { label: '灰色', value: '#666666' },
 ];
 

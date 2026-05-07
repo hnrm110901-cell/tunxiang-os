@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 import type {
   Coupon, CouponType, CouponStatus, CouponStats, CreateCouponPayload,
   PointsRule, PointsProduct, StoredValuePlan, StoredValueStats,
@@ -14,10 +15,10 @@ import type {
 } from '../../../api/couponBenefitApi';
 
 // ---- 颜色常量 ----
-const PRIMARY = '#FF6B35';
-const SUCCESS = '#0F6E56';
-const WARNING = '#BA7517';
-const ERROR = '#A32D2D';
+const PRIMARY = txColors.primary;
+const SUCCESS = txColors.success;
+const WARNING = txColors.warning;
+const ERROR = txColors.danger;
 const BG_PAGE = '#0d1b21';
 const BG_CARD = '#112228';
 const BG_INPUT = '#1a2a33';

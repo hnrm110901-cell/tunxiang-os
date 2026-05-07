@@ -13,7 +13,7 @@
 }
 
 .wrapper:focus-within {
-  border-color: #FF6B2C;
+  border-color: var(--tx-primary);
 }
 
 .searchIcon {
@@ -30,7 +30,7 @@
   color: var(--tx-text-primary, #e2e8f0);
   font-size: var(--tx-font-md, 15px);
   outline: none;
-  caret-color: #FF6B2C;
+  caret-color: var(--tx-primary);
 }
 
 .input::placeholder {
@@ -60,7 +60,7 @@
 }
 
 .voiceBtn {
-  color: #FF6B2C;
+  color: var(--tx-primary);
 }
 
 .voiceBtn:hover {

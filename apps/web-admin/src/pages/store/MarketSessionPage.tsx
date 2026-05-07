@@ -37,6 +37,7 @@ import { useRequest } from 'ahooks';
 import dayjs from 'dayjs';
 import { txAdminTheme } from '../../theme/antd-theme';
 import { getTenantId } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -108,7 +109,7 @@ function SessionTemplateCard({
   onEdit: (item: MarketSessionTemplate) => void;
   onToggle: (id: string, active: boolean) => Promise<void>;
 }) {
-  const color = SESSION_COLOR[item.code] ?? '#FF6B35';
+  const color = SESSION_COLOR[item.code] ?? txColors.primary;
   return (
     <Card
       size="small"
@@ -371,7 +372,7 @@ export function MarketSessionPage() {
         <Card
           title={
             <Space>
-              <ClockCircleOutlined style={{ color: '#FF6B35' }} />
+              <ClockCircleOutlined style={{ color: txColors.primary }} />
               <span>集团市别模板</span>
               <Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
                 （定义全集团通用的营业时段，门店可基于此覆盖）
@@ -387,7 +388,7 @@ export function MarketSessionPage() {
                 templateForm.resetFields();
                 setTemplateModalOpen(true);
               }}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               新增市别模板
             </Button>
@@ -442,7 +443,7 @@ export function MarketSessionPage() {
                 icon={<PlusOutlined />}
                 disabled={!selectedStoreId}
                 onClick={() => setStoreSessionModalOpen(true)}
-                style={selectedStoreId ? { background: '#FF6B35', borderColor: '#FF6B35' } : {}}
+                style={selectedStoreId ? { background: txColors.primary, borderColor: txColors.primary } : {}}
               >
                 添加门店市别
               </Button>
@@ -478,7 +479,7 @@ export function MarketSessionPage() {
           }}
           okText="保存"
           cancelText="取消"
-          okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+          okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
           destroyOnClose
         >
           <Form form={templateForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -546,7 +547,7 @@ export function MarketSessionPage() {
           }}
           okText="保存"
           cancelText="取消"
-          okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+          okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
           destroyOnClose
         >
           <Form form={storeSessionForm} layout="vertical" style={{ marginTop: 16 }}>

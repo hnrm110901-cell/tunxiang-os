@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * city-picker/index.tsx — 城市选择（LBS降级）
  *
@@ -14,7 +15,7 @@ import { View, Text, Input, ScrollView } from '@tarojs/components'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',

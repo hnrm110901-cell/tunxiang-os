@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import type { TemplateElement } from '../../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 
 interface ReceiptCanvasProps {
   elements: TemplateElement[];
@@ -149,7 +150,7 @@ function CanvasElement({
         position: 'relative',
         borderRadius: 2,
         outline: isSelected
-          ? '2px solid #FF6B35'
+          ? `2px solid ${txColors.primary}`
           : hovered
           ? '1px dashed #bbb'
           : '1px solid transparent',
@@ -206,7 +207,7 @@ function CanvasElement({
           top: 2,
           left: 2,
           fontSize: 9,
-          background: '#FF6B35',
+          background: txColors.primary,
           color: '#fff',
           borderRadius: 3,
           padding: '1px 5px',
@@ -252,7 +253,7 @@ function ActionBtn({ title, disabled, danger, onClick, children }: ActionBtnProp
         background: disabled
           ? 'rgba(0,0,0,0.1)'
           : danger
-          ? hov ? '#A32D2D' : 'rgba(163,45,45,0.8)'
+          ? hov ? txColors.danger : 'rgba(163,45,45,0.8)'
           : hov ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.15)',
         color: disabled ? '#bbb' : '#fff',
         transition: 'background 0.1s',

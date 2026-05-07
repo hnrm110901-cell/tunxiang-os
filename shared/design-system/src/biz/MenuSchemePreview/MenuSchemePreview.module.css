@@ -52,12 +52,12 @@
 
 .statusDraft {
   background: rgba(186,117,23,0.15);
-  color: #BA7517;
+  color: var(--tx-warning);
 }
 
 .statusPublished {
   background: rgba(15,110,86,0.15);
-  color: #0F6E56;
+  color: var(--tx-success);
 }
 
 .statusArchived {

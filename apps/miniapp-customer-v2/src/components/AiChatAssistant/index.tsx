@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * AiChatAssistant — AI点餐助手（对标海底捞"小捞捞"）
  *
@@ -17,9 +18,9 @@ import { useUserStore } from '../../store/useUserStore'
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryBg: 'rgba(255,107,44,0.12)',
-  aiBlue: '#185FA5',
+  aiBlue: txColors.info,
   aiBlueBg: 'rgba(24,95,165,0.08)',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

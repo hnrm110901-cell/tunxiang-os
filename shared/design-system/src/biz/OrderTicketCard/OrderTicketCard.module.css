@@ -39,7 +39,7 @@
 
 .kds.overtime {
   background: #1a0505;
-  border-color: #A32D2D;
+  border-color: var(--tx-danger);
   animation: kdsBorderFlash 1.5s infinite;
 }
 
@@ -65,7 +65,7 @@
 }
 
 @keyframes kdsBorderFlash {
-  0%, 100% { border-color: #A32D2D; }
+  0%, 100% { border-color: var(--tx-danger); }
   50% { border-color: #ff4d4f; }
 }
 
@@ -181,9 +181,9 @@
 }
 
 /* Time level colors */
-.timeNormal { color: #0F6E56; }
-.timeWarning { color: #BA7517; }
-.timeCritical { color: #A32D2D; }
+.timeNormal { color: var(--tx-success); }
+.timeWarning { color: var(--tx-warning); }
+.timeCritical { color: var(--tx-danger); }
 
 .timerOvertime {
   color: #EF4444;

@@ -1,6 +1,7 @@
 import React from 'react';
+import { txColors } from '@tx/tokens';
 
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 
 const capabilities = [
   { number: '190+', label: 'API 端点', desc: '覆盖餐饮全业务链路的 RESTful API' },

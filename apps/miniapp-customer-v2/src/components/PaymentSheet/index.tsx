@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * PaymentSheet — bottom-sheet payment method selector
  *
@@ -211,7 +212,7 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                   flexDirection: 'row',
                   alignItems: 'center',
                   background: isSelected ? 'rgba(255,107,53,0.12)' : '#1A2E38',
-                  border: `2rpx solid ${isSelected ? '#FF6B35' : '#1E3340'}`,
+                  border: `2rpx solid ${isSelected ? txColors.primary : '#1E3340'}`,
                   borderRadius: '24rpx',
                   padding: '28rpx 32rpx',
                   minHeight: '96rpx',
@@ -228,7 +229,7 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                     width: '72rpx',
                     height: '72rpx',
                     borderRadius: '16rpx',
-                    background: opt.method === 'wechat' ? '#07C160' : '#FF6B35',
+                    background: opt.method === 'wechat' ? '#07C160' : txColors.primary,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -297,8 +298,8 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
                     width: '44rpx',
                     height: '44rpx',
                     borderRadius: '22rpx',
-                    border: `3rpx solid ${isSelected ? '#FF6B35' : '#2A4558'}`,
-                    background: isSelected ? '#FF6B35' : 'transparent',
+                    border: `3rpx solid ${isSelected ? txColors.primary : '#2A4558'}`,
+                    background: isSelected ? txColors.primary : 'transparent',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -328,7 +329,7 @@ const PaymentSheet: React.FC<PaymentSheetProps> = ({
         <View style={{ padding: '32rpx 32rpx 16rpx' }}>
           <View
             style={{
-              background: '#FF6B35',
+              background: txColors.primary,
               borderRadius: '44rpx',
               height: '96rpx',
               display: 'flex',

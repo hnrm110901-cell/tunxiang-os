@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * stored-value/index.tsx — 储值卡页
  *
@@ -21,7 +22,7 @@ import { fenToYuanDisplay } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',

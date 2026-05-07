@@ -43,6 +43,7 @@ import {
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -88,10 +89,10 @@ const fmtYuan = (fen: number) => `\u00A5${(fen / 100).toFixed(0)}`;
 const fmtPct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 
 function marginColor(rate: number): string {
-  if (rate < 0) return '#A32D2D';
-  if (rate < 0.15) return '#BA7517';
-  if (rate < 0.30) return '#FF6B35';
-  return '#0F6E56';
+  if (rate < 0) return txColors.danger;
+  if (rate < 0.15) return txColors.warning;
+  if (rate < 0.30) return txColors.primary;
+  return txColors.success;
 }
 
 // ─── 组件 ────────────────────────────────────────────────────────────────────
@@ -160,7 +161,7 @@ export default function LaborMarginDashboard() {
       key: 'hour',
       width: 80,
       render: (h: number) => (
-        <span style={{ color: lossHourSet.has(h) ? '#A32D2D' : undefined, fontWeight: lossHourSet.has(h) ? 600 : 400 }}>
+        <span style={{ color: lossHourSet.has(h) ? txColors.danger : undefined, fontWeight: lossHourSet.has(h) ? 600 : 400 }}>
           {h}:00
         </span>
       ),
@@ -215,7 +216,7 @@ export default function LaborMarginDashboard() {
             statistic={{
               title: '日营收',
               value: summary ? (summary.revenue_fen / 100).toFixed(0) : '-',
-              prefix: <DollarOutlined style={{ color: '#FF6B35' }} />,
+              prefix: <DollarOutlined style={{ color: txColors.primary }} />,
               suffix: '元',
             }}
           />
@@ -253,7 +254,7 @@ export default function LaborMarginDashboard() {
             statistic={{
               title: '真实毛利',
               value: summary ? (summary.real_margin_fen / 100).toFixed(0) : '-',
-              prefix: <TrophyOutlined style={{ color: summary && summary.real_margin_rate < 0.30 ? '#A32D2D' : '#0F6E56' }} />,
+              prefix: <TrophyOutlined style={{ color: summary && summary.real_margin_rate < 0.30 ? txColors.danger : txColors.success }} />,
               suffix: '元',
               description: summary ? (
                 <Tag color={summary.real_margin_rate < 0.30 ? 'red' : 'green'}>
@@ -275,7 +276,7 @@ export default function LaborMarginDashboard() {
             seriesField="type"
             height={320}
             areaStyle={{ fillOpacity: 0.7 }}
-            color={['#A32D2D', '#BA7517', '#185FA5', '#0F6E56']}
+            color={[txColors.danger, txColors.warning, txColors.info, txColors.success]}
             yAxis={{ label: { formatter: (v: string) => `${v}元` } }}
             tooltip={{ formatter: (datum: Record<string, unknown>) => ({ name: datum.type, value: `${Number(datum.value).toFixed(0)}元` }) }}
             annotations={
@@ -283,7 +284,7 @@ export default function LaborMarginDashboard() {
                 type: 'region',
                 start: [`${h}:00`, 'min'] as [string, string],
                 end: [`${h}:00`, 'max'] as [string, string],
-                style: { fill: '#A32D2D', fillOpacity: 0.08 },
+                style: { fill: txColors.danger, fillOpacity: 0.08 },
               }))
             }
           />
@@ -297,7 +298,7 @@ export default function LaborMarginDashboard() {
         <Card
           title={
             <Space>
-              <WarningOutlined style={{ color: '#A32D2D' }} />
+              <WarningOutlined style={{ color: txColors.danger }} />
               <span>亏损时段识别</span>
               <Tag color="blue">{lossData.ai_tag}</Tag>
             </Space>

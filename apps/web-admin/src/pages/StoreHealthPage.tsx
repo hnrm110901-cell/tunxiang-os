@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useState, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   fetchStoreHealthOverview,
   StoreHealthItem,
@@ -17,9 +18,9 @@ import {
 // ─── 颜色映射 ──────────────────────────────────────────────────────────────────
 
 const SCORE_COLOR: Record<string, string> = {
-  A: '#0F6E56',  // ≥80 绿色（优秀）
+  A: txColors.success,  // ≥80 绿色（优秀）
   B: '#4FC3F7',  // ≥60 蓝色（良好）
-  C: '#BA7517',  // ≥40 橙色（警告）
+  C: txColors.warning,  // ≥40 橙色（警告）
   D: '#FF4D4D',  // <40 红色（危险）
 };
 
@@ -33,7 +34,7 @@ function scoreColor(grade: string): string {
 
 function costRateColor(rate: number): string {
   if (rate > 0.50) return '#FF4D4D';
-  if (rate > 0.38) return '#BA7517';
+  if (rate > 0.38) return txColors.warning;
   return '#4CAF50';
 }
 

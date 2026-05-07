@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * 屯象OS · 色彩Token
  * 品牌色: #FF6B35（暖橙色）— 统一 Design Token，与 @tx/tokens 对齐
@@ -6,13 +7,13 @@
 
 // ── 品牌主色阶（暖橙 #FF6B35）──
 export const brand = {
-  50:  '#FFF3ED',
+  50:  txColors.primaryLight,
   100: '#FFE0CC',
   200: '#FFBD99',
   300: '#FF9966',
-  400: '#FF8555',
-  500: '#FF6B35',  // Primary — --tx-primary / --color-primary
-  600: '#E55A28',  // Hover
+  400: txColors.primaryHover,
+  500: txColors.primary,  // Primary — --tx-primary / --color-primary
+  600: txColors.primaryActive,  // Hover
   700: '#CC4A1A',  // Active/Pressed
   800: '#A33515',
   900: '#7A2510',
@@ -30,7 +31,7 @@ export const navy = {
   400: '#667F99',
   500: '#3D5A80',
   600: '#2E4666',
-  700: '#1E2A3A',  // 主标题色 — --color-navy-900
+  700: txColors.navy,  // 主标题色 — --color-navy-900
   800: '#151E2A',
   900: '#0D131C',
 } as const;

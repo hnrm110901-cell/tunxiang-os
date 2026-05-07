@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * SharePoster — canvas-based promotional poster generator
  *
@@ -33,7 +34,7 @@ const CANVAS_ID = 'share-poster-canvas'
 // Brand colours
 const BG_COLOR = '#0B1A20'
 const CARD_COLOR = '#132029'
-const BRAND_COLOR = '#FF6B35'
+const BRAND_COLOR = txColors.primary
 
 // ─── Drawing helpers ──────────────────────────────────────────────────────────
 

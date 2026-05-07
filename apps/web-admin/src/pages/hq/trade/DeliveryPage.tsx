@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -46,9 +47,9 @@ const STATUS_META: Record<string, { label: string; color: string; bg: string }> 
   pending:   { label: '待接单', color: '#E8820C', bg: '#E8820C22' },
   confirmed: { label: '已接单', color: '#3B9EFF', bg: '#3B9EFF22' },
   delivering:{ label: '配送中', color: '#3B9EFF', bg: '#3B9EFF22' },
-  completed: { label: '已完成', color: '#0F6E56', bg: '#0F6E5622' },
+  completed: { label: '已完成', color: txColors.success, bg: `${txColors.success}22` },
   cancelled: { label: '已取消', color: '#666',    bg: '#66666622' },
-  rejected:  { label: '已拒单', color: '#A32D2D', bg: '#A32D2D22' },
+  rejected:  { label: '已拒单', color: txColors.danger, bg: `${txColors.danger}22` },
 };
 
 // ─── 工具函数 ───
@@ -150,7 +151,7 @@ function OrderCard({
               onClick={() => onConfirm(order.id)}
               style={{
                 minWidth: 80, height: 44, borderRadius: 8,
-                background: '#0F6E56', color: '#fff', border: 'none',
+                background: txColors.success, color: '#fff', border: 'none',
                 cursor: 'pointer', fontSize: 14, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}
@@ -161,8 +162,8 @@ function OrderCard({
               onClick={() => onReject(order.id)}
               style={{
                 minWidth: 80, height: 44, borderRadius: 8,
-                background: 'transparent', color: '#A32D2D',
-                border: '1px solid #A32D2D44',
+                background: 'transparent', color: txColors.danger,
+                border: `1px solid ${txColors.danger}44`,
                 cursor: 'pointer', fontSize: 14, fontWeight: 600,
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
               }}
@@ -233,7 +234,7 @@ function RejectModal({
             disabled={!reason.trim()}
             style={{
               padding: '8px 20px', borderRadius: 8, border: 'none',
-              background: reason.trim() ? '#A32D2D' : '#A32D2D44',
+              background: reason.trim() ? txColors.danger : `${txColors.danger}44`,
               color: reason.trim() ? '#fff' : '#666',
               cursor: reason.trim() ? 'pointer' : 'not-allowed',
               fontSize: 14, fontWeight: 600,
@@ -436,7 +437,7 @@ export function DeliveryPage() {
               title="待接单"
               value={String(pendingCount)}
               sub="需立即处理"
-              accent={pendingCount > 0 ? '#E8820C' : '#0F6E56'}
+              accent={pendingCount > 0 ? '#E8820C' : txColors.success}
             />
             <StatCard
               title="今日订单数"
@@ -452,7 +453,7 @@ export function DeliveryPage() {
               title="总佣金"
               value={`¥${fenToYuan(totalCommission)}`}
               sub={totalAmount > 0 ? `占比 ${((totalCommission / totalAmount) * 100).toFixed(1)}%` : '—'}
-              accent="#A32D2D"
+              accent={txColors.danger}
             />
           </div>
 

@@ -9,6 +9,7 @@ import { useOrderStore } from '../store/orderStore';
 import { createPayment, settleOrder, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint } from '../bridge/TXBridge';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
@@ -103,7 +104,7 @@ export function CreditPayPage() {
               <span>优惠</span><span>-{fen2yuan(discountFen)}</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 24, fontWeight: 'bold', color: '#FF6B35' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 24, fontWeight: 'bold', color: txColors.primary }}>
             <span>应付</span><span>{fen2yuan(finalFen)}</span>
           </div>
         </div>
@@ -125,7 +126,7 @@ export function CreditPayPage() {
                 borderRadius: 12, background: '#112228', color: '#fff', marginBottom: 16,
                 boxSizing: 'border-box', outline: 'none',
               }}
-              onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
+              onFocus={(e) => { e.currentTarget.style.borderColor = txColors.primary; }}
               onBlur={(e) => { e.currentTarget.style.borderColor = '#333'; }}
             />
             {/* 企业列表 */}
@@ -157,8 +158,8 @@ export function CreditPayPage() {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                       <span style={{ fontSize: 18, fontWeight: 'bold' }}>{c.name}</span>
-                      {isFrozen && <span style={{ fontSize: 16, color: '#A32D2D', fontWeight: 'bold' }}>已冻结</span>}
-                      {!isFrozen && isInsufficient && <span style={{ fontSize: 16, color: '#BA7517' }}>额度不足</span>}
+                      {isFrozen && <span style={{ fontSize: 16, color: txColors.danger, fontWeight: 'bold' }}>已冻结</span>}
+                      {!isFrozen && isInsufficient && <span style={{ fontSize: 16, color: txColors.warning }}>额度不足</span>}
                     </div>
                     <div style={{ fontSize: 16, color: '#8899A6', marginBottom: 8 }}>
                       联系人: {c.contactPerson} &nbsp;|&nbsp; ID: {c.id}
@@ -166,12 +167,12 @@ export function CreditPayPage() {
                     {/* 额度条 */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, marginBottom: 6 }}>
                       <span>额度 {fen2yuan(c.creditLimitFen)}</span>
-                      <span style={{ color: avail > 0 ? '#0F6E56' : '#A32D2D' }}>可用 {fen2yuan(avail)}</span>
+                      <span style={{ color: avail > 0 ? txColors.success : txColors.danger }}>可用 {fen2yuan(avail)}</span>
                     </div>
                     <div style={{ height: 8, background: '#1A3A48', borderRadius: 4, overflow: 'hidden' }}>
                       <div style={{
                         width: `${usagePercent}%`, height: '100%', borderRadius: 4,
-                        background: usagePercent > 90 ? '#A32D2D' : usagePercent > 70 ? '#BA7517' : '#0F6E56',
+                        background: usagePercent > 90 ? txColors.danger : usagePercent > 70 ? txColors.warning : txColors.success,
                         transition: 'width 300ms ease',
                       }} />
                     </div>
@@ -194,7 +195,7 @@ export function CreditPayPage() {
             <h3 style={{ margin: '0 0 20px', fontSize: 20 }}>确认挂账信息</h3>
 
             {/* 企业信息卡片 */}
-            <div style={{ background: '#112B36', borderRadius: 12, padding: 20, marginBottom: 20, borderLeft: '4px solid #FF6B35' }}>
+            <div style={{ background: '#112B36', borderRadius: 12, padding: 20, marginBottom: 20, borderLeft: `4px solid ${txColors.primary}` }}>
               <div style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 8 }}>{selectedCustomer.name}</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, fontSize: 16 }}>
                 <div>
@@ -203,11 +204,11 @@ export function CreditPayPage() {
                 </div>
                 <div>
                   <div style={{ color: '#8899A6', marginBottom: 4 }}>已使用</div>
-                  <div style={{ fontWeight: 'bold', color: '#BA7517' }}>{fen2yuan(selectedCustomer.usedFen)}</div>
+                  <div style={{ fontWeight: 'bold', color: txColors.warning }}>{fen2yuan(selectedCustomer.usedFen)}</div>
                 </div>
                 <div>
                   <div style={{ color: '#8899A6', marginBottom: 4 }}>可用余额</div>
-                  <div style={{ fontWeight: 'bold', color: '#0F6E56' }}>{fen2yuan(availableFen)}</div>
+                  <div style={{ fontWeight: 'bold', color: txColors.success }}>{fen2yuan(availableFen)}</div>
                 </div>
               </div>
             </div>
@@ -215,16 +216,16 @@ export function CreditPayPage() {
             {/* 挂账金额 */}
             <div style={{ background: '#112B36', borderRadius: 12, padding: 20, marginBottom: 20, textAlign: 'center' }}>
               <div style={{ color: '#8899A6', fontSize: 16, marginBottom: 8 }}>本次挂账金额</div>
-              <div style={{ fontSize: 36, fontWeight: 'bold', color: '#FF6B35' }}>{fen2yuan(finalFen)}</div>
+              <div style={{ fontSize: 36, fontWeight: 'bold', color: txColors.primary }}>{fen2yuan(finalFen)}</div>
               <div style={{ color: '#8899A6', fontSize: 16, marginTop: 8 }}>
-                挂账后可用额度: <span style={{ color: '#0F6E56', fontWeight: 'bold' }}>{fen2yuan(availableFen - finalFen)}</span>
+                挂账后可用额度: <span style={{ color: txColors.success, fontWeight: 'bold' }}>{fen2yuan(availableFen - finalFen)}</span>
               </div>
             </div>
 
             {/* 签单人 */}
             <div style={{ marginBottom: 20 }}>
               <label style={{ display: 'block', fontSize: 18, marginBottom: 8, fontWeight: 'bold' }}>
-                签单人姓名 <span style={{ color: '#A32D2D' }}>*</span>
+                签单人姓名 <span style={{ color: txColors.danger }}>*</span>
               </label>
               <input
                 type="text"
@@ -236,11 +237,11 @@ export function CreditPayPage() {
                   borderRadius: 12, background: '#112228', color: '#fff',
                   boxSizing: 'border-box', outline: 'none',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = txColors.primary; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = '#333'; }}
               />
               {signerName.trim().length === 0 && (
-                <div style={{ color: '#BA7517', fontSize: 16, marginTop: 6 }}>签单人姓名为必填项</div>
+                <div style={{ color: txColors.warning, fontSize: 16, marginTop: 6 }}>签单人姓名为必填项</div>
               )}
             </div>
 
@@ -259,7 +260,7 @@ export function CreditPayPage() {
                 {...tf.handlers}
                 style={{
                   ...navBtn, flex: 2,
-                  background: canPay && !submitting ? '#FF6B35' : '#444',
+                  background: canPay && !submitting ? txColors.primary : '#444',
                   cursor: canPay && !submitting ? 'pointer' : 'not-allowed',
                   fontSize: 20, fontWeight: 'bold',
                   ...tf.style,

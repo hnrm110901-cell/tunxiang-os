@@ -3,6 +3,7 @@
  * Sprint 4: tx-agent Agent市场
  */
 import React from 'react';
+import { txColors } from '@tx/tokens';
 import {
   ConfigProvider, Row, Col, Card, Badge, Button, Input, Select, Tag, Pagination, Space,
 } from 'antd';
@@ -41,7 +42,7 @@ const categoryOptions = [
 // ---- 页面组件 ----
 export const AgentMarketplacePage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部搜索 */}
         <div style={{ marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
@@ -87,7 +88,7 @@ export const AgentMarketplacePage: React.FC = () => {
                 {/* 价格 + 状态 + 操作 */}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#FF6B35' }}>{agent.price}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: txColors.primary }}>{agent.price}</div>
                     {agent.installed ? (
                       <Badge status="success" text={<span style={{ fontSize: 11 }}>已安装</span>} />
                     ) : (
@@ -100,7 +101,7 @@ export const AgentMarketplacePage: React.FC = () => {
                     <Button
                       size="small"
                       type="primary"
-                      style={{ background: '#FF6B35', border: 'none' }}
+                      style={{ background: txColors.primary, border: 'none' }}
                     >
                       免费试用7天
                     </Button>

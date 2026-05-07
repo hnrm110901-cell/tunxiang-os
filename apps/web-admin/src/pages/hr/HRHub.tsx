@@ -21,6 +21,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -66,7 +67,7 @@ export default function HRHub() {
             statistic={{
               title: '在职总人数',
               value: data.total_active,
-              prefix: <TeamOutlined style={{ color: '#FF6B35' }} />,
+              prefix: <TeamOutlined style={{ color: txColors.primary }} />,
             }}
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/hr/employees')}
@@ -77,7 +78,7 @@ export default function HRHub() {
             statistic={{
               title: '今日应到',
               value: data.today_expected,
-              prefix: <CalendarOutlined style={{ color: '#185FA5' }} />,
+              prefix: <CalendarOutlined style={{ color: txColors.info }} />,
             }}
           />
         </Col>
@@ -86,7 +87,7 @@ export default function HRHub() {
             statistic={{
               title: '今日实到',
               value: data.today_present,
-              prefix: <ClockCircleOutlined style={{ color: '#0F6E56' }} />,
+              prefix: <ClockCircleOutlined style={{ color: txColors.success }} />,
             }}
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/hr/attendance')}
@@ -97,7 +98,7 @@ export default function HRHub() {
             statistic={{
               title: '缺岗数',
               value: data.today_absent,
-              prefix: <WarningOutlined style={{ color: data.today_absent > 0 ? '#A32D2D' : '#999' }} />,
+              prefix: <WarningOutlined style={{ color: data.today_absent > 0 ? txColors.danger : '#999' }} />,
             }}
           />
         </Col>
@@ -124,7 +125,7 @@ export default function HRHub() {
             statistic={{
               title: '合规预警',
               value: data.compliance_alerts,
-              prefix: <AlertOutlined style={{ color: data.compliance_alerts > 0 ? '#A32D2D' : undefined }} />,
+              prefix: <AlertOutlined style={{ color: data.compliance_alerts > 0 ? txColors.danger : undefined }} />,
             }}
             style={{ cursor: 'pointer' }}
             onClick={() => navigate('/hr/compliance')}
@@ -175,7 +176,7 @@ export default function HRHub() {
               height={200}
               yAxis={{ label: { formatter: (v: string) => `${v}%` } }}
               point={{ size: 3 }}
-              color="#FF6B35"
+              color={txColors.primary}
             />
           </Card>
         </Col>
@@ -185,7 +186,7 @@ export default function HRHub() {
       <Card
         title={
           <Space>
-            <RobotOutlined style={{ color: '#185FA5' }} />
+            <RobotOutlined style={{ color: txColors.info }} />
             <span>Agent 智能建议</span>
           </Space>
         }

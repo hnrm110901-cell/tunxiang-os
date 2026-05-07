@@ -5,6 +5,7 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 interface DishMatch {
   dish_id: string;
@@ -183,7 +184,7 @@ export default function DishRecognizePage() {
   // ─── 样式常量 ───
   const BG = '#0B1A20';
   const CARD_BG = '#112228';
-  const ACCENT = '#FF6B35';
+  const ACCENT = txColors.primary;
   const TEXT_PRIMARY = '#FFFFFF';
   const TEXT_SECONDARY = '#94A3B8';
   const BORDER = '#1A2A33';

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pay-result/index.tsx — 支付结果页
  *
@@ -38,7 +39,7 @@ function buildProgressSteps(status: OrderStatus) {
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   border: '#1E3040',

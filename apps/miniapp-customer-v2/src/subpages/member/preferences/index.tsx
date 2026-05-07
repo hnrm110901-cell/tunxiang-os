@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * preferences/index.tsx — 口味偏好页
  *
@@ -18,7 +19,7 @@ import { useUserStore } from '../../../store/useUserStore'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   border: '#1E3040',

@@ -5,6 +5,7 @@
  * 遵循 Store 终端触控规范：最小字体 16px，按钮 >= 48px。
  */
 import type { FC } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface ShortcutOverlayProps {
   visible: boolean;
@@ -14,7 +15,7 @@ interface ShortcutOverlayProps {
 const C = {
   bg: 'rgba(11, 26, 32, 0.92)',
   card: '#112228',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   text: '#E0E0E0',
   textDim: '#8899A6',
   border: '#1A3A48',

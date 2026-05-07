@@ -3,9 +3,10 @@
  * 固定在收银界面顶部，展示今日计划摘要 + 风险预警
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量 ----
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 const BG_BAR = '#112228';
 const BG_RISK = '#ff4d4f';
 const BG_EXPAND = '#0B1A20';

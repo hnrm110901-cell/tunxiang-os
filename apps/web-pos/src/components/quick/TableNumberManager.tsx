@@ -19,19 +19,20 @@
  *   - 无 hover，用 :active / onPointerDown 替代
  */
 import { useState, useCallback, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens（与 QuickCashierPage 一致） ────────────────────────────────
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
-  success: '#0F6E56',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
+  success: txColors.success,
   successLight: '#0D5A47',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
   muted: '#64748b',
   text: '#E0E0E0',
   white: '#FFFFFF',

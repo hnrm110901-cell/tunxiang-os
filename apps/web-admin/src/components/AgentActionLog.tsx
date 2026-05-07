@@ -5,6 +5,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Collapse, ConfigProvider, Progress, Tag, Timeline } from 'antd';
+import { txColors } from '@tx/tokens';
 
 /* ─── Props ─── */
 interface AgentActionLogProps {
@@ -117,7 +118,7 @@ const MOCK_ACTION_LOGS: ActionLogEntry[] = [
 /* ─── Sprint 2 Mock 数据（含三条硬约束字段） ─── */
 const SPRINT2_MOCK_LOGS: ActionLogItem[] = [
   {
-    id: 's2-001', time: '14:32:05', agent: '折扣守护', agentColor: '#FF6B35',
+    id: 's2-001', time: '14:32:05', agent: '折扣守护', agentColor: txColors.primary,
     actionType: 'DISCOUNT.RISK_CHECK',
     inputSummary: '员工E-0023申请对订单#TXO-4421执行免单（¥488）',
     reasoning: '该员工本月已执行3次免单，超出阈值2次。单笔毛利将降至-¥58，违反毛利底线约束。建议拒绝并升级审批。',
@@ -133,7 +134,7 @@ const SPRINT2_MOCK_LOGS: ActionLogItem[] = [
     confidence: 0.91, result: '已执行',
   },
   {
-    id: 's2-003', time: '14:15:44', agent: '出餐调度', agentColor: '#0F6E56',
+    id: 's2-003', time: '14:15:44', agent: '出餐调度', agentColor: txColors.success,
     actionType: 'DISH.TIME_PREDICTED',
     inputSummary: '桌台A08下单蒜蓉蒸鲍鱼×2，当前厨房负载78%',
     reasoning: '当前厨房蒸台占用率高（78%），预计出餐时间从标准12分钟延长至18分钟。已向前台服务员推送预警。',
@@ -141,7 +142,7 @@ const SPRINT2_MOCK_LOGS: ActionLogItem[] = [
     confidence: 0.84, result: '已执行',
   },
   {
-    id: 's2-004', time: '14:02:11', agent: '库存预警', agentColor: '#BA7517',
+    id: 's2-004', time: '14:02:11', agent: '库存预警', agentColor: txColors.warning,
     actionType: 'INVENTORY.LOW_STOCK_ALERT',
     inputSummary: '皮皮虾库存降至2.3kg，低于安全库存线5kg',
     reasoning: '按当前消耗速率（约1.5kg/小时），预计1.5小时内耗尽。建议立即标记沽清并推送替代菜品「椒盐濑尿虾」。',
@@ -189,7 +190,7 @@ const SPRINT2_MOCK_LOGS: ActionLogItem[] = [
     confidence: 0.82, result: '已执行',
   },
   {
-    id: 's2-010', time: '11:30:00', agent: '折扣守护', agentColor: '#FF6B35',
+    id: 's2-010', time: '11:30:00', agent: '折扣守护', agentColor: txColors.primary,
     actionType: 'DISCOUNT.APPROVED',
     inputSummary: '店长M-Manager申请对VIP桌台#TXO-4398执行九折优惠（优惠¥44）',
     reasoning: '店长权限允许九折以内优惠。优惠后毛利率39.2%，高于毛利底线35%。客户为钻石会员，符合体验优化条件。批准执行。',
@@ -200,9 +201,9 @@ const SPRINT2_MOCK_LOGS: ActionLogItem[] = [
 
 function getResultColor(result: ActionLogItem['result']): string {
   switch (result) {
-    case '已执行': return '#0F6E56';
+    case '已执行': return txColors.success;
     case '已忽略': return '#8A94A4';
-    case '待确认': return '#BA7517';
+    case '待确认': return txColors.warning;
   }
 }
 
@@ -277,7 +278,7 @@ export default function AgentActionLogV2({ limit, agentId }: AgentActionLogProps
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: '0 0 24px' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#2C2C2A' }}>🤖 Agent 决策留痕</div>
@@ -336,7 +337,7 @@ export default function AgentActionLogV2({ limit, agentId }: AgentActionLogProps
                         <Progress
                           percent={Math.round(item.confidence * 100)}
                           size="small"
-                          strokeColor={item.confidence >= 0.9 ? '#0F6E56' : item.confidence >= 0.75 ? '#BA7517' : '#A32D2D'}
+                          strokeColor={item.confidence >= 0.9 ? txColors.success : item.confidence >= 0.75 ? txColors.warning : txColors.danger}
                           showInfo={false}
                         />
                       </div>

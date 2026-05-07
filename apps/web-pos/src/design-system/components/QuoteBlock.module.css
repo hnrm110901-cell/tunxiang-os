@@ -1,5 +1,5 @@
 .quote {
-  border-left: 3px solid #FF6B35;
+  border-left: 3px solid var(--tx-primary);
   background: rgba(0,0,0,0.02);
   border-radius: 0 var(--radius-sm, 8px) var(--radius-sm, 8px) 0;
   padding: 14px 18px;

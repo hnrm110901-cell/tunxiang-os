@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 类型 ---------- */
 interface ServiceCall {
@@ -140,7 +141,7 @@ export function ServiceCallPage() {
         padding: 16, display: 'flex', justifyContent: 'space-around',
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>{stats.total}</div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: txColors.primary }}>{stats.total}</div>
           <div style={{ fontSize: 14, color: '#64748b', marginTop: 2 }}>总呼叫</div>
         </div>
         <div style={{ textAlign: 'center' }}>
@@ -199,7 +200,7 @@ export function ServiceCallPage() {
               <button
                 onClick={() => handleProcess(call.id)}
                 style={{
-                  background: '#FF6B35', border: 'none', borderRadius: 10,
+                  background: txColors.primary, border: 'none', borderRadius: 10,
                   color: '#fff', fontSize: 16, fontWeight: 700,
                   padding: '12px 20px', cursor: 'pointer',
                   minWidth: 48, minHeight: 48,

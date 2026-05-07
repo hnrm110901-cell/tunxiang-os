@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * order-flow/payment/index.tsx — 支付选择页（待支付订单独立支付入口）
  *
@@ -32,7 +33,7 @@ import { fenToYuanDisplay } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
   bgDeep:     '#0B1A20',
   bgCard:     '#132029',

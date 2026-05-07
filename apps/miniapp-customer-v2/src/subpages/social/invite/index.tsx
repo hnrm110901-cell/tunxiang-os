@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * invite/index.tsx — 邀请有礼（老带新）
  *
@@ -19,7 +20,7 @@ import { useUserStore } from '../../../store/useUserStore'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -442,7 +443,7 @@ function FriendsList({ friends, loading }: FriendsListProps) {
     <View style={{ margin: '0 24rpx', display: 'flex', flexDirection: 'column', gap: '16rpx' }}>
       {friends.map((friend) => {
         const initial = (friend.nickname || '?')[0].toUpperCase()
-        const avatarColors = ['#FF6B35', '#4CAF50', '#2196F3', '#9C27B0', '#FF9800']
+        const avatarColors = [txColors.primary, '#4CAF50', '#2196F3', '#9C27B0', '#FF9800']
         const colorIdx = friend.memberId.charCodeAt(friend.memberId.length - 1) % avatarColors.length
         const avatarBg = avatarColors[colorIdx]
         const rewarded = friend.rewardIssued

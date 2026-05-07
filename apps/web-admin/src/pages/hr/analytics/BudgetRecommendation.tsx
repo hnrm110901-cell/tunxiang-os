@@ -41,6 +41,7 @@ import {
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -269,7 +270,7 @@ export default function BudgetRecommendation() {
                 <Gauge
                   percent={gaugePercent}
                   height={200}
-                  range={{ color: ['#0F6E56', '#BA7517', '#A32D2D'], ticks: [0, 0.625, 0.875, 1] }}
+                  range={{ color: [txColors.success, txColors.warning, txColors.danger], ticks: [0, 0.625, 0.875, 1] }}
                   indicator={{
                     pointer: { style: { stroke: '#2C2C2A' } },
                     pin: { style: { stroke: '#2C2C2A' } },

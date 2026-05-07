@@ -19,9 +19,10 @@ import type { ActionType } from '@ant-design/pro-components';
 import { Line } from '@ant-design/charts';
 import { useParams } from 'react-router-dom';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

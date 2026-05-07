@@ -63,6 +63,7 @@ import type { ColumnsType } from 'antd/es/table';
 import ReactECharts from 'echarts-for-react';
 import { txFetchData } from '../../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -70,13 +71,13 @@ const { Option } = Select;
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────
 
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_INFO = '#185FA5';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_INFO = txColors.info;
 const TX_BG_SECONDARY = '#F8F7F5';
 const TX_BORDER = '#E8E6E1';
-const TX_NAVY = '#1E2A3A';
+const TX_NAVY = txColors.navy;
 const TX_TEXT_PRIMARY = '#2C2C2A';
 const TX_TEXT_SECONDARY = '#5F5E5A';
 
@@ -700,7 +701,7 @@ const BomEditorPage: React.FC = () => {
                       style={{
                         padding: '10px 16px',
                         cursor: 'pointer',
-                        background: selectedDish?.id === dish.id ? '#FFF3ED' : undefined,
+                        background: selectedDish?.id === dish.id ? txColors.primaryLight : undefined,
                         borderLeft: selectedDish?.id === dish.id ? `3px solid ${TX_PRIMARY}` : '3px solid transparent',
                         transition: 'all 0.15s',
                       }}

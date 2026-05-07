@@ -35,6 +35,7 @@ import {
   UserOutlined,
 } from '@ant-design/icons';
 import { StatisticCard } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 
@@ -111,17 +112,17 @@ const buildHeaders = (tenantId: string) => ({
 });
 
 const riskLevelConfig = {
-  high: { color: '#A32D2D', bg: '#FFF0F0', label: '高风险', icon: <StopOutlined /> },
-  medium: { color: '#BA7517', bg: '#FFFBF0', label: '中风险', icon: <ExclamationCircleOutlined /> },
-  low: { color: '#0F6E56', bg: '#F0FFF8', label: '低风险', icon: <CheckCircleOutlined /> },
+  high: { color: txColors.danger, bg: '#FFF0F0', label: '高风险', icon: <StopOutlined /> },
+  medium: { color: txColors.warning, bg: '#FFFBF0', label: '中风险', icon: <ExclamationCircleOutlined /> },
+  low: { color: txColors.success, bg: '#F0FFF8', label: '低风险', icon: <CheckCircleOutlined /> },
 };
 
 const formatYuan = (fen: number): string => `¥${(fen / 100).toFixed(0)}`;
 
 const anomalyScoreColor = (score: number): string => {
-  if (score >= 0.8) return '#A32D2D';
-  if (score >= 0.6) return '#BA7517';
-  return '#0F6E56';
+  if (score >= 0.8) return txColors.danger;
+  if (score >= 0.6) return txColors.warning;
+  return txColors.success;
 };
 
 // ─── 子组件：高频会员列表 ─────────────────────────────────────────────────────
@@ -213,7 +214,7 @@ const MemberList: React.FC<MemberListProps> = ({ members, loading, onDetail }) =
                     type="text"
                     size="small"
                     icon={<EyeOutlined />}
-                    style={{ color: '#185FA5' }}
+                    style={{ color: txColors.info }}
                   />
                 </Tooltip>
               </Col>
@@ -320,7 +321,7 @@ const TableList: React.FC<TableListProps> = ({ tables, loading, onDetail }) => {
                     type="text"
                     size="small"
                     icon={<EyeOutlined />}
-                    style={{ color: '#185FA5' }}
+                    style={{ color: txColors.info }}
                   />
                 </Tooltip>
               </Col>
@@ -433,7 +434,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
         title={
           <Row align="middle" gutter={8}>
             <Col>
-              <AlertOutlined style={{ color: '#FF6B35', fontSize: 16 }} />
+              <AlertOutlined style={{ color: txColors.primary, fontSize: 16 }} />
             </Col>
             <Col>
               <span style={{ fontSize: 15, fontWeight: 600, color: '#2C2C2A' }}>
@@ -444,7 +445,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
               <Col>
                 <Badge
                   count={todayAlerts}
-                  style={{ backgroundColor: '#A32D2D' }}
+                  style={{ backgroundColor: txColors.danger }}
                   overflowCount={99}
                 />
               </Col>
@@ -460,7 +461,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
               </Text>
             </Col>
             <Col>
-              <Button size="small" onClick={refresh} style={{ borderColor: '#FF6B35', color: '#FF6B35' }}>
+              <Button size="small" onClick={refresh} style={{ borderColor: txColors.primary, color: txColors.primary }}>
                 刷新
               </Button>
             </Col>
@@ -480,7 +481,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                 title: '今日已检查',
                 value: todayChecks,
                 suffix: '笔',
-                icon: <SafetyCertificateOutlined style={{ color: '#185FA5' }} />,
+                icon: <SafetyCertificateOutlined style={{ color: txColors.info }} />,
               }}
               loading={loadingSummary}
               style={{ borderRadius: 6, border: '1px solid #E8E6E1' }}
@@ -492,13 +493,13 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                 title: '预警笔数',
                 value: todayAlerts,
                 suffix: `笔 (${alertRate}%)`,
-                valueStyle: todayAlerts > 0 ? { color: '#A32D2D' } : {},
-                icon: <ExclamationCircleOutlined style={{ color: todayAlerts > 0 ? '#A32D2D' : '#0F6E56' }} />,
+                valueStyle: todayAlerts > 0 ? { color: txColors.danger } : {},
+                icon: <ExclamationCircleOutlined style={{ color: todayAlerts > 0 ? txColors.danger : txColors.success }} />,
               }}
               loading={loadingSummary}
               style={{
                 borderRadius: 6,
-                border: `1px solid ${todayAlerts > 0 ? '#A32D2D44' : '#E8E6E1'}`,
+                border: `1px solid ${todayAlerts > 0 ? `${txColors.danger}44` : '#E8E6E1'}`,
                 background: todayAlerts > 0 ? '#FFF8F8' : undefined,
               }}
             />
@@ -513,7 +514,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                     因拦截避免的异常折扣
                   </Text>
                 ),
-                icon: <RiseOutlined style={{ color: '#0F6E56' }} />,
+                icon: <RiseOutlined style={{ color: txColors.success }} />,
               }}
               loading={loadingSummary}
               style={{ borderRadius: 6, border: '1px solid #E8E6E1' }}
@@ -532,7 +533,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                 <Col>
                   <Row align="middle" gutter={6}>
                     <Col>
-                      <UserOutlined style={{ color: '#A32D2D' }} />
+                      <UserOutlined style={{ color: txColors.danger }} />
                     </Col>
                     <Col>
                       <Text strong style={{ fontSize: 13 }}>
@@ -543,7 +544,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                       <Badge
                         count={members.length}
                         style={{
-                          backgroundColor: members.length > 0 ? '#A32D2D' : '#0F6E56',
+                          backgroundColor: members.length > 0 ? txColors.danger : txColors.success,
                           fontSize: 11,
                         }}
                       />
@@ -571,7 +572,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                 <Col>
                   <Row align="middle" gutter={6}>
                     <Col>
-                      <AlertOutlined style={{ color: '#BA7517' }} />
+                      <AlertOutlined style={{ color: txColors.warning }} />
                     </Col>
                     <Col>
                       <Text strong style={{ fontSize: 13 }}>
@@ -582,7 +583,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                       <Badge
                         count={tables.length}
                         style={{
-                          backgroundColor: tables.length > 0 ? '#BA7517' : '#0F6E56',
+                          backgroundColor: tables.length > 0 ? txColors.warning : txColors.success,
                           fontSize: 11,
                         }}
                       />
@@ -614,7 +615,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                   type="primary"
                   icon={<EyeOutlined />}
                   onClick={() => window.open(reportPath, '_blank')}
-                  style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35', borderRadius: 6 }}
+                  style={{ backgroundColor: txColors.primary, borderColor: txColors.primary, borderRadius: 6 }}
                 >
                   查看完整折扣守护报告
                 </Button>
@@ -629,7 +630,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
         title={
           <Row align="middle" gutter={8}>
             <Col>
-              <UserOutlined style={{ color: '#A32D2D' }} />
+              <UserOutlined style={{ color: txColors.danger }} />
             </Col>
             <Col>会员折扣频率详情</Col>
           </Row>
@@ -638,7 +639,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
         onCancel={() => setDetailMember(null)}
         footer={
           <Button type="primary" onClick={() => setDetailMember(null)}
-            style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}>
+            style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}>
             关闭
           </Button>
         }
@@ -671,14 +672,14 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                   title="近30天折扣次数"
                   value={detailMember.discount_count}
                   suffix="次"
-                  valueStyle={{ color: '#A32D2D' }}
+                  valueStyle={{ color: txColors.danger }}
                 />
               </Col>
               <Col span={12}>
                 <Statistic
                   title="累计减免金额"
                   value={formatYuan(detailMember.total_saved_fen)}
-                  valueStyle={{ color: '#A32D2D' }}
+                  valueStyle={{ color: txColors.danger }}
                 />
               </Col>
             </Row>
@@ -696,7 +697,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                   ),
                 },
                 {
-                  color: '#185FA5',
+                  color: txColors.info,
                   children: (
                     <>
                       <Text strong>Agent分析</Text>
@@ -716,7 +717,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
         title={
           <Row align="middle" gutter={8}>
             <Col>
-              <AlertOutlined style={{ color: '#BA7517' }} />
+              <AlertOutlined style={{ color: txColors.warning }} />
             </Col>
             <Col>桌台异常折扣详情</Col>
           </Row>
@@ -725,7 +726,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
         onCancel={() => setDetailTable(null)}
         footer={
           <Button type="primary" onClick={() => setDetailTable(null)}
-            style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}>
+            style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}>
             关闭
           </Button>
         }
@@ -779,7 +780,7 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
                   <Text>{emp.name}</Text>
                 </Col>
                 <Col>
-                  <Tag color="#BA7517">{emp.count}次</Tag>
+                  <Tag color={txColors.warning}>{emp.count}次</Tag>
                 </Col>
               </Row>
             ))}
@@ -787,13 +788,13 @@ const DiscountGuardPanel: React.FC<DiscountGuardPanelProps> = ({
             <div
               style={{
                 padding: '10px 12px',
-                background: '#FFF3ED',
+                background: txColors.primaryLight,
                 borderRadius: 6,
-                borderLeft: '3px solid #FF6B35',
+                borderLeft: `3px solid ${txColors.primary}`,
               }}
             >
               <Text style={{ fontSize: 13, color: '#2C2C2A' }}>
-                <AlertOutlined style={{ color: '#FF6B35', marginRight: 6 }} />
+                <AlertOutlined style={{ color: txColors.primary, marginRight: 6 }} />
                 {detailTable.note}
               </Text>
             </div>

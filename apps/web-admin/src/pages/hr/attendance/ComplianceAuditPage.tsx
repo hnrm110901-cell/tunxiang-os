@@ -46,9 +46,10 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -339,7 +340,7 @@ export default function ComplianceAuditPage() {
               title="本月违规总数"
               value={stats?.total ?? 0}
               prefix={<AlertOutlined />}
-              valueStyle={{ color: stats?.total ? '#A32D2D' : '#2C2C2A' }}
+              valueStyle={{ color: stats?.total ? txColors.danger : '#2C2C2A' }}
             />
           </Card>
         </Col>

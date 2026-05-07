@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -54,7 +55,7 @@ async function submitFeedback(suggestionId: string, useful: boolean): Promise<vo
 
 function getBorderColor(urgency: ServiceSuggestion['urgency']): string {
   if (urgency === 'urgent') return '#E53E3E';
-  if (urgency === 'suggest') return '#FF6B35';
+  if (urgency === 'suggest') return txColors.primary;
   return '#1A9BE8';
 }
 

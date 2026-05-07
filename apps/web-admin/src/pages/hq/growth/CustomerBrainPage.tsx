@@ -9,6 +9,7 @@ import {
 import type { TabsProps } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 
@@ -33,11 +34,11 @@ interface RecommendRow {
 
 // ---- Mock 数据 ----
 const RFM_SEGMENTS = [
-  { label: '冠军客户', count: 342,  avgSpend: 2840, color: '#FF6B35', action: '维系 VIP 权益' },
-  { label: '忠诚客户', count: 621,  avgSpend: 1580, color: '#0F6E56', action: '升级会员等级' },
-  { label: '潜力客户', count: 987,  avgSpend: 890,  color: '#185FA5', action: '发优惠券激活' },
-  { label: '需要关注', count: 468,  avgSpend: 640,  color: '#BA7517', action: '定向推送关怀' },
-  { label: '即将流失', count: 234,  avgSpend: 420,  color: '#A32D2D', action: '紧急召回活动' },
+  { label: '冠军客户', count: 342,  avgSpend: 2840, color: txColors.primary, action: '维系 VIP 权益' },
+  { label: '忠诚客户', count: 621,  avgSpend: 1580, color: txColors.success, action: '升级会员等级' },
+  { label: '潜力客户', count: 987,  avgSpend: 890,  color: txColors.info, action: '发优惠券激活' },
+  { label: '需要关注', count: 468,  avgSpend: 640,  color: txColors.warning, action: '定向推送关怀' },
+  { label: '即将流失', count: 234,  avgSpend: 420,  color: txColors.danger, action: '紧急召回活动' },
   { label: '已流失',   count: 689,  avgSpend: 210,  color: '#888',    action: '长期召回旅程' },
 ];
 
@@ -65,9 +66,9 @@ const CAMPAIGNS = [
 ];
 
 const roiColor = (roi: number) => {
-  if (roi >= 200) return '#0F6E56';
-  if (roi >= 100) return '#BA7517';
-  return '#A32D2D';
+  if (roi >= 200) return txColors.success;
+  if (roi >= 100) return txColors.warning;
+  return txColors.danger;
 };
 
 // ---- 列定义 ----
@@ -78,12 +79,12 @@ const CHURN_COLS: ProColumns<ChurnRow>[] = [
   { title: '预测流失概率', dataIndex: 'churnProb', width: 120,
     render: (v) => {
       const pct = Number(v);
-      return <span style={{ color: pct >= 70 ? '#A32D2D' : '#BA7517', fontWeight: 700 }}>{pct}%</span>;
+      return <span style={{ color: pct >= 70 ? txColors.danger : txColors.warning, fontWeight: 700 }}>{pct}%</span>;
     } },
   { title: '流失原因预测', dataIndex: 'churnReason', ellipsis: true },
   { title: '操作', valueType: 'option', width: 100,
     render: () => [
-      <Button key="coupon" size="small" type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+      <Button key="coupon" size="small" type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}>
         发优惠券
       </Button>,
     ] },
@@ -187,7 +188,7 @@ const tabItems: TabsProps['items'] = [
 // ---- 主组件 ----
 export const CustomerBrainPage = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24 }}>
         {/* 顶部过滤器行 */}
         <Row justify="space-between" align="middle" style={{ marginBottom: 12 }}>
@@ -225,17 +226,17 @@ export const CustomerBrainPage = () => {
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="AI 识别高价值" value={2341} suffix="人" valueStyle={{ color: '#FF6B35', fontWeight: 700 }} />
+              <Statistic title="AI 识别高价值" value={2341} suffix="人" valueStyle={{ color: txColors.primary, fontWeight: 700 }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="流失预警" value={487} suffix="人" valueStyle={{ color: '#A32D2D', fontWeight: 700 }} />
+              <Statistic title="流失预警" value={487} suffix="人" valueStyle={{ color: txColors.danger, fontWeight: 700 }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="本月新增" value={623} suffix="人" valueStyle={{ color: '#0F6E56', fontWeight: 700 }} />
+              <Statistic title="本月新增" value={623} suffix="人" valueStyle={{ color: txColors.success, fontWeight: 700 }} />
             </Card>
           </Col>
         </Row>

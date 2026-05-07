@@ -6,6 +6,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -92,9 +93,9 @@ function fmtMin(sec: number): string {
 }
 
 function kpiColor(val: number, thresholdBad: number): string {
-  if (val >= thresholdBad) return '#A32D2D';
-  if (val >= thresholdBad * 0.7) return '#BA7517';
-  return '#0F6E56';
+  if (val >= thresholdBad) return txColors.danger;
+  if (val >= thresholdBad * 0.7) return txColors.warning;
+  return txColors.success;
 }
 
 // ─── Component ───
@@ -113,9 +114,9 @@ export function StatsPanel() {
     }}>
       {/* 顶栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>出品统计</h1>
+        <h1 style={{ margin: 0, fontSize: 28, color: txColors.primary }}>出品统计</h1>
         <span style={{ fontSize: 18, color: '#666' }}>
-          今日已完成 <b style={{ color: '#0F6E56', fontSize: 24 }}>{overall.todayCompleted}</b> / {overall.todayTotal} 单
+          今日已完成 <b style={{ color: txColors.success, fontSize: 24 }}>{overall.todayCompleted}</b> / {overall.todayTotal} 单
         </span>
       </div>
 
@@ -133,14 +134,14 @@ export function StatsPanel() {
           value={String(overall.overtimeCount)}
           unit={`超时率 ${overall.overtimeRate}%`}
           color={kpiColor(overall.overtimeRate, 15)}
-          topColor="#A32D2D"
+          topColor={txColors.danger}
         />
         <KPICard
           label="当前排队"
           value={String(overall.currentPending)}
           unit={`制作中 ${overall.currentCooking}`}
-          color="#BA7517"
-          topColor="#BA7517"
+          color={txColors.warning}
+          topColor={txColors.warning}
         />
         <KPICard
           label="高峰时段"
@@ -162,7 +163,7 @@ export function StatsPanel() {
           {hourly.map(h => {
             const barH = (h.count / maxHourlyCount) * 140;
             const avgMin = h.avgTimeSec / 60;
-            const barColor = avgMin >= 15 ? '#A32D2D' : avgMin >= 10 ? '#BA7517' : '#0F6E56';
+            const barColor = avgMin >= 15 ? txColors.danger : avgMin >= 10 ? txColors.warning : txColors.success;
             return (
               <div key={h.hour} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <span style={{ fontSize: 16, color: '#888', marginBottom: 4, fontFamily: 'JetBrains Mono, monospace' }}>
@@ -191,7 +192,7 @@ export function StatsPanel() {
           return (
             <div key={dept.deptId} style={{
               background: '#111', borderRadius: 12, padding: 20,
-              borderLeft: `6px solid ${dept.overtimeRate > 20 ? '#A32D2D' : dept.overtimeRate > 10 ? '#BA7517' : '#0F6E56'}`,
+              borderLeft: `6px solid ${dept.overtimeRate > 20 ? txColors.danger : dept.overtimeRate > 10 ? txColors.warning : txColors.success}`,
             }}>
               {/* 标题行 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
@@ -225,17 +226,17 @@ export function StatsPanel() {
               {/* 快慢极值 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, marginBottom: 8 }}>
                 <span style={{ color: '#888' }}>
-                  最快 <span style={{ color: '#0F6E56' }}>{fmtSec(dept.fastestTimeSec)}</span>
+                  最快 <span style={{ color: txColors.success }}>{fmtSec(dept.fastestTimeSec)}</span>
                 </span>
                 <span style={{ color: '#888' }}>
-                  最慢 <span style={{ color: '#A32D2D' }}>{fmtSec(dept.slowestTimeSec)}</span>
+                  最慢 <span style={{ color: txColors.danger }}>{fmtSec(dept.slowestTimeSec)}</span>
                 </span>
               </div>
 
               {/* 超时 */}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, marginBottom: 8 }}>
                 <span style={{ color: '#888' }}>超时</span>
-                <span style={{ color: dept.overtimeRate > 15 ? '#A32D2D' : '#888' }}>
+                <span style={{ color: dept.overtimeRate > 15 ? txColors.danger : '#888' }}>
                   {dept.overtimeCount}单 ({dept.overtimeRate}%)
                 </span>
               </div>

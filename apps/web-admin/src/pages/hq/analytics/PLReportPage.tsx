@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型定义 ----------
 
@@ -241,9 +242,9 @@ export function PLReportPage() {
 
   // 成本率颜色
   const costRateColor = (rate: number) => {
-    if (rate > 50) return '#A32D2D';
-    if (rate >= 30) return '#BA7517';
-    return '#0F6E56';
+    if (rate > 50) return txColors.danger;
+    if (rate >= 30) return txColors.warning;
+    return txColors.success;
   };
 
   const { start: periodStart, end: periodEnd } = getDateRange();
@@ -251,10 +252,10 @@ export function PLReportPage() {
   // 饼图数据
   const pieSlices: PieSlice[] = report
     ? [
-        { label: '食材成本', value: report.costs.food_cost_fen, color: '#FF6B35' },
-        { label: '人工成本', value: report.costs.labor_cost_fen, color: '#185FA5' },
-        { label: '房租及摊销', value: report.costs.rent_fen, color: '#0F6E56' },
-        { label: '水电气', value: report.costs.utilities_fen, color: '#BA7517' },
+        { label: '食材成本', value: report.costs.food_cost_fen, color: txColors.primary },
+        { label: '人工成本', value: report.costs.labor_cost_fen, color: txColors.info },
+        { label: '房租及摊销', value: report.costs.rent_fen, color: txColors.success },
+        { label: '水电气', value: report.costs.utilities_fen, color: txColors.warning },
         { label: '其他费用', value: report.costs.other_fen, color: '#6B4EA8' },
       ]
     : [];
@@ -268,35 +269,35 @@ export function PLReportPage() {
           label: '营业收入',
           value: `¥${fenToYuan(report.revenue.total_fen)}`,
           sub: null as string | null,
-          color: '#FF6B35',
+          color: txColors.primary,
           trend: null as 'up' | 'down' | null,
         },
         {
           label: '食材成本',
           value: `¥${fenToYuan(report.costs.food_cost_fen)}`,
           sub: `成本率 ${pct(report.costs.food_cost_rate)}`,
-          color: '#BA7517',
+          color: txColors.warning,
           trend: null,
         },
         {
           label: '毛利额',
           value: `¥${fenToYuan(report.gross_profit_fen)}`,
           sub: `毛利率 ${pct(report.gross_margin_rate)}`,
-          color: '#0F6E56',
+          color: txColors.success,
           trend: null,
         },
         {
           label: '运营费用',
           value: `¥${fenToYuan(report.costs.labor_cost_fen + report.costs.rent_fen + report.costs.utilities_fen + report.costs.other_fen)}`,
           sub: '含人工/租金/水电/其他',
-          color: '#185FA5',
+          color: txColors.info,
           trend: null,
         },
         {
           label: '净利润',
           value: `¥${fenToYuan(report.net_profit_fen)}`,
           sub: `净利率 ${pct(report.net_margin_rate)}`,
-          color: report.net_profit_fen >= 0 ? '#0F6E56' : '#A32D2D',
+          color: report.net_profit_fen >= 0 ? txColors.success : txColors.danger,
           trend: (report.net_profit_fen >= 0 ? 'up' : 'down') as 'up' | 'down',
         },
       ]
@@ -365,7 +366,7 @@ export function PLReportPage() {
               style={{
                 padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600,
-                background: datePreset === d ? '#FF6B35' : '#1a2a33',
+                background: datePreset === d ? txColors.primary : '#1a2a33',
                 color: datePreset === d ? '#fff' : '#999',
                 transition: 'background .15s',
               }}
@@ -406,7 +407,7 @@ export function PLReportPage() {
             style={{
               padding: '6px 18px', borderRadius: 6, border: 'none', cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: 12, fontWeight: 700,
-              background: loading ? '#2a3a43' : '#FF6B35',
+              background: loading ? '#2a3a43' : txColors.primary,
               color: loading ? '#666' : '#fff',
               transition: 'background .15s',
             }}
@@ -421,7 +422,7 @@ export function PLReportPage() {
               style={{
                 padding: '6px 14px', borderRadius: 6, border: '1px solid #1a2a33',
                 background: 'transparent', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, color: '#0F6E56',
+                fontSize: 12, fontWeight: 600, color: txColors.success,
                 transition: 'background .15s',
               }}
             >
@@ -520,24 +521,24 @@ export function PLReportPage() {
                     let labelColor = '#ccc';
                     if (isSectionRow) labelColor = '#e0e0e0';
                     if (isSubtotal) labelColor = '#fff';
-                    if (isProfit) labelColor = '#0F6E56';
+                    if (isProfit) labelColor = txColors.success;
                     if (isNet) {
-                      labelColor = row.fen != null && row.fen >= 0 ? '#0F6E56' : '#A32D2D';
+                      labelColor = row.fen != null && row.fen >= 0 ? txColors.success : txColors.danger;
                     }
 
                     let fontWeight: 'bold' | 'normal' = 'normal';
                     if (isSectionRow || isSubtotal || isProfit || isNet) fontWeight = 'bold';
 
                     const amountColor = isNet
-                      ? (row.fen != null && row.fen >= 0 ? '#0F6E56' : '#A32D2D')
-                      : isProfit ? '#0F6E56'
+                      ? (row.fen != null && row.fen >= 0 ? txColors.success : txColors.danger)
+                      : isProfit ? txColors.success
                       : '#fff';
 
                     return (
                       <tr key={i} style={{
                         background: rowBg,
                         borderTop: (isSubtotal || isProfit || isNet) ? '1px solid #2a3a43' : '1px solid #162028',
-                        borderBottom: isNet ? '2px solid #FF6B35' : undefined,
+                        borderBottom: isNet ? `2px solid ${txColors.primary}` : undefined,
                       }}>
                         <td style={{
                           padding: `${isSectionRow ? 10 : 8}px 20px`,
@@ -549,7 +550,7 @@ export function PLReportPage() {
                           {isSectionRow && (
                             <span style={{
                               display: 'inline-block', width: 3, height: 12,
-                              background: '#FF6B35', borderRadius: 2,
+                              background: txColors.primary, borderRadius: 2,
                               marginRight: 8, verticalAlign: 'middle',
                             }} />
                           )}
@@ -676,15 +677,15 @@ export function PLReportPage() {
             </table>
             <div style={{ marginTop: 12, fontSize: 11, color: '#555', display: 'flex', gap: 16 }}>
               <span>
-                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#0F6E56', marginRight: 4 }} />
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: txColors.success, marginRight: 4 }} />
                 &lt; 30% 健康
               </span>
               <span>
-                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#BA7517', marginRight: 4 }} />
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: txColors.warning, marginRight: 4 }} />
                 30%–50% 偏高
               </span>
               <span>
-                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: '#A32D2D', marginRight: 4 }} />
+                <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: txColors.danger, marginRight: 4 }} />
                 &gt; 50% 危险
               </span>
             </div>

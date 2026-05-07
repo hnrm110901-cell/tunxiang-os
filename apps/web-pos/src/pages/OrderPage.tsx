@@ -22,6 +22,7 @@ import DishRecommendBanner from '../components/DishRecommendBanner';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 扩展类型 ──────────────────────────────────────────────────────────────────
 
@@ -356,7 +357,7 @@ export function OrderPage() {
                       background: d.isAvailable ? '#1a2a33' : '#111c22',
                       cursor: d.isAvailable ? 'pointer' : 'not-allowed',
                       textAlign: 'center', minHeight: 100,
-                      border: inOrder ? '2px solid #FF6B35' : isSpecial ? '1.5px solid rgba(255,107,53,0.3)' : '1.5px solid transparent',
+                      border: inOrder ? `2px solid ${txColors.primary}` : isSpecial ? '1.5px solid rgba(255,107,53,0.3)' : '1.5px solid transparent',
                       opacity: d.isAvailable ? 1 : 0.45,
                       transition: 'transform 150ms ease, border-color 150ms ease',
                       userSelect: 'none', WebkitUserSelect: 'none' as never,
@@ -365,7 +366,7 @@ export function OrderPage() {
                   >
                     <div style={{ fontWeight: 600, fontSize: 17, color: '#fff', lineHeight: 1.3 }}>{d.name}</div>
                     {d.spicy && d.spicy > 0 && <div style={{ fontSize: 12 }}>{SPICY_ICONS[d.spicy]}</div>}
-                    <div style={{ color: '#FF6B35', fontSize: 16, fontWeight: 600 }}>
+                    <div style={{ color: txColors.primary, fontSize: 16, fontWeight: 600 }}>
                       {d.comboType === 'flexible' && d.comboPriceFen
                         ? fen2yuan(d.comboPriceFen)
                         : d.pricingMethod === 'weight' || d.pricingMethod === 'count'
@@ -374,14 +375,14 @@ export function OrderPage() {
                     </div>
                     {d.pricingMethod === 'weight' && <div style={{ fontSize: 12, color: '#52c41a' }}>⚖ 按重量</div>}
                     {d.comboType === 'flexible' && <div style={{ fontSize: 12, color: '#1890ff' }}>📋 套餐</div>}
-                    {d.tags?.includes('招牌') && <div style={{ fontSize: 11, color: '#FF6B35', background: 'rgba(255,107,53,0.15)', padding: '1px 6px', borderRadius: 3 }}>招牌</div>}
+                    {d.tags?.includes('招牌') && <div style={{ fontSize: 11, color: txColors.primary, background: 'rgba(255,107,53,0.15)', padding: '1px 6px', borderRadius: 3 }}>招牌</div>}
                     {!d.isAvailable && (
                       <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: '#aaa', fontWeight: 600 }}>
                         已沽清
                       </div>
                     )}
                     {inOrder && (
-                      <div style={{ position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: '50%', background: '#FF6B35', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
+                      <div style={{ position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: '50%', background: txColors.primary, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700 }}>
                         {inOrder.quantity}
                       </div>
                     )}
@@ -405,7 +406,7 @@ export function OrderPage() {
             {items.length > 0 && <span style={{ fontSize: 14, color: '#9CA3AF', fontWeight: 400, marginLeft: 6 }}>{items.reduce((s, i) => s + i.quantity, 0)}道</span>}
           </span>
           {items.length > 0 && (
-            <button type="button" onClick={() => store.clear()} style={{ padding: '4px 10px', background: 'transparent', border: '1px solid #A32D2D', borderRadius: 6, color: '#A32D2D', fontSize: 13, cursor: 'pointer', minHeight: 32, minWidth: 48 }}>
+            <button type="button" onClick={() => store.clear()} style={{ padding: '4px 10px', background: 'transparent', border: `1px solid ${txColors.danger}`, borderRadius: 6, color: txColors.danger, fontSize: 13, cursor: 'pointer', minHeight: 32, minWidth: 48 }}>
               清空
             </button>
           )}
@@ -421,7 +422,7 @@ export function OrderPage() {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{item.name}</div>
                   {item.notes && <div style={{ fontSize: 13, color: '#9CA3AF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.notes}</div>}
-                  <div style={{ fontSize: 14, color: '#FF6B35', marginTop: 3, fontWeight: 500 }}>{fen2yuan(item.priceFen * item.quantity)}</div>
+                  <div style={{ fontSize: 14, color: txColors.primary, marginTop: 3, fontWeight: 500 }}>{fen2yuan(item.priceFen * item.quantity)}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                   <button type="button" onClick={() => handleQtyChange(item.id, -1)} {...tf.handlers} style={{ ...qtyBtnStyle, ...tf.style }}>−</button>
@@ -447,14 +448,14 @@ export function OrderPage() {
               <span>优惠</span><span>-{fen2yuan(discountFen)}</span>
             </div>
           )}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 700, color: '#FF6B35', marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 700, color: txColors.primary, marginBottom: 14 }}>
             <span>合计</span><span>{fen2yuan(finalFen)}</span>
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button type="button" onClick={handleHoldOrder} {...tf.handlers} style={{ flex: 1, padding: '14px 0', background: '#1a2a33', color: '#fff', border: '1px solid #333', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 52, ...tf.style }}>
               挂单
             </button>
-            <button type="button" onClick={handleSubmitOrder} disabled={items.length === 0} {...tf.handlers} style={{ flex: 2, padding: '14px 0', background: items.length > 0 ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: items.length > 0 ? 'pointer' : 'not-allowed', minHeight: 52, ...tf.style }}>
+            <button type="button" onClick={handleSubmitOrder} disabled={items.length === 0} {...tf.handlers} style={{ flex: 2, padding: '14px 0', background: items.length > 0 ? txColors.primary : '#444', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: items.length > 0 ? 'pointer' : 'not-allowed', minHeight: 52, ...tf.style }}>
               下单结算
             </button>
           </div>
@@ -514,7 +515,7 @@ export function OrderPage() {
                 const item = items.find(i => i.id === showNoteModal);
                 if (item) { store.removeItem(showNoteModal); const { id: _unused, ...rest } = item; store.addItem({ ...rest, notes: noteText }); }
                 setShowNoteModal(null);
-              }} style={{ flex: 1, padding: '10px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>确定</button>
+              }} style={{ flex: 1, padding: '10px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>确定</button>
             </div>
           </div>
         </div>
@@ -529,12 +530,12 @@ function CategoryBtn({ label, count, active, onClick }: { label: string; count: 
   return (
     <button type="button" onClick={onClick} style={{
       padding: '14px 8px', background: active ? 'rgba(255,107,53,0.15)' : 'transparent',
-      border: 'none', borderLeft: active ? '3px solid #FF6B35' : '3px solid transparent',
-      color: active ? '#FF6B35' : '#ccc', fontSize: 15, fontWeight: active ? 600 : 400,
+      border: 'none', borderLeft: active ? `3px solid ${txColors.primary}` : '3px solid transparent',
+      color: active ? txColors.primary : '#ccc', fontSize: 15, fontWeight: active ? 600 : 400,
       cursor: 'pointer', textAlign: 'center', minHeight: 48, transition: 'background 150ms, color 150ms',
     }}>
       <div>{label}</div>
-      <div style={{ fontSize: 12, color: active ? '#FF6B35' : '#6B7280', marginTop: 2 }}>{count}</div>
+      <div style={{ fontSize: 12, color: active ? txColors.primary : '#6B7280', marginTop: 2 }}>{count}</div>
     </button>
   );
 }

@@ -5,6 +5,7 @@
  * 快捷键 ⌘K 打开/关闭，支持键盘导航、分组搜索、实时过滤。
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ── 颜色常量 ──
 const BG = '#0A1418';
@@ -16,7 +17,7 @@ const BORDER2 = '#23485a';
 const TEXT = '#E6EDF1';
 const TEXT2 = '#94A8B3';
 const TEXT3 = '#647985';
-const ORANGE = '#FF6B35';
+const ORANGE = txColors.primary;
 
 // ── 类型定义 ──
 

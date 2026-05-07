@@ -41,6 +41,7 @@ import {
 } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
 
@@ -176,7 +177,7 @@ export function PayrollRecordsPage() {
           <a
             key="approve"
             onClick={() => handleApprove([record.id])}
-            style={{ color: '#185FA5' }}
+            style={{ color: txColors.info }}
           >
             审批
           </a>
@@ -190,7 +191,7 @@ export function PayrollRecordsPage() {
             okButtonProps={{ danger: true }}
             cancelText="取消"
           >
-            <a style={{ color: '#A32D2D' }}>作废</a>
+            <a style={{ color: txColors.danger }}>作废</a>
           </Popconfirm>
         ),
       ].filter(Boolean),
@@ -417,7 +418,7 @@ export function PayrollRecordsPage() {
                 <strong>{fenToYuan(drawerRecord.gross_amount)}</strong>
               </Descriptions.Item>
               <Descriptions.Item label="实发金额">
-                <strong style={{ color: '#0F6E56' }}>{fenToYuan(drawerRecord.net_amount)}</strong>
+                <strong style={{ color: txColors.success }}>{fenToYuan(drawerRecord.net_amount)}</strong>
               </Descriptions.Item>
             </Descriptions>
 

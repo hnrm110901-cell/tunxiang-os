@@ -24,9 +24,10 @@ import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import { useNavigate } from 'react-router-dom';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

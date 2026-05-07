@@ -11,6 +11,7 @@ import { Select, Button, Spin, Tag, Tooltip } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -160,14 +161,14 @@ export function TrafficForecastPage() {
 
   const cellBg = (value: number, isPeak: boolean) => {
     const intensity = value / maxTraffic;
-    if (isPeak && intensity > 0.5) return '#FFF3ED';
+    if (isPeak && intensity > 0.5) return txColors.primaryLight;
     return 'transparent';
   };
 
   const cellColor = (value: number) => {
     const intensity = value / maxTraffic;
-    if (intensity > 0.7) return '#A32D2D';
-    if (intensity > 0.4) return '#BA7517';
+    if (intensity > 0.7) return txColors.danger;
+    if (intensity > 0.4) return txColors.warning;
     return '#2C2C2A';
   };
 
@@ -228,7 +229,7 @@ export function TrafficForecastPage() {
                 {columns.map(col => (
                   <th key={col.date} style={{
                     padding: '6px 8px', textAlign: 'center', fontWeight: 600,
-                    color: col.day_label === '今天' ? '#FF6B35' : '#2C2C2A',
+                    color: col.day_label === '今天' ? txColors.primary : '#2C2C2A',
                   }}>
                     {col.day_label}
                     <div style={{ fontSize: 11, fontWeight: 400, color: '#B4B2A9' }}>{col.date}</div>
@@ -259,7 +260,7 @@ export function TrafficForecastPage() {
                       {((h >= 11 && h <= 13) || (h >= 17 && h <= 19)) && (
                         <span style={{
                           display: 'inline-block', width: 6, height: 6,
-                          borderRadius: '50%', background: '#FF6B35',
+                          borderRadius: '50%', background: txColors.primary,
                           marginLeft: 6, verticalAlign: 'middle',
                         }} />
                       )}
@@ -296,7 +297,7 @@ export function TrafficForecastPage() {
                           <span style={{ color: '#2C2C2A' }}>{staff.current_staff}人</span>
                           <span style={{ color: '#B4B2A9' }}>/</span>
                           <span style={{
-                            color: staffDiff > 0 ? '#A32D2D' : staffDiff < 0 ? '#0F6E56' : '#2C2C2A',
+                            color: staffDiff > 0 ? txColors.danger : staffDiff < 0 ? txColors.success : '#2C2C2A',
                             fontWeight: staffDiff !== 0 ? 600 : 400,
                           }}>
                             {staff.suggested_staff}人
@@ -321,7 +322,7 @@ export function TrafficForecastPage() {
               <tr style={{ borderTop: '2px solid #E8E6E1', background: '#F8F7F5' }}>
                 <td style={{ padding: '8px 12px', fontWeight: 700, color: '#2C2C2A' }}>合计</td>
                 {columns.map(col => (
-                  <td key={col.date} style={{ padding: '8px', textAlign: 'center', fontWeight: 700, color: '#FF6B35' }}>
+                  <td key={col.date} style={{ padding: '8px', textAlign: 'center', fontWeight: 700, color: txColors.primary }}>
                     {col.total_predicted}
                     {col.total_actual !== null && (
                       <span style={{ fontSize: 11, color: '#B4B2A9', display: 'block', fontWeight: 400 }}>
@@ -343,7 +344,7 @@ export function TrafficForecastPage() {
           display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13, color: '#5F5E5A',
         }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#FF6B35', display: 'inline-block' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: txColors.primary, display: 'inline-block' }} />
             高峰时段
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>

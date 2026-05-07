@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -144,7 +145,7 @@ export function ChefStatsPage() {
                 style={{
                   padding: '8px 16px',
                   minHeight: 48,
-                  background: period === p ? '#FF6B35' : '#1A1A1A',
+                  background: period === p ? txColors.primary : '#1A1A1A',
                   color: period === p ? '#fff' : '#888',
                   border: 'none',
                   borderRadius: 8,
@@ -204,7 +205,7 @@ export function ChefStatsPage() {
                       style={{
                         fontSize: 36,
                         fontWeight: 700,
-                        color: '#FF6B35',
+                        color: txColors.primary,
                         fontFamily: 'monospace',
                         lineHeight: 1,
                       }}
@@ -229,7 +230,7 @@ export function ChefStatsPage() {
                     style={{
                       width: `${barWidth}%`,
                       height: '100%',
-                      background: idx === 0 ? '#FFD60A' : '#FF6B35',
+                      background: idx === 0 ? '#FFD60A' : txColors.primary,
                       transition: 'width 0.5s',
                     }}
                   />

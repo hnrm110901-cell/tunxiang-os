@@ -4,12 +4,13 @@
  * 深色主题内联CSS，无外部依赖
  */
 import { MemberLevelBadge, type MemberLevelBadgeProps } from './MemberLevelBadge';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   text: '#e2e8f0',
   muted: '#64748b',
   border: '#1E3A45',

@@ -47,6 +47,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 
@@ -250,18 +251,18 @@ function TrendChart({ data, width = 720, height = 260 }: { data: DailyStat[]; wi
         );
       })}
       {/* 折线 */}
-      <polyline points={participantPoints} fill="none" stroke="#FF6B35" strokeWidth={2} />
+      <polyline points={participantPoints} fill="none" stroke={txColors.primary} strokeWidth={2} />
       <polyline points={redeemedPoints} fill="none" stroke="#52c41a" strokeWidth={2} />
       {/* 数据点 */}
       {data.map((d, i) => (
         <g key={`dot-${i}`}>
-          <circle cx={toX(i)} cy={toY(d.participants)} r={3} fill="#FF6B35" />
+          <circle cx={toX(i)} cy={toY(d.participants)} r={3} fill={txColors.primary} />
           <circle cx={toX(i)} cy={toY(d.redeemed)} r={3} fill="#52c41a" />
         </g>
       ))}
       {/* 图例 */}
       <g transform={`translate(${padding.left + 10}, ${padding.top})`}>
-        <line x1={0} y1={0} x2={20} y2={0} stroke="#FF6B35" strokeWidth={2} />
+        <line x1={0} y1={0} x2={20} y2={0} stroke={txColors.primary} strokeWidth={2} />
         <text x={24} y={4} fill="#333">参与人次</text>
         <line x1={100} y1={0} x2={120} y2={0} stroke="#52c41a" strokeWidth={2} />
         <text x={124} y={4} fill="#333">核销人次</text>
@@ -685,22 +686,22 @@ export function CampaignPage() {
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
           <Card>
-            <Statistic title="进行中活动数" value={summary.active_campaigns} valueStyle={{ color: '#FF6B35' }} />
+            <Statistic title="进行中活动数" value={summary.active_campaigns} valueStyle={{ color: txColors.primary }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="本月参与人次" value={summary.monthly_participants} valueStyle={{ color: '#FF6B35' }} />
+            <Statistic title="本月参与人次" value={summary.monthly_participants} valueStyle={{ color: txColors.primary }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="核销率" value={`${(summary.redemption_rate * 100).toFixed(1)}%`} valueStyle={{ color: '#FF6B35' }} />
+            <Statistic title="核销率" value={`${(summary.redemption_rate * 100).toFixed(1)}%`} valueStyle={{ color: txColors.primary }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="本月营销成本（万元）" value={(summary.monthly_cost_fen / 100 / 10000).toFixed(2)} valueStyle={{ color: '#FF6B35' }} />
+            <Statistic title="本月营销成本（万元）" value={(summary.monthly_cost_fen / 100 / 10000).toFixed(2)} valueStyle={{ color: txColors.primary }} />
           </Card>
         </Col>
       </Row>

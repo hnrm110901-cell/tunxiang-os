@@ -11,6 +11,7 @@ import {
 } from 'antd';
 import { SearchOutlined, TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量 ----
 const PAGE_BG = '#0d1e28';
@@ -18,7 +19,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 const WARNING_ORANGE = '#faad14';
 const DANGER_RED = '#ff4d4f';

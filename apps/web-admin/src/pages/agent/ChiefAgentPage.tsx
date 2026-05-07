@@ -12,6 +12,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
+import { txColors } from '@tx/tokens';
 import {
   Card, Input, Button, Tag, Space, Timeline, Badge, Typography,
   Spin, Divider, Row, Col,
@@ -25,12 +26,12 @@ const { Text } = Typography;
 
 // ─── Design Tokens ───
 const C = {
-  primary:   '#FF6B35',
-  success:   '#0F6E56',
-  warning:   '#BA7517',
-  danger:    '#A32D2D',
-  info:      '#185FA5',
-  navy:      '#1E2A3A',
+  primary:   txColors.primary,
+  success:   txColors.success,
+  warning:   txColors.warning,
+  danger:    txColors.danger,
+  info:      txColors.info,
+  navy:      txColors.navy,
   bg:        '#F8F7F5',
   border:    '#E8E6E1',
   textSub:   '#5F5E5A',

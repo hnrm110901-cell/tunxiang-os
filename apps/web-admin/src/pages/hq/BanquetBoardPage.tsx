@@ -28,6 +28,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import type { TablePaginationConfig } from 'antd/es/table';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 import {
   fetchBanquetFunnel,
   fetchBanquetList,
@@ -61,15 +62,15 @@ const STAGE_LABELS: Record<string, string> = {
 
 // 状态徽章颜色：按设计要求
 const STAGE_BADGE: Record<string, { bg: string; color: string }> = {
-  lead:      { bg: '#185FA520', color: '#185FA5' }, // 蓝
-  quote:     { bg: '#BA751720', color: '#BA7517' }, // 橙
-  signed:    { bg: '#0F6E5620', color: '#0F6E56' }, // 绿
+  lead:      { bg: `${txColors.info}20`, color: txColors.info }, // 蓝
+  quote:     { bg: `${txColors.warning}20`, color: txColors.warning }, // 橙
+  signed:    { bg: `${txColors.success}20`, color: txColors.success }, // 绿
   executing: { bg: '#0a4a3820', color: '#0a8a68' }, // 深绿
   completed: { bg: '#66666620', color: '#888888' }, // 灰
   cancelled: { bg: '#66666615', color: '#666666' }, // 浅灰
 };
 
-const FUNNEL_COLORS = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#8B5CF6'];
+const FUNNEL_COLORS = [txColors.primary, txColors.info, txColors.success, txColors.warning, '#8B5CF6'];
 
 const NEXT_STAGE: Record<string, string> = {
   lead: 'quote',
@@ -270,7 +271,7 @@ function DetailDrawer({ contractId, onClose, onStageAdvanced }: DetailDrawerProp
               type="primary"
               loading={advancing}
               onClick={handleAdvance}
-              style={{ flex: 1, background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ flex: 1, background: txColors.primary, borderColor: txColors.primary }}
             >
               推进至「{STAGE_LABELS[NEXT_STAGE[detail.stage]]}」
             </Button>
@@ -295,7 +296,7 @@ function DetailDrawer({ contractId, onClose, onStageAdvanced }: DetailDrawerProp
         <div>
           {/* 客户信息 */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
               客户信息
             </div>
             {infoRow('客户姓名', detail.customer_name)}
@@ -308,7 +309,7 @@ function DetailDrawer({ contractId, onClose, onStageAdvanced }: DetailDrawerProp
 
           {/* 宴会信息 */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
+            <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
               宴会信息
             </div>
             {infoRow('活动类型', EVENT_TYPE_OPTIONS.find(e => e.value === detail.event_type)?.label || detail.event_type)}
@@ -323,12 +324,12 @@ function DetailDrawer({ contractId, onClose, onStageAdvanced }: DetailDrawerProp
             <>
               <Divider style={{ borderColor: '#2a3a43', margin: '12px 0' }} />
               <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' }}>
                   报价明细
                 </div>
                 {detail.menu_name && infoRow('套餐名称', detail.menu_name)}
                 {detail.per_table_price_fen != null && infoRow('桌均价格', fmtMoney(detail.per_table_price_fen))}
-                {infoRow('合同金额', <span style={{ color: '#FF6B35', fontWeight: 700 }}>{fmtMoney(detail.total_amount_fen)}</span>)}
+                {infoRow('合同金额', <span style={{ color: txColors.primary, fontWeight: 700 }}>{fmtMoney(detail.total_amount_fen)}</span>)}
                 {detail.deposit_fen != null && infoRow('已收定金', fmtMoney(detail.deposit_fen))}
                 {detail.paid_fen != null && infoRow('已付总额', fmtMoney(detail.paid_fen))}
               </div>
@@ -351,12 +352,12 @@ function DetailDrawer({ contractId, onClose, onStageAdvanced }: DetailDrawerProp
             <>
               <Divider style={{ borderColor: '#2a3a43', margin: '12px 0' }} />
               <div>
-                <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 12, textTransform: 'uppercase' }}>
+                <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 12, textTransform: 'uppercase' }}>
                   推进记录
                 </div>
                 <Timeline
                   items={detail.timeline.map((t) => ({
-                    color: '#FF6B35',
+                    color: txColors.primary,
                     children: (
                       <div>
                         <div style={{ fontSize: 12, color: '#aaa', marginBottom: 2 }}>{t.time}</div>
@@ -458,7 +459,7 @@ function NewLeadModal({ open, onClose, onCreated }: NewLeadModalProps) {
       okText="提交线索"
       cancelText="取消"
       width={520}
-      okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+      okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       styles={{
         content: { background: '#1a2a33', padding: 0 },
         header: { background: '#1a2a33', borderBottom: '1px solid #2a3a43', padding: '16px 24px' },
@@ -468,7 +469,7 @@ function NewLeadModal({ open, onClose, onCreated }: NewLeadModalProps) {
     >
       <Form form={form} layout="vertical" requiredMark={false}>
         {/* 客户信息 */}
-        <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 12 }}>
           客户信息
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -497,7 +498,7 @@ function NewLeadModal({ open, onClose, onCreated }: NewLeadModalProps) {
         <Divider style={{ borderColor: '#2a3a43', margin: '8px 0 16px' }} />
 
         {/* 宴会信息 */}
-        <div style={{ fontSize: 11, color: '#FF6B35', letterSpacing: 1, marginBottom: 12 }}>
+        <div style={{ fontSize: 11, color: txColors.primary, letterSpacing: 1, marginBottom: 12 }}>
           宴会信息
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -677,7 +678,7 @@ export function BanquetBoardPage() {
       key: 'total_amount_fen',
       align: 'right',
       render: (v) => (
-        <span style={{ fontWeight: 700, color: '#FF6B35', fontSize: 13 }}>
+        <span style={{ fontWeight: 700, color: txColors.primary, fontSize: 13 }}>
           {v > 0 ? fmtMoney(v) : <span style={{ color: '#555' }}>—</span>}
         </span>
       ),
@@ -718,7 +719,7 @@ export function BanquetBoardPage() {
                     message.error('操作失败');
                   }
                 }}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35', fontSize: 11 }}
+                style={{ background: txColors.primary, borderColor: txColors.primary, fontSize: 11 }}
               >
                 更新状态
               </Button>
@@ -736,22 +737,22 @@ export function BanquetBoardPage() {
           label: '本月宴会数',
           value: String(kpis.month_banquet_count),
           unit: '场',
-          color: '#FF6B35',
+          color: txColors.primary,
         },
         {
           label: '签约率',
           value: `${(kpis.sign_rate * 100).toFixed(1)}%`,
-          color: '#185FA5',
+          color: txColors.info,
         },
         {
           label: '平均桌均价',
           value: fmtMoney(kpis.avg_per_table_fen),
-          color: '#0F6E56',
+          color: txColors.success,
         },
         {
           label: '本月总营收',
           value: fmtMoney(kpis.month_revenue_fen),
-          color: '#BA7517',
+          color: txColors.warning,
         },
       ]
     : Array(4).fill({ label: '', value: '', color: '#444' });
@@ -767,7 +768,7 @@ export function BanquetBoardPage() {
         <Button
           type="primary"
           onClick={() => setNewLeadOpen(true)}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35', fontWeight: 600 }}
+          style={{ background: txColors.primary, borderColor: txColors.primary, fontWeight: 600 }}
         >
           + 新增线索
         </Button>
@@ -799,7 +800,7 @@ export function BanquetBoardPage() {
             {funnel && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#FF6B3520', color: '#FF6B35', fontWeight: 600,
+                background: `${txColors.primary}20`, color: txColors.primary, fontWeight: 600,
               }}>
                 总转化 {funnel.overall_conversion.toFixed(1)}%
               </span>
@@ -819,7 +820,7 @@ export function BanquetBoardPage() {
                 <div>最终完成：<span style={{ color: '#fff', fontWeight: 600 }}>
                   {funnel.stages.find((s) => s.stage === 'completed')?.count || 0}
                 </span></div>
-                <div>整体转化：<span style={{ color: '#FF6B35', fontWeight: 600 }}>
+                <div>整体转化：<span style={{ color: txColors.primary, fontWeight: 600 }}>
                   {funnel.overall_conversion.toFixed(1)}%
                 </span></div>
               </div>
@@ -854,7 +855,7 @@ export function BanquetBoardPage() {
                     style={{
                       padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                       fontSize: 11, fontWeight: 600,
-                      background: stageFilter === s ? '#FF6B35' : '#0B1A20',
+                      background: stageFilter === s ? txColors.primary : '#0B1A20',
                       color: stageFilter === s ? '#fff' : '#888',
                       transition: 'all 0.2s',
                     }}

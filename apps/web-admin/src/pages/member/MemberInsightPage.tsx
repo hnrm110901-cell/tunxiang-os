@@ -29,6 +29,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -163,7 +164,7 @@ function SingleInsightPanel() {
             icon={<RocketOutlined />}
             loading={loading}
             onClick={handleAnalyze}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             AI 分析会员
           </Button>
@@ -201,7 +202,7 @@ function SingleInsightPanel() {
             >
               <Space wrap>
                 {result.tags.map((tag) => (
-                  <Tag key={tag} color="#185FA5" style={{ borderRadius: 4 }}>
+                  <Tag key={tag} color={txColors.info} style={{ borderRadius: 4 }}>
                     {tag}
                   </Tag>
                 ))}
@@ -219,13 +220,13 @@ function SingleInsightPanel() {
                     size="small"
                     style={{
                       borderRadius: 6,
-                      background: '#FFF3ED',
+                      background: txColors.primaryLight,
                       border: '1px solid #FFD4B8',
                       minWidth: 160,
                       flex: '1 1 160px',
                     }}
                   >
-                    <Text strong style={{ color: '#FF6B35' }}>
+                    <Text strong style={{ color: txColors.primary }}>
                       {dish.dish_name}
                     </Text>
                     <div>
@@ -266,7 +267,7 @@ function SingleInsightPanel() {
                 bordered
               >
                 <Descriptions.Item label="月均消费">
-                  <Text strong style={{ color: '#FF6B35' }}>
+                  <Text strong style={{ color: txColors.primary }}>
                     ¥{(result.stats.monthly_avg_spend_fen / 100).toFixed(2)}
                   </Text>
                 </Descriptions.Item>
@@ -420,7 +421,7 @@ function BatchInsightPanel() {
               loading={running}
               disabled={batchRows.length === 0}
               onClick={handleBatchRun}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               {running ? '分析中...' : '开始批量分析'}
             </Button>
@@ -489,7 +490,7 @@ export function MemberInsightPage() {
         <Title level={4} style={{ margin: 0, color: '#2C2C2A' }}>
           AI 会员洞察分析
         </Title>
-        <Tag color="#185FA5" style={{ fontSize: 11 }}>
+        <Tag color={txColors.info} style={{ fontSize: 11 }}>
           Brain Agent
         </Tag>
       </div>
@@ -511,8 +512,8 @@ export function MemberInsightPage() {
                 cursor: 'pointer',
                 fontSize: 14,
                 fontWeight: tab === key ? 600 : 400,
-                color: tab === key ? '#FF6B35' : '#5F5E5A',
-                borderBottom: tab === key ? '2px solid #FF6B35' : '2px solid transparent',
+                color: tab === key ? txColors.primary : '#5F5E5A',
+                borderBottom: tab === key ? `2px solid ${txColors.primary}` : '2px solid transparent',
                 transition: 'all 0.15s',
               }}
             >

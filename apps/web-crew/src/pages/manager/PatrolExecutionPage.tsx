@@ -12,6 +12,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 import {
   fetchInspectionToday,
   fetchInspectionItems,
@@ -36,10 +37,10 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
 };
 
 const pageStyle: React.CSSProperties = {
@@ -72,8 +73,8 @@ const CATEGORY_CONFIG: Record<InspectionCategory, { label: string; icon: string 
 
 const STATUS_CONFIG: Record<CheckStatus, { label: string; color: string; icon: string }> = {
   pending: { label: '待检', color: C.muted, icon: '⏳' },
-  pass: { label: '合格', color: '#0F6E56', icon: '✅' },
-  fail: { label: '不合格', color: '#A32D2D', icon: '❌' },
+  pass: { label: '合格', color: txColors.success, icon: '✅' },
+  fail: { label: '不合格', color: txColors.danger, icon: '❌' },
   na: { label: '不适用', color: '#6B7280', icon: '⚪' },
 };
 
@@ -276,7 +277,7 @@ export function PatrolExecutionPage() {
       <div style={pageStyle}>
         <div style={{ textAlign: 'center', paddingTop: 60 }}>
           <div style={{ fontSize: 56, marginBottom: 16 }}>✅</div>
-          <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8, color: '#0F6E56' }}>巡检已完成</div>
+          <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8, color: txColors.success }}>巡检已完成</div>
           <div style={{ fontSize: 14, color: '#9CA3AF', marginBottom: 24 }}>
             {new Date().toISOString().slice(0, 10)}
           </div>
@@ -286,12 +287,12 @@ export function PatrolExecutionPage() {
             <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>巡检报告摘要</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
               <SummaryCell label="检查总数" value={total} color={C.text} />
-              <SummaryCell label="合格" value={passCount} color="#0F6E56" />
-              <SummaryCell label="不合格" value={failCount} color="#A32D2D" />
+              <SummaryCell label="合格" value={passCount} color={txColors.success} />
+              <SummaryCell label="不合格" value={failCount} color={txColors.danger} />
               <SummaryCell label="不适用" value={naCount} color="#6B7280" />
             </div>
             {failCount > 0 && (
-              <div style={{ marginTop: 12, padding: 10, background: `${C.danger}22`, borderRadius: 6, fontSize: 13, color: '#A32D2D' }}>
+              <div style={{ marginTop: 12, padding: 10, background: `${C.danger}22`, borderRadius: 6, fontSize: 13, color: txColors.danger }}>
                 已自动生成 {failCount} 条整改任务，请在整改跟踪区查看
               </div>
             )}
@@ -334,21 +335,21 @@ export function PatrolExecutionPage() {
       <div style={{ ...cardStyle, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>今日巡检进度</span>
-          <span style={{ fontSize: 16, fontWeight: 600, color: progress === 100 ? '#0F6E56' : C.primary }}>
+          <span style={{ fontSize: 16, fontWeight: 600, color: progress === 100 ? txColors.success : C.primary }}>
             {progress}%
           </span>
         </div>
         <div style={{ height: 8, background: C.border, borderRadius: 4, overflow: 'hidden' }}>
           <div style={{
             height: '100%', width: `${progress}%`,
-            background: progress === 100 ? '#0F6E56' : C.primary,
+            background: progress === 100 ? txColors.success : C.primary,
             borderRadius: 4, transition: 'width 300ms ease',
           }} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8, marginTop: 10 }}>
           <MiniStat label="待检" value={total - completed} color={C.muted} />
-          <MiniStat label="合格" value={passCount} color="#0F6E56" />
-          <MiniStat label="不合格" value={failCount} color="#A32D2D" />
+          <MiniStat label="合格" value={passCount} color={txColors.success} />
+          <MiniStat label="不合格" value={failCount} color={txColors.danger} />
           <MiniStat label="不适用" value={naCount} color="#6B7280" />
         </div>
       </div>
@@ -383,7 +384,7 @@ export function PatrolExecutionPage() {
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', minHeight: 52,
                   }}>
                   <span>{cfg.icon} {cfg.label}</span>
-                  <span style={{ fontSize: 14, color: catCompleted === catItems.length ? '#0F6E56' : '#9CA3AF' }}>
+                  <span style={{ fontSize: 14, color: catCompleted === catItems.length ? txColors.success : '#9CA3AF' }}>
                     {catCompleted}/{catItems.length} {isExpanded ? '▼' : '▶'}
                   </span>
                 </button>
@@ -403,7 +404,7 @@ export function PatrolExecutionPage() {
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
                             fontSize: 15, fontWeight: 500,
-                            color: item.status === 'fail' ? '#A32D2D' : '#fff',
+                            color: item.status === 'fail' ? txColors.danger : '#fff',
                           }}>
                             {item.name}
                           </div>
@@ -430,9 +431,9 @@ export function PatrolExecutionPage() {
 
                       {/* 快捷状态按钮 */}
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <StatusBtn label="合格 ✅" active={item.status === 'pass'} color="#0F6E56"
+                        <StatusBtn label="合格 ✅" active={item.status === 'pass'} color={txColors.success}
                           onClick={() => handleStatusChange(item.id, item.status === 'pass' ? 'pending' : 'pass')} />
-                        <StatusBtn label="不合格 ❌" active={item.status === 'fail'} color="#A32D2D"
+                        <StatusBtn label="不合格 ❌" active={item.status === 'fail'} color={txColors.danger}
                           onClick={() => handleStatusChange(item.id, item.status === 'fail' ? 'pending' : 'fail')} />
                         <StatusBtn label="不适用 ⚪" active={item.status === 'na'} color="#6B7280"
                           onClick={() => handleStatusChange(item.id, item.status === 'na' ? 'pending' : 'na')} />
@@ -492,7 +493,7 @@ export function PatrolExecutionPage() {
                               style={{
                                 flex: 1, padding: '10px 0', borderRadius: 6, fontSize: 14, fontWeight: 500,
                                 cursor: failNote.trim() ? 'pointer' : 'default', minHeight: 40, border: 'none',
-                                background: failNote.trim() ? '#A32D2D' : C.muted, color: '#fff',
+                                background: failNote.trim() ? txColors.danger : C.muted, color: '#fff',
                                 opacity: failNote.trim() ? 1 : 0.5,
                               }}>
                               确认不合格
@@ -514,7 +515,7 @@ export function PatrolExecutionPage() {
               style={{
                 width: '100%', padding: '16px 0', border: 'none', borderRadius: 10,
                 fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 56,
-                background: completed === total && completed > 0 ? '#0F6E56' : (completed > 0 ? C.primary : '#444'),
+                background: completed === total && completed > 0 ? txColors.success : (completed > 0 ? C.primary : '#444'),
                 color: '#fff', opacity: submitting ? 0.6 : 1,
               }}>
               {submitting
@@ -546,7 +547,7 @@ export function PatrolExecutionPage() {
                 {/* 状态颜色条 */}
                 <div style={{
                   position: 'absolute', left: 0, top: 0, bottom: 0, width: 4,
-                  background: isOverdue ? '#A32D2D' : sts.color,
+                  background: isOverdue ? txColors.danger : sts.color,
                   borderRadius: '10px 0 0 10px',
                 }} />
 
@@ -561,7 +562,7 @@ export function PatrolExecutionPage() {
                     {isOverdue && (
                       <span style={{
                         fontSize: 11, padding: '2px 8px', borderRadius: 4,
-                        background: '#A32D2D22', color: '#A32D2D', fontWeight: 500,
+                        background: `${txColors.danger}22`, color: txColors.danger, fontWeight: 500,
                       }}>已逾期</span>
                     )}
                     <span style={{ fontSize: 12, color: C.muted, marginLeft: 'auto' }}>
@@ -662,7 +663,7 @@ export function PatrolExecutionPage() {
                     )}
 
                     {task.status === 'completed' && (
-                      <div style={{ textAlign: 'center', padding: 10, color: '#0F6E56', fontSize: 14, fontWeight: 500 }}>
+                      <div style={{ textAlign: 'center', padding: 10, color: txColors.success, fontSize: 14, fontWeight: 500 }}>
                         ✅ 整改已完成
                       </div>
                     )}

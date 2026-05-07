@@ -12,6 +12,7 @@ import { PropertyPanel } from '../components/receipt-editor/PropertyPanel';
 import { TemplateListPanel } from '../components/receipt-editor/TemplateListPanel';
 import { TemplateGallery } from '../components/receipt-editor/TemplateGallery';
 import { receiptTemplateApi } from '../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 import type {
   TemplateElement,
   TemplateConfig,
@@ -398,7 +399,7 @@ function Toolbar({
           width: 180,
           transition: 'border-color 0.15s',
         }}
-        onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--brand, #FF6B35)')}
+        onFocus={(e) => (e.currentTarget.style.borderColor = `var(--brand, ${txColors.primary})`)}
         onBlur={(e) => (e.currentTarget.style.borderColor = 'transparent')}
         placeholder="输入模板名称..."
       />
@@ -409,7 +410,7 @@ function Toolbar({
           width: 6,
           height: 6,
           borderRadius: '50%',
-          background: '#FF6B35',
+          background: txColors.primary,
           flexShrink: 0,
         }} />
       )}
@@ -491,7 +492,7 @@ function PaperWidthToggle({
           style={{
             padding: '4px 10px',
             border: 'none',
-            background: value === w ? 'var(--brand, #FF6B35)' : 'transparent',
+            background: value === w ? `var(--brand, ${txColors.primary})` : 'transparent',
             color: value === w ? '#fff' : 'var(--text-3, #999)',
             fontSize: 12,
             fontWeight: value === w ? 600 : 400,
@@ -536,7 +537,7 @@ function ToolBtn({
         background: disabled
           ? 'var(--bg-2, #1a2a33)'
           : primary
-          ? hov ? '#E55A28' : '#FF6B35'
+          ? hov ? txColors.primaryActive : txColors.primary
           : hov
           ? 'var(--bg-2, #1a2a33)'
           : 'transparent',

@@ -46,6 +46,7 @@ import {
 } from '../../api/serviceChargeApi';
 import type { ServiceChargeConfig, ServiceChargeTemplate } from '../../api/serviceChargeApi';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -607,7 +608,7 @@ export function ServiceChargeConfigPage() {
                     type="primary"
                     onClick={handleSave}
                     loading={saveLoading}
-                    style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                    style={{ background: txColors.primary, borderColor: txColors.primary }}
                     disabled={!selectedStoreId}
                   >
                     保存配置
@@ -664,14 +665,14 @@ export function ServiceChargeConfigPage() {
 
               {previewFee !== null && (
                 <Card
-                  style={{ background: '#FFF3ED', borderColor: '#FF6B35' }}
+                  style={{ background: txColors.primaryLight, borderColor: txColors.primary }}
                   styles={{ body: { padding: '16px 20px' } }}
                 >
                   <Statistic
                     title="预计服务费"
                     value={fenToYuan(previewFee)}
                     prefix="¥"
-                    valueStyle={{ color: '#FF6B35', fontSize: 28 }}
+                    valueStyle={{ color: txColors.primary, fontSize: 28 }}
                   />
                   {previewOrderYuan > 0 && previewFee > 0 && (
                     <Text style={{ color: '#5F5E5A', fontSize: 12 }}>
@@ -695,7 +696,7 @@ export function ServiceChargeConfigPage() {
             type="primary"
             size="small"
             onClick={() => setNewTemplateOpen(true)}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             新建模板
           </Button>

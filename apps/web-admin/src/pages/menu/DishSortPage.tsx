@@ -28,6 +28,7 @@ import {
   StarFilled,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -90,9 +91,9 @@ function fenToYuan(fen: number) {
 }
 
 const TAG_CONFIG = {
-  recommended: { label: '推荐', color: '#FF6B35' },
-  new: { label: '新品', color: '#0F6E56' },
-  limited: { label: '限时', color: '#BA7517' },
+  recommended: { label: '推荐', color: txColors.primary },
+  new: { label: '新品', color: txColors.success },
+  limited: { label: '限时', color: txColors.warning },
 };
 
 // ─── 单个分类排序列表 ─────────────────────────────────────────
@@ -168,7 +169,7 @@ function CategorySortList({ dishes, onChange }: CategorySortListProps) {
               width: 32,
               height: 32,
               borderRadius: '50%',
-              background: idx === 0 ? '#FF6B35' : '#f0ede6',
+              background: idx === 0 ? txColors.primary : '#f0ede6',
               color: idx === 0 ? '#fff' : '#5f5e5a',
               display: 'flex',
               alignItems: 'center',
@@ -331,7 +332,7 @@ export function DishSortPage() {
         <span>
           {cat.icon}{' '}
           {cat.id === 'recommended' ? (
-            <span style={{ color: '#FF6B35', fontWeight: 600 }}>
+            <span style={{ color: txColors.primary, fontWeight: 600 }}>
               <StarFilled style={{ marginRight: 4, fontSize: 12 }} />
               {cat.name}
             </span>
@@ -349,7 +350,7 @@ export function DishSortPage() {
                 width: 6,
                 height: 6,
                 borderRadius: '50%',
-                background: '#FF6B35',
+                background: txColors.primary,
                 marginLeft: 6,
                 verticalAlign: 'middle',
               }}
@@ -393,7 +394,7 @@ export function DishSortPage() {
             loading={saving}
             disabled={currentDirtyCount === 0}
             onClick={handleSave}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             保存排序
           </Button>

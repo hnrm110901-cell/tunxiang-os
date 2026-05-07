@@ -3,6 +3,7 @@
  */
 import { useEffect, useState } from 'react';
 import { hubGet, type HubListResult } from '../api/hubApi';
+import { txColors } from '@tx/tokens';
 
 const s = {
   page: { color: '#E0E0E0' } as React.CSSProperties,
@@ -13,14 +14,14 @@ const s = {
     border: '1px solid #1A3540',
   } as React.CSSProperties,
   cardLabel: { fontSize: 12, color: '#6B8A97', marginBottom: 6 } as React.CSSProperties,
-  cardValue: { fontSize: 28, fontWeight: 700, color: '#FF6B35' } as React.CSSProperties,
+  cardValue: { fontSize: 28, fontWeight: 700, color: txColors.primary } as React.CSSProperties,
   toolbar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 } as React.CSSProperties,
   btn: {
-    background: '#FF6B35', color: '#FFF', border: 'none', borderRadius: 6,
+    background: txColors.primary, color: '#FFF', border: 'none', borderRadius: 6,
     padding: '8px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   } as React.CSSProperties,
   btnSec: {
-    background: 'transparent', color: '#FF6B35', border: '1px solid #FF6B35', borderRadius: 6,
+    background: 'transparent', color: txColors.primary, border: `1px solid ${txColors.primary}`, borderRadius: 6,
     padding: '6px 14px', fontSize: 12, cursor: 'pointer', marginLeft: 6,
   } as React.CSSProperties,
   table: { width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 } as React.CSSProperties,
@@ -56,7 +57,7 @@ type HubMerchant = {
 };
 
 const tierColor: Record<string, string> = {
-  pro: '#FF6B35',
+  pro: txColors.primary,
   standard: '#3B82F6',
   lite: '#6B8A97',
 };
@@ -109,7 +110,7 @@ export function TemplatesPage() {
         {templates.map((t) => (
           <div key={t.id} style={s.card}>
             <div style={s.cardLabel}>{t.name}</div>
-            <div style={{ ...s.cardValue, color: tierColor[t.id] || '#FF6B35' }}>
+            <div style={{ ...s.cardValue, color: tierColor[t.id] || txColors.primary }}>
               {merchants.filter((m) => m.template.toLowerCase() === t.id.toLowerCase()).length}
             </div>
             <div style={{ fontSize: 11, color: '#6B8A97', marginTop: 4 }}>

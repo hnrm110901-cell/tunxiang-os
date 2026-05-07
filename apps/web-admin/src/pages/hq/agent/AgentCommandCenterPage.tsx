@@ -5,6 +5,7 @@
 import { Alert, Button, Card, Col, ConfigProvider, Row, Tag, Timeline } from 'antd';
 import { ProTable, StatisticCard } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 /* ─── 行动队列类型 ─── */
 interface ActionItem {
@@ -71,7 +72,7 @@ const ACTION_COLUMNS: ProColumns<ActionItem>[] = [
     width: 140,
     render: () => (
       <div style={{ display: 'flex', gap: 6 }}>
-        <Button size="small" type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>确认</Button>
+        <Button size="small" type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}>确认</Button>
         <Button size="small" type="default">忽略</Button>
       </div>
     ),
@@ -81,7 +82,7 @@ const ACTION_COLUMNS: ProColumns<ActionItem>[] = [
 /* ─── 主页面 ─── */
 export function AgentCommandCenterPage() {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         <h2 style={{ margin: '0 0 16px', fontSize: 22, fontWeight: 700 }}>运营大盘</h2>
 
@@ -97,8 +98,8 @@ export function AgentCommandCenterPage() {
         <StatisticCard.Group style={{ marginBottom: 24 }}>
           <StatisticCard statistic={{ title: '在线 Agent 数', value: 6, suffix: '个', valueStyle: { color: '#52c41a' } }} />
           <StatisticCard statistic={{ title: '今日行动数',    value: 47, suffix: '次' }} />
-          <StatisticCard statistic={{ title: '待确认',        value: 3,  suffix: '条', valueStyle: { color: '#FF6B35' } }} />
-          <StatisticCard statistic={{ title: '自动处理率',    value: 89, suffix: '%',  valueStyle: { color: '#185FA5' } }} />
+          <StatisticCard statistic={{ title: '待确认',        value: 3,  suffix: '条', valueStyle: { color: txColors.primary } }} />
+          <StatisticCard statistic={{ title: '自动处理率',    value: 89, suffix: '%',  valueStyle: { color: txColors.info } }} />
         </StatisticCard.Group>
 
         {/* 主体：行动队列 + 实时事件流 */}

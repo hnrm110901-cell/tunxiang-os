@@ -8,6 +8,7 @@ import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment } from '../api/tradeApi';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
@@ -161,7 +162,7 @@ export function SplitPayPage() {
                   width: '100%', display: 'flex', alignItems: 'center', gap: 16,
                   padding: 16, marginBottom: 8, borderRadius: 12, textAlign: 'left',
                   background: isSelected ? '#1A3A48' : '#112B36',
-                  border: isSelected ? '2px solid #FF6B35' : '2px solid transparent',
+                  border: isSelected ? `2px solid ${txColors.primary}` : '2px solid transparent',
                   color: '#fff', cursor: step === 'select' ? 'pointer' : 'default',
                   transition: 'transform 200ms ease, border-color 200ms ease',
                   opacity: step !== 'select' ? 0.7 : 1,
@@ -173,7 +174,7 @@ export function SplitPayPage() {
                 <div style={{
                   width: 28, height: 28, borderRadius: 6, flexShrink: 0,
                   border: isSelected ? 'none' : '2px solid #555',
-                  background: isSelected ? '#FF6B35' : 'transparent',
+                  background: isSelected ? txColors.primary : 'transparent',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: '#fff', fontSize: 16, fontWeight: 'bold',
                 }}>
@@ -185,7 +186,7 @@ export function SplitPayPage() {
                     {fen2yuan(item.priceFen)} x {item.quantity}
                   </div>
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 'bold', color: isSelected ? '#FF6B35' : '#fff' }}>
+                <div style={{ fontSize: 18, fontWeight: 'bold', color: isSelected ? txColors.primary : '#fff' }}>
                   {fen2yuan(item.priceFen * item.quantity)}
                 </div>
               </button>
@@ -199,7 +200,7 @@ export function SplitPayPage() {
             <span>已选 {selectedItemIds.size}/{items.length} 项</span>
             <span>未选金额: {fen2yuan(finalFen - selectedTotalFen)}</span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 'bold', color: '#FF6B35', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 22, fontWeight: 'bold', color: txColors.primary, marginBottom: 12 }}>
             <span>选中金额</span>
             <span>{fen2yuan(selectedTotalFen)}</span>
           </div>
@@ -219,7 +220,7 @@ export function SplitPayPage() {
                 style={{
                   flex: 2, padding: 16, border: 'none', borderRadius: 12, color: '#fff',
                   fontSize: 18, fontWeight: 'bold', minHeight: 56,
-                  background: selectedItemIds.size > 0 ? '#FF6B35' : '#444',
+                  background: selectedItemIds.size > 0 ? txColors.primary : '#444',
                   cursor: selectedItemIds.size > 0 ? 'pointer' : 'not-allowed',
                   transition: 'transform 200ms ease', ...tf.style,
                 }}
@@ -231,7 +232,7 @@ export function SplitPayPage() {
               <button
                 onClick={() => { setStep('select'); setPayments([]); }}
                 {...tf.handlers}
-                style={{ flex: 2, padding: 16, background: '#1A3A48', border: '1px solid #FF6B35', borderRadius: 12, color: '#FF6B35', fontSize: 18, cursor: 'pointer', minHeight: 56, ...tf.style }}
+                style={{ flex: 2, padding: 16, background: '#1A3A48', border: `1px solid ${txColors.primary}`, borderRadius: 12, color: txColors.primary, fontSize: 18, cursor: 'pointer', minHeight: 56, ...tf.style }}
               >
                 返回选菜
               </button>
@@ -253,11 +254,11 @@ export function SplitPayPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, marginBottom: 8 }}>
               <span style={{ color: '#8899A6' }}>已分摊</span>
-              <span style={{ color: '#0F6E56' }}>{fen2yuan(paidTotalFen)}</span>
+              <span style={{ color: txColors.success }}>{fen2yuan(paidTotalFen)}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 20, fontWeight: 'bold', borderTop: '1px solid #333', paddingTop: 8 }}>
               <span>待付</span>
-              <span style={{ color: remainingFen > 0 ? '#FF6B35' : '#0F6E56' }}>{fen2yuan(remainingFen)}</span>
+              <span style={{ color: remainingFen > 0 ? txColors.primary : txColors.success }}>{fen2yuan(remainingFen)}</span>
             </div>
           </div>
 
@@ -276,7 +277,7 @@ export function SplitPayPage() {
                       onClick={() => removePayment(p.id)}
                       style={{
                         width: 44, height: 44, borderRadius: 8, border: 'none',
-                        background: '#A32D2D', color: '#fff', fontSize: 18,
+                        background: txColors.danger, color: '#fff', fontSize: 18,
                         cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
                       }}
                     >
@@ -299,7 +300,7 @@ export function SplitPayPage() {
                     onClick={() => setActiveMethod(m.key)}
                     {...tf.handlers}
                     style={{
-                      padding: 12, borderRadius: 8, border: activeMethod === m.key ? '2px solid #FF6B35' : '2px solid transparent',
+                      padding: 12, borderRadius: 8, border: activeMethod === m.key ? `2px solid ${txColors.primary}` : '2px solid transparent',
                       background: activeMethod === m.key ? '#1A3A48' : '#112B36',
                       color: '#fff', fontSize: 16, cursor: 'pointer', minHeight: 48,
                       transition: 'transform 200ms ease', ...tf.style,
@@ -324,7 +325,7 @@ export function SplitPayPage() {
                     borderRadius: 12, background: '#0B1A20', color: '#fff',
                     outline: 'none', boxSizing: 'border-box', textAlign: 'right',
                   }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = txColors.primary; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = '#333'; }}
                 />
                 <button
@@ -363,7 +364,7 @@ export function SplitPayPage() {
             {...tf.handlers}
             style={{
               width: '100%', padding: 16, border: 'none', borderRadius: 12,
-              background: remainingFen === 0 && !submitting ? '#FF6B35' : '#444',
+              background: remainingFen === 0 && !submitting ? txColors.primary : '#444',
               color: '#fff', fontSize: 20, fontWeight: 'bold', marginTop: 'auto',
               cursor: remainingFen === 0 && !submitting ? 'pointer' : 'not-allowed',
               minHeight: 72, transition: 'transform 200ms ease', ...tf.style,

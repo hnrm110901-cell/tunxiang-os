@@ -4,6 +4,7 @@
  * 每10秒从API刷新，纯展示（无用户交互）
  */
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ======================== 类型 ======================== */
 interface WaitlistData {
@@ -95,7 +96,7 @@ export default function QueueDisplayPage() {
     flexShrink: 0,
     height: 160,
     background: 'linear-gradient(90deg, #3d1200 0%, #2a0e00 50%, #3d1200 100%)',
-    borderBottom: '3px solid #FF6B35',
+    borderBottom: `3px solid ${txColors.primary}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -120,7 +121,7 @@ export default function QueueDisplayPage() {
   const storeNameStyle: CSSProperties = {
     fontSize: 36,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
     letterSpacing: 4,
   };
 
@@ -204,7 +205,7 @@ export default function QueueDisplayPage() {
   const waitCountStyle: CSSProperties = {
     fontSize: 140,
     fontWeight: 900,
-    color: '#FF6B35',
+    color: txColors.primary,
     lineHeight: 1,
     fontVariantNumeric: 'tabular-nums',
     textShadow: '0 0 40px rgba(255, 107, 53, 0.5)',
@@ -213,7 +214,7 @@ export default function QueueDisplayPage() {
   const waitUnitStyle: CSSProperties = {
     fontSize: 40,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
   };
 
   const dividerStyle: CSSProperties = {

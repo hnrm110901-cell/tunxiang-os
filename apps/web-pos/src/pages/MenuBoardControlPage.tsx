@@ -10,6 +10,7 @@
  *   - 调用结果实时反馈（成功 / 失败）
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Constants ───
 
@@ -139,7 +140,7 @@ export function MenuBoardControlPage() {
             style={{
               width: 4,
               height: 28,
-              background: '#FF6B35',
+              background: txColors.primary,
               borderRadius: 2,
             }}
           />
@@ -224,7 +225,7 @@ export function MenuBoardControlPage() {
             style={{
               width: '100%',
               background: '#111827',
-              border: `1px solid ${isDirty ? '#FF6B35' : '#374151'}`,
+              border: `1px solid ${isDirty ? txColors.primary : '#374151'}`,
               borderRadius: 10,
               padding: '14px 16px',
               fontSize: 16,
@@ -255,7 +256,7 @@ export function MenuBoardControlPage() {
           <div
             style={{
               background: 'rgba(163, 45, 45, 0.2)',
-              border: '1px solid #A32D2D',
+              border: `1px solid ${txColors.danger}`,
               borderRadius: 8,
               padding: '10px 14px',
               fontSize: 15,
@@ -272,7 +273,7 @@ export function MenuBoardControlPage() {
           <div
             style={{
               background: 'rgba(15, 110, 86, 0.2)',
-              border: '1px solid #0F6E56',
+              border: `1px solid ${txColors.success}`,
               borderRadius: 8,
               padding: '10px 14px',
               fontSize: 15,
@@ -294,7 +295,7 @@ export function MenuBoardControlPage() {
             background:
               isPushing || !draft.trim()
                 ? '#374151'
-                : '#FF6B35',
+                : txColors.primary,
             color: isPushing || !draft.trim() ? '#6B7280' : '#fff',
             border: 'none',
             borderRadius: 12,

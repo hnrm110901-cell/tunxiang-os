@@ -2,6 +2,7 @@
  * 宴请接待 — VIP客户管理、到店弹窗提醒、历史偏好、宴请标记
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 type BanquetType = 'business' | 'family' | 'celebration' | 'other';
 
@@ -31,7 +32,7 @@ interface VIPGuest {
 
 const BANQUET_MAP: Record<BanquetType, { label: string; color: string; bg: string }> = {
   business:    { label: '商务宴请', color: 'var(--tx-info)',    bg: '#EBF3FF' },
-  family:      { label: '家庭聚餐', color: 'var(--tx-success)', bg: '#E8F5F0' },
+  family:      { label: '家庭聚餐', color: 'var(--tx-success)', bg: txColors.successLight },
   celebration: { label: '庆祝宴会', color: '#9333EA',           bg: '#F3E8FF' },
   other:       { label: '其他宴请', color: 'var(--tx-text-2)',  bg: 'var(--tx-bg-3)' },
 };
@@ -184,7 +185,7 @@ export function VIPAlertPage() {
               <div style={{
                 fontSize: 18, fontWeight: 700,
                 color: selectedVip.isArrived ? 'var(--tx-success)' : 'var(--tx-text-3)',
-                background: selectedVip.isArrived ? '#E8F5F0' : 'var(--tx-bg-3)',
+                background: selectedVip.isArrived ? txColors.successLight : 'var(--tx-bg-3)',
                 padding: '8px 16px', borderRadius: 8,
               }}>
                 {selectedVip.isArrived ? '已到店' : '待到店'}
@@ -388,7 +389,7 @@ function VIPCard({
         }}>{bt.label}</span>
         {vip.isArrived && (
           <span style={{
-            background: '#E8F5F0', color: 'var(--tx-success)',
+            background: txColors.successLight, color: 'var(--tx-success)',
             fontSize: 16, fontWeight: 700, padding: '2px 8px', borderRadius: 4,
           }}>已到店</span>
         )}

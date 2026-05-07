@@ -8,6 +8,7 @@
  */
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { apiGet, apiPost } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -63,14 +64,14 @@ interface ReservationStats {
 // ─── 常量 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<ReservationStatus, { label: string; color: string; bg: string }> = {
-  pending:    { label: '待确认', color: '#BA7517', bg: 'rgba(186,117,23,0.10)' },
-  confirmed:  { label: '已确认', color: '#185FA5', bg: 'rgba(24,95,165,0.10)' },
-  arrived:    { label: '已到店', color: '#0F6E56', bg: 'rgba(15,110,86,0.10)' },
+  pending:    { label: '待确认', color: txColors.warning, bg: 'rgba(186,117,23,0.10)' },
+  confirmed:  { label: '已确认', color: txColors.info, bg: 'rgba(24,95,165,0.10)' },
+  arrived:    { label: '已到店', color: txColors.success, bg: 'rgba(15,110,86,0.10)' },
   queuing:    { label: '排队中', color: '#7C3AED', bg: 'rgba(124,58,237,0.10)' },
-  seated:     { label: '已入座', color: '#0F6E56', bg: 'rgba(15,110,86,0.15)' },
+  seated:     { label: '已入座', color: txColors.success, bg: 'rgba(15,110,86,0.15)' },
   completed:  { label: '已完成', color: '#6B7280', bg: 'rgba(107,114,128,0.10)' },
-  cancelled:  { label: '已取消', color: '#A32D2D', bg: 'rgba(163,45,45,0.10)' },
-  no_show:    { label: '爽约',   color: '#A32D2D', bg: 'rgba(163,45,45,0.15)' },
+  cancelled:  { label: '已取消', color: txColors.danger, bg: 'rgba(163,45,45,0.10)' },
+  no_show:    { label: '爽约',   color: txColors.danger, bg: 'rgba(163,45,45,0.15)' },
 };
 
 const TYPE_LABELS: Record<ReservationType, string> = {
@@ -196,7 +197,7 @@ export function ReservationManagePage() {
 
   const pageStyle: React.CSSProperties = { padding: '24px', maxWidth: 1400, margin: '0 auto' };
   const headerStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 };
-  const titleStyle: React.CSSProperties = { fontSize: 20, fontWeight: 600, color: '#1E2A3A' };
+  const titleStyle: React.CSSProperties = { fontSize: 20, fontWeight: 600, color: txColors.navy };
   const subtitleStyle: React.CSSProperties = { fontSize: 13, color: '#6B7280', marginTop: 4 };
 
   return (
@@ -208,7 +209,7 @@ export function ReservationManagePage() {
           <div style={subtitleStyle}>管理门店预定台账，确认/入座/爽约全流程</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowCreateModal(true)} style={{ padding: '8px 16px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>
+          <button onClick={() => setShowCreateModal(true)} style={{ padding: '8px 16px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontWeight: 500, fontSize: 14 }}>
             + 新建预定
           </button>
         </div>
@@ -230,14 +231,14 @@ export function ReservationManagePage() {
       {/* 统计卡片 */}
       {stats && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
-          <StatCard label="今日总预定" value={stats.total} color="#1E2A3A" />
-          <StatCard label="待确认" value={stats.pending} color="#BA7517" />
-          <StatCard label="已确认" value={stats.confirmed} color="#185FA5" />
-          <StatCard label="已到店" value={stats.arrived} color="#0F6E56" />
-          <StatCard label="已入座" value={stats.seated} color="#0F6E56" />
+          <StatCard label="今日总预定" value={stats.total} color={txColors.navy} />
+          <StatCard label="待确认" value={stats.pending} color={txColors.warning} />
+          <StatCard label="已确认" value={stats.confirmed} color={txColors.info} />
+          <StatCard label="已到店" value={stats.arrived} color={txColors.success} />
+          <StatCard label="已入座" value={stats.seated} color={txColors.success} />
           <StatCard label="已完成" value={stats.completed} color="#6B7280" />
-          <StatCard label="已取消" value={stats.cancelled} color="#A32D2D" />
-          <StatCard label="爽约" value={stats.no_show} color="#A32D2D" />
+          <StatCard label="已取消" value={stats.cancelled} color={txColors.danger} />
+          <StatCard label="爽约" value={stats.no_show} color={txColors.danger} />
         </div>
       )}
 
@@ -282,7 +283,7 @@ export function ReservationManagePage() {
                     <td style={cellStyle}>{SOURCE_LABELS[r.source_channel]}</td>
                     <td style={cellStyle}>
                       {r.deposit_required ? (
-                        <span style={{ color: r.deposit_paid ? '#0F6E56' : '#BA7517' }}>
+                        <span style={{ color: r.deposit_paid ? txColors.success : txColors.warning }}>
                           {formatFen(r.deposit_amount_fen)} {r.deposit_paid ? '✓' : '未付'}
                         </span>
                       ) : '—'}
@@ -290,16 +291,16 @@ export function ReservationManagePage() {
                     <td style={cellStyle} onClick={e => e.stopPropagation()}>
                       <div style={{ display: 'flex', gap: 4 }}>
                         {r.status === 'pending' && (
-                          <ActionBtn label="确认" color="#185FA5" onClick={() => openAction(r, 'confirm')} />
+                          <ActionBtn label="确认" color={txColors.info} onClick={() => openAction(r, 'confirm')} />
                         )}
                         {(r.status === 'confirmed' || r.status === 'arrived') && (
-                          <ActionBtn label="入座" color="#0F6E56" onClick={() => openAction(r, 'seat')} />
+                          <ActionBtn label="入座" color={txColors.success} onClick={() => openAction(r, 'seat')} />
                         )}
                         {r.status === 'pending' && (
-                          <ActionBtn label="取消" color="#A32D2D" onClick={() => openAction(r, 'cancel')} />
+                          <ActionBtn label="取消" color={txColors.danger} onClick={() => openAction(r, 'cancel')} />
                         )}
                         {r.status === 'confirmed' && (
-                          <ActionBtn label="爽约" color="#A32D2D" onClick={() => openAction(r, 'no_show')} />
+                          <ActionBtn label="爽约" color={txColors.danger} onClick={() => openAction(r, 'no_show')} />
                         )}
                       </div>
                     </td>
@@ -375,7 +376,7 @@ function DetailDrawer({ reservation: r, onClose, onAction }: { reservation: Rese
   const drawerStyle: React.CSSProperties = { width: 420, maxWidth: '90vw', background: '#fff', height: '100%', overflowY: 'auto', padding: 24, boxShadow: '-4px 0 12px rgba(0,0,0,0.08)' };
   const sectionStyle: React.CSSProperties = { marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid #F3F4F6' };
   const labelStyle: React.CSSProperties = { fontSize: 12, color: '#6B7280', marginBottom: 2 };
-  const valueStyle: React.CSSProperties = { fontSize: 14, color: '#1E2A3A', fontWeight: 500 };
+  const valueStyle: React.CSSProperties = { fontSize: 14, color: txColors.navy, fontWeight: 500 };
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -415,7 +416,7 @@ function DetailDrawer({ reservation: r, onClose, onAction }: { reservation: Rese
           {r.special_requests && (
             <div style={{ marginTop: 8 }}>
               <div style={labelStyle}>特殊要求</div>
-              <div style={{ ...valueStyle, fontWeight: 400, color: '#BA7517', padding: '6px 10px', background: 'rgba(186,117,23,0.06)', borderRadius: 6, marginTop: 4 }}>
+              <div style={{ ...valueStyle, fontWeight: 400, color: txColors.warning, padding: '6px 10px', background: 'rgba(186,117,23,0.06)', borderRadius: 6, marginTop: 4 }}>
                 {r.special_requests}
               </div>
             </div>
@@ -428,7 +429,7 @@ function DetailDrawer({ reservation: r, onClose, onAction }: { reservation: Rese
             <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>定金</div>
             <div style={{ display: 'flex', gap: 16 }}>
               <div><div style={labelStyle}>金额</div><div style={valueStyle}>{formatFen(r.deposit_amount_fen)}</div></div>
-              <div><div style={labelStyle}>状态</div><div style={{ ...valueStyle, color: r.deposit_paid ? '#0F6E56' : '#A32D2D' }}>{r.deposit_paid ? '已支付' : '未支付'}</div></div>
+              <div><div style={labelStyle}>状态</div><div style={{ ...valueStyle, color: r.deposit_paid ? txColors.success : txColors.danger }}>{r.deposit_paid ? '已支付' : '未支付'}</div></div>
             </div>
           </div>
         )}
@@ -447,11 +448,11 @@ function DetailDrawer({ reservation: r, onClose, onAction }: { reservation: Rese
 
         {/* 操作按钮 */}
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {r.status === 'pending' && <ActionBtn label="确认预定" color="#185FA5" onClick={() => onAction('confirm')} />}
-          {r.status === 'pending' && <ActionBtn label="取消预定" color="#A32D2D" onClick={() => onAction('cancel')} />}
-          {(r.status === 'confirmed' || r.status === 'arrived') && <ActionBtn label="安排入座" color="#0F6E56" onClick={() => onAction('seat')} />}
-          {r.status === 'confirmed' && <ActionBtn label="记录爽约" color="#A32D2D" onClick={() => onAction('no_show')} />}
-          {r.status === 'seated' && <ActionBtn label="完成用餐" color="#0F6E56" onClick={() => onAction('complete')} />}
+          {r.status === 'pending' && <ActionBtn label="确认预定" color={txColors.info} onClick={() => onAction('confirm')} />}
+          {r.status === 'pending' && <ActionBtn label="取消预定" color={txColors.danger} onClick={() => onAction('cancel')} />}
+          {(r.status === 'confirmed' || r.status === 'arrived') && <ActionBtn label="安排入座" color={txColors.success} onClick={() => onAction('seat')} />}
+          {r.status === 'confirmed' && <ActionBtn label="记录爽约" color={txColors.danger} onClick={() => onAction('no_show')} />}
+          {r.status === 'seated' && <ActionBtn label="完成用餐" color={txColors.success} onClick={() => onAction('complete')} />}
         </div>
       </div>
     </div>
@@ -518,7 +519,7 @@ function ActionModal({ reservation: r, action, onConfirm, onCancel }: {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button onClick={onCancel} style={{ padding: '8px 16px', border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 14 }}>取消</button>
-          <button onClick={handleSubmit} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: action === 'cancel' || action === 'no_show' ? '#A32D2D' : '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
+          <button onClick={handleSubmit} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: action === 'cancel' || action === 'no_show' ? txColors.danger : txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500 }}>
             {actionLabels[action]}
           </button>
         </div>
@@ -609,7 +610,7 @@ function CreateModal({ storeId, onSuccess, onCancel }: { storeId: string; onSucc
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
           <button onClick={onCancel} style={{ padding: '8px 16px', border: '1px solid #D1D5DB', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 14 }}>取消</button>
-          <button onClick={handleSubmit} disabled={submitting} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: '#FF6B35', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500, opacity: submitting ? 0.6 : 1 }}>
+          <button onClick={handleSubmit} disabled={submitting} style={{ padding: '8px 16px', border: 'none', borderRadius: 6, background: txColors.primary, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 500, opacity: submitting ? 0.6 : 1 }}>
             {submitting ? '提交中...' : '创建预定'}
           </button>
         </div>

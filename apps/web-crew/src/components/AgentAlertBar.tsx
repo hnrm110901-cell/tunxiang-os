@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * AgentAlertBar — Agent 顶部预警条（web-crew）
  * Sprint 1: 运营指挥官基础层
@@ -27,18 +28,18 @@ const DEFAULT_ALERTS: AgentAlert[] = [
 const LEVEL_STYLE: Record<AgentAlert['level'], { background: string; borderBottom: string; color: string }> = {
   critical: {
     background: 'rgba(163,45,45,.1)',
-    borderBottom: '2px solid #A32D2D',
-    color: '#A32D2D',
+    borderBottom: `2px solid ${txColors.danger}`,
+    color: txColors.danger,
   },
   warning: {
     background: 'rgba(186,117,23,.1)',
-    borderBottom: '2px solid #BA7517',
-    color: '#BA7517',
+    borderBottom: `2px solid ${txColors.warning}`,
+    color: txColors.warning,
   },
   info: {
     background: 'rgba(24,95,165,.08)',
-    borderBottom: '2px solid #185FA5',
-    color: '#185FA5',
+    borderBottom: `2px solid ${txColors.info}`,
+    color: txColors.info,
   },
 };
 

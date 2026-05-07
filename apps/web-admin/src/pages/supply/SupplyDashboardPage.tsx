@@ -33,6 +33,7 @@ import { useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 
@@ -168,7 +169,7 @@ export function SupplyDashboardPage() {
       title: '当前库存',
       key: 'current',
       render: (_: unknown, r: LowStockItem) => (
-        <Text style={{ color: '#A32D2D', fontWeight: 600 }}>
+        <Text style={{ color: txColors.danger, fontWeight: 600 }}>
           {r.current_quantity} {r.unit}
         </Text>
       ),
@@ -237,33 +238,33 @@ export function SupplyDashboardPage() {
               </Card>
             </Col>
             <Col span={6}>
-              <Card bordered={false} style={{ borderLeft: '4px solid #A32D2D' }}>
+              <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.danger}` }}>
                 <Statistic
                   title="临期食材"
                   value={expirySummary?.urgent_count ?? 0}
                   suffix="种（≤3天）"
-                  valueStyle={{ color: '#A32D2D', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.danger, fontWeight: 700 }}
                   prefix={<ExclamationCircleOutlined />}
                 />
               </Card>
             </Col>
             <Col span={6}>
-              <Card bordered={false} style={{ borderLeft: '4px solid #BA7517' }}>
+              <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.warning}` }}>
                 <Statistic
                   title="低库存食材"
                   value={inventorySummary?.low_stock_count ?? 0}
                   suffix="种"
-                  valueStyle={{ color: '#BA7517', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.warning, fontWeight: 700 }}
                   prefix={<WarningOutlined />}
                 />
               </Card>
             </Col>
             <Col span={6}>
-              <Card bordered={false} style={{ borderLeft: '4px solid #0F6E56' }}>
+              <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.success}` }}>
                 <Statistic
                   title="食安检查合格率"
                   value={safetyStats?.pass_rate != null ? `${safetyStats.pass_rate}%` : '—'}
-                  valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.success, fontWeight: 700 }}
                   prefix={<CheckCircleOutlined />}
                 />
               </Card>
@@ -281,7 +282,7 @@ export function SupplyDashboardPage() {
                 bordered={false}
                 title={
                   <Space>
-                    <WarningOutlined style={{ color: '#BA7517' }} />
+                    <WarningOutlined style={{ color: txColors.warning }} />
                     <Text strong>库存不足商品</Text>
                     <Tag color="warning">{lowStockItems.length} 种</Tag>
                   </Space>
@@ -306,7 +307,7 @@ export function SupplyDashboardPage() {
                 bordered={false}
                 title={
                   <Space>
-                    <ExclamationCircleOutlined style={{ color: '#A32D2D' }} />
+                    <ExclamationCircleOutlined style={{ color: txColors.danger }} />
                     <Text strong>临期食材 Top 5</Text>
                     <Tag color="error">需关注</Tag>
                   </Space>
@@ -334,7 +335,7 @@ export function SupplyDashboardPage() {
                               width: 8,
                               height: 8,
                               borderRadius: '50%',
-                              background: item.days_remaining <= 3 ? '#A32D2D' : item.days_remaining <= 7 ? '#D46B08' : '#BA7517',
+                              background: item.days_remaining <= 3 ? txColors.danger : item.days_remaining <= 7 ? '#D46B08' : txColors.warning,
                               flexShrink: 0,
                             }}
                           />
@@ -369,7 +370,7 @@ export function SupplyDashboardPage() {
                 size="large"
                 icon={<ShoppingCartOutlined />}
                 onClick={() => navigate('/supply/purchase-orders')}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                style={{ background: txColors.primary, borderColor: txColors.primary }}
               >
                 新建采购单
               </Button>
@@ -377,7 +378,7 @@ export function SupplyDashboardPage() {
                 size="large"
                 icon={<ExclamationCircleOutlined />}
                 onClick={() => navigate('/supply/expiry-alerts')}
-                style={{ color: '#A32D2D', borderColor: '#A32D2D' }}
+                style={{ color: txColors.danger, borderColor: txColors.danger }}
               >
                 查看临期预警
               </Button>

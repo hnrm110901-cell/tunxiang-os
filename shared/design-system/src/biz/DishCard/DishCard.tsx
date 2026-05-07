@@ -10,9 +10,10 @@ import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';
 import type { DishCardProps } from './types';
 import styles from './DishCard.module.css';
+import { txColors } from '@tx/tokens';
 
 const TAG_COLORS: Record<string, string> = {
-  signature: '#FF6B2C',
+  signature: txColors.primary,
   new: '#22C55E',
   spicy1: '#F59E0B',
   spicy2: '#EF4444',

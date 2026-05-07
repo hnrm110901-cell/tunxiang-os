@@ -1,10 +1,11 @@
+import { txColors } from '@tx/tokens';
 // Brand color palette
 export const colors = {
   // Primary brand
-  brand: '#FF6B35',
-  brandActive: '#E55A28',
-  brandDark: '#E55A28',
-  brandLight: '#FFF3ED',
+  brand: txColors.primary,
+  brandActive: txColors.primaryActive,
+  brandDark: txColors.primaryActive,
+  brandLight: txColors.primaryLight,
 
   // Background layers
   appBg: '#0B1A20',

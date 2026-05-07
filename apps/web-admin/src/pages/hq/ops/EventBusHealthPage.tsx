@@ -4,6 +4,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -53,8 +54,8 @@ const REFRESH_INTERVAL = 30_000; // 30秒
 
 function getStreamStatus(length: number): { label: string; color: string; bg: string } {
   if (length >= 5000) return { label: '积压严重', color: '#FF4D4D', bg: '#FF4D4D22' };
-  if (length >= 1000) return { label: '积压警告', color: '#BA7517', bg: '#BA751722' };
-  return { label: '正常', color: '#0F6E56', bg: '#0F6E5622' };
+  if (length >= 1000) return { label: '积压警告', color: txColors.warning, bg: `${txColors.warning}22` };
+  return { label: '正常', color: txColors.success, bg: `${txColors.success}22` };
 }
 
 function formatNumber(n: number): string {
@@ -68,13 +69,13 @@ function CheckCard({ title, ok, detail }: { title: string; ok: boolean; detail?:
   return (
     <div style={{
       background: '#1a2a33', borderRadius: 8, padding: '12px 16px',
-      border: `1px solid ${ok ? '#0F6E5644' : '#A32D2D44'}`,
+      border: `1px solid ${ok ? `${txColors.success}44` : `${txColors.danger}44`}`,
       display: 'flex', alignItems: 'center', gap: 12,
     }}>
       <span style={{ fontSize: 20 }}>{ok ? '✅' : '❌'}</span>
       <div>
         <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{title}</div>
-        {detail && <div style={{ color: ok ? '#0F6E56' : '#A32D2D', fontSize: 12, marginTop: 2 }}>{detail}</div>}
+        {detail && <div style={{ color: ok ? txColors.success : txColors.danger, fontSize: 12, marginTop: 2 }}>{detail}</div>}
       </div>
     </div>
   );
@@ -154,8 +155,8 @@ export function EventBusHealthPage() {
         <>
           {/* 整体健康状态 */}
           <div style={{
-            background: isHealthy ? '#0F6E5622' : '#A32D2D22',
-            border: `2px solid ${isHealthy ? '#0F6E56' : '#A32D2D'}`,
+            background: isHealthy ? `${txColors.success}22` : `${txColors.danger}22`,
+            border: `2px solid ${isHealthy ? txColors.success : txColors.danger}`,
             borderRadius: 12, padding: '20px 24px', marginBottom: 24,
             display: 'flex', alignItems: 'center', gap: 20,
           }}>
@@ -163,7 +164,7 @@ export function EventBusHealthPage() {
             <div style={{ flex: 1 }}>
               <div style={{
                 fontSize: 22, fontWeight: 700,
-                color: isHealthy ? '#0F6E56' : '#BA7517',
+                color: isHealthy ? txColors.success : txColors.warning,
               }}>
                 系统状态：{isHealthy ? 'HEALTHY' : 'DEGRADED'}
               </div>
@@ -241,18 +242,18 @@ export function EventBusHealthPage() {
                       </td>
                       <td style={{ padding: '14px 16px' }}>
                         {totalPending > 0 ? (
-                          <span style={{ color: '#BA7517', fontSize: 13 }}>
+                          <span style={{ color: txColors.warning, fontSize: 13 }}>
                             {totalPending} 条待确认
                           </span>
                         ) : (
-                          <span style={{ color: '#0F6E56', fontSize: 13 }}>✓ 无积压</span>
+                          <span style={{ color: txColors.success, fontSize: 13 }}>✓ 无积压</span>
                         )}
                       </td>
                       <td style={{ padding: '14px 16px', width: 160 }}>
                         <div style={{ height: 6, background: '#0d1e28', borderRadius: 3, overflow: 'hidden' }}>
                           <div style={{
                             width: `${barPct}%`, height: '100%', borderRadius: 3,
-                            background: barPct >= 100 ? '#FF4D4D' : barPct >= 20 ? '#BA7517' : '#0F6E56',
+                            background: barPct >= 100 ? '#FF4D4D' : barPct >= 20 ? txColors.warning : txColors.success,
                             transition: 'width 0.4s ease',
                           }} />
                         </div>
@@ -277,8 +278,8 @@ export function EventBusHealthPage() {
 
           {/* 积压说明 */}
           <div style={{ display: 'flex', gap: 20, marginTop: 16, color: '#888', fontSize: 12 }}>
-            <span>● <span style={{ color: '#0F6E56' }}>正常</span>：&lt; 1,000 条</span>
-            <span>● <span style={{ color: '#BA7517' }}>积压警告</span>：1,000 – 4,999 条</span>
+            <span>● <span style={{ color: txColors.success }}>正常</span>：&lt; 1,000 条</span>
+            <span>● <span style={{ color: txColors.warning }}>积压警告</span>：1,000 – 4,999 条</span>
             <span>● <span style={{ color: '#FF4D4D' }}>积压严重</span>：≥ 5,000 条（需排查消费者）</span>
           </div>
         </>

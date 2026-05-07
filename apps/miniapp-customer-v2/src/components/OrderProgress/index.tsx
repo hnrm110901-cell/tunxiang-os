@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 import { View, Text } from '@tarojs/components'
 import React from 'react'
 
@@ -18,7 +19,7 @@ function getCurrentIndex(steps: ProgressStep[]): number {
   return firstPending === -1 ? steps.length - 1 : firstPending
 }
 
-const BRAND = '#FF6B35'
+const BRAND = txColors.primary
 const GREY  = '#2A4050'
 const GREY_TEXT = '#6B8A96'
 

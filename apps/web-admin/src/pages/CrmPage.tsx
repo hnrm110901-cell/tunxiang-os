@@ -8,6 +8,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { txFetchData } from '../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 工具函数 ──────────────────────────────────────────────────
 
@@ -587,7 +588,7 @@ export function CrmPage() {
           <StatCard
             label="平均客单价"
             value={overview ? `¥${fenToYuan(overview.avg_order_value_fen)}` : '—'}
-            accent="#FF6B35"
+            accent={txColors.primary}
           />
         </div>
       )}

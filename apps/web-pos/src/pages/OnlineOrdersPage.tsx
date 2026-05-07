@@ -19,6 +19,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getStoreToken } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -223,9 +224,9 @@ function getRemainingSeconds(createdAt: string): number {
 
 function countdownColor(rem: number): string {
   const ratio = rem / AUTO_REJECT_SECONDS;
-  if (ratio > 0.5) return '#0F6E56';
-  if (ratio > 0.2) return '#BA7517';
-  return '#A32D2D';
+  if (ratio > 0.5) return txColors.success;
+  if (ratio > 0.2) return txColors.warning;
+  return txColors.danger;
 }
 
 function playNewOrderSound(): void {
@@ -486,7 +487,7 @@ function RefundSheet({
               minHeight: 56,
               border: 'none',
               borderRadius: 12,
-              background: '#A32D2D',
+              background: txColors.danger,
               color: '#fff',
               cursor: 'pointer',
               fontSize: 18,
@@ -530,7 +531,7 @@ function OrderCard({
           background: '#fff',
           borderRadius: 12,
           padding: 16,
-          border: isPending ? '2px solid #FF6B35' : '1.5px solid #E8E6E1',
+          border: isPending ? `2px solid ${txColors.primary}` : '1.5px solid #E8E6E1',
           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
           marginBottom: 12,
         }}
@@ -584,10 +585,10 @@ function OrderCard({
           <div
             style={{
               padding: '6px 10px',
-              background: '#FFF3ED',
+              background: txColors.primaryLight,
               borderRadius: 8,
               fontSize: 16,
-              color: '#FF6B35',
+              color: txColors.primary,
               marginBottom: 10,
             }}
           >
@@ -627,7 +628,7 @@ function OrderCard({
                 minHeight: 56,
                 borderRadius: 12,
                 border: 'none',
-                background: '#0F6E56',
+                background: txColors.success,
                 color: '#fff',
                 fontSize: 18,
                 fontWeight: 700,
@@ -674,7 +675,7 @@ function OrderCard({
         {/* 备餐中状态 + 退单按钮 */}
         {isConfirmed && (
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 18, color: '#BA7517', fontWeight: 600 }}>
+            <span style={{ fontSize: 18, color: txColors.warning, fontWeight: 600 }}>
               {order.status === 'preparing' ? '配餐中' : '已接单'}
             </span>
             <button
@@ -685,7 +686,7 @@ function OrderCard({
                 border: '1.5px solid #E8E6E1',
                 borderRadius: 10,
                 background: '#F8F7F5',
-                color: '#A32D2D',
+                color: txColors.danger,
                 fontSize: 16,
                 cursor: 'pointer',
                 fontFamily: 'inherit',
@@ -699,14 +700,14 @@ function OrderCard({
 
         {/* 已退单标签 */}
         {order.status === 'refunded' && (
-          <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 18, color: '#A32D2D', fontWeight: 600 }}>
+          <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 18, color: txColors.danger, fontWeight: 600 }}>
             已退单
           </div>
         )}
 
         {/* 已完成标签 */}
         {order.status === 'completed' && (
-          <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 18, color: '#0F6E56', fontWeight: 600 }}>
+          <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 18, color: txColors.success, fontWeight: 600 }}>
             已完成
           </div>
         )}
@@ -766,9 +767,9 @@ function PlatformTabs({
               minHeight: 48,
               padding: '0 16px',
               borderRadius: 10,
-              border: isActive ? '2px solid #0F6E56' : '1.5px solid #E8E6E1',
+              border: isActive ? `2px solid ${txColors.success}` : '1.5px solid #E8E6E1',
               background: isActive ? '#E6F5F0' : '#fff',
-              color: isActive ? '#0F6E56' : '#5F5E5A',
+              color: isActive ? txColors.success : '#5F5E5A',
               fontSize: 16,
               fontWeight: isActive ? 700 : 500,
               cursor: 'pointer',
@@ -1057,7 +1058,7 @@ export function OnlineOrdersPage() {
                 padding: '10px 12px',
                 background: '#F8F7F5',
                 borderRadius: '10px 10px 0 0',
-                borderBottom: '3px solid #FF6B35',
+                borderBottom: `3px solid ${txColors.primary}`,
                 marginBottom: 12,
               }}
             >
@@ -1103,7 +1104,7 @@ export function OnlineOrdersPage() {
                 padding: '10px 12px',
                 background: '#F8F7F5',
                 borderRadius: '10px 10px 0 0',
-                borderBottom: '3px solid #0F6E56',
+                borderBottom: `3px solid ${txColors.success}`,
                 marginBottom: 12,
               }}
             >
@@ -1113,7 +1114,7 @@ export function OnlineOrdersPage() {
                   minWidth: 28,
                   height: 28,
                   borderRadius: 14,
-                  background: '#0F6E56',
+                  background: txColors.success,
                   color: '#fff',
                   fontSize: 15,
                   fontWeight: 700,
@@ -1147,7 +1148,7 @@ export function OnlineOrdersPage() {
             bottom: 32,
             left: '50%',
             transform: 'translateX(-50%)',
-            background: toast.type === 'error' ? '#A32D2D' : '#0F6E56',
+            background: toast.type === 'error' ? txColors.danger : txColors.success,
             color: '#fff',
             padding: '12px 24px',
             borderRadius: 10,

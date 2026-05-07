@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import type { ElementType, TemplateElement } from '../../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 
 // ─── 元素目录配置 ───
 
@@ -256,7 +257,7 @@ function ElementCard({ meta, onAdd }: ElementCardProps) {
       <span style={{ color: 'var(--text-2, #ccc)', flex: 1 }}>{meta.label}</span>
       <span style={{
         fontSize: 10,
-        color: hovered ? 'var(--brand, #FF6B35)' : 'transparent',
+        color: hovered ? `var(--brand, ${txColors.primary})` : 'transparent',
         transition: 'color 0.15s',
       }}>
         +

@@ -7,6 +7,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -51,8 +52,8 @@ function getAlertLevel(createdAt: number, timeLimitMin: number): AlertLevel {
 
 const LEVEL_STYLES: Record<AlertLevel, { bg: string; border: string; timeColor: string; label: string }> = {
   normal: { bg: '#111', border: '#333', timeColor: '#E0E0E0', label: '即将超时' },
-  warning: { bg: '#1a1500', border: '#BA7517', timeColor: '#BA7517', label: '已超时' },
-  critical: { bg: '#1a0505', border: '#A32D2D', timeColor: '#ff4d4f', label: '严重超时' },
+  warning: { bg: '#1a1500', border: txColors.warning, timeColor: txColors.warning, label: '已超时' },
+  critical: { bg: '#1a0505', border: txColors.danger, timeColor: '#ff4d4f', label: '严重超时' },
 };
 
 function formatOvertime(createdAt: number, timeLimitMin: number): string {
@@ -121,13 +122,13 @@ export function TimeoutAlert() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         marginBottom: 20,
       }}>
-        <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>
+        <h1 style={{ margin: 0, fontSize: 28, color: txColors.primary }}>
           超时预警
           {activeAlerts.length > 0 && (
             <span style={{
               display: 'inline-block', marginLeft: 12, fontSize: 20,
               padding: '4px 14px', borderRadius: 12,
-              background: '#A32D2D', color: '#fff',
+              background: txColors.danger, color: '#fff',
               animation: 'timeout-pulse 1.5s infinite',
             }}>
               {activeAlerts.length}
@@ -140,7 +141,7 @@ export function TimeoutAlert() {
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
         <button
           onClick={() => setTab('active')}
-          style={tabStyle(tab === 'active', '#A32D2D')}
+          style={tabStyle(tab === 'active', txColors.danger)}
           onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
           onTouchEnd={e => (e.currentTarget.style.transform = 'scale(1)')}
         >
@@ -160,7 +161,7 @@ export function TimeoutAlert() {
       {tab === 'active' && (
         <div>
           {activeAlerts.length === 0 && (
-            <div style={{ textAlign: 'center', padding: 80, color: '#0F6E56', fontSize: 24 }}>
+            <div style={{ textAlign: 'center', padding: 80, color: txColors.success, fontSize: 24 }}>
               当前无超时订单
             </div>
           )}
@@ -182,7 +183,7 @@ export function TimeoutAlert() {
                     <span style={{ fontSize: 32, fontWeight: 'bold', color: '#fff' }}>{alert.tableNo}</span>
                     <span style={{ fontSize: 16, color: '#666' }}>#{alert.orderNo}</span>
                     {alert.priority === 'rush' && (
-                      <span style={{ fontSize: 16, padding: '2px 10px', borderRadius: 6, background: '#A32D2D', color: '#fff', fontWeight: 'bold' }}>催</span>
+                      <span style={{ fontSize: 16, padding: '2px 10px', borderRadius: 6, background: txColors.danger, color: '#fff', fontWeight: 'bold' }}>催</span>
                     )}
                     {alert.priority === 'vip' && (
                       <span style={{ fontSize: 16, padding: '2px 10px', borderRadius: 6, background: 'linear-gradient(135deg, #C5A347, #E8D48B)', color: '#1a1a00', fontWeight: 'bold' }}>VIP</span>
@@ -226,7 +227,7 @@ export function TimeoutAlert() {
                   <button
                     onClick={() => handleResolve(alert.id)}
                     style={{
-                      padding: '12px 32px', background: '#0F6E56', color: '#fff',
+                      padding: '12px 32px', background: txColors.success, color: '#fff',
                       border: 'none', borderRadius: 8, cursor: 'pointer',
                       fontSize: 18, fontWeight: 'bold', minHeight: 48,
                       transition: 'transform 200ms ease',
@@ -258,7 +259,7 @@ export function TimeoutAlert() {
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{
-                    fontSize: 20, fontWeight: 'bold', color: '#BA7517',
+                    fontSize: 20, fontWeight: 'bold', color: txColors.warning,
                     fontFamily: 'JetBrains Mono, monospace',
                   }}>
                     {Math.floor((alert.resolvedAt! - alert.createdAt) / 60000)}'

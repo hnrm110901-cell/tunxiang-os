@@ -4,6 +4,7 @@
  * 最小点击区48px，最小字体16px，inline style
  */
 import { useState, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ── 类型 ──────────────────────────────────────────────────
 type DishStatus = 'soldout' | 'available';
@@ -115,7 +116,7 @@ function SoldoutModal({ dish, onConfirm, onCancel }: SoldoutModalProps) {
           标记沽清
         </div>
         <div style={{
-          fontSize: 18, fontWeight: 600, color: '#A32D2D',
+          fontSize: 18, fontWeight: 600, color: txColors.danger,
           marginBottom: 24, paddingBottom: 20,
           borderBottom: '1px solid #E8E6E1',
         }}>
@@ -134,9 +135,9 @@ function SoldoutModal({ dish, onConfirm, onCancel }: SoldoutModalProps) {
                 style={{
                   ...btnBase,
                   height: 56, padding: '0 16px',
-                  background: isSelected ? '#FFF3ED' : '#F8F7F5',
-                  color: isSelected ? '#FF6B35' : '#2C2C2A',
-                  border: isSelected ? '2px solid #FF6B35' : '2px solid transparent',
+                  background: isSelected ? txColors.primaryLight : '#F8F7F5',
+                  color: isSelected ? txColors.primary : '#2C2C2A',
+                  border: isSelected ? `2px solid ${txColors.primary}` : '2px solid transparent',
                   fontSize: 17,
                 }}
               >
@@ -162,7 +163,7 @@ function SoldoutModal({ dish, onConfirm, onCancel }: SoldoutModalProps) {
             disabled={!selectedReason}
             style={{
               ...btnBase, flex: 2, height: 56,
-              background: selectedReason ? '#A32D2D' : '#ccc',
+              background: selectedReason ? txColors.danger : '#ccc',
               color: '#fff', fontSize: 17,
               opacity: selectedReason ? 1 : 0.5,
               cursor: selectedReason ? 'pointer' : 'not-allowed',
@@ -195,7 +196,7 @@ function DishRow({ dish, selected, multiSelectMode, onToggleSelect, onMarkSoldou
       style={{
         display: 'flex', alignItems: 'center',
         minHeight: 72, padding: '12px 20px', gap: 16,
-        background: selected ? '#FFF3ED' : isSoldout ? '#FFF8F8' : '#fff',
+        background: selected ? txColors.primaryLight : isSoldout ? '#FFF8F8' : '#fff',
         borderBottom: '1px solid #E8E6E1',
         cursor: multiSelectMode ? 'pointer' : 'default',
         transition: 'background 150ms',
@@ -205,8 +206,8 @@ function DishRow({ dish, selected, multiSelectMode, onToggleSelect, onMarkSoldou
       {multiSelectMode && (
         <div style={{
           width: 28, height: 28, borderRadius: 6, flexShrink: 0,
-          border: `2px solid ${selected ? '#FF6B35' : '#B4B2A9'}`,
-          background: selected ? '#FF6B35' : '#fff',
+          border: `2px solid ${selected ? txColors.primary : '#B4B2A9'}`,
+          background: selected ? txColors.primary : '#fff',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
           {selected && (
@@ -224,7 +225,7 @@ function DishRow({ dish, selected, multiSelectMode, onToggleSelect, onMarkSoldou
         }}>
           <span style={{
             fontSize: 20, fontWeight: 600,
-            color: isSoldout ? '#A32D2D' : '#2C2C2A',
+            color: isSoldout ? txColors.danger : '#2C2C2A',
             textDecoration: isSoldout ? 'line-through' : 'none',
           }}>
             {dish.name}
@@ -234,7 +235,7 @@ function DishRow({ dish, selected, multiSelectMode, onToggleSelect, onMarkSoldou
             display: 'inline-flex', alignItems: 'center',
             padding: '2px 10px', borderRadius: 20, fontSize: 14, fontWeight: 600,
             background: isSoldout ? '#FDEDED' : '#EEF7F3',
-            color: isSoldout ? '#A32D2D' : '#0F6E56',
+            color: isSoldout ? txColors.danger : txColors.success,
           }}>
             {isSoldout ? '已沽清' : '可供应'}
           </span>
@@ -242,7 +243,7 @@ function DishRow({ dish, selected, multiSelectMode, onToggleSelect, onMarkSoldou
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <span style={{ fontSize: 16, color: '#5F5E5A' }}>{dish.category}</span>
           {dish.stock != null && !isSoldout && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>剩余 {dish.stock} 份</span>
+            <span style={{ fontSize: 16, color: txColors.warning }}>剩余 {dish.stock} 份</span>
           )}
           {isSoldout && dish.soldout_at && (
             <span style={{ fontSize: 16, color: '#B4B2A9' }}>
@@ -275,7 +276,7 @@ function RestoreButton({ dishId, onRestore }: { dishId: string; onRestore: (id: 
       style={{
         ...btnBase,
         height: 48, padding: '0 20px',
-        background: '#0F6E56', color: '#fff', fontSize: 16,
+        background: txColors.success, color: '#fff', fontSize: 16,
         transform: pressed ? 'scale(0.97)' : 'scale(1)',
       }}
     >
@@ -293,7 +294,7 @@ function MarkSoldoutButton({ dish, onMark }: { dish: Dish; onMark: (d: Dish) => 
       style={{
         ...btnBase,
         height: 48, padding: '0 20px',
-        background: '#A32D2D', color: '#fff', fontSize: 16,
+        background: txColors.danger, color: '#fff', fontSize: 16,
         transform: pressed ? 'scale(0.97)' : 'scale(1)',
       }}
     >
@@ -424,7 +425,7 @@ export function SoldOutPage() {
             <div style={{ fontSize: 24, fontWeight: 700, color: '#2C2C2A' }}>菜品沽清管理</div>
             <div style={{ fontSize: 16, color: '#5F5E5A', marginTop: 2 }}>
               当前已沽清
-              <span style={{ color: '#A32D2D', fontWeight: 700, margin: '0 4px' }}>{soldoutCount}</span>
+              <span style={{ color: txColors.danger, fontWeight: 700, margin: '0 4px' }}>{soldoutCount}</span>
               道菜品
             </div>
           </div>
@@ -474,7 +475,7 @@ export function SoldOutPage() {
                 onClick={() => setActiveCategory(cat)}
                 style={{
                   ...btnBase, flexShrink: 0, height: 40, padding: '0 18px',
-                  background: isActive ? '#FF6B35' : '#F0EDE6',
+                  background: isActive ? txColors.primary : '#F0EDE6',
                   color: isActive ? '#fff' : '#5F5E5A',
                   fontSize: 16, fontWeight: isActive ? 600 : 400,
                   borderRadius: 20,
@@ -497,19 +498,19 @@ export function SoldOutPage() {
                 style={{
                   ...btnBase, height: 40, padding: '0 18px',
                   background: isActive
-                    ? (val === 'soldout' ? '#FDEDED' : val === 'available' ? '#EEF7F3' : '#FFF3ED')
+                    ? (val === 'soldout' ? '#FDEDED' : val === 'available' ? '#EEF7F3' : txColors.primaryLight)
                     : '#F8F7F5',
                   color: isActive
-                    ? (val === 'soldout' ? '#A32D2D' : val === 'available' ? '#0F6E56' : '#FF6B35')
+                    ? (val === 'soldout' ? txColors.danger : val === 'available' ? txColors.success : txColors.primary)
                     : '#5F5E5A',
-                  border: isActive ? `2px solid ${val === 'soldout' ? '#A32D2D' : val === 'available' ? '#0F6E56' : '#FF6B35'}` : '2px solid transparent',
+                  border: isActive ? `2px solid ${val === 'soldout' ? txColors.danger : val === 'available' ? txColors.success : txColors.primary}` : '2px solid transparent',
                   fontSize: 16, fontWeight: isActive ? 600 : 400, borderRadius: 20,
                 }}
               >
                 {label}
                 {val === 'soldout' && soldoutCount > 0 && (
                   <span style={{
-                    marginLeft: 6, background: '#A32D2D', color: '#fff',
+                    marginLeft: 6, background: txColors.danger, color: '#fff',
                     borderRadius: 10, padding: '0 6px', fontSize: 13, fontWeight: 700,
                   }}>
                     {soldoutCount}
@@ -570,9 +571,9 @@ export function SoldOutPage() {
           onClick={toggleMultiSelect}
           style={{
             ...btnBase, height: 52, padding: '0 20px', flexShrink: 0,
-            background: multiSelectMode ? '#FFF3ED' : '#F0EDE6',
-            color: multiSelectMode ? '#FF6B35' : '#5F5E5A',
-            border: multiSelectMode ? '2px solid #FF6B35' : '2px solid transparent',
+            background: multiSelectMode ? txColors.primaryLight : '#F0EDE6',
+            color: multiSelectMode ? txColors.primary : '#5F5E5A',
+            border: multiSelectMode ? `2px solid ${txColors.primary}` : '2px solid transparent',
             fontSize: 16,
           }}
         >
@@ -584,7 +585,7 @@ export function SoldOutPage() {
             {/* 已选数量 */}
             <div style={{ flex: 1, fontSize: 17, color: '#5F5E5A', fontWeight: 500 }}>
               已选
-              <span style={{ color: '#FF6B35', fontWeight: 700, margin: '0 4px' }}>
+              <span style={{ color: txColors.primary, fontWeight: 700, margin: '0 4px' }}>
                 {selectedIds.size}
               </span>
               项
@@ -597,8 +598,8 @@ export function SoldOutPage() {
               style={{
                 ...btnBase, height: 52, padding: '0 20px', flexShrink: 0,
                 background: selectedIds.size > 0 ? '#EEF7F3' : '#F0EDE6',
-                color: selectedIds.size > 0 ? '#0F6E56' : '#B4B2A9',
-                border: selectedIds.size > 0 ? '2px solid #0F6E56' : '2px solid transparent',
+                color: selectedIds.size > 0 ? txColors.success : '#B4B2A9',
+                border: selectedIds.size > 0 ? `2px solid ${txColors.success}` : '2px solid transparent',
                 fontSize: 16, fontWeight: 600,
                 cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed',
               }}
@@ -612,7 +613,7 @@ export function SoldOutPage() {
               disabled={selectedIds.size === 0}
               style={{
                 ...btnBase, height: 52, padding: '0 24px', flexShrink: 0,
-                background: selectedIds.size > 0 ? '#A32D2D' : '#ccc',
+                background: selectedIds.size > 0 ? txColors.danger : '#ccc',
                 color: '#fff', fontSize: 16, fontWeight: 600,
                 cursor: selectedIds.size > 0 ? 'pointer' : 'not-allowed',
               }}

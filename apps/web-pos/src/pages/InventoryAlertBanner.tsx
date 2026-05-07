@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -117,7 +118,7 @@ export function InventoryAlertBanner({ storeId }: InventoryAlertBannerProps) {
 
   // 颜色策略：已下架 → 深橙红；仅低库存 → 橙色
   const bgColor = hasSoldout ? '#92400E' : '#78350F';
-  const borderColor = hasSoldout ? '#F97316' : '#FF6B35';
+  const borderColor = hasSoldout ? '#F97316' : txColors.primary;
   const textColor = '#FEF3C7';
   const iconColor = hasSoldout ? '#FCA5A5' : '#FDE68A';
 
@@ -186,7 +187,7 @@ export function InventoryAlertBanner({ storeId }: InventoryAlertBannerProps) {
         style={{
           height: 44,
           padding: '0 20px',
-          background: '#FF6B35',
+          background: txColors.primary,
           color: '#fff',
           border: 'none',
           borderRadius: 8,

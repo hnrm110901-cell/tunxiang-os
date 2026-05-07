@@ -23,6 +23,7 @@ import {
 import { CheckCircleOutlined, ExclamationCircleOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
 import { apiGet, apiRequest } from '../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Text, Paragraph } = Typography;
 
@@ -95,9 +96,9 @@ const PLATFORM_LABEL: Record<string, string> = {
 };
 
 const SENTIMENT_CONFIG: Record<string, { color: string; label: string; antColor: string }> = {
-  positive: { color: '#0F6E56', label: '好评', antColor: 'success' },
+  positive: { color: txColors.success, label: '好评', antColor: 'success' },
   neutral:  { color: '#5F5E5A', label: '中性', antColor: 'default' },
-  negative: { color: '#A32D2D', label: '差评', antColor: 'error' },
+  negative: { color: txColors.danger, label: '差评', antColor: 'error' },
 };
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
@@ -226,7 +227,7 @@ export function PublicOpinionPage() {
     xField: 'week',
     yField: 'count',
     seriesField: 'type',
-    color: ['#0F6E56', '#A32D2D'],
+    color: [txColors.success, txColors.danger],
     smooth: true,
     point: { size: 3, shape: 'circle' as const },
     legend: { position: 'top-right' as const },
@@ -253,7 +254,7 @@ export function PublicOpinionPage() {
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: '#2C2C2A' }}>舆情监控</span>
         {totalUnresolved > 0 && (
-          <Badge count={totalUnresolved} color="#A32D2D" overflowCount={99}>
+          <Badge count={totalUnresolved} color={txColors.danger} overflowCount={99}>
             <Tag icon={<ExclamationCircleOutlined />} color="error">未处理差评</Tag>
           </Badge>
         )}
@@ -276,10 +277,10 @@ export function PublicOpinionPage() {
       {/* ── 汇总指标 ── */}
       <Row gutter={12} style={{ marginBottom: 16 }}>
         {[
-          { label: '总声量', value: totalMentions, color: '#185FA5' },
-          { label: '好评', value: totalPositive, color: '#0F6E56' },
-          { label: '差评', value: totalNegative, color: '#A32D2D' },
-          { label: '未处理', value: totalUnresolved, color: '#BA7517' },
+          { label: '总声量', value: totalMentions, color: txColors.info },
+          { label: '好评', value: totalPositive, color: txColors.success },
+          { label: '差评', value: totalNegative, color: txColors.danger },
+          { label: '未处理', value: totalUnresolved, color: txColors.warning },
         ].map(({ label, value, color }) => (
           <Col span={6} key={label}>
             <Card size="small" bordered={false} style={{ borderTop: `3px solid ${color}` }}>
@@ -356,7 +357,7 @@ export function PublicOpinionPage() {
                   <Tag color="success" style={{ fontSize: 10, margin: 0 }}>{s.positive_count}好</Tag>
                   <Tag color="error" style={{ fontSize: 10, margin: 0 }}>{s.negative_count}差</Tag>
                   {s.avg_rating && (
-                    <span style={{ fontSize: 11, color: '#BA7517' }}>⭐{Number(s.avg_rating).toFixed(1)}</span>
+                    <span style={{ fontSize: 11, color: txColors.warning }}>⭐{Number(s.avg_rating).toFixed(1)}</span>
                   )}
                 </Space>
               </div>
@@ -391,7 +392,7 @@ export function PublicOpinionPage() {
                         background: '#fff',
                         borderRadius: 6,
                         padding: '10px 12px',
-                        borderLeft: isNegativeUnresolved ? '3px solid #A32D2D' : '3px solid transparent',
+                        borderLeft: isNegativeUnresolved ? `3px solid ${txColors.danger}` : '3px solid transparent',
                         boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
                         opacity: m.is_resolved ? 0.65 : 1,
                       }}
@@ -407,7 +408,7 @@ export function PublicOpinionPage() {
                           {sentCfg.label}
                         </Tag>
                         {m.rating !== null && m.rating !== undefined && (
-                          <span style={{ fontSize: 11, color: '#BA7517', marginLeft: 2 }}>
+                          <span style={{ fontSize: 11, color: txColors.warning, marginLeft: 2 }}>
                             {'⭐'.repeat(Math.round(m.rating))}
                           </span>
                         )}
@@ -524,7 +525,7 @@ export function PublicOpinionPage() {
                   <div key={keyword} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <span style={{
                       width: 18, height: 18, borderRadius: '50%',
-                      background: idx < 3 ? '#A32D2D' : '#E8E6E1',
+                      background: idx < 3 ? txColors.danger : '#E8E6E1',
                       color: idx < 3 ? '#fff' : '#5F5E5A',
                       fontSize: 10, fontWeight: 700,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -533,14 +534,14 @@ export function PublicOpinionPage() {
                       {idx + 1}
                     </span>
                     <span style={{ flex: 1, fontSize: 12, color: '#2C2C2A' }}>{keyword}</span>
-                    <span style={{ fontSize: 11, color: '#A32D2D', fontWeight: 600 }}>{frequency}次</span>
+                    <span style={{ fontSize: 11, color: txColors.danger, fontWeight: 600 }}>{frequency}次</span>
                     <div style={{
                       width: 60, height: 4, borderRadius: 2, background: '#F0EDE6', overflow: 'hidden',
                     }}>
                       <div style={{
                         width: `${(frequency / maxFreq) * 100}%`,
                         height: '100%',
-                        background: '#A32D2D',
+                        background: txColors.danger,
                         borderRadius: 2,
                       }} />
                     </div>

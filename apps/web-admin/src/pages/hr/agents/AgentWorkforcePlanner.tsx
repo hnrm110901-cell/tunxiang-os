@@ -35,6 +35,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -151,7 +152,7 @@ export default function AgentWorkforcePlanner() {
       width: 80,
       align: 'center' as const,
       render: (delta: number) => (
-        <Text style={{ color: delta > 0 ? '#0F6E56' : delta < 0 ? '#A32D2D' : undefined }}>
+        <Text style={{ color: delta > 0 ? txColors.success : delta < 0 ? txColors.danger : undefined }}>
           {delta > 0 ? '+' : ''}{delta}
         </Text>
       ),
@@ -166,7 +167,7 @@ export default function AgentWorkforcePlanner() {
       dataIndex: 'estimated_saving_fen',
       width: 110,
       render: (fen: number) => {
-        const color = fen > 0 ? '#0F6E56' : fen < 0 ? '#A32D2D' : undefined;
+        const color = fen > 0 ? txColors.success : fen < 0 ? txColors.danger : undefined;
         return <Text style={{ color }}>{fmtYuan(fen)}元/天</Text>;
       },
     },
@@ -210,7 +211,7 @@ export default function AgentWorkforcePlanner() {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
-          <CalendarOutlined style={{ marginRight: 8, color: '#185FA5' }} />
+          <CalendarOutlined style={{ marginRight: 8, color: txColors.info }} />
           排班优化 Agent
         </Title>
         <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
@@ -238,7 +239,7 @@ export default function AgentWorkforcePlanner() {
                 value={Math.abs(summary.estimated_net_saving_fen) / 100}
                 suffix="元"
                 valueStyle={{
-                  color: summary.estimated_net_saving_fen >= 0 ? '#0F6E56' : '#A32D2D',
+                  color: summary.estimated_net_saving_fen >= 0 ? txColors.success : txColors.danger,
                 }}
               />
             </Card>
@@ -291,7 +292,7 @@ export default function AgentWorkforcePlanner() {
                 dataIndex: 'improvement',
                 width: 100,
                 render: (v: number) => (
-                  <Text style={{ color: v > 0 ? '#0F6E56' : v < 0 ? '#A32D2D' : undefined }}>
+                  <Text style={{ color: v > 0 ? txColors.success : v < 0 ? txColors.danger : undefined }}>
                     {v > 0 ? '+' : ''}{(v / 100).toFixed(0)}元
                   </Text>
                 ),

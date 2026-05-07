@@ -87,6 +87,7 @@ import { PatrolExecutionPage } from './pages/manager/PatrolExecutionPage';
 // ─── 模块3.3: 供应链移动端 ────────────────────────────────────────────────────
 import { MobilePurchasePage } from './pages/supply/MobilePurchasePage';
 import { MobileStocktakePage } from './pages/supply/MobileStocktakePage';
+import { txColors } from '@tx/tokens';
 
 // ─── Agent 预警数据结构（后续接 WebSocket 推送，暂用 mock 空数组）───────────
 interface AgentAlert extends TXAgentAlertProps {
@@ -154,7 +155,7 @@ function BottomTab() {
               flex: 1,
               textAlign: 'center',
               textDecoration: 'none',
-              color: isActive ? 'var(--tx-primary, #FF6B35)' : '#64748b',
+              color: isActive ? `var(--tx-primary, ${txColors.primary})` : '#64748b',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',

@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -171,7 +172,7 @@ export function OpeningChecklistPage() {
           </div>
           <div style={{ fontSize: 14, color: '#6B7280' }}>{checklist.date}</div>
           <button type="button" onClick={() => navigate(-1)}
-            style={{ marginTop: 32, padding: '14px 48px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
+            style={{ marginTop: 32, padding: '14px 48px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
             返回
           </button>
         </div>
@@ -196,10 +197,10 @@ export function OpeningChecklistPage() {
       <div style={{ background: '#112228', borderRadius: 10, padding: 16, marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>完成进度</span>
-          <span style={{ fontSize: 16, fontWeight: 600, color: progress === 100 ? '#52c41a' : '#FF6B35' }}>{progress}%</span>
+          <span style={{ fontSize: 16, fontWeight: 600, color: progress === 100 ? '#52c41a' : txColors.primary }}>{progress}%</span>
         </div>
         <div style={{ height: 8, background: '#1a2a33', borderRadius: 4, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#52c41a' : '#FF6B35', borderRadius: 4, transition: 'width 300ms ease' }} />
+          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#52c41a' : txColors.primary, borderRadius: 4, transition: 'width 300ms ease' }} />
         </div>
         <div style={{ display: 'flex', gap: 16, marginTop: 8, fontSize: 13, color: '#9CA3AF' }}>
           <span>已检查 {checked}/{total}</span>
@@ -269,7 +270,7 @@ export function OpeningChecklistPage() {
         <button type="button" onClick={handleSubmit} disabled={submitting || checked === 0}
           style={{
             width: '100%', padding: '16px 0', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 56,
-            background: checked > 0 && !submitting ? '#FF6B35' : '#444', color: '#fff', opacity: submitting ? 0.6 : 1,
+            background: checked > 0 && !submitting ? txColors.primary : '#444', color: '#fff', opacity: submitting ? 0.6 : 1,
           }}>
           {submitting ? '提交中...' : `提交开店检查 (${checked}/${total})`}
         </button>
@@ -286,7 +287,7 @@ export function OpeningChecklistPage() {
               <button type="button" onClick={() => setNoteModal(null)}
                 style={{ flex: 1, padding: '12px 0', background: '#333', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, cursor: 'pointer', minHeight: 48 }}>取消</button>
               <button type="button" onClick={() => saveNote(noteModal)}
-                style={{ flex: 1, padding: '12px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>保存</button>
+                style={{ flex: 1, padding: '12px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>保存</button>
             </div>
           </div>
         </div>

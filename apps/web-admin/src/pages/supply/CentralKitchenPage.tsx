@@ -45,6 +45,7 @@ import {
 import type { ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -310,10 +311,10 @@ function OverviewTab() {
       {/* 5 指标卡 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         {[
-          { title: '待审需求单', value: overview?.pending_requisitions ?? 0, color: '#BA7517', icon: <UnorderedListOutlined /> },
-          { title: '已审核需求单', value: overview?.approved_requisitions ?? 0, color: '#0F6E56', icon: <CheckCircleOutlined /> },
-          { title: '参与门店数', value: overview?.stores_requesting ?? 0, color: '#185FA5', icon: <ShopOutlined /> },
-          { title: '今日排产计划', value: overview?.active_production_plans ?? 0, color: '#FF6B35', icon: <CalendarOutlined /> },
+          { title: '待审需求单', value: overview?.pending_requisitions ?? 0, color: txColors.warning, icon: <UnorderedListOutlined /> },
+          { title: '已审核需求单', value: overview?.approved_requisitions ?? 0, color: txColors.success, icon: <CheckCircleOutlined /> },
+          { title: '参与门店数', value: overview?.stores_requesting ?? 0, color: txColors.info, icon: <ShopOutlined /> },
+          { title: '今日排产计划', value: overview?.active_production_plans ?? 0, color: txColors.primary, icon: <CalendarOutlined /> },
           { title: '今日配送单', value: overview?.todays_deliveries ?? 0, color: '#722ED1', icon: <CarOutlined /> },
         ].map((card) => (
           <Col span={4} key={card.title} style={{ minWidth: 160 }}>
@@ -334,7 +335,7 @@ function OverviewTab() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             onClick={() => setGenModal(true)}
           >
             一键生成排产计划
@@ -369,7 +370,7 @@ function OverviewTab() {
         onCancel={() => { setGenModal(false); form.resetFields(); }}
         confirmLoading={genLoading}
         okText="生成"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item
@@ -462,7 +463,7 @@ function RequisitionsTab() {
       title: '品项数',
       dataIndex: 'items',
       width: 80,
-      render: (items) => <Badge count={(items as ReqItem[]).length} color="#FF6B35" />,
+      render: (items) => <Badge count={(items as ReqItem[]).length} color={txColors.primary} />,
     },
     {
       title: '状态',
@@ -763,7 +764,7 @@ function ProductionPlansTab() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
           onClick={() => setCreateOpen(true)}
         >
           新建排产计划
@@ -843,7 +844,7 @@ function ProductionPlansTab() {
         onCancel={() => { setCreateOpen(false); form.resetFields(); setPlanItems([]); }}
         width={720}
         okText="创建"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form form={form} layout="vertical">
           <Row gutter={16}>
@@ -1104,7 +1105,7 @@ function DeliveryTab() {
               okText="确认"
               cancelText="取消"
             >
-              <Button size="small" type="primary" style={{ background: '#0F6E56', borderColor: '#0F6E56' }} icon={<CheckCircleOutlined />}>
+              <Button size="small" type="primary" style={{ background: txColors.success, borderColor: txColors.success }} icon={<CheckCircleOutlined />}>
                 确认收货
               </Button>
             </Popconfirm>
@@ -1208,11 +1209,11 @@ export function CentralKitchenPage() {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#FF6B35',
-          colorSuccess: '#0F6E56',
-          colorWarning: '#BA7517',
-          colorError: '#A32D2D',
-          colorInfo: '#185FA5',
+          colorPrimary: txColors.primary,
+          colorSuccess: txColors.success,
+          colorWarning: txColors.warning,
+          colorError: txColors.danger,
+          colorInfo: txColors.info,
           borderRadius: 6,
         },
       }}

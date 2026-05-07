@@ -6,16 +6,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TXButton, TXCard } from '@tx/touch';
 import { fetchActiveOrders, type ActiveOrder } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   muted: '#5F5E5A',
   text: '#E2EAE8',
   white: '#FFFFFF',
-  green: '#0F6E56',
+  green: txColors.success,
 };
 
 export function QuickOrderView() {

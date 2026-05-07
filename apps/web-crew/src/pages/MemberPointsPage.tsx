@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 import {
   fetchLevelConfigs,
   calcPointsToNextLevel,
@@ -148,7 +149,7 @@ function LevelProgressBar({
 
       <div style={{ textAlign: 'right', marginTop: 4 }}>
         <span style={{
-          fontSize: 16, color: '#FF6B35', fontWeight: 700,
+          fontSize: 16, color: txColors.primary, fontWeight: 700,
         }}>{progressPct}%</span>
       </div>
     </div>
@@ -282,7 +283,7 @@ function TxnRow({ txn }: { txn: PointsTransaction }) {
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         <div style={{
           fontSize: 22, fontWeight: 800,
-          color: isPlus ? '#0F6E56' : '#A32D2D',
+          color: isPlus ? txColors.success : txColors.danger,
         }}>
           {isPlus ? '+' : ''}{txn.delta}
         </div>
@@ -348,7 +349,7 @@ function GiftPointsModal({
           background: '#0B1A20', borderRadius: 12, padding: '12px 16px',
           marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>+</span>
+          <span style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>+</span>
           <span style={{ fontSize: 36, fontWeight: 700, color: '#e2e8f0', minWidth: 80 }}>
             {pointsStr || '0'}
           </span>
@@ -363,7 +364,7 @@ function GiftPointsModal({
             }} style={{
               height: 52, borderRadius: 10, background: k ? '#1a2a33' : 'transparent',
               border: k ? '1px solid #2a3a43' : 'none',
-              color: k === '⌫' ? '#FF6B35' : '#e2e8f0',
+              color: k === '⌫' ? txColors.primary : '#e2e8f0',
               fontSize: 20, cursor: k ? 'pointer' : 'default', minHeight: 52,
             }}>{k}</button>
           ))}
@@ -391,7 +392,7 @@ function GiftPointsModal({
           }}>取消</button>
           <button onClick={handleConfirm} disabled={loading} style={{
             flex: 2, height: 56, borderRadius: 12,
-            background: loading ? '#1a2a33' : '#FF6B35',
+            background: loading ? '#1a2a33' : txColors.primary,
             border: 'none', color: '#fff', fontSize: 18, fontWeight: 700,
             cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.6 : 1, minHeight: 56,
           }}>{loading ? '处理中…' : '确认赠送'}</button>
@@ -458,7 +459,7 @@ function ExchangeModal({
       >
         <div style={{ padding: '0 20px 16px', borderBottom: '1px solid #1a2a33' }}>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#e2e8f0', marginBottom: 4 }}>积分兑换</div>
-          <div style={{ fontSize: 16, color: '#64748b' }}>当前积分：<span style={{ color: '#FF6B35', fontWeight: 700 }}>{currentPoints}</span></div>
+          <div style={{ fontSize: 16, color: '#64748b' }}>当前积分：<span style={{ color: txColors.primary, fontWeight: 700 }}>{currentPoints}</span></div>
         </div>
 
         <div style={{ overflowY: 'auto', flex: 1, WebkitOverflowScrolling: 'touch' as React.CSSProperties['WebkitOverflowScrolling'] }}>
@@ -485,7 +486,7 @@ function ExchangeModal({
                   <div style={{ fontSize: 18, fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>
                     {item.name}
                   </div>
-                  <div style={{ fontSize: 16, color: '#FF6B35', fontWeight: 700 }}>
+                  <div style={{ fontSize: 16, color: txColors.primary, fontWeight: 700 }}>
                     {item.points_required} 积分
                   </div>
                 </div>
@@ -494,7 +495,7 @@ function ExchangeModal({
                   disabled={!canExchange || !!exchanging || !!done}
                   style={{
                     height: 48, padding: '0 20px', borderRadius: 10,
-                    background: done ? '#0F6E56' : canExchange ? '#FF6B35' : '#1a2a33',
+                    background: done ? txColors.success : canExchange ? txColors.primary : '#1a2a33',
                     border: 'none', color: '#fff',
                     fontSize: 16, fontWeight: 700,
                     cursor: canExchange && !done ? 'pointer' : 'not-allowed',
@@ -647,7 +648,7 @@ export function MemberPointsPage() {
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: 16, color: '#64748b' }}>当前积分</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#FF6B35', lineHeight: 1.1 }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: txColors.primary, lineHeight: 1.1 }}>
             {currentPoints.toLocaleString()}
           </div>
         </div>
@@ -656,7 +657,7 @@ export function MemberPointsPage() {
       {apiWarn && (
         <div style={{
           background: '#1a1500', borderBottom: '1px solid #2a2000',
-          padding: '10px 20px', fontSize: 16, color: '#BA7517',
+          padding: '10px 20px', fontSize: 16, color: txColors.warning,
         }}>
           ⚠ {apiWarn}
         </div>
@@ -665,7 +666,7 @@ export function MemberPointsPage() {
       {giftMsg && (
         <div style={{
           background: '#001a10', borderBottom: '1px solid #002a18',
-          padding: '10px 20px', fontSize: 16, color: '#0F6E56',
+          padding: '10px 20px', fontSize: 16, color: txColors.success,
         }}>
           ✓ {giftMsg}
         </div>
@@ -713,7 +714,7 @@ export function MemberPointsPage() {
           onClick={() => setShowGift(true)}
           style={{
             flex: 1, height: 60, borderRadius: 14,
-            background: '#FF6B35', border: 'none',
+            background: txColors.primary, border: 'none',
             color: '#fff', fontSize: 18, fontWeight: 700,
             cursor: 'pointer', minHeight: 60,
             transition: 'transform 200ms ease',

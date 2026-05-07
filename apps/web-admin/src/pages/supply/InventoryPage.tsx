@@ -49,6 +49,7 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -795,7 +796,7 @@ const StocktakeTab: React.FC = () => {
           type="primary"
           size="large"
           icon={<AuditOutlined />}
-          style={{ marginTop: 24, background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ marginTop: 24, background: txColors.primary, borderColor: txColors.primary }}
           onClick={handleStartStocktake}
         >
           发起盘点
@@ -881,7 +882,7 @@ const StocktakeTab: React.FC = () => {
             icon={<CheckCircleOutlined />}
             loading={submitting}
             onClick={handleSubmit}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             提交盘点
           </Button>,

@@ -52,6 +52,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 
@@ -343,7 +344,7 @@ function EditableDishTable({ value = [], onChange }: EditableDishTableProps) {
         block
         icon={<PlusCircleOutlined />}
         onClick={handleAdd}
-        style={{ borderColor: '#FF6B35', color: '#FF6B35' }}
+        style={{ borderColor: txColors.primary, color: txColors.primary }}
       >
         添加菜品
       </Button>
@@ -669,12 +670,12 @@ function BuildQuoteModal({ template, open, onClose }: BuildQuoteModalProps) {
           <Divider style={{ margin: '8px 0 16px' }} />
           <Row gutter={16}>
             <Col span={12}>
-              <Card size="small" style={{ textAlign: 'center', background: '#FFF3ED' }}>
+              <Card size="small" style={{ textAlign: 'center', background: txColors.primaryLight }}>
                 <Statistic
                   title="预估总价"
                   value={totalYuan.toFixed(2)}
                   prefix="¥"
-                  valueStyle={{ color: '#FF6B35', fontWeight: 600 }}
+                  valueStyle={{ color: txColors.primary, fontWeight: 600 }}
                 />
               </Card>
             </Col>
@@ -684,7 +685,7 @@ function BuildQuoteModal({ template, open, onClose }: BuildQuoteModalProps) {
                   title={`定金（${template ? (template.deposit_ratio * 100).toFixed(0) : 30}%）`}
                   value={depositYuan.toFixed(2)}
                   prefix="¥"
-                  valueStyle={{ color: '#0F6E56', fontWeight: 600 }}
+                  valueStyle={{ color: txColors.success, fontWeight: 600 }}
                 />
               </Card>
             </Col>
@@ -706,12 +707,12 @@ function BuildQuoteModal({ template, open, onClose }: BuildQuoteModalProps) {
             <Descriptions.Item label="每桌价格">¥{fenToYuan(quoteResult.per_table_price_fen)}</Descriptions.Item>
             <Descriptions.Item label="预计人数">{quoteResult.estimated_guest_count ?? '—'} 人</Descriptions.Item>
             <Descriptions.Item label="费用总价">
-              <Text style={{ color: '#FF6B35', fontWeight: 600, fontSize: 16 }}>
+              <Text style={{ color: txColors.primary, fontWeight: 600, fontSize: 16 }}>
                 ¥{fenToYuan(quoteResult.total_price_fen)}
               </Text>
             </Descriptions.Item>
             <Descriptions.Item label="应付定金">
-              <Text style={{ color: '#0F6E56', fontWeight: 600, fontSize: 16 }}>
+              <Text style={{ color: txColors.success, fontWeight: 600, fontSize: 16 }}>
                 ¥{fenToYuan(quoteResult.deposit_fen)}
               </Text>
             </Descriptions.Item>
@@ -797,7 +798,7 @@ export function BanquetTemplatePage() {
       width: 120,
       sorter: true,
       render: (_, r) => (
-        <Text style={{ color: '#FF6B35', fontWeight: 600 }}>
+        <Text style={{ color: txColors.primary, fontWeight: 600 }}>
           ¥{fenToYuan(r.per_table_price_fen)}
         </Text>
       ),
@@ -861,7 +862,7 @@ export function BanquetTemplatePage() {
         <a
           key="quote"
           onClick={() => handleOpenQuote(record)}
-          style={{ color: '#0F6E56' }}
+          style={{ color: txColors.success }}
         >
           <FileTextOutlined /> 生成报价
         </a>,

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/mine/index.tsx — 我的
  *
@@ -25,7 +26,7 @@ import type { MemberLevel, PointsBalance } from '../../api/member'
 const C = {
   bg:       '#0B1A20',
   card:     '#132029',
-  primary:  '#FF6B35',
+  primary:  txColors.primary,
   text1:    '#E8F4F8',
   text2:    '#9EB5C0',
   divider:  'rgba(255,255,255,0.07)',
@@ -184,7 +185,7 @@ export default function MinePage() {
     Taro.showModal({
       title: '退出登录',
       content: '确定要退出登录吗？',
-      confirmColor: '#E55A28',
+      confirmColor: txColors.primaryActive,
       success: ({ confirm }) => {
         if (confirm) {
           useUserStore.getState().logout()

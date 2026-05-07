@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 颜色常量 ---------- */
 const C = {
@@ -13,7 +14,7 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
+  primary: txColors.primary,
   success: '#30D158',
   warning: '#FF9F0A',
   danger: '#FF453A',

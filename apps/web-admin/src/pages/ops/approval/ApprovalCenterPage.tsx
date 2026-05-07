@@ -13,6 +13,7 @@ import {
 import { EyeOutlined, SearchOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Search } = Input;
@@ -75,9 +76,9 @@ const BIZ_TYPE_CONFIG: Record<BusinessType, { label: string; color: string }> = 
 };
 
 const STEP_STATUS_CONFIG: Record<string, { label: string; color: string; dot?: React.ReactNode }> = {
-  approved: { label: '已通过', color: '#0F6E56' },
-  rejected: { label: '已拒绝', color: '#A32D2D' },
-  pending:  { label: '审批中', color: '#BA7517', dot: <ClockCircleOutlined style={{ color: '#BA7517' }} /> },
+  approved: { label: '已通过', color: txColors.success },
+  rejected: { label: '已拒绝', color: txColors.danger },
+  pending:  { label: '审批中', color: txColors.warning, dot: <ClockCircleOutlined style={{ color: txColors.warning }} /> },
   waiting:  { label: '待处理', color: '#999' },
 };
 
@@ -357,16 +358,16 @@ export function ApprovalCenterPage() {
     <div style={{ padding: '24px 32px', background: '#f8f7f5', minHeight: '100vh' }}>
       {/* 标题 */}
       <div style={{ marginBottom: 20 }}>
-        <Title level={4} style={{ margin: 0, color: '#1E2A3A' }}>审批中心</Title>
+        <Title level={4} style={{ margin: 0, color: txColors.navy }}>审批中心</Title>
         <Text type="secondary" style={{ fontSize: 13 }}>总部视角 · 跨门店审批流统一管理</Text>
       </div>
 
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 24 }}>
         {[
-          { label: '审批中', value: pendingCount, color: '#BA7517' },
-          { label: '已通过', value: approvedCount, color: '#0F6E56' },
-          { label: '已拒绝', value: rejectedCount, color: '#A32D2D' },
+          { label: '审批中', value: pendingCount, color: txColors.warning },
+          { label: '已通过', value: approvedCount, color: txColors.success },
+          { label: '已拒绝', value: rejectedCount, color: txColors.danger },
           { label: '已过期', value: expiredCount, color: '#999' },
         ].map(item => (
           <Col span={6} key={item.label}>

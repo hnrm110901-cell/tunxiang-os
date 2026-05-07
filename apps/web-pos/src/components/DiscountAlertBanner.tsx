@@ -19,6 +19,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DiscountAlert } from '../hooks/usePOSAlerts';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ───
 
@@ -51,14 +52,14 @@ interface LevelStyle {
 
 const LEVEL_STYLES: Record<string, LevelStyle> = {
   critical: {
-    background: '#A32D2D',
+    background: txColors.danger,
     border: '#7A2020',
     text: '#FFFFFF',
     label: '严重违规',
     shake: true,
   },
   high: {
-    background: '#BA7517',
+    background: txColors.warning,
     border: '#8A5510',
     text: '#FFFFFF',
     label: '高风险',

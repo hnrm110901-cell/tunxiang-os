@@ -38,6 +38,7 @@ import {
   message,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { txColors } from '@tx/tokens';
 import {
   BarcodeOutlined,
   CheckCircleOutlined,
@@ -59,9 +60,9 @@ import {
 const { Title, Text, Paragraph } = Typography;
 
 // ─── Design Token ──────────────────────────────────────────────────────────
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
 const TX_BG_SECONDARY = '#F8F7F5';
 const TX_TEXT_SECONDARY = '#5F5E5A';
 
@@ -578,7 +579,7 @@ export const DispatchCodePage: React.FC = () => {
           {[
             { step: '1', title: '接单', desc: '外卖订单进入系统，自动生成出餐码', color: TX_PRIMARY },
             { step: '2', title: '备餐', desc: '厨师完成菜品，打包员准备出餐', color: TX_WARNING },
-            { step: '3', title: '扫码', desc: '打包员扫码 / 输入6位出餐码确认', color: '#185FA5' },
+            { step: '3', title: '扫码', desc: '打包员扫码 / 输入6位出餐码确认', color: txColors.info },
             { step: '4', title: '通知', desc: '系统自动通知外卖平台，骑手取餐', color: TX_SUCCESS },
           ].map(({ step, title, desc, color }) => (
             <Col span={6} key={step}>

@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxScatterChart } from '../../../components/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型 ----------
 interface OverviewKPI {
@@ -71,9 +72,9 @@ interface ChurnRiskData {
 }
 
 // ---------- 工具 ----------
-const riskColor = (score: number) => score >= 80 ? '#A32D2D' : score >= 60 ? '#BA7517' : '#185FA5';
+const riskColor = (score: number) => score >= 80 ? txColors.danger : score >= 60 ? txColors.warning : txColors.info;
 const levelColor = (level: string) =>
-  level === '金卡' ? '#BA7517' : level === '银卡' ? '#888' : '#555';
+  level === '金卡' ? txColors.warning : level === '银卡' ? '#888' : '#555';
 
 const PERIOD_MAP: Record<string, string> = {
   '本周': 'week',
@@ -131,8 +132,8 @@ export function MemberAnalysisPage() {
 
   const growthLabels = growthTrend.map(g => g.month);
   const growthDatasets = growthLabels.length > 0 ? [
-    { name: '累计会员', values: growthTrend.map(g => g.total), color: '#FF6B35' },
-    { name: '新增会员', values: growthTrend.map(g => g.new_members), color: '#0F6E56' },
+    { name: '累计会员', values: growthTrend.map(g => g.total), color: txColors.primary },
+    { name: '新增会员', values: growthTrend.map(g => g.new_members), color: txColors.success },
   ] : [];
 
   return (
@@ -145,7 +146,7 @@ export function MemberAnalysisPage() {
             <button key={d} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === d ? '#FF6B35' : '#1a2a33',
+              background: period === d ? txColors.primary : '#1a2a33',
               color: period === d ? '#fff' : '#999',
             }} onClick={() => setPeriod(d)}>
               {d}
@@ -171,7 +172,7 @@ export function MemberAnalysisPage() {
               }}>
                 <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
                 <div style={{ fontSize: 26, fontWeight: 'bold', color: '#fff' }}>{kpi.value}</div>
-                <div style={{ fontSize: 11, marginTop: 4, color: kpi.up ? '#0F6E56' : '#A32D2D' }}>
+                <div style={{ fontSize: 11, marginTop: 4, color: kpi.up ? txColors.success : txColors.danger }}>
                   {kpi.up ? '\u2191' : '\u2193'} {kpi.trend}
                 </div>
               </div>
@@ -217,7 +218,7 @@ export function MemberAnalysisPage() {
                         {convRate && (
                           <span style={{
                             fontSize: 10, padding: '1px 6px', borderRadius: 4,
-                            background: '#185FA520', color: '#185FA5', fontWeight: 600,
+                            background: `${txColors.info}20`, color: txColors.info, fontWeight: 600,
                           }}>
                             {convRate}%
                           </span>
@@ -252,7 +253,7 @@ export function MemberAnalysisPage() {
             <>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {repurchase.map((item) => {
-                  const barColor = item.rate >= 42 ? '#0F6E56' : item.rate >= 40 ? '#185FA5' : '#BA7517';
+                  const barColor = item.rate >= 42 ? txColors.success : item.rate >= 40 ? txColors.info : txColors.warning;
                   return (
                     <div key={item.month} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                       <span style={{ width: 36, fontSize: 12, color: '#999', textAlign: 'right' }}>{item.month}</span>
@@ -298,7 +299,7 @@ export function MemberAnalysisPage() {
             {churnRisks.length > 0 && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#A32D2D20', color: '#A32D2D', fontWeight: 600,
+                background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 600,
               }}>
                 {churnRisks.length} 人
               </span>
@@ -337,10 +338,10 @@ export function MemberAnalysisPage() {
                     <span>累计 \u00A5{(member.totalSpend / 100).toLocaleString()} | {member.visitCount}次</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: 11, color: '#185FA5' }}>{member.suggestedAction}</span>
+                    <span style={{ fontSize: 11, color: txColors.info }}>{member.suggestedAction}</span>
                     <button style={{
                       padding: '3px 10px', borderRadius: 4, border: 'none',
-                      background: '#FF6B3520', color: '#FF6B35',
+                      background: `${txColors.primary}20`, color: txColors.primary,
                       cursor: 'pointer', fontWeight: 600, fontSize: 10,
                     }}>
                       执行

@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { CategoryNav, DishCard } from '@tx-ds/biz';
 import type { DishData } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 类型 ---------- */
 interface DishItem {
@@ -210,14 +211,14 @@ export function CrewOrderPage() {
               onClick={() => { vibrate(); if (t.open) setSelectedTable(t.id); }}
               style={{
                 background: t.open ? '#112228' : '#0d1f26',
-                border: t.open ? '2px solid #FF6B35' : '2px solid #1a2a33',
+                border: t.open ? `2px solid ${txColors.primary}` : '2px solid #1a2a33',
                 borderRadius: 12, padding: 16, cursor: t.open ? 'pointer' : 'default',
                 opacity: t.open ? 1 : 0.4, minHeight: 64,
                 display: 'flex', flexDirection: 'column', alignItems: 'center',
                 justifyContent: 'center', gap: 4,
               }}
             >
-              <span style={{ fontSize: 22, fontWeight: 700, color: t.open ? '#FF6B35' : '#475569' }}>
+              <span style={{ fontSize: 22, fontWeight: 700, color: t.open ? txColors.primary : '#475569' }}>
                 {t.id}
               </span>
               <span style={{ fontSize: 14, color: t.open ? '#94a3b8' : '#334155' }}>
@@ -249,7 +250,7 @@ export function CrewOrderPage() {
           &lt; 换桌
         </button>
         <span style={{ fontSize: 20, fontWeight: 700 }}>
-          <span style={{ color: '#FF6B35' }}>{selectedTable}</span> 桌点餐
+          <span style={{ color: txColors.primary }}>{selectedTable}</span> 桌点餐
         </span>
         <div style={{ width: 48 }} />
       </div>
@@ -288,7 +289,7 @@ export function CrewOrderPage() {
                       onClick={() => { vibrate(); if (qty > 0) setShowPractice(dish.id); else { addToCart(dish); setShowPractice(dish.id); } }}
                       style={{
                         background: '#1a2a33', border: 'none', borderRadius: 6, padding: '4px 8px',
-                        color: inCart?.practice ? '#FF6B35' : '#94a3b8', fontSize: 14,
+                        color: inCart?.practice ? txColors.primary : '#94a3b8', fontSize: 14,
                         cursor: 'pointer', minHeight: 32,
                       }}
                     >
@@ -299,7 +300,7 @@ export function CrewOrderPage() {
                     onClick={() => { vibrate(); if (qty > 0) { setRemarkDishId(dish.id); setRemarkText(inCart?.remark ?? ''); } else { addToCart(dish); setRemarkDishId(dish.id); setRemarkText(''); } }}
                     style={{
                       background: '#1a2a33', border: 'none', borderRadius: 6, padding: '4px 8px',
-                      color: inCart?.remark ? '#FF6B35' : '#94a3b8', fontSize: 14,
+                      color: inCart?.remark ? txColors.primary : '#94a3b8', fontSize: 14,
                       cursor: 'pointer', minHeight: 32,
                     }}
                   >
@@ -309,9 +310,9 @@ export function CrewOrderPage() {
                     <button
                       onClick={() => toggleRecommend(dish.id)}
                       style={{
-                        background: inCart?.isRecommended ? '#FF6B3533' : '#1a2a33',
+                        background: inCart?.isRecommended ? `${txColors.primary}33` : '#1a2a33',
                         border: 'none', borderRadius: 6, padding: '4px 8px',
-                        color: inCart?.isRecommended ? '#FF6B35' : '#94a3b8',
+                        color: inCart?.isRecommended ? txColors.primary : '#94a3b8',
                         fontSize: 14, cursor: 'pointer', minHeight: 32,
                       }}
                     >
@@ -339,15 +340,15 @@ export function CrewOrderPage() {
         }}>
           <div>
             <span style={{ fontSize: 16, color: '#94a3b8' }}>已选 </span>
-            <span style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35' }}>{totalQty}</span>
+            <span style={{ fontSize: 20, fontWeight: 700, color: txColors.primary }}>{totalQty}</span>
             <span style={{ fontSize: 16, color: '#94a3b8' }}> 件</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <span style={{ fontSize: 22, fontWeight: 700, color: '#FF6B35' }}>{formatPrice(totalPrice * 100)}</span>
+            <span style={{ fontSize: 22, fontWeight: 700, color: txColors.primary }}>{formatPrice(totalPrice * 100)}</span>
             <button
               onClick={() => { vibrate(); setShowConfirm(true); }}
               style={{
-                background: '#FF6B35', border: 'none', borderRadius: 10,
+                background: txColors.primary, border: 'none', borderRadius: 10,
                 color: '#fff', fontSize: 18, fontWeight: 700,
                 padding: '12px 28px', cursor: 'pointer',
                 minWidth: 48, minHeight: 48,
@@ -386,7 +387,7 @@ export function CrewOrderPage() {
                     key={p}
                     onClick={() => setPractice(showPractice, p)}
                     style={{
-                      background: item?.practice === p ? '#FF6B35' : '#1a2a33',
+                      background: item?.practice === p ? txColors.primary : '#1a2a33',
                       border: 'none', borderRadius: 8, padding: '12px 20px',
                       color: item?.practice === p ? '#fff' : '#e2e8f0',
                       fontSize: 16, fontWeight: 600, cursor: 'pointer',
@@ -432,7 +433,7 @@ export function CrewOrderPage() {
             <button
               onClick={saveRemark}
               style={{
-                width: '100%', background: '#FF6B35', border: 'none', borderRadius: 10,
+                width: '100%', background: txColors.primary, border: 'none', borderRadius: 10,
                 color: '#fff', fontSize: 18, fontWeight: 700, padding: '14px 0',
                 marginTop: 12, cursor: 'pointer', minHeight: 48,
               }}
@@ -473,7 +474,7 @@ export function CrewOrderPage() {
                     <div style={{ fontSize: 16 }}>
                       {item.dish.name}
                       {item.isRecommended && (
-                        <span style={{ fontSize: 12, color: '#FF6B35', marginLeft: 6 }}>[推荐]</span>
+                        <span style={{ fontSize: 12, color: txColors.primary, marginLeft: 6 }}>[推荐]</span>
                       )}
                     </div>
                     {item.practice && (
@@ -484,7 +485,7 @@ export function CrewOrderPage() {
                     )}
                   </div>
                   <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    <div style={{ fontSize: 16, color: '#FF6B35' }}>x{item.qty}</div>
+                    <div style={{ fontSize: 16, color: txColors.primary }}>x{item.qty}</div>
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{formatPrice(item.dish.price * item.qty * 100)}</div>
                   </div>
                 </div>
@@ -495,7 +496,7 @@ export function CrewOrderPage() {
               padding: '12px 0 8px', borderTop: '1px solid #1a2a33',
             }}>
               <span style={{ fontSize: 16, color: '#94a3b8' }}>共 {totalQty} 件</span>
-              <span style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>{formatPrice(totalPrice * 100)}</span>
+              <span style={{ fontSize: 24, fontWeight: 700, color: txColors.primary }}>{formatPrice(totalPrice * 100)}</span>
             </div>
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button
@@ -511,7 +512,7 @@ export function CrewOrderPage() {
               <button
                 onClick={handleSubmit}
                 style={{
-                  flex: 1, background: '#FF6B35', border: 'none', borderRadius: 10,
+                  flex: 1, background: txColors.primary, border: 'none', borderRadius: 10,
                   color: '#fff', fontSize: 18, fontWeight: 700, padding: '14px 0',
                   cursor: 'pointer', minHeight: 48,
                 }}

@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface DataPoint {
   label:   string;
@@ -57,7 +58,7 @@ export default function ChartTrend({
 
     // Resolve CSS vars (canvas doesn't inherit CSS vars)
     const style = getComputedStyle(canvas);
-    const resolvedColor  = color.startsWith('var') ? style.getPropertyValue(color.slice(4, -1).trim()).trim() || '#FF6B35' : color;
+    const resolvedColor  = color.startsWith('var') ? style.getPropertyValue(color.slice(4, -1).trim()).trim() || txColors.primary : color;
     const resolvedColor2 = color2.startsWith('var') ? style.getPropertyValue(color2.slice(4, -1).trim()).trim() || '#007AFF' : color2;
     const textColor      = style.getPropertyValue('--text-tertiary').trim() || '#999';
 

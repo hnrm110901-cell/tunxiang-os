@@ -24,13 +24,14 @@ import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../api/index';
 import { KdsTimeline, deriveStageDurations } from '../../components/KdsTimeline';
 import { VoiceCommandBar, matchVoiceCommand } from '../../components/VoiceCommandBar';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',

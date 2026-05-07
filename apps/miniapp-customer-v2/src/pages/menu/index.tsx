@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/menu/index.tsx — 点餐页
  *
@@ -40,7 +41,7 @@ const C = {
   bg:      '#0B1A20',
   card:    '#132029',
   nav:     '#0D2030',
-  primary: '#FF6B35',
+  primary: txColors.primary,
   text1:   '#E8F4F8',
   text2:   '#9EB5C0',
   divider: 'rgba(255,255,255,0.06)',

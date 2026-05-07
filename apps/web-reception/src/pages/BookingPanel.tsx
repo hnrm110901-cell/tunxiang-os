@@ -6,6 +6,7 @@
  * 10s自动刷新
  */
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -41,17 +42,17 @@ const C = {
   bg1: '#0B1A20',
   bg2: '#112228',
   bg3: '#1A3038',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   accentHover: '#E85A28',
-  green: '#0F6E56',
+  green: txColors.success,
   greenBg: 'rgba(15,110,86,0.25)',
-  yellow: '#BA7517',
+  yellow: txColors.warning,
   yellowBg: 'rgba(186,117,23,0.25)',
   gray: '#5F5E5A',
   grayBg: 'rgba(95,94,90,0.25)',
-  red: '#A32D2D',
+  red: txColors.danger,
   redBg: 'rgba(163,45,45,0.25)',
-  blue: '#185FA5',
+  blue: txColors.info,
   blueBg: 'rgba(24,95,165,0.25)',
   orange: '#D4700A',
   orangeBg: 'rgba(212,112,10,0.25)',

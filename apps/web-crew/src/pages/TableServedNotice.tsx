@@ -14,6 +14,7 @@
  *   - 深色主题，颜色复用 web-crew 的 C 常量
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -208,7 +209,7 @@ function NoticeBar({ notice, onDismiss }: {
 
   return (
     <div style={{
-      background: '#0F6E56',
+      background: txColors.success,
       color: '#fff',
       padding: '14px 16px',
       display: 'flex',

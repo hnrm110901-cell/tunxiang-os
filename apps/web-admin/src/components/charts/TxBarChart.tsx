@@ -3,6 +3,7 @@
  * 支持垂直/水平方向、多组数据、品牌色渐变
  */
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -19,7 +20,7 @@ interface Props {
   unit?: string;
 }
 
-const PALETTE = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#A32D2D', '#8B5CF6'];
+const PALETTE = [txColors.primary, txColors.info, txColors.success, txColors.warning, txColors.danger, '#8B5CF6'];
 
 function formatValue(v: number, unit?: string): string {
   if (unit === '%') return `${v.toFixed(1)}%`;

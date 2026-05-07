@@ -9,6 +9,7 @@ import {
 import { BulbOutlined } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface TurnoverRow {
@@ -63,7 +64,7 @@ const columns: ProColumns<TurnoverRow>[] = [
       <Progress
         percent={r.achievement}
         size="small"
-        strokeColor={r.achievement < 80 ? '#A32D2D' : '#FF6B35'}
+        strokeColor={r.achievement < 80 ? txColors.danger : txColors.primary}
         format={(p) => `${p}%`}
       />
     ),
@@ -71,14 +72,14 @@ const columns: ProColumns<TurnoverRow>[] = [
   { title: 'AI建议',   dataIndex: 'aiSuggestion'},
   {
     title: '操作', valueType: 'option', width: 80,
-    render: () => [<a key="detail" style={{ color: '#FF6B35' }}>查看详情</a>],
+    render: () => [<a key="detail" style={{ color: txColors.primary }}>查看详情</a>],
   },
 ];
 
 // ---- 页面组件 ----
 export const TableTurnoverPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部统计卡片 */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
@@ -90,12 +91,12 @@ export const TableTurnoverPage: React.FC = () => {
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="达标门店" value="2/5" valueStyle={{ color: '#BA7517' }} />
+              <Statistic title="达标门店" value="2/5" valueStyle={{ color: txColors.warning }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="最佳门店" value="南山旗舰" valueStyle={{ color: '#0F6E56', fontSize: 16 }} />
+              <Statistic title="最佳门店" value="南山旗舰" valueStyle={{ color: txColors.success, fontSize: 16 }} />
             </Card>
           </Col>
         </Row>
@@ -137,7 +138,7 @@ export const TableTurnoverPage: React.FC = () => {
                   <Progress
                     percent={item.percent}
                     size="small"
-                    strokeColor="#FF6B35"
+                    strokeColor={txColors.primary}
                     showInfo={false}
                   />
                 </div>

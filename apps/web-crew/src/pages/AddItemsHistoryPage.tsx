@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ── 类型 ──────────────────────────────────────────────────
 interface AddItemRecord {
@@ -92,8 +93,8 @@ function DetailModal({ record, onClose }: DetailModalProps) {
           <span style={{
             display: 'inline-flex', alignItems: 'center',
             padding: '4px 12px', borderRadius: 20, fontSize: 15, fontWeight: 600,
-            background: record.status === 'served' ? '#EEF7F3' : '#FFF3ED',
-            color: record.status === 'served' ? '#0F6E56' : '#BA7517',
+            background: record.status === 'served' ? '#EEF7F3' : txColors.primaryLight,
+            color: record.status === 'served' ? txColors.success : txColors.warning,
           }}>
             {record.status === 'served' ? '已出' : '待出'}
           </span>
@@ -124,7 +125,7 @@ function DetailModal({ record, onClose }: DetailModalProps) {
           borderTop: '2px solid #F0EDE6',
         }}>
           <span style={{ fontSize: 17, color: '#5F5E5A', fontWeight: 600 }}>加菜合计</span>
-          <span style={{ fontSize: 22, color: '#FF6B35', fontWeight: 700 }}>¥{total.toFixed(0)}</span>
+          <span style={{ fontSize: 22, color: txColors.primary, fontWeight: 700 }}>¥{total.toFixed(0)}</span>
         </div>
 
         {/* 关闭按钮 */}
@@ -180,8 +181,8 @@ function RecordCard({ record, onPress }: RecordCardProps) {
         <span style={{
           display: 'inline-flex', alignItems: 'center',
           padding: '3px 10px', borderRadius: 20, fontSize: 14, fontWeight: 600,
-          background: record.status === 'served' ? '#EEF7F3' : '#FFF3ED',
-          color: record.status === 'served' ? '#0F6E56' : '#BA7517',
+          background: record.status === 'served' ? '#EEF7F3' : txColors.primaryLight,
+          color: record.status === 'served' ? txColors.success : txColors.warning,
         }}>
           {record.status === 'served' ? '已出' : '待出'}
         </span>
@@ -191,7 +192,7 @@ function RecordCard({ record, onPress }: RecordCardProps) {
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 16, color: '#B4B2A9' }}>共{record.items.length}道菜</span>
-        <span style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35' }}>+¥{total.toFixed(0)}</span>
+        <span style={{ fontSize: 18, fontWeight: 700, color: txColors.primary }}>+¥{total.toFixed(0)}</span>
       </div>
     </div>
   );
@@ -216,11 +217,11 @@ function TableGroup({ tableNo, records, onPressRecord }: TableGroupProps) {
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
-            width: 8, height: 8, borderRadius: '50%', background: '#FF6B35',
+            width: 8, height: 8, borderRadius: '50%', background: txColors.primary,
           }} />
           <span style={{ fontSize: 18, fontWeight: 700, color: '#2C2C2A' }}>{tableNo}桌</span>
           <span style={{
-            background: '#FFF3ED', color: '#FF6B35', borderRadius: 10,
+            background: txColors.primaryLight, color: txColors.primary, borderRadius: 10,
             padding: '2px 8px', fontSize: 14, fontWeight: 600,
           }}>
             {records.length}次加菜
@@ -308,7 +309,7 @@ export function AddItemsHistoryPage() {
             style={{
               ...btnBase, height: 40, padding: '0 16px', borderRadius: 20,
               background: loading ? '#1a2a33' : 'rgba(255,107,53,0.15)',
-              color: loading ? '#5F5E5A' : '#FF6B35',
+              color: loading ? '#5F5E5A' : txColors.primary,
               fontSize: 16, display: 'flex', alignItems: 'center', gap: 6,
             }}
           >
@@ -317,8 +318,8 @@ export function AddItemsHistoryPage() {
             ) : (
               <>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path d="M13 7A6 6 0 1 1 7 1" stroke="#FF6B35" strokeWidth="1.8" strokeLinecap="round" />
-                  <path d="M13 1v6h-6" stroke="#FF6B35" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13 7A6 6 0 1 1 7 1" stroke={txColors.primary} strokeWidth="1.8" strokeLinecap="round" />
+                  <path d="M13 1v6h-6" stroke={txColors.primary} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
                 刷新
               </>
@@ -332,21 +333,21 @@ export function AddItemsHistoryPage() {
             background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: '#FF6B35' }}>{totalTimes}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: txColors.primary }}>{totalTimes}</div>
             <div style={{ fontSize: 15, color: '#B4B2A9', marginTop: 2 }}>加菜次数</div>
           </div>
           <div style={{
             background: 'rgba(255,255,255,0.07)', borderRadius: 12, padding: '12px 14px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: '#FF6B35' }}>¥{totalAmount.toFixed(0)}</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: txColors.primary }}>¥{totalAmount.toFixed(0)}</div>
             <div style={{ fontSize: 15, color: '#B4B2A9', marginTop: 2 }}>加菜金额</div>
           </div>
           <div style={{
             background: pendingCount > 0 ? 'rgba(186,117,23,0.15)' : 'rgba(255,255,255,0.07)',
             borderRadius: 12, padding: '12px 14px', textAlign: 'center',
           }}>
-            <div style={{ fontSize: 26, fontWeight: 700, color: pendingCount > 0 ? '#BA7517' : '#B4B2A9' }}>
+            <div style={{ fontSize: 26, fontWeight: 700, color: pendingCount > 0 ? txColors.warning : '#B4B2A9' }}>
               {pendingCount}
             </div>
             <div style={{ fontSize: 15, color: '#B4B2A9', marginTop: 2 }}>待出单</div>

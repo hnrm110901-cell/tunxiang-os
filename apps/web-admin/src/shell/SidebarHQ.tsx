@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getTokenPayload } from '../api/client';
 import { MENU_CONFIGS } from '../config/menuConfigs';
 import { useLang } from '../i18n/LangContext';
+import { txColors } from '@tx/tokens';
 
 interface SidebarHQProps {
   activeModule: string;
@@ -75,7 +76,7 @@ export function SidebarHQ({ activeModule }: SidebarHQProps) {
                       padding: '7px 10px', borderRadius: 8, cursor: 'pointer', fontSize: 13,
                       transition: 'background var(--duration-fast, .15s)',
                       background: isActive ? 'var(--brand-bg, rgba(255,107,44,0.12))' : 'transparent',
-                      color: isActive ? 'var(--brand, #FF6B35)' : 'inherit',
+                      color: isActive ? `var(--brand, ${txColors.primary})` : 'inherit',
                       fontWeight: isActive ? 600 : 400,
                     }}
                     onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.background = 'var(--bg-2, #1a2a33)'; }}

@@ -52,14 +52,15 @@ import type { ProColumns } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 const API_PREFIX = '/api/v1/analytics/daily-report';
 
 // ─── Design Token ─────────────────────────────────────────────────────────────
 const T = {
-  brand: '#FF6B35',
-  brandLight: '#FFF3ED',
+  brand: txColors.primary,
+  brandLight: txColors.primaryLight,
   success: '#52c41a',
   danger: '#ff4d4f',
   warning: '#faad14',
@@ -191,7 +192,7 @@ function ChannelBarChart({
   showCompare: boolean;
 }) {
   const channels = [
-    { key: 'dine_in', label: '堂食', color: '#FF6B35' },
+    { key: 'dine_in', label: '堂食', color: txColors.primary },
     { key: 'takeaway', label: '外卖', color: '#1890ff' },
     { key: 'mini_program', label: '小程序', color: '#52c41a' },
     { key: 'retail', label: '零售', color: '#722ed1' },

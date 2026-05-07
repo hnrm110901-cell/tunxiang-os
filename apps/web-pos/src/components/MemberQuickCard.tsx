@@ -5,6 +5,7 @@
  * Sprint 2：菜品智能体 + 客户大脑 POS 层
  */
 import { useEffect, useRef, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface MemberQuickCardProps {
   visible: boolean;
@@ -177,7 +178,7 @@ export default function MemberQuickCard({
 
             {/* 存酒 */}
             {member.wineStorage && (
-              <div style={{ fontSize: 13, color: '#BA7517', marginTop: 4, fontWeight: 600 }}>
+              <div style={{ fontSize: 13, color: txColors.warning, marginTop: 4, fontWeight: 600 }}>
                 🍷 {member.wineStorage}
               </div>
             )}
@@ -196,7 +197,7 @@ export default function MemberQuickCard({
             height: 56,
             border: 'none',
             borderRadius: 12,
-            background: '#FF6B35',
+            background: txColors.primary,
             color: '#fff',
             fontSize: 16,
             fontWeight: 700,

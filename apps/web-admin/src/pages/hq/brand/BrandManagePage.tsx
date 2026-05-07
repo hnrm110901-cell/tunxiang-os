@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button, Modal, Form, Input, InputNumber, Spin, Tag, message, Checkbox } from 'antd';
 import { PlusOutlined, ReloadOutlined, SwapOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -49,7 +50,7 @@ const fmtPercent = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
 
 // ─── Mock 数据 ──────────────────────────────────────────────────────────────
 
-const BRAND_COLORS = ['#FF6B35', '#185FA5', '#0F6E56', '#BA7517', '#8B5CF6', '#A32D2D'];
+const BRAND_COLORS = [txColors.primary, txColors.info, txColors.success, txColors.warning, '#8B5CF6', txColors.danger];
 
 function mockBrands(): BrandInfo[] {
   const names = [
@@ -179,7 +180,7 @@ export function BrandManagePage() {
               if (compareMode) setSelectedBrandIds([]);
             }}
             type={compareMode ? 'primary' : 'default'}
-            style={compareMode ? { background: '#FF6B35', borderColor: '#FF6B35' } : {}}
+            style={compareMode ? { background: txColors.primary, borderColor: txColors.primary } : {}}
           >
             {compareMode ? '退出对比' : '品牌对比'}
           </Button>
@@ -190,7 +191,7 @@ export function BrandManagePage() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => setCreateOpen(true)}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             新建品牌
           </Button>
@@ -255,7 +256,7 @@ export function BrandManagePage() {
                     </span>
                     <span style={{
                       fontSize: 13, fontWeight: 600,
-                      color: brand.trend_percent >= 0 ? '#0F6E56' : '#A32D2D',
+                      color: brand.trend_percent >= 0 ? txColors.success : txColors.danger,
                     }}>
                       {fmtPercent(brand.trend_percent)}
                     </span>
@@ -335,7 +336,7 @@ export function BrandManagePage() {
                           <td key={b.brand_id} style={{ padding: '10px 12px', textAlign: 'center' }}>
                             <span style={{
                               fontWeight: isMax ? 700 : 400,
-                              color: isMax ? '#FF6B35' : '#2C2C2A',
+                              color: isMax ? txColors.primary : '#2C2C2A',
                             }}>
                               {metric.format(val)}
                             </span>
@@ -413,10 +414,10 @@ export function BrandManagePage() {
                 </div>
               </div>
               <div style={{
-                background: '#FFF3ED', borderRadius: 8, padding: 16, textAlign: 'center',
+                background: txColors.primaryLight, borderRadius: 8, padding: 16, textAlign: 'center',
               }}>
                 <div style={{ fontSize: 13, color: '#5F5E5A', marginBottom: 4 }}>跨品牌共享会员</div>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#FF6B35' }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: txColors.primary }}>
                   {memberStats.shared_members >= 10000
                     ? `${(memberStats.shared_members / 10000).toFixed(1)}万`
                     : memberStats.shared_members}
@@ -429,7 +430,7 @@ export function BrandManagePage() {
                 background: '#F0F7F4', borderRadius: 8, padding: 16, textAlign: 'center',
               }}>
                 <div style={{ fontSize: 13, color: '#5F5E5A', marginBottom: 4 }}>品牌独占会员</div>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#0F6E56' }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color: txColors.success }}>
                   {(memberStats.total_members - memberStats.shared_members) >= 10000
                     ? `${((memberStats.total_members - memberStats.shared_members) / 10000).toFixed(1)}万`
                     : memberStats.total_members - memberStats.shared_members}
@@ -505,7 +506,7 @@ export function BrandManagePage() {
         onCancel={() => { setCreateOpen(false); form.resetFields(); }}
         okText="确认创建"
         cancelText="取消"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form form={form} layout="vertical" style={{ marginTop: 16 }}>
           <Form.Item

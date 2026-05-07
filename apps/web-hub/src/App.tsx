@@ -47,6 +47,7 @@ import { PlaybooksPage as PlaybooksPageV2 } from './workspaces/PlaybooksPage';
 import { WorkbenchPage } from './workspaces/WorkbenchPage';
 import { SettingsPage } from './workspaces/SettingsPage';
 import { JourneyPage } from './workspaces/JourneyPage';
+import { txColors } from '@tx/tokens';
 
 /* ═══════════════════════════════════════════════════════════════
    色板常量
@@ -60,7 +61,7 @@ const C = {
   text: '#E6EDF1',
   text2: '#94A8B3',
   text3: '#647985',
-  orange: '#FF6B35',
+  orange: txColors.primary,
   green: '#22C55E',
   yellow: '#F59E0B',
   red: '#EF4444',

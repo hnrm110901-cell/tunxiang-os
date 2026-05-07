@@ -19,6 +19,7 @@ import {
   BarChartOutlined, CommentOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
@@ -26,11 +27,11 @@ const { Text, Paragraph } = Typography;
 // ─── Design Token ──────────────────────────────────────────────────────────
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
@@ -117,10 +118,10 @@ function StarDisplay({ value }: { value: number }) {
 // ─── 纯CSS雷达图（4维度） ──────────────────────────────────────────────────
 function SubRatingRadar({ data }: { data: SubRatings }) {
   const dims = [
-    { key: 'food', label: '口味', color: '#FF6B35' },
-    { key: 'service', label: '服务', color: '#185FA5' },
-    { key: 'environment', label: '环境', color: '#0F6E56' },
-    { key: 'speed', label: '速度', color: '#BA7517' },
+    { key: 'food', label: '口味', color: txColors.primary },
+    { key: 'service', label: '服务', color: txColors.info },
+    { key: 'environment', label: '环境', color: txColors.success },
+    { key: 'speed', label: '速度', color: txColors.warning },
   ] as const;
 
   return (
@@ -189,7 +190,7 @@ function RatingTrendSVG() {
         <polyline
           points={polyline}
           fill="none"
-          stroke="#FF6B35"
+          stroke={txColors.primary}
           strokeWidth={2}
           strokeLinejoin="round"
           strokeLinecap="round"
@@ -197,7 +198,7 @@ function RatingTrendSVG() {
         {/* 数据点 */}
         {points.map((p) => (
           <circle key={p.day} cx={p.x} cy={p.y} r={3}
-            fill="#FF6B35" stroke="#fff" strokeWidth={1.5} />
+            fill={txColors.primary} stroke="#fff" strokeWidth={1.5} />
         ))}
       </svg>
       {/* X轴标签 */}
@@ -226,7 +227,7 @@ function TagCloud({ tags }: { tags: { tag: string; count: number }[] }) {
           <span key={tag} style={{
             fontSize: size,
             color: `rgba(255, 107, 53, ${opacity})`,
-            background: '#FFF3ED',
+            background: txColors.primaryLight,
             padding: '3px 8px',
             borderRadius: 12,
             lineHeight: 1.4,
@@ -387,8 +388,8 @@ export function ReviewManagePage() {
           </Text>
           {record.merchant_reply ? (
             <div style={{
-              background: '#FFF3ED', borderRadius: 6, padding: '10px 12px',
-              borderLeft: '3px solid #FF6B35',
+              background: txColors.primaryLight, borderRadius: 6, padding: '10px 12px',
+              borderLeft: `3px solid ${txColors.primary}`,
             }}>
               <Paragraph style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
                 {record.merchant_reply}
@@ -452,7 +453,7 @@ export function ReviewManagePage() {
           {r.tags.slice(0, 3).map((tag) => (
             <Tag key={tag} style={{
               fontSize: 11, padding: '0 6px', margin: 0,
-              background: '#FFF3ED', color: '#FF6B35', border: '1px solid #FFD5B8',
+              background: txColors.primaryLight, color: txColors.primary, border: '1px solid #FFD5B8',
             }}>
               {tag}
             </Tag>
@@ -546,7 +547,7 @@ export function ReviewManagePage() {
               size="small"
               style={{
                 fontSize: 12,
-                color: '#0F6E56', borderColor: '#0F6E56',
+                color: txColors.success, borderColor: txColors.success,
               }}
               onClick={async () => {
                 message.success('已通过发布');
@@ -628,7 +629,7 @@ export function ReviewManagePage() {
               setStatsDrawer(true);
               loadStats();
             }}
-            style={{ borderColor: '#FF6B35', color: '#FF6B35' }}
+            style={{ borderColor: txColors.primary, color: txColors.primary }}
           >
             数据统计
           </Button>
@@ -647,7 +648,7 @@ export function ReviewManagePage() {
                 <StarFilled style={{ color: '#FAAD14', fontSize: 16 }} />
                 <span style={{ fontSize: 12, color: '#5F5E5A' }}>综合评分</span>
               </div>
-              <div style={{ fontSize: 32, fontWeight: 800, color: '#FF6B35', lineHeight: 1 }}>
+              <div style={{ fontSize: 32, fontWeight: 800, color: txColors.primary, lineHeight: 1 }}>
                 {summary.avg_rating || 3.5}
               </div>
               <Rate
@@ -670,7 +671,7 @@ export function ReviewManagePage() {
                 title={<span style={{ fontSize: 12 }}>好评率</span>}
                 value={summary.positive_rate || 62.5}
                 suffix="%"
-                valueStyle={{ color: '#0F6E56', fontWeight: 800 }}
+                valueStyle={{ color: txColors.success, fontWeight: 800 }}
                 precision={1}
               />
             </Card>
@@ -705,7 +706,7 @@ export function ReviewManagePage() {
             >
               <Statistic
                 title={
-                  <span style={{ fontSize: 12, color: summary.unreplied_count > 0 ? '#A32D2D' : undefined }}>
+                  <span style={{ fontSize: 12, color: summary.unreplied_count > 0 ? txColors.danger : undefined }}>
                     待回复数
                     {summary.unreplied_count > 0 && (
                       <span style={{ marginLeft: 4, fontSize: 10 }}>⚡ 需及时回复</span>
@@ -714,7 +715,7 @@ export function ReviewManagePage() {
                 }
                 value={summary.unreplied_count || 0}
                 valueStyle={{
-                  color: summary.unreplied_count > 0 ? '#A32D2D' : '#2C2C2A',
+                  color: summary.unreplied_count > 0 ? txColors.danger : '#2C2C2A',
                   fontWeight: 800,
                 }}
                 suffix="条"
@@ -730,9 +731,9 @@ export function ReviewManagePage() {
               bodyStyle={{ padding: '16px 20px' }}
             >
               <Statistic
-                title={<span style={{ fontSize: 12, color: '#BA7517' }}>差评待处理</span>}
+                title={<span style={{ fontSize: 12, color: txColors.warning }}>差评待处理</span>}
                 value={1}
-                valueStyle={{ color: '#BA7517', fontWeight: 800 }}
+                valueStyle={{ color: txColors.warning, fontWeight: 800 }}
                 suffix="条"
               />
             </Card>
@@ -838,7 +839,7 @@ export function ReviewManagePage() {
           headerTitle={
             <Space>
               <span style={{ fontWeight: 600 }}>评价列表</span>
-              <Badge count={summary.unreplied_count} style={{ backgroundColor: '#A32D2D' }}>
+              <Badge count={summary.unreplied_count} style={{ backgroundColor: txColors.danger }}>
                 <span />
               </Badge>
             </Space>
@@ -903,7 +904,7 @@ export function ReviewManagePage() {
         <Drawer
           title={
             <Space>
-              <BarChartOutlined style={{ color: '#FF6B35' }} />
+              <BarChartOutlined style={{ color: txColors.primary }} />
               <span>评价数据统计</span>
             </Space>
           }
@@ -919,7 +920,7 @@ export function ReviewManagePage() {
               <Row gutter={16} style={{ marginBottom: 20 }}>
                 <Col span={12}>
                   <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: '#FF6B35' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: txColors.primary }}>
                       {stats.avg_rating}
                     </div>
                     <div style={{ fontSize: 12, color: '#5F5E5A' }}>综合评分</div>
@@ -927,7 +928,7 @@ export function ReviewManagePage() {
                 </Col>
                 <Col span={12}>
                   <Card size="small" style={{ borderRadius: 8, textAlign: 'center' }}>
-                    <div style={{ fontSize: 28, fontWeight: 800, color: '#0F6E56' }}>
+                    <div style={{ fontSize: 28, fontWeight: 800, color: txColors.success }}>
                       {stats.positive_rate}%
                     </div>
                     <div style={{ fontSize: 12, color: '#5F5E5A' }}>好评率</div>
@@ -974,8 +975,8 @@ export function ReviewManagePage() {
                       }}>
                         <div style={{
                           width: `${pct}%`, height: '100%',
-                          background: Number(star) >= 4 ? '#0F6E56'
-                            : Number(star) === 3 ? '#BA7517' : '#A32D2D',
+                          background: Number(star) >= 4 ? txColors.success
+                            : Number(star) === 3 ? txColors.warning : txColors.danger,
                           borderRadius: 4,
                         }} />
                       </div>
@@ -1016,8 +1017,8 @@ export function ReviewManagePage() {
               {stats._is_mock && (
                 <div style={{
                   marginTop: 20, padding: '6px 10px',
-                  background: '#FFF3ED', borderRadius: 4,
-                  fontSize: 11, color: '#BA7517',
+                  background: txColors.primaryLight, borderRadius: 4,
+                  fontSize: 11, color: txColors.warning,
                 }}>
                   当前显示 Mock 数据，接入真实数据库后自动生效
                 </div>

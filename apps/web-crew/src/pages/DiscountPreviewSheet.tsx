@@ -18,6 +18,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───────────────────────────────────────────────────────────────────
 
@@ -139,12 +140,12 @@ function DiscountStepRow({
           height: 40,
           borderRadius: '50%',
           background: '#1E3040',
-          border: '2px solid #FF6B35',
+          border: `2px solid ${txColors.primary}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           fontSize: 16,
-          color: '#FF6B35',
+          color: txColors.primary,
           flexShrink: 0,
           fontWeight: 700,
         }}
@@ -188,7 +189,7 @@ function DiscountStepRow({
           <span style={{ fontSize: 16, color: '#9DB4B2', textDecoration: 'line-through' }}>
             ¥{fenToYuan(step.before)}
           </span>
-          <span style={{ fontSize: 18, color: '#FF6B35' }}>→</span>
+          <span style={{ fontSize: 18, color: txColors.primary }}>→</span>
           <span style={{ fontSize: 20, color: '#FFFFFF', fontWeight: 700 }}>
             ¥{fenToYuan(step.after)}
           </span>
@@ -500,7 +501,7 @@ export default function DiscountPreviewSheet({
                   width: 40,
                   height: 40,
                   border: '3px solid #1A2E3A',
-                  borderTopColor: '#FF6B35',
+                  borderTopColor: txColors.primary,
                   borderRadius: '50%',
                   animation: 'spin 0.8s linear infinite',
                 }}
@@ -528,7 +529,7 @@ export default function DiscountPreviewSheet({
                   marginTop: 12,
                   minHeight: 48,
                   padding: '0 24px',
-                  background: '#FF6B35',
+                  background: txColors.primary,
                   border: 'none',
                   borderRadius: 10,
                   color: '#fff',
@@ -641,7 +642,7 @@ export default function DiscountPreviewSheet({
               style={{
                 fontSize: 40,
                 fontWeight: 800,
-                color: '#FF6B35',
+                color: txColors.primary,
                 lineHeight: 1,
                 fontVariantNumeric: 'tabular-nums',
               }}
@@ -674,7 +675,7 @@ export default function DiscountPreviewSheet({
             style={{
               width: '100%',
               minHeight: 56,
-              background: paying || calcLoading ? '#2A3E4A' : '#FF6B35',
+              background: paying || calcLoading ? '#2A3E4A' : txColors.primary,
               border: 'none',
               borderRadius: 14,
               color: '#FFFFFF',

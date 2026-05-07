@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -73,7 +74,7 @@ async function fetchConstraintStatus(_orderId: string): Promise<ConstraintStatus
 // ─── 样式工具 ───
 
 const LEVEL_COLORS: Record<Level, { text: string; bg: string; border: string }> = {
-  ok:      { text: '#0F6E56', bg: '#F0FDF8', border: '#0F6E56' },
+  ok:      { text: txColors.success, bg: '#F0FDF8', border: txColors.success },
   warn:    { text: '#B45309', bg: '#FFFBEB', border: '#D97706' },
   danger:  { text: '#FFFFFF', bg: '#DC2626', border: '#DC2626' },
   loading: { text: '#999999', bg: '#F5F5F5', border: '#CCCCCC' },

@@ -5,8 +5,9 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
-const PRIMARY = '#FF6B35';
+const PRIMARY = txColors.primary;
 const BG = '#0B1A20';
 const SURFACE = '#112228';
 const SURFACE2 = '#1a2f38';

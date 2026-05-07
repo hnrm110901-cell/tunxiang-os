@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -85,9 +86,9 @@ function formatDateTime(dateStr: string): string {
 
 function getSourceLabel(source: string): { label: string; color: string } {
   const map: Record<string, { label: string; color: string }> = {
-    consume:    { label: '消费积分', color: '#0F6E56' },
+    consume:    { label: '消费积分', color: txColors.success },
     recharge:   { label: '充值赠送', color: '#4A90D9' },
-    activity:   { label: '活动赠送', color: '#BA7517' },
+    activity:   { label: '活动赠送', color: txColors.warning },
     sign_in:    { label: '签到', color: '#7B68EE' },
     cash_offset:{ label: '积分抵现', color: '#FF7043' },
     exchange:   { label: '积分兑换', color: '#FF4D4D' },
@@ -178,8 +179,8 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
                   onClick={() => { setSelectedPlanId(plan.id); setCustomAmount(''); }}
                   style={{
                     padding: '12px 14px', borderRadius: 8, cursor: 'pointer',
-                    border: `2px solid ${selectedPlanId === plan.id ? '#0F6E56' : '#2a3a44'}`,
-                    background: selectedPlanId === plan.id ? '#0F6E5620' : '#0d1e28',
+                    border: `2px solid ${selectedPlanId === plan.id ? txColors.success : '#2a3a44'}`,
+                    background: selectedPlanId === plan.id ? `${txColors.success}20` : '#0d1e28',
                     transition: 'border-color .15s, background .15s',
                   }}
                 >
@@ -187,7 +188,7 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
                     ¥ {fenToYuan(plan.recharge_fen)}
                   </div>
                   {plan.bonus_fen > 0 && (
-                    <div style={{ color: '#0F6E56', fontSize: 12, marginTop: 4 }}>
+                    <div style={{ color: txColors.success, fontSize: 12, marginTop: 4 }}>
                       赠送 ¥ {fenToYuan(plan.bonus_fen)}
                     </div>
                   )}
@@ -216,7 +217,7 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
               onChange={e => { setCustomAmount(e.target.value); setSelectedPlanId(null); }}
               style={{
                 width: '100%', padding: '10px 12px 10px 28px', borderRadius: 8,
-                border: `1px solid ${customAmount && !selectedPlanId ? '#0F6E56' : '#2a3a44'}`,
+                border: `1px solid ${customAmount && !selectedPlanId ? txColors.success : '#2a3a44'}`,
                 background: '#0d1e28', color: '#fff', fontSize: 14, outline: 'none',
                 boxSizing: 'border-box',
               }}
@@ -227,10 +228,10 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
         {/* 确认信息 */}
         {(selectedPlan || customAmountFen > 0) && (
           <div style={{
-            background: '#0F6E5610', border: '1px solid #0F6E5640', borderRadius: 8,
+            background: `${txColors.success}10`, border: `1px solid ${txColors.success}40`, borderRadius: 8,
             padding: '12px 14px', marginBottom: 16, fontSize: 13,
           }}>
-            <div style={{ color: '#0F6E56', fontWeight: 600 }}>充值确认</div>
+            <div style={{ color: txColors.success, fontWeight: 600 }}>充值确认</div>
             {selectedPlan ? (
               <>
                 <div style={{ color: '#ccc', marginTop: 6 }}>充值金额：¥ {fenToYuan(selectedPlan.recharge_fen)}</div>
@@ -260,7 +261,7 @@ function RechargeModal({ card, plans, onClose, onSuccess }: RechargeModalProps) 
           }}>取消</button>
           <button onClick={handleRecharge} disabled={loading} style={{
             flex: 2, padding: '10px 0', borderRadius: 8, border: 'none',
-            background: loading ? '#0a4a38' : '#0F6E56', color: '#fff',
+            background: loading ? '#0a4a38' : txColors.success, color: '#fff',
             cursor: loading ? 'not-allowed' : 'pointer', fontSize: 14, fontWeight: 600,
           }}>
             {loading ? '处理中...' : '确认充值'}
@@ -368,7 +369,7 @@ function StoredValueTab({ cards, plans, loading, onRefresh }: StoredValueTabProp
                     {card.card_level && (
                       <span style={{
                         padding: '2px 8px', borderRadius: 10, fontSize: 11,
-                        background: '#BA751722', color: '#BA7517',
+                        background: `${txColors.warning}22`, color: txColors.warning,
                       }}>{card.card_level}</span>
                     )}
                   </div>
@@ -378,7 +379,7 @@ function StoredValueTab({ cards, plans, loading, onRefresh }: StoredValueTabProp
                     </span>
                     {card.bonus_balance_fen > 0 && (
                       <span>
-                        赠送余额：<span style={{ color: '#0F6E56', fontWeight: 600 }}>¥ {fenToYuan(card.bonus_balance_fen)}</span>
+                        赠送余额：<span style={{ color: txColors.success, fontWeight: 600 }}>¥ {fenToYuan(card.bonus_balance_fen)}</span>
                       </span>
                     )}
                     <span style={{ color: '#888' }}>
@@ -392,8 +393,8 @@ function StoredValueTab({ cards, plans, loading, onRefresh }: StoredValueTabProp
                 <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                   <button onClick={() => setRechargeTarget(card)} style={{
                     padding: '6px 14px', borderRadius: 6,
-                    border: '1px solid #0F6E56', background: '#0F6E5620',
-                    color: '#0F6E56', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    border: `1px solid ${txColors.success}`, background: `${txColors.success}20`,
+                    color: txColors.success, cursor: 'pointer', fontSize: 13, fontWeight: 600,
                   }}>充值</button>
                   <button onClick={() => openDetail(card)} style={{
                     padding: '6px 14px', borderRadius: 6,
@@ -462,7 +463,7 @@ function StoredValueTab({ cards, plans, loading, onRefresh }: StoredValueTabProp
                       <tr key={tx.id} style={{ borderTop: '1px solid #2a3a4440' }}>
                         <td style={{ padding: '8px 10px', color: '#888' }}>{formatDateTime(tx.created_at)}</td>
                         <td style={{ padding: '8px 10px', color: '#ccc' }}>{tx.type}</td>
-                        <td style={{ padding: '8px 10px', color: tx.amount_fen >= 0 ? '#0F6E56' : '#FF4D4D', fontWeight: 600 }}>
+                        <td style={{ padding: '8px 10px', color: tx.amount_fen >= 0 ? txColors.success : '#FF4D4D', fontWeight: 600 }}>
                           {tx.amount_fen >= 0 ? '+' : ''}¥ {fenToYuan(Math.abs(tx.amount_fen))}
                         </td>
                         <td style={{ padding: '8px 10px', color: '#fff' }}>¥ {fenToYuan(tx.balance_after_fen)}</td>
@@ -596,7 +597,7 @@ function PointsTab({ history, earnRules, spendRules, loading, onRefresh }: Point
                         background: `${src.color}22`, color: src.color,
                       }}>{src.label}</span>
                     </td>
-                    <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: 14, color: isGain ? '#0F6E56' : '#FF4D4D' }}>
+                    <td style={{ padding: '12px 16px', fontWeight: 700, fontSize: 14, color: isGain ? txColors.success : '#FF4D4D' }}>
                       {isGain ? '+' : ''}{item.amount.toLocaleString('zh-CN')}
                     </td>
                     <td style={{ padding: '12px 16px', color: '#fff', fontSize: 13 }}>
@@ -710,7 +711,7 @@ export function MemberCardPage() {
             style={{
               padding: '8px 20px', borderRadius: 7, border: 'none', cursor: 'pointer',
               fontSize: 14, fontWeight: activeTab === tab.key ? 700 : 400,
-              background: activeTab === tab.key ? '#0F6E56' : 'transparent',
+              background: activeTab === tab.key ? txColors.success : 'transparent',
               color: activeTab === tab.key ? '#fff' : '#888',
               transition: 'background .15s, color .15s',
             }}

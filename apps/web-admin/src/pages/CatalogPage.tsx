@@ -5,6 +5,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { txFetchData } from '../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────
 
@@ -52,28 +53,28 @@ function fenToYuan(fen: number): string {
 
 function costRateColor(rate?: number): string {
   if (rate === undefined || rate === null) return '#8899A6';
-  if (rate > 0.5) return '#A32D2D';
-  if (rate >= 0.3) return '#BA7517';
-  return '#0F6E56';
+  if (rate > 0.5) return txColors.danger;
+  if (rate >= 0.3) return txColors.warning;
+  return txColors.success;
 }
 
 function costRateAntColor(rate?: number): string {
   if (rate === undefined || rate === null) return '#8899A6';
-  if (rate > 0.5) return '#A32D2D';
-  if (rate >= 0.3) return '#BA7517';
-  return '#0F6E56';
+  if (rate > 0.5) return txColors.danger;
+  if (rate >= 0.3) return txColors.warning;
+  return txColors.success;
 }
 
 function stockBadge(status: Dish['stock_status']): { label: string; color: string; bg: string } {
-  if (status === 'out_of_stock') return { label: '缺货', color: '#A32D2D', bg: '#3A1515' };
-  if (status === 'low') return { label: '低库存', color: '#BA7517', bg: '#3A2A10' };
-  return { label: '正常', color: '#0F6E56', bg: '#0E2A22' };
+  if (status === 'out_of_stock') return { label: '缺货', color: txColors.danger, bg: '#3A1515' };
+  if (status === 'low') return { label: '低库存', color: txColors.warning, bg: '#3A2A10' };
+  return { label: '正常', color: txColors.success, bg: '#0E2A22' };
 }
 
 function quadrantMeta(q?: Dish['quadrant']): { label: string; emoji: string; color: string } {
-  if (q === 'star') return { label: '明星菜品', emoji: '⭐', color: '#FF6B35' };
-  if (q === 'cash_cow') return { label: '金牛菜品', emoji: '🐂', color: '#185FA5' };
-  if (q === 'question') return { label: '问题菜品', emoji: '❓', color: '#BA7517' };
+  if (q === 'star') return { label: '明星菜品', emoji: '⭐', color: txColors.primary };
+  if (q === 'cash_cow') return { label: '金牛菜品', emoji: '🐂', color: txColors.info };
+  if (q === 'question') return { label: '问题菜品', emoji: '❓', color: txColors.warning };
   if (q === 'dog') return { label: '瘦狗菜品', emoji: '🐕', color: '#5F5E5A' };
   return { label: '未分类', emoji: '—', color: '#5F5E5A' };
 }
@@ -141,7 +142,7 @@ const s = {
     cursor: 'pointer',
     fontSize: '13px',
     fontWeight: active ? 600 : 400,
-    backgroundColor: active ? '#FF6B35' : '#1E3A47',
+    backgroundColor: active ? txColors.primary : '#1E3A47',
     color: active ? '#FFFFFF' : '#8899A6',
     transition: 'all 0.2s',
   }),
@@ -176,8 +177,8 @@ const s = {
     fontSize: '12px',
     fontWeight: 500,
     backgroundColor:
-      variant === 'primary' ? '#FF6B35' :
-      variant === 'danger' ? '#A32D2D' : '#1E3A47',
+      variant === 'primary' ? txColors.primary :
+      variant === 'danger' ? txColors.danger : '#1E3A47',
     color: '#FFFFFF',
     transition: 'opacity 0.2s',
   }),
@@ -267,9 +268,9 @@ function SkeletonRows({ count = 8 }: { count?: number }) {
 // ─── 子组件：四象限视图 ───────────────────────────────────────
 
 const QUADRANTS: Array<{ key: Dish['quadrant']; label: string; emoji: string; desc: string; borderColor: string }> = [
-  { key: 'star',      label: '明星菜品', emoji: '⭐', desc: '高销量 · 高利润', borderColor: '#FF6B35' },
-  { key: 'cash_cow',  label: '金牛菜品', emoji: '🐂', desc: '高销量 · 低利润', borderColor: '#185FA5' },
-  { key: 'question',  label: '问题菜品', emoji: '❓', desc: '低销量 · 高利润', borderColor: '#BA7517' },
+  { key: 'star',      label: '明星菜品', emoji: '⭐', desc: '高销量 · 高利润', borderColor: txColors.primary },
+  { key: 'cash_cow',  label: '金牛菜品', emoji: '🐂', desc: '高销量 · 低利润', borderColor: txColors.info },
+  { key: 'question',  label: '问题菜品', emoji: '❓', desc: '低销量 · 高利润', borderColor: txColors.warning },
   { key: 'dog',       label: '瘦狗菜品', emoji: '🐕', desc: '低销量 · 低利润', borderColor: '#5F5E5A' },
 ];
 
@@ -505,14 +506,14 @@ export function CatalogPage() {
         title: '缺货菜品',
         value: stats.outOfStock,
         suffix: '道',
-        color: stats.outOfStock > 0 ? '#A32D2D' : '#0F6E56',
+        color: stats.outOfStock > 0 ? txColors.danger : txColors.success,
         alert: stats.outOfStock > 0,
       },
       {
         title: '本月新增',
         value: stats.monthlyNew,
         suffix: '道',
-        color: '#FF6B35',
+        color: txColors.primary,
       },
     ];
 
@@ -530,7 +531,7 @@ export function CatalogPage() {
             key={c.title}
             style={{
               ...s.card,
-              borderTop: c.alert ? '2px solid #A32D2D' : '2px solid transparent',
+              borderTop: c.alert ? `2px solid ${txColors.danger}` : '2px solid transparent',
             }}
           >
             <div style={s.cardTitle}>{c.title}</div>
@@ -541,7 +542,7 @@ export function CatalogPage() {
               </span>
             </div>
             {c.alert && (
-              <div style={{ fontSize: '11px', color: '#A32D2D', marginTop: '4px' }}>
+              <div style={{ fontSize: '11px', color: txColors.danger, marginTop: '4px' }}>
                 ⚠ 需要补货
               </div>
             )}

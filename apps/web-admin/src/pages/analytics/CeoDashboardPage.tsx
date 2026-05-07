@@ -19,6 +19,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ConfigProvider } from 'antd';
 import { apiGet } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token（CEO驾驶舱暗色） ─────────────────────────────────────────────
 const T = {
@@ -30,7 +31,7 @@ const T = {
   text1: '#e6edf3',
   text2: '#8b949e',
   text3: '#6e7681',
-  brand: '#FF6B35',
+  brand: txColors.primary,
   brandMuted: 'rgba(255,107,53,0.15)',
   brandGlow: 'rgba(255,107,53,0.3)',
   success: '#3fb950',
@@ -583,7 +584,7 @@ export function CeoDashboardPage() {
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div
         ref={containerRef}
         onDoubleClick={handleDoubleClick}

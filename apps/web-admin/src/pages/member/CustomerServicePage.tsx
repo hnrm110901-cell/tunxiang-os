@@ -28,6 +28,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -86,19 +87,19 @@ const CUSTOMER_TIERS = [
 ];
 
 const INTENT_LABELS: Record<string, { label: string; color: string }> = {
-  food_quality:    { label: '食品质量', color: '#A32D2D' },
-  wait_time:       { label: '等待时间', color: '#BA7517' },
-  wrong_dish:      { label: '上错菜',   color: '#E55A28' },
-  price:           { label: '价格',     color: '#185FA5' },
-  service:         { label: '服务',     color: '#0F6E56' },
+  food_quality:    { label: '食品质量', color: txColors.danger },
+  wait_time:       { label: '等待时间', color: txColors.warning },
+  wrong_dish:      { label: '上错菜',   color: txColors.primaryActive },
+  price:           { label: '价格',     color: txColors.info },
+  service:         { label: '服务',     color: txColors.success },
   other:           { label: '其他',     color: '#5F5E5A' },
 };
 
 const SENTIMENT_CONFIG: Record<string, { label: string; color: string }> = {
-  positive: { label: '正面', color: '#0F6E56' },
+  positive: { label: '正面', color: txColors.success },
   neutral:  { label: '中性', color: '#B4B2A9' },
-  negative: { label: '负面', color: '#BA7517' },
-  angry:    { label: '愤怒', color: '#A32D2D' },
+  negative: { label: '负面', color: txColors.warning },
+  angry:    { label: '愤怒', color: txColors.danger },
 };
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -257,7 +258,7 @@ function AIAnalysisPanel({ onOrderCreated }: { onOrderCreated: (order: WorkOrder
               icon={<RobotOutlined />}
               loading={loading}
               onClick={handleAnalyze}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               AI 分析并生成回复
             </Button>
@@ -283,7 +284,7 @@ function AIAnalysisPanel({ onOrderCreated }: { onOrderCreated: (order: WorkOrder
           size="small"
           title={
             <Space>
-              <RobotOutlined style={{ color: '#185FA5' }} />
+              <RobotOutlined style={{ color: txColors.info }} />
               <span>AI 分析结果</span>
             </Space>
           }
@@ -365,7 +366,7 @@ function AIAnalysisPanel({ onOrderCreated }: { onOrderCreated: (order: WorkOrder
                   type="primary"
                   icon={<SendOutlined />}
                   onClick={handleMarkSent}
-                  style={{ background: '#0F6E56', borderColor: '#0F6E56' }}
+                  style={{ background: txColors.success, borderColor: txColors.success }}
                 >
                   标记为已回复并存档
                 </Button>
@@ -585,7 +586,7 @@ export function CustomerServicePage() {
         <Title level={4} style={{ margin: 0, color: '#2C2C2A' }}>
           客服工单管理
         </Title>
-        <Tag color="#185FA5" style={{ fontSize: 11 }}>
+        <Tag color={txColors.info} style={{ fontSize: 11 }}>
           Brain Agent
         </Tag>
         <CustomerServiceOutlined style={{ color: '#5F5E5A', fontSize: 16 }} />

@@ -42,6 +42,7 @@ import {
   ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -174,7 +175,7 @@ function PriceAdjustModal({ open, selectedCount, onClose, onConfirm }: PriceAdju
       onCancel={onClose}
       onOk={handleConfirm}
       okText="确认调价"
-      okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+      okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       width={480}
     >
       <Alert
@@ -217,10 +218,10 @@ function PriceAdjustModal({ open, selectedCount, onClose, onConfirm }: PriceAdju
           <div
             style={{
               padding: '10px 16px',
-              background: '#fff3ed',
+              background: txColors.primaryLight,
               borderRadius: 6,
               border: '1px solid #ffd8c0',
-              color: '#FF6B35',
+              color: txColors.primary,
               fontWeight: 600,
             }}
           >
@@ -255,7 +256,7 @@ export function DishBatchPage() {
     }
     Modal.confirm({
       title: `确认上架 ${selectedRowKeys.length} 个菜品？`,
-      icon: <CheckCircleOutlined style={{ color: '#0F6E56' }} />,
+      icon: <CheckCircleOutlined style={{ color: txColors.success }} />,
       onOk: async () => {
         try {
           await apiBatchToggle(selectedRowKeys, true);
@@ -277,7 +278,7 @@ export function DishBatchPage() {
     }
     Modal.confirm({
       title: `确认下架 ${selectedRowKeys.length} 个菜品？`,
-      icon: <ExclamationCircleOutlined style={{ color: '#A32D2D' }} />,
+      icon: <ExclamationCircleOutlined style={{ color: txColors.danger }} />,
       content: '下架后顾客将无法看到这些菜品，请确认。',
       okText: '确认下架',
       okType: 'danger',
@@ -371,7 +372,7 @@ export function DishBatchPage() {
       width: 90,
       search: false,
       render: (_, r) => (
-        <Text style={{ color: '#FF6B35', fontWeight: 600 }}>
+        <Text style={{ color: txColors.primary, fontWeight: 600 }}>
           {fenToYuan(r.price_fen)}
         </Text>
       ),
@@ -428,7 +429,7 @@ export function DishBatchPage() {
           style={{ marginBottom: 16 }}
           message={
             <span>
-              已选 <Text strong style={{ color: '#FF6B35' }}>{selectedCount}</Text> 个菜品
+              已选 <Text strong style={{ color: txColors.primary }}>{selectedCount}</Text> 个菜品
               <Divider type="vertical" />
               <Space size={8}>
                 <Button size="small" icon={<CheckCircleOutlined />} onClick={handleBatchOnline}>

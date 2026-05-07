@@ -15,6 +15,7 @@ import { txFetch } from '../api/index';
 import { DishGrid, CategoryNav, MenuSearch } from '@tx-ds/biz';
 import type { DishData } from '@tx-ds/biz';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Props ───
 
@@ -281,7 +282,7 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
           left: '50%',
           transform: `translateX(-50%) translateY(${toastMsg.show ? '0' : '-60px'})`,
           transition: 'transform 280ms ease',
-          background: toastMsg.type === 'success' ? '#0F6E56' : '#A32D2D',
+          background: toastMsg.type === 'success' ? txColors.success : txColors.danger,
           color: '#fff',
           padding: '10px 20px',
           borderRadius: 10,
@@ -388,10 +389,10 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
           }}>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 16, color: '#94a3b8' }}>
-                已选 <span style={{ color: '#FF6B35', fontWeight: 700 }}>{selectedSummary.count}</span> 件
+                已选 <span style={{ color: txColors.primary, fontWeight: 700 }}>{selectedSummary.count}</span> 件
               </div>
               <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>
-                合计 <span style={{ color: '#FF6B35' }}>{formatPrice(selectedSummary.totalFen)}</span>
+                合计 <span style={{ color: txColors.primary }}>{formatPrice(selectedSummary.totalFen)}</span>
               </div>
             </div>
 
@@ -403,7 +404,7 @@ export function AddDishSheet({ visible, onClose, orderId, storeId, onSuccess }: 
                 height: 52,
                 padding: '0 28px',
                 borderRadius: 14,
-                background: submitting ? 'rgba(255,107,53,0.5)' : '#FF6B35',
+                background: submitting ? 'rgba(255,107,53,0.5)' : txColors.primary,
                 border: 'none',
                 color: '#fff',
                 fontSize: 18,

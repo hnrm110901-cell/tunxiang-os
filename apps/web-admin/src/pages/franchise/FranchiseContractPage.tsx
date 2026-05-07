@@ -53,6 +53,7 @@ import {
 } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -294,7 +295,7 @@ function ContractTab() {
         <a
           key="alert"
           onClick={() => handleSendAlert(record)}
-          style={{ color: record.days_to_expire <= 30 ? '#A32D2D' : undefined }}
+          style={{ color: record.days_to_expire <= 30 ? txColors.danger : undefined }}
         >
           {alertLoading === record.id ? '发送中…' : '发送提醒'}
         </a>,
@@ -311,7 +312,7 @@ function ContractTab() {
           icon={<BellOutlined />}
           message={
             <span>
-              <Text strong style={{ color: '#BA7517' }}>
+              <Text strong style={{ color: txColors.warning }}>
                 {expiringCount} 份合同将在 30 天内到期
               </Text>
               ，请及时跟进续签或发送提醒。
@@ -534,7 +535,7 @@ function FeeTab() {
       width: 110,
       search: false,
       render: (_, r) => (
-        <Text style={{ color: r.paid_fen >= r.amount_fen ? '#0F6E56' : undefined }}>
+        <Text style={{ color: r.paid_fen >= r.amount_fen ? txColors.success : undefined }}>
           ¥{fenToYuan(r.paid_fen)}
         </Text>
       ),
@@ -583,7 +584,7 @@ function FeeTab() {
               <a
                 key="pay"
                 onClick={() => setPayTarget(record)}
-                style={{ color: record.status === 'overdue' ? '#A32D2D' : undefined }}
+                style={{ color: record.status === 'overdue' ? txColors.danger : undefined }}
               >
                 {record.status === 'overdue' ? (
                   <Tooltip title="该收款已逾期，请尽快处理">
@@ -620,7 +621,7 @@ function FeeTab() {
                 title="已收"
                 value={fenToYuan(stats.total_paid_fen)}
                 prefix="¥"
-                valueStyle={{ fontSize: 22, color: '#0F6E56' }}
+                valueStyle={{ fontSize: 22, color: txColors.success }}
               />
             </div>
           </Col>
@@ -630,17 +631,17 @@ function FeeTab() {
                 title="未收"
                 value={fenToYuan(stats.total_unpaid_fen)}
                 prefix="¥"
-                valueStyle={{ fontSize: 22, color: '#BA7517' }}
+                valueStyle={{ fontSize: 22, color: txColors.warning }}
               />
             </div>
           </Col>
           <Col span={6}>
-            <div style={{ background: '#FFF3ED', borderRadius: 6, padding: '16px 20px', border: stats.total_overdue_fen > 0 ? '1px solid #A32D2D' : undefined }}>
+            <div style={{ background: txColors.primaryLight, borderRadius: 6, padding: '16px 20px', border: stats.total_overdue_fen > 0 ? `1px solid ${txColors.danger}` : undefined }}>
               <Statistic
                 title="逾期未收"
                 value={fenToYuan(stats.total_overdue_fen)}
                 prefix="¥"
-                valueStyle={{ fontSize: 22, color: stats.total_overdue_fen > 0 ? '#A32D2D' : '#2C2C2A' }}
+                valueStyle={{ fontSize: 22, color: stats.total_overdue_fen > 0 ? txColors.danger : '#2C2C2A' }}
               />
             </div>
           </Col>
@@ -750,7 +751,7 @@ function FeeTab() {
               <Col span={12}>
                 <Text type="secondary">已付金额</Text>
                 <div>
-                  <Text strong style={{ color: '#0F6E56' }}>
+                  <Text strong style={{ color: txColors.success }}>
                     ¥{fenToYuan(payTarget.paid_fen)}
                   </Text>
                 </div>
@@ -759,7 +760,7 @@ function FeeTab() {
             <Row style={{ marginTop: 8 }}>
               <Col span={24}>
                 <Text type="secondary">待收</Text>
-                <Text strong style={{ color: '#A32D2D', marginLeft: 8 }}>
+                <Text strong style={{ color: txColors.danger, marginLeft: 8 }}>
                   ¥{fenToYuan(payTarget.amount_fen - payTarget.paid_fen)}
                 </Text>
               </Col>

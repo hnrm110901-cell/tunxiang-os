@@ -9,6 +9,7 @@ import {
 import type { TabsProps } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface AuthRow {
@@ -168,7 +169,7 @@ const tabItems: TabsProps['items'] = [
 // ---- 页面组件 ----
 export const AgentSettingsPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部说明 */}
         <Alert

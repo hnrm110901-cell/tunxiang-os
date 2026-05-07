@@ -8,6 +8,7 @@ import { CategoryNav, DishCard } from '@tx-ds/biz';
 import type { DishData } from '@tx-ds/biz';
 import type { Category, DishItem } from '@/api/menuApi';
 import type { OrderSummary } from '@/api/orderApi';
+import { txColors } from '@tx/tokens';
 
 /** 加菜页 — 已有订单基础上追加菜品 */
 export default function AddMorePage() {
@@ -189,7 +190,7 @@ export default function AddMorePage() {
         <div style={{
           padding: '4px 10px', borderRadius: 'var(--tx-radius-full)',
           background: 'rgba(255,107,53,0.1)',
-          fontSize: 'var(--tx-font-xs)', color: '#FF6B35', fontWeight: 600,
+          fontSize: 'var(--tx-font-xs)', color: txColors.primary, fontWeight: 600,
         }}>
           {t('addMoreBadge')}
         </div>
@@ -243,7 +244,7 @@ export default function AddMorePage() {
             style={{
               width: '100%', height: 56,
               borderRadius: 'var(--tx-radius-full)',
-              background: submitting ? 'var(--tx-bg-tertiary)' : '#FF6B35',
+              background: submitting ? 'var(--tx-bg-tertiary)' : txColors.primary,
               color: submitting ? 'var(--tx-text-tertiary)' : '#fff',
               fontSize: 'var(--tx-font-lg)', fontWeight: 700,
               transition: 'background 0.2s',

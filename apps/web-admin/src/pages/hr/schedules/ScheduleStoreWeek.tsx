@@ -40,11 +40,12 @@ import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { useSearchParams } from 'react-router-dom';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 dayjs.extend(isoWeek);
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

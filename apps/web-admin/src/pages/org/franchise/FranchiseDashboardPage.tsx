@@ -47,6 +47,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -168,7 +169,7 @@ function KpiTrendChart({ data }: { data: KpiMonth[] }) {
               目标
             </span>
             <span style={{ fontSize: 12 }}>
-              <span style={{ display: 'inline-block', width: 12, height: 12, background: '#FF6B35', borderRadius: 2, marginRight: 4 }} />
+              <span style={{ display: 'inline-block', width: 12, height: 12, background: txColors.primary, borderRadius: 2, marginRight: 4 }} />
               实际
             </span>
           </Space>
@@ -186,7 +187,7 @@ function KpiTrendChart({ data }: { data: KpiMonth[] }) {
                 <div style={{ fontSize: 12 }}>
                   <div>目标：¥{fenToWan(d.revenue_target_fen)}</div>
                   <div>实际：¥{fenToWan(d.revenue_actual_fen)}</div>
-                  <div style={{ color: achieved ? '#0F6E56' : '#A32D2D' }}>
+                  <div style={{ color: achieved ? txColors.success : txColors.danger }}>
                     完成率：{d.completion_rate.toFixed(1)}%
                   </div>
                 </div>
@@ -199,7 +200,7 @@ function KpiTrendChart({ data }: { data: KpiMonth[] }) {
                   {/* 实际柱 */}
                   <div style={{
                     flex: 1,
-                    background: achieved ? '#0F6E56' : '#FF6B35',
+                    background: achieved ? txColors.success : txColors.primary,
                     height: `${actualH}%`,
                     borderRadius: '3px 3px 0 0',
                     minHeight: 2,
@@ -370,7 +371,7 @@ export function FranchiseDashboardPage() {
     },
     {
       title: '门店数', dataIndex: 'store_count', width: 75, align: 'center',
-      render: (v: number) => <Badge count={v} color="#1E2A3A" />,
+      render: (v: number) => <Badge count={v} color={txColors.navy} />,
     },
     {
       title: '本月营收', dataIndex: 'monthly_revenue_fen', width: 110, align: 'right',
@@ -378,12 +379,12 @@ export function FranchiseDashboardPage() {
     },
     {
       title: '本月分润', dataIndex: 'monthly_royalty_fen', width: 110, align: 'right',
-      render: (v: number) => <Text style={{ color: '#0F6E56' }}>¥{fenToWan(v)}</Text>,
+      render: (v: number) => <Text style={{ color: txColors.success }}>¥{fenToWan(v)}</Text>,
     },
     {
       title: '综合评分', dataIndex: 'overall_score', width: 90, align: 'center',
       render: (v: number) => (
-        <Text style={{ color: v >= 4.5 ? '#0F6E56' : v >= 3.5 ? '#BA7517' : '#A32D2D', fontWeight: 600 }}>
+        <Text style={{ color: v >= 4.5 ? txColors.success : v >= 3.5 ? txColors.warning : txColors.danger, fontWeight: 600 }}>
           {v.toFixed(1)}
         </Text>
       ),
@@ -406,7 +407,7 @@ export function FranchiseDashboardPage() {
     },
     {
       title: '分润额', dataIndex: 'royalty_fen', align: 'right',
-      render: (v: number) => <Text style={{ color: '#FF6B35' }}>¥{fenToYuan(v)}</Text>,
+      render: (v: number) => <Text style={{ color: txColors.primary }}>¥{fenToYuan(v)}</Text>,
     },
     {
       title: '到期日', dataIndex: 'due_date', width: 100,
@@ -446,7 +447,7 @@ export function FranchiseDashboardPage() {
       {/* 页头 */}
       <Row align="middle" justify="space-between" style={{ marginBottom: 20 }}>
         <Col>
-          <Title level={4} style={{ margin: 0, color: '#1E2A3A' }}>
+          <Title level={4} style={{ margin: 0, color: txColors.navy }}>
             <BankOutlined style={{ marginRight: 8 }} />
             加盟商驾驶舱
           </Title>
@@ -488,7 +489,7 @@ export function FranchiseDashboardPage() {
               title={<><ShopOutlined style={{ marginRight: 6 }} />运营中门店</>}
               value={stats?.active_stores ?? 0}
               suffix="家"
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>
@@ -499,7 +500,7 @@ export function FranchiseDashboardPage() {
               value={(stats?.monthly_royalty_total_fen ?? 0) / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>
@@ -510,7 +511,7 @@ export function FranchiseDashboardPage() {
               value={stats?.royalty_collection_rate ?? 0}
               precision={1}
               suffix="%"
-              valueStyle={{ color: (stats?.royalty_collection_rate ?? 0) >= 90 ? '#0F6E56' : '#BA7517' }}
+              valueStyle={{ color: (stats?.royalty_collection_rate ?? 0) >= 90 ? txColors.success : txColors.warning }}
             />
           </Card>
         </Col>
@@ -605,12 +606,12 @@ export function FranchiseDashboardPage() {
                       mode="left"
                       items={kpiTrend.map(d => ({
                         label: d.month.slice(5) + '月',
-                        color: d.completion_rate >= 100 ? '#0F6E56' : d.completion_rate >= 90 ? '#BA7517' : '#A32D2D',
+                        color: d.completion_rate >= 100 ? txColors.success : d.completion_rate >= 90 ? txColors.warning : txColors.danger,
                         children: (
                           <Space>
                             <Text style={{ fontSize: 12 }}>
                               完成率 <Text strong style={{
-                                color: d.completion_rate >= 100 ? '#0F6E56' : d.completion_rate >= 90 ? '#BA7517' : '#A32D2D',
+                                color: d.completion_rate >= 100 ? txColors.success : d.completion_rate >= 90 ? txColors.warning : txColors.danger,
                               }}>
                                 {d.completion_rate.toFixed(1)}%
                               </Text>

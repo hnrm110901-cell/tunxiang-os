@@ -41,6 +41,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 const { Option } = Select;
@@ -601,7 +602,7 @@ function PublishStatsTab() {
       title: '近7天变更',
       dataIndex: 'changed_7d',
       width: 100,
-      render: v => v > 0 ? <Badge count={v} showZero style={{ backgroundColor: '#FF6B35' }} /> : <Text type="secondary">—</Text>,
+      render: v => v > 0 ? <Badge count={v} showZero style={{ backgroundColor: txColors.primary }} /> : <Text type="secondary">—</Text>,
     },
   ];
 
@@ -627,7 +628,7 @@ function PublishStatsTab() {
                 <Statistic
                   title="已下架（渠道）"
                   value={stats.total_unavailable}
-                  valueStyle={{ color: '#A32D2D' }}
+                  valueStyle={{ color: txColors.danger }}
                   suffix="处"
                 />
               </Card>
@@ -637,7 +638,7 @@ function PublishStatsTab() {
                 <Statistic
                   title="近7天变更"
                   value={stats.changed_7d}
-                  valueStyle={{ color: '#FF6B35' }}
+                  valueStyle={{ color: txColors.primary }}
                   suffix="次"
                 />
               </Card>

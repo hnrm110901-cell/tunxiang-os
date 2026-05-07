@@ -22,17 +22,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart } from '../components/charts';
 import { TxPieChart } from '../components/charts';
 import { txFetchData } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── E1-E8 日清日结环节名称 ───
 const E_NAMES = ['营业准备', '收银核对', '库存盘点', '卫生检查', '设备检查', '人员签退', '财务汇总', '日结确认'];
 
 // ─── 颜色常量（Design Token） ───
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
   cardBg: '#112228',
   innerBg: '#0B1A20',
   border: '#1a2a33',

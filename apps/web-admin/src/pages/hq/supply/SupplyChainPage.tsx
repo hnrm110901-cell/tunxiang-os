@@ -4,6 +4,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -40,17 +41,17 @@ interface TransferOrder {
 // ─── 常量 ───
 
 const RECEIVING_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  pending:    { label: '待验收', color: '#BA7517', bg: '#BA751722' },
+  pending:    { label: '待验收', color: txColors.warning, bg: `${txColors.warning}22` },
   inspecting: { label: '验收中', color: '#2196f3', bg: '#2196f322' },
-  completed:  { label: '已完成', color: '#0F6E56', bg: '#0F6E5622' },
+  completed:  { label: '已完成', color: txColors.success, bg: `${txColors.success}22` },
   rejected:   { label: '已拒收', color: '#FF4D4D', bg: '#FF4D4D22' },
 };
 
 const TRANSFER_STATUS_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  draft:     { label: '待审批', color: '#BA7517', bg: '#BA751722' },
+  draft:     { label: '待审批', color: txColors.warning, bg: `${txColors.warning}22` },
   approved:  { label: '已审批', color: '#2196f3', bg: '#2196f322' },
   shipped:   { label: '发货中', color: '#9c27b0', bg: '#9c27b022' },
-  received:  { label: '已收货', color: '#0F6E56', bg: '#0F6E5622' },
+  received:  { label: '已收货', color: txColors.success, bg: `${txColors.success}22` },
   cancelled: { label: '已取消', color: '#666',    bg: '#66666622' },
 };
 
@@ -92,7 +93,7 @@ function ReceivingCard({ order, onOpenDrawer, onStartInspect, successIds }: Rece
   return (
     <div style={{
       background: '#1a2a33',
-      border: `1px solid ${isSuccess ? '#0F6E56' : '#2a3a44'}`,
+      border: `1px solid ${isSuccess ? txColors.success : '#2a3a44'}`,
       borderRadius: 10,
       padding: '16px 20px',
       marginBottom: 12,
@@ -116,7 +117,7 @@ function ReceivingCard({ order, onOpenDrawer, onStartInspect, successIds }: Rece
           )}
         </div>
         {isSuccess && (
-          <span style={{ color: '#0F6E56', fontSize: 13, fontWeight: 600 }}>入库成功 ✅</span>
+          <span style={{ color: txColors.success, fontSize: 13, fontWeight: 600 }}>入库成功 ✅</span>
         )}
       </div>
 
@@ -329,7 +330,7 @@ function ReceivingDrawer({ order, onClose, onComplete, onRejectAll, onInspectIte
             disabled={completing}
             style={{
               flex: 1, padding: '10px 0', borderRadius: 7, border: 'none',
-              background: completing ? '#2a3a44' : '#0F6E56',
+              background: completing ? '#2a3a44' : txColors.success,
               color: '#fff', cursor: completing ? 'default' : 'pointer',
               fontSize: 14, fontWeight: 700,
             }}
@@ -341,7 +342,7 @@ function ReceivingDrawer({ order, onClose, onComplete, onRejectAll, onInspectIte
             disabled={rejecting}
             style={{
               flex: 1, padding: '10px 0', borderRadius: 7, border: 'none',
-              background: rejecting ? '#2a3a44' : '#A32D2D',
+              background: rejecting ? '#2a3a44' : txColors.danger,
               color: '#fff', cursor: rejecting ? 'default' : 'pointer',
               fontSize: 14, fontWeight: 700,
             }}
@@ -410,14 +411,14 @@ function TransferCard({ order, onAction }: TransferCardProps) {
               <button
                 onClick={() => handleAction('approve')}
                 disabled={loading === 'approve'}
-                style={actionBtnStyle('#0F6E56', loading === 'approve')}
+                style={actionBtnStyle(txColors.success, loading === 'approve')}
               >
                 {loading === 'approve' ? '...' : '审批通过'}
               </button>
               <button
                 onClick={() => handleAction('cancel')}
                 disabled={loading === 'cancel'}
-                style={actionBtnStyle('#A32D2D', loading === 'cancel')}
+                style={actionBtnStyle(txColors.danger, loading === 'cancel')}
               >
                 {loading === 'cancel' ? '...' : '取消'}
               </button>

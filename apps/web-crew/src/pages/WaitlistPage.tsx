@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── 颜色系统 ──────────────────────────────────────────────────────────────
 
@@ -14,7 +15,7 @@ const C = {
   bg:      '#0B1A20',
   card:    '#112228',
   border:  '#1a2a33',
-  accent:  '#FF6B35',
+  accent:  txColors.primary,
   gold:    '#facc15',
   silver:  '#94a3b8',
   green:   '#22c55e',

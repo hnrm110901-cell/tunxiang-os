@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * takeaway/index.tsx — 外卖点餐
  *
@@ -18,7 +19,7 @@ import './index.scss'
 // ─── Brand tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  primary:     '#FF6B35',
+  primary:     txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep:      '#0B1A20',
   bgCard:      '#132029',

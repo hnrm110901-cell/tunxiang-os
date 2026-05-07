@@ -12,14 +12,15 @@ import {
   EditOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  info: txColors.info,
   textSub: '#5F5E5A',
 };
 

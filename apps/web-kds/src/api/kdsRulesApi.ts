@@ -3,6 +3,7 @@
  * 对应后端 GET/PUT /api/v1/kds-rules/{store_id}
  */
 import { txFetch } from './index';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -102,7 +103,7 @@ export function getTimerColorFromLevel(
 ): string {
   if (level === 'urgent') return rules.urgent_color;
   if (level === 'warning') return rules.warn_color;
-  return '#0F6E56';
+  return txColors.success;
 }
 
 /**

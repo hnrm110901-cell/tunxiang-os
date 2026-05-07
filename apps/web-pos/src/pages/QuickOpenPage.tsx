@@ -4,13 +4,14 @@
  */
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ─── 颜色常量 ─── */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#10B981',
   muted: '#64748b',
   text: '#E0E0E0',

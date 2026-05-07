@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/login/index.tsx — 登录 / 引导页
  *
@@ -23,7 +24,7 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:     '#FF6B35',
+  primary:     txColors.primary,
   primaryDk:   '#E55A1F',
   primaryBg:   'rgba(255,107,53,0.10)',
   wechat:      '#07C160',

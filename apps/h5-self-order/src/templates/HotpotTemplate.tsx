@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '@/store/useOrderStore';
 import type { DishItem } from '@/api/menuApi';
 import CartBar from '@/components/CartBar';
+import { txColors } from '@tx/tokens';
 
 // ─── 火锅专用类型 ─────────────────────────────────────────────────────────────
 
@@ -59,9 +60,9 @@ function spicyDots(level: 0 | 1 | 2 | 3): string {
 }
 
 function cookTimeBadgeColor(seconds: number): string {
-  if (seconds <= 15) return 'var(--tx-success, #0F6E56)';
-  if (seconds <= 60) return 'var(--tx-warning, #BA7517)';
-  return 'var(--tx-danger, #A32D2D)';
+  if (seconds <= 15) return `var(--tx-success, ${txColors.success})`;
+  if (seconds <= 60) return `var(--tx-warning, ${txColors.warning})`;
+  return `var(--tx-danger, ${txColors.danger})`;
 }
 
 // ─── 组件 ──────────────────────────────────────────────────────────────────────
@@ -196,7 +197,7 @@ export default function HotpotTemplate() {
             <div className="flex items-center gap-1.5">
               <span
                 className="w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: 'var(--tx-brand, #FF6B35)' }}
+                style={{ background: `var(--tx-brand, ${txColors.primary})` }}
               >
                 1
               </span>
@@ -221,7 +222,7 @@ export default function HotpotTemplate() {
           {isYuanyang && selectedSoups.length === 1 && (
             <div
               className="text-sm py-2 px-3 rounded-lg mb-2"
-              style={{ background: 'var(--tx-brand-light, #FFF3ED)', color: 'var(--tx-brand, #FF6B35)' }}
+              style={{ background: `var(--tx-brand-light, ${txColors.primaryLight})`, color: `var(--tx-brand, ${txColors.primary})` }}
             >
               鸳鸯锅已选左侧，请再选一种作为右侧锅底
             </div>
@@ -242,7 +243,7 @@ export default function HotpotTemplate() {
                   borderRadius: 12,
                   background: 'var(--tx-bg-card, #fff)',
                   border: selected
-                    ? '2px solid var(--tx-brand, #FF6B35)'
+                    ? `2px solid var(--tx-brand, ${txColors.primary})`
                     : '2px solid var(--tx-border, #E8E6E1)',
                   boxShadow: selected ? '0 2px 8px rgba(255,107,53,0.15)' : '0 1px 2px rgba(0,0,0,0.05)',
                   minHeight: 56,
@@ -268,7 +269,7 @@ export default function HotpotTemplate() {
                     {selected && (
                       <span
                         className="text-xs px-2 py-0.5 rounded-full text-white flex-shrink-0"
-                        style={{ background: 'var(--tx-brand, #FF6B35)' }}
+                        style={{ background: `var(--tx-brand, ${txColors.primary})` }}
                       >
                         已选
                       </span>
@@ -278,7 +279,7 @@ export default function HotpotTemplate() {
                     {soup.description}
                   </div>
                   <div className="flex items-center gap-2 mt-2">
-                    <span className="text-sm font-bold" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                    <span className="text-sm font-bold" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                       ¥{soup.price}
                     </span>
                     <span className="text-xs" style={{ color: 'var(--tx-text-tertiary)' }}>
@@ -288,7 +289,7 @@ export default function HotpotTemplate() {
                       <span
                         key={tag}
                         className="text-xs px-1.5 py-0.5 rounded"
-                        style={{ background: 'var(--tx-brand-light, #FFF3ED)', color: 'var(--tx-brand)' }}
+                        style={{ background: `var(--tx-brand-light, ${txColors.primaryLight})`, color: 'var(--tx-brand)' }}
                       >
                         {tag}
                       </span>
@@ -308,7 +309,7 @@ export default function HotpotTemplate() {
             onClick={handleConfirmSoup}
             style={{
               height: 56, borderRadius: 12,
-              background: canProceedToDishes ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-bg-tertiary, #E8E6E1)',
+              background: canProceedToDishes ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-bg-tertiary, #E8E6E1)',
               color: canProceedToDishes ? '#fff' : 'var(--tx-text-tertiary)',
               fontSize: 18, fontWeight: 700,
               opacity: canProceedToDishes ? 1 : 0.6,
@@ -364,7 +365,7 @@ export default function HotpotTemplate() {
               style={{
                 padding: '16px 8px', textAlign: 'center',
                 fontSize: 13,
-                color: activeCat === cat.id ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-text-secondary)',
+                color: activeCat === cat.id ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-text-secondary)',
                 fontWeight: activeCat === cat.id ? 700 : 400,
                 background: activeCat === cat.id ? 'var(--tx-bg-primary, #fff)' : 'transparent',
                 borderLeft: activeCat === cat.id ? '3px solid var(--tx-brand)' : '3px solid transparent',
@@ -415,7 +416,7 @@ export default function HotpotTemplate() {
                       {dish.isSignature && (
                         <span
                           className="text-xs px-1 py-0.5 rounded flex-shrink-0"
-                          style={{ background: 'var(--tx-brand-light, #FFF3ED)', color: 'var(--tx-brand)' }}
+                          style={{ background: `var(--tx-brand-light, ${txColors.primaryLight})`, color: 'var(--tx-brand)' }}
                         >
                           招牌
                         </span>
@@ -426,7 +427,7 @@ export default function HotpotTemplate() {
                     </div>
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-base font-bold" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                    <span className="text-base font-bold" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                       ¥{dish.price}
                     </span>
                     {/* 加减按钮 */}
@@ -458,7 +459,7 @@ export default function HotpotTemplate() {
                         className="rounded-full flex items-center justify-center active:scale-90 transition-transform"
                         style={{
                           width: 32, height: 32,
-                          background: dish.soldOut ? 'var(--tx-bg-tertiary)' : 'var(--tx-brand, #FF6B35)',
+                          background: dish.soldOut ? 'var(--tx-bg-tertiary)' : `var(--tx-brand, ${txColors.primary})`,
                           color: dish.soldOut ? 'var(--tx-text-tertiary)' : '#fff',
                           minWidth: 48, minHeight: 48,
                           padding: 0,

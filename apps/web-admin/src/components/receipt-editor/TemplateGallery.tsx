@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { receiptTemplateApi } from '../../api/receiptTemplateApi';
 import type { TemplateConfig } from '../../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 
 interface TemplateGalleryProps {
   open: boolean;
@@ -289,7 +290,7 @@ export function TemplateGallery({ open, onClose, onSelect }: TemplateGalleryProp
                     borderRadius: 8,
                     border: '2px solid',
                     borderColor: isSelected
-                      ? 'var(--brand, #FF6B35)'
+                      ? `var(--brand, ${txColors.primary})`
                       : isHovered
                       ? 'rgba(255,107,53,0.4)'
                       : 'var(--bg-2, #1a2a33)',
@@ -328,7 +329,7 @@ export function TemplateGallery({ open, onClose, onSelect }: TemplateGalleryProp
                   </div>
 
                   {isSelected && applying && (
-                    <div style={{ fontSize: 11, color: 'var(--brand, #FF6B35)' }}>应用中...</div>
+                    <div style={{ fontSize: 11, color: `var(--brand, ${txColors.primary})` }}>应用中...</div>
                   )}
                 </div>
               );

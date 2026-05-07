@@ -14,6 +14,7 @@
  * API：http://localhost:8001，try/catch 降级 Mock
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ─────────────────── 类型定义 ─────────────────── */
 
@@ -49,7 +50,7 @@ const STATUS_MAP: Record<StationData['status'], { emoji: string; label: string; 
   idle:   { emoji: '🟢', label: '空闲', color: '#4ADE80' },
 };
 
-const STATION_COLORS = ['#FF6B35', '#4FC3F7', '#81C784', '#FFD54F', '#CE93D8', '#FF8A65'];
+const STATION_COLORS = [txColors.primary, '#4FC3F7', '#81C784', '#FFD54F', '#CE93D8', '#FF8A65'];
 
 /* ─────────────────── Mock 数据 ─────────────────── */
 
@@ -293,7 +294,7 @@ const styles: Record<string, React.CSSProperties> = {
   },
   progressFill: {
     height: '100%',
-    background: '#FF6B35',
+    background: txColors.primary,
     transition: 'width 1s linear',
   },
 
@@ -315,7 +316,7 @@ const styles: Record<string, React.CSSProperties> = {
   statValue: {
     fontSize: 22,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
     marginLeft: 6,
   },
 
@@ -437,7 +438,7 @@ const styles: Record<string, React.CSSProperties> = {
   marqueeLabel: {
     fontSize: 16,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
     padding: '0 16px',
     flexShrink: 0,
     whiteSpace: 'nowrap' as const,

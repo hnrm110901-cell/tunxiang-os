@@ -6,6 +6,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型 ----------
 
@@ -109,17 +110,17 @@ const RANGE_OPTIONS: { key: TimeRange; label: string; days: number }[] = [
 ];
 
 const DEFAULT_METRICS: MetricConfig[] = [
-  { key: 'revenue_fen', label: '营收', unit: '元', color: '#FF6B35', enabled: true },
-  { key: 'avg_ticket_fen', label: '客单价', unit: '元', color: '#185FA5', enabled: false },
-  { key: 'margin_pct', label: '毛利率', unit: '%', color: '#0F6E56', enabled: false },
-  { key: 'turnover_rate', label: '翻台率', unit: '次', color: '#BA7517', enabled: false },
+  { key: 'revenue_fen', label: '营收', unit: '元', color: txColors.primary, enabled: true },
+  { key: 'avg_ticket_fen', label: '客单价', unit: '元', color: txColors.info, enabled: false },
+  { key: 'margin_pct', label: '毛利率', unit: '%', color: txColors.success, enabled: false },
+  { key: 'turnover_rate', label: '翻台率', unit: '次', color: txColors.warning, enabled: false },
   { key: 'order_count', label: '订单数', unit: '单', color: '#8B5CF6', enabled: false },
 ];
 
 const SEVERITY_COLOR: Record<string, string> = {
-  critical: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  critical: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -325,9 +326,9 @@ function SVGLineChart({ labels, datasets, height = 300 }: LineChartProps) {
             return (
               <g key={`anomaly-${ds.name}-${i}`}>
                 <circle cx={toX(i)} cy={toY(v)} r={7}
-                  fill="none" stroke="#A32D2D" strokeWidth={1.5} opacity={0.7} />
+                  fill="none" stroke={txColors.danger} strokeWidth={1.5} opacity={0.7} />
                 <circle cx={toX(i)} cy={toY(v)} r={3}
-                  fill="#A32D2D" />
+                  fill={txColors.danger} />
               </g>
             );
           }),
@@ -336,7 +337,7 @@ function SVGLineChart({ labels, datasets, height = 300 }: LineChartProps) {
         {/* Tooltip竖线 */}
         {tooltip && (
           <line x1={tooltip.x} y1={pad.top} x2={tooltip.x} y2={height - pad.bottom}
-            stroke="#FF6B35" strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
+            stroke={txColors.primary} strokeWidth={1} strokeDasharray="3,3" opacity={0.6} />
         )}
       </svg>
 
@@ -357,12 +358,12 @@ function SVGLineChart({ labels, datasets, height = 300 }: LineChartProps) {
           <div style={{ fontSize: 11, color: '#999', marginBottom: 6 }}>{tooltip.label}</div>
           {tooltip.values.map((v) => (
             <div key={v.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, marginBottom: 3 }}>
-              <span style={{ width: 8, height: 8, borderRadius: 2, background: v.isAnomaly ? '#A32D2D' : v.color, flexShrink: 0 }} />
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: v.isAnomaly ? txColors.danger : v.color, flexShrink: 0 }} />
               <span style={{ color: '#ccc' }}>{v.name}</span>
-              <span style={{ color: v.isAnomaly ? '#A32D2D' : '#fff', fontWeight: 600, marginLeft: 'auto' }}>
+              <span style={{ color: v.isAnomaly ? txColors.danger : '#fff', fontWeight: 600, marginLeft: 'auto' }}>
                 {v.unit === '元' ? `${(v.value / 100).toLocaleString()}元` : `${v.value.toLocaleString()}${v.unit}`}
               </span>
-              {v.isAnomaly && <span style={{ fontSize: 9, color: '#A32D2D', marginLeft: 2 }}>异常</span>}
+              {v.isAnomaly && <span style={{ fontSize: 9, color: txColors.danger, marginLeft: 2 }}>异常</span>}
             </div>
           ))}
         </div>
@@ -378,7 +379,7 @@ function SVGLineChart({ labels, datasets, height = 300 }: LineChartProps) {
             </div>
           ))}
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#999' }}>
-            <span style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid #A32D2D', display: 'inline-block' }} />
+            <span style={{ width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${txColors.danger}`, display: 'inline-block' }} />
             异常点
           </div>
         </div>
@@ -603,7 +604,7 @@ export function TrendAnalysisPage() {
             <button key={r.key} onClick={() => setTimeRange(r.key)} style={{
               padding: '5px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: timeRange === r.key ? '#FF6B35' : '#1a2a33',
+              background: timeRange === r.key ? txColors.primary : '#1a2a33',
               color: timeRange === r.key ? '#fff' : '#999',
             }}>
               {r.label}
@@ -638,7 +639,7 @@ export function TrendAnalysisPage() {
           style={{
             marginLeft: 'auto', padding: '7px 18px', borderRadius: 6, border: 'none',
             cursor: aiLoading || !storeId || !trendData.length ? 'not-allowed' : 'pointer',
-            background: '#185FA5', color: '#fff', fontSize: 13, fontWeight: 600,
+            background: txColors.info, color: '#fff', fontSize: 13, fontWeight: 600,
             opacity: aiLoading || !storeId || !trendData.length ? 0.5 : 1,
             display: 'flex', alignItems: 'center', gap: 6,
           }}
@@ -665,11 +666,11 @@ export function TrendAnalysisPage() {
           </h3>
           <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#666', alignItems: 'center' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 16, height: 2, background: '#FF6B35', display: 'inline-block' }} />
+              <span style={{ width: 16, height: 2, background: txColors.primary, display: 'inline-block' }} />
               实际值
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 10, height: 10, borderRadius: '50%', border: '1.5px solid #A32D2D', display: 'inline-block' }} />
+              <span style={{ width: 10, height: 10, borderRadius: '50%', border: `1.5px solid ${txColors.danger}`, display: 'inline-block' }} />
               异常点（&gt;2σ）
             </span>
           </div>
@@ -680,7 +681,7 @@ export function TrendAnalysisPage() {
             <div style={{ fontSize: 13 }}>加载中…</div>
           </div>
         ) : error ? (
-          <div style={{ textAlign: 'center', padding: 60, color: '#A32D2D', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: 60, color: txColors.danger, fontSize: 13 }}>
             {error}
             <div style={{ marginTop: 8, color: '#666', fontSize: 12 }}>图表暂无法显示，请检查网络或联系管理员</div>
           </div>
@@ -730,14 +731,14 @@ export function TrendAnalysisPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{
                     fontSize: 12, fontWeight: 700,
-                    color: isUp ? '#0F6E56' : '#A32D2D',
+                    color: isUp ? txColors.success : txColors.danger,
                   }}>
                     {isUp ? '↑' : '↓'} {Math.abs(m.changePct).toFixed(1)}%
                   </span>
                   {m.anomalyCount > 0 && (
                     <span style={{
                       fontSize: 10, padding: '1px 6px', borderRadius: 10,
-                      background: '#A32D2D20', color: '#A32D2D', fontWeight: 600,
+                      background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 600,
                     }}>
                       {m.anomalyCount} 次异常
                     </span>
@@ -751,7 +752,7 @@ export function TrendAnalysisPage() {
 
       {/* ── Section 4: AI 趋势解读 ───────────────────────── */}
       {(aiReport || aiLoading) && (
-        <div style={{ background: '#0B1A20', borderRadius: 8, marginBottom: 16, border: '1px solid #185FA540' }}>
+        <div style={{ background: '#0B1A20', borderRadius: 8, marginBottom: 16, border: `1px solid ${txColors.info}40` }}>
           <div
             onClick={() => setAiExpanded((v) => !v)}
             style={{
@@ -762,7 +763,7 @@ export function TrendAnalysisPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                background: '#185FA520', color: '#185FA5', fontWeight: 700,
+                background: `${txColors.info}20`, color: txColors.info, fontWeight: 700,
               }}>AI</span>
               <span style={{ fontSize: 14, fontWeight: 600, color: '#fff' }}>趋势解读</span>
             </div>
@@ -827,7 +828,7 @@ export function TrendAnalysisPage() {
                     }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                         <span style={{ fontSize: 13, fontWeight: 700, color: m.color }}>{m.label}</span>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: isUp ? '#0F6E56' : '#A32D2D' }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: isUp ? txColors.success : txColors.danger }}>
                           {isUp ? '↑' : '↓'} {Math.abs(changePct).toFixed(1)}%
                         </span>
                       </div>
@@ -849,7 +850,7 @@ export function TrendAnalysisPage() {
             {bossAlerts.length > 0 && (
               <span style={{
                 fontSize: 11, padding: '2px 8px', borderRadius: 10,
-                background: '#A32D2D20', color: '#A32D2D', fontWeight: 700,
+                background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 700,
               }}>{bossAlerts.length}</span>
             )}
           </h3>
@@ -887,7 +888,7 @@ export function TrendAnalysisPage() {
                       {a.message}
                     </div>
                     {a.suggestion && (
-                      <div style={{ fontSize: 11, color: '#185FA5' }}>
+                      <div style={{ fontSize: 11, color: txColors.info }}>
                         建议：{a.suggestion}
                       </div>
                     )}

@@ -7,6 +7,7 @@ import {
   Timeline, Row, Col, Spin, message, Table, Select, Empty,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { txColors } from '@tx/tokens';
 import {
   CloudOutlined,
   CalendarOutlined,
@@ -73,9 +74,9 @@ function WeatherTab() {
   useEffect(() => { loadForecast(); }, [loadForecast]);
 
   const impactColor = (val: number) => {
-    if (val < -0.3) return '#A32D2D';
-    if (val < -0.1) return '#BA7517';
-    if (val > 0.1) return '#0F6E56';
+    if (val < -0.3) return txColors.danger;
+    if (val < -0.1) return txColors.warning;
+    if (val > 0.1) return txColors.success;
     return '#666';
   };
 
@@ -229,9 +230,9 @@ function CalendarTab() {
       {/* Active Triggers */}
       {triggers.length > 0 && (
         <Card
-          title={<><ThunderboltOutlined style={{ color: '#FF6B35' }} /> 当前应触发的增长动作</>}
+          title={<><ThunderboltOutlined style={{ color: txColors.primary }} /> 当前应触发的增长动作</>}
           size="small"
-          style={{ marginBottom: 16, borderColor: '#FF6B35' }}
+          style={{ marginBottom: 16, borderColor: txColors.primary }}
         >
           {triggers.map((t, i) => (
             <div key={i} style={{ padding: '8px 0', borderBottom: '1px solid #f0f0f0' }}>
@@ -261,8 +262,8 @@ function CalendarTab() {
         <Timeline
           items={events.map((evt, i) => ({
             key: i,
-            color: evt.should_push_now ? '#FF6B35' : '#1890ff',
-            dot: evt.should_push_now ? <ThunderboltOutlined style={{ color: '#FF6B35' }} /> : undefined,
+            color: evt.should_push_now ? txColors.primary : '#1890ff',
+            dot: evt.should_push_now ? <ThunderboltOutlined style={{ color: txColors.primary }} /> : undefined,
             children: (
               <div>
                 <Space>
@@ -375,7 +376,7 @@ function StoreReadinessTab() {
         <Progress
           percent={val}
           size="small"
-          strokeColor={val >= 80 ? '#0F6E56' : val >= 60 ? '#FF6B35' : '#A32D2D'}
+          strokeColor={val >= 80 ? txColors.success : val >= 60 ? txColors.primary : txColors.danger}
           format={(p) => `${p}%`}
         />
       ),
@@ -386,9 +387,9 @@ function StoreReadinessTab() {
       width: 100,
       render: (val: number) => (
         <span>
-          {val >= 8 ? <CheckCircleOutlined style={{ color: '#0F6E56', marginRight: 4 }} /> :
+          {val >= 8 ? <CheckCircleOutlined style={{ color: txColors.success, marginRight: 4 }} /> :
            val >= 6 ? null :
-           <WarningOutlined style={{ color: '#BA7517', marginRight: 4 }} />}
+           <WarningOutlined style={{ color: txColors.warning, marginRight: 4 }} />}
           {val}/10
         </span>
       ),
@@ -436,7 +437,7 @@ function StoreReadinessTab() {
                 <Progress
                   type="dashboard"
                   percent={selectedReadiness.readiness_pct}
-                  strokeColor={selectedReadiness.readiness_pct >= 80 ? '#0F6E56' : '#FF6B35'}
+                  strokeColor={selectedReadiness.readiness_pct >= 80 ? txColors.success : txColors.primary}
                   format={(p) => <span style={{ fontSize: 20 }}>{p}%</span>}
                 />
                 <div style={{ color: '#666', marginTop: 8 }}>

@@ -13,14 +13,15 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import type { ComboDetail, ComboGroup, ComboSelection } from '../api/comboApi';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  accentBg: '#FF6B3522',
+  accent: txColors.primary,
+  accentBg: `${txColors.primary}22`,
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',

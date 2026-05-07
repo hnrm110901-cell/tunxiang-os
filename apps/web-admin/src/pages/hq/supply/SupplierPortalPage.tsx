@@ -50,6 +50,7 @@ import {
   ShopOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 import {
   fetchSupplierList,
   fetchSupplierDetail,
@@ -283,7 +284,7 @@ function SupplierArchiveTab() {
           <Progress
             percent={r.rating * 20}
             showInfo={false}
-            strokeColor="#FF6B35"
+            strokeColor={txColors.primary}
             style={{ width: 100, marginBottom: 2 }}
           />
           <Text style={{ fontSize: 12, color: '#5F5E5A' }}>{r.rating.toFixed(1)} / 5.0</Text>
@@ -454,7 +455,7 @@ function SupplierArchiveTab() {
                       title="交付率"
                       value={(selectedDetail.delivery_rate * 100).toFixed(1)}
                       suffix="%"
-                      valueStyle={{ color: selectedDetail.delivery_rate >= 0.9 ? '#0F6E56' : '#BA7517', fontSize: 22 }}
+                      valueStyle={{ color: selectedDetail.delivery_rate >= 0.9 ? txColors.success : txColors.warning, fontSize: 22 }}
                     />
                   </Card>
                 </Col>
@@ -464,7 +465,7 @@ function SupplierArchiveTab() {
                       title="质量通过率"
                       value={(selectedDetail.quality_pass_rate * 100).toFixed(1)}
                       suffix="%"
-                      valueStyle={{ color: selectedDetail.quality_pass_rate >= 0.95 ? '#0F6E56' : '#BA7517', fontSize: 22 }}
+                      valueStyle={{ color: selectedDetail.quality_pass_rate >= 0.95 ? txColors.success : txColors.warning, fontSize: 22 }}
                     />
                   </Card>
                 </Col>
@@ -486,7 +487,7 @@ function SupplierArchiveTab() {
                 <Progress
                   percent={selectedDetail.rating * 20}
                   showInfo={false}
-                  strokeColor="#FF6B35"
+                  strokeColor={txColors.primary}
                   style={{ marginTop: 4 }}
                 />
               </div>
@@ -646,7 +647,7 @@ function RFQTab() {
       title: '综合评分',
       dataIndex: 'supplier_rating',
       width: 90,
-      render: (v: number) => <Text style={{ color: '#FF6B35' }}>{v.toFixed(1)}</Text>,
+      render: (v: number) => <Text style={{ color: txColors.primary }}>{v.toFixed(1)}</Text>,
     },
     {
       title: '推荐',
@@ -845,23 +846,23 @@ function RiskAssessmentTab() {
             <Statistic
               title="整体风险等级"
               value={overallCfg.label}
-              valueStyle={{ color: overallCfg.color === 'success' ? '#0F6E56' : overallCfg.color === 'warning' ? '#BA7517' : '#A32D2D' }}
+              valueStyle={{ color: overallCfg.color === 'success' ? txColors.success : overallCfg.color === 'warning' ? txColors.warning : txColors.danger }}
             />
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <Statistic title="高风险供应商" value={data.high_risk_count} suffix="家" valueStyle={{ color: '#A32D2D' }} />
+            <Statistic title="高风险供应商" value={data.high_risk_count} suffix="家" valueStyle={{ color: txColors.danger }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <Statistic title="中风险供应商" value={data.medium_risk_count} suffix="家" valueStyle={{ color: '#BA7517' }} />
+            <Statistic title="中风险供应商" value={data.medium_risk_count} suffix="家" valueStyle={{ color: txColors.warning }} />
           </Card>
         </Col>
         <Col span={6}>
           <Card size="small" style={{ textAlign: 'center' }}>
-            <Statistic title="低风险供应商" value={data.low_risk_count} suffix="家" valueStyle={{ color: '#0F6E56' }} />
+            <Statistic title="低风险供应商" value={data.low_risk_count} suffix="家" valueStyle={{ color: txColors.success }} />
           </Card>
         </Col>
       </Row>

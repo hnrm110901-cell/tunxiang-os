@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ function formatElapsed(ms: number): string {
 function timerColor(createdAt: number): { color: string; bg?: string } {
   const elapsed = Date.now() - createdAt;
   const min = elapsed / 60000;
-  if (min >= 15) return { color: '#FFFFFF', bg: '#A32D2D' };
+  if (min >= 15) return { color: '#FFFFFF', bg: txColors.danger };
   if (min >= 10) return { color: '#FFD166' };
   return { color: '#4ADE80' };
 }
@@ -115,12 +116,12 @@ function timerColor(createdAt: number): { color: string; bg?: string } {
 const PRIORITY_LABELS: Record<Priority, { label: string; color: string; bg: string }> = {
   normal:  { label: '',    color: 'transparent', bg: 'transparent' },
   vip:     { label: 'VIP',  color: '#1A1A00', bg: '#FFD166' },
-  rush:    { label: '催菜', color: '#FFFFFF', bg: '#FF6B35' },
+  rush:    { label: '催菜', color: '#FFFFFF', bg: txColors.primary },
   banquet: { label: '宴席', color: '#FFFFFF', bg: '#9B59B6' },
 };
 
 const STATION_COLORS: Record<StationLabel, string> = {
-  炒菜: '#FF6B35',
+  炒菜: txColors.primary,
   烧烤: '#E67E22',
   凉菜: '#2ECC71',
   甜品: '#E91E63',
@@ -159,7 +160,7 @@ function OrderCard({ order, onAction, actionLabel, actionColor, largeAction }: O
 
   const cardStyle: React.CSSProperties = {
     background: isOvertime ? '#2A0A0A' : '#112228',
-    border: `2px solid ${isOvertime ? '#A32D2D' : order.status === 'ready' ? '#0F6E56' : '#1D3540'}`,
+    border: `2px solid ${isOvertime ? txColors.danger : order.status === 'ready' ? txColors.success : '#1D3540'}`,
     borderRadius: 12,
     padding: '16px',
     marginBottom: 12,
@@ -454,7 +455,7 @@ export function DispatchBoard() {
   const bellBtnStyle: React.CSSProperties = {
     width: 80,
     height: 48,
-    background: '#FF6B35',
+    background: txColors.primary,
     border: 'none',
     borderRadius: 12,
     color: '#FFFFFF',
@@ -476,7 +477,7 @@ export function DispatchBoard() {
         <div style={{
           height: '100%',
           width: `${progressPct}%`,
-          background: '#FF6B35',
+          background: txColors.primary,
           transition: 'width 1s linear',
           borderRadius: 2,
         }} />
@@ -495,7 +496,7 @@ export function DispatchBoard() {
         {[
           { label: '今日出餐', value: servedToday, unit: '单', color: '#4ADE80' },
           { label: '平均时长', value: avgMinutes,  unit: '分', color: '#FFD166' },
-          { label: '队列中',   value: waiting.length + making.length, unit: '单', color: '#FF6B35' },
+          { label: '队列中',   value: waiting.length + making.length, unit: '单', color: txColors.primary },
           { label: '在岗员工', value: staffCount,  unit: '人', color: '#60D4FA' },
         ].map(stat => (
           <div key={stat.label} style={{ ...statStyle, minWidth: 80 }}>
@@ -517,7 +518,7 @@ export function DispatchBoard() {
       <div style={mainStyle}>
         {/* 左列：等待出餐 35% */}
         <div style={colStyle(35)}>
-          <ColumnHeader title="等待出餐" count={waiting.length} accent="#FF6B35" />
+          <ColumnHeader title="等待出餐" count={waiting.length} accent={txColors.primary} />
           <div style={scrollStyle}>
             {waiting.length === 0 && (
               <div style={{ textAlign: 'center', color: '#4A6A7A', fontSize: 18, paddingTop: 40 }}>
@@ -530,7 +531,7 @@ export function DispatchBoard() {
                 order={order}
                 onAction={handleStartMaking}
                 actionLabel="开始制作"
-                actionColor="#FF6B35"
+                actionColor={txColors.primary}
               />
             ))}
           </div>
@@ -551,7 +552,7 @@ export function DispatchBoard() {
                 order={order}
                 onAction={handleFinish}
                 actionLabel="完成出餐"
-                actionColor="#0F6E56"
+                actionColor={txColors.success}
               />
             ))}
           </div>
@@ -572,7 +573,7 @@ export function DispatchBoard() {
                 order={order}
                 onAction={handleServe}
                 actionLabel="传菜"
-                actionColor="#FF6B35"
+                actionColor={txColors.primary}
                 largeAction
               />
             ))}

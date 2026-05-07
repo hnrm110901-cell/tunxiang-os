@@ -6,6 +6,7 @@
  */
 import type { EligibleCoupon } from '../api/couponApi';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => (fen / 100).toFixed(2);
@@ -87,7 +88,7 @@ export function CouponEligibleSheet({ visible, coupons, applying, onApply, onClo
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                   <span style={{
                     fontSize: 11, padding: '2px 6px', borderRadius: 4,
-                    background: '#FF6B3522', color: '#FF6B35', fontWeight: 600,
+                    background: `${txColors.primary}22`, color: txColors.primary, fontWeight: 600,
                   }}>
                     {COUPON_TYPE_LABEL[c.coupon_type] ?? c.coupon_type}
                   </span>
@@ -100,7 +101,7 @@ export function CouponEligibleSheet({ visible, coupons, applying, onApply, onClo
 
               {/* 中：减免金额 */}
               <div style={{ textAlign: 'center', marginLeft: 12, marginRight: 16 }}>
-                <div style={{ color: '#FF6B35', fontWeight: 700, fontSize: 20 }}>
+                <div style={{ color: txColors.primary, fontWeight: 700, fontSize: 20 }}>
                   -{fen2yuan(c.discount_amount_fen)}
                 </div>
                 <div style={{ color: '#888', fontSize: 11 }}>元</div>
@@ -112,7 +113,7 @@ export function CouponEligibleSheet({ visible, coupons, applying, onApply, onClo
                 onClick={() => onApply(c.id)}
                 style={{
                   padding: '8px 16px',
-                  background: applying ? '#444' : '#FF6B35',
+                  background: applying ? '#444' : txColors.primary,
                   color: '#fff', border: 'none', borderRadius: 8,
                   fontSize: 13, fontWeight: 600, cursor: applying ? 'not-allowed' : 'pointer',
                   whiteSpace: 'nowrap',

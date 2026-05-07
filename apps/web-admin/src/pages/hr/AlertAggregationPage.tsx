@@ -39,6 +39,7 @@ import {
 } from '@ant-design/icons';
 import { Line } from '@ant-design/charts';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -369,8 +370,8 @@ export default function AlertAggregationPage() {
               title: '解决率',
               value: effectiveness?.resolution_rate ?? 0,
               suffix: '%',
-              valueStyle: { color: '#0F6E56' },
-              icon: <CheckCircleOutlined style={{ color: '#0F6E56' }} />,
+              valueStyle: { color: txColors.success },
+              icon: <CheckCircleOutlined style={{ color: txColors.success }} />,
             }}
           />
         </Col>
@@ -382,7 +383,7 @@ export default function AlertAggregationPage() {
               value: effectiveness?.avg_resolution_hours ?? 0,
               suffix: '小时',
               precision: 1,
-              icon: <ClockCircleOutlined style={{ color: '#185FA5' }} />,
+              icon: <ClockCircleOutlined style={{ color: txColors.info }} />,
             }}
           />
         </Col>
@@ -393,7 +394,7 @@ export default function AlertAggregationPage() {
               title: 'DRI转化率',
               value: effectiveness?.dri_conversion_rate ?? 0,
               suffix: '%',
-              icon: <RiseOutlined style={{ color: '#BA7517' }} />,
+              icon: <RiseOutlined style={{ color: txColors.warning }} />,
             }}
           />
         </Col>
@@ -403,8 +404,8 @@ export default function AlertAggregationPage() {
             statistic={{
               title: '总未解决',
               value: unresolved,
-              valueStyle: unresolved > 0 ? { color: '#A32D2D' } : undefined,
-              icon: <AlertOutlined style={{ color: '#A32D2D' }} />,
+              valueStyle: unresolved > 0 ? { color: txColors.danger } : undefined,
+              icon: <AlertOutlined style={{ color: txColors.danger }} />,
             }}
           />
         </Col>
@@ -503,7 +504,7 @@ export default function AlertAggregationPage() {
                 <Descriptions.Item label="解决预警">{digest.resolved_alerts}</Descriptions.Item>
                 <Descriptions.Item label="净变化">
                   <Text
-                    style={{ color: digest.net_change > 0 ? '#A32D2D' : '#0F6E56', fontWeight: 600 }}
+                    style={{ color: digest.net_change > 0 ? txColors.danger : txColors.success, fontWeight: 600 }}
                   >
                     {digest.net_change > 0 ? (
                       <><RiseOutlined /> +{digest.net_change}</>
@@ -515,12 +516,12 @@ export default function AlertAggregationPage() {
                 <Descriptions.Item label="训练完成数">{digest.training_completions}</Descriptions.Item>
                 <Descriptions.Item label="新认证数">{digest.new_certifications}</Descriptions.Item>
                 <Descriptions.Item label="预警环比">
-                  <Text style={{ color: digest.wow_change.alerts > 0 ? '#A32D2D' : '#0F6E56' }}>
+                  <Text style={{ color: digest.wow_change.alerts > 0 ? txColors.danger : txColors.success }}>
                     {digest.wow_change.alerts > 0 ? '+' : ''}{digest.wow_change.alerts}%
                   </Text>
                 </Descriptions.Item>
                 <Descriptions.Item label="解决率环比">
-                  <Text style={{ color: digest.wow_change.resolution_rate >= 0 ? '#0F6E56' : '#A32D2D' }}>
+                  <Text style={{ color: digest.wow_change.resolution_rate >= 0 ? txColors.success : txColors.danger }}>
                     {digest.wow_change.resolution_rate > 0 ? '+' : ''}{digest.wow_change.resolution_rate}%
                   </Text>
                 </Descriptions.Item>

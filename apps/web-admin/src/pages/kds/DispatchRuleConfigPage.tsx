@@ -60,14 +60,15 @@ import {
   updateDispatchRule,
 } from '../../api/kdsManageApi';
 import type { ProductionDept } from '../../api/kdsManageApi';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
 // ─── Design Token ──────────────────────────────────────────────────────────
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_DANGER = '#A32D2D';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_DANGER = txColors.danger;
 const TX_BG_SECONDARY = '#F8F7F5';
 const TX_TEXT_SECONDARY = '#5F5E5A';
 

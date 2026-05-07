@@ -42,6 +42,7 @@ import {
   DownloadOutlined,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -363,7 +364,7 @@ function DiffTrendChart({ data }: { data: MonthlyReportData['diff_trend'] }) {
       <text x={PAD.left - 8} y={zeroY + 4} textAnchor="end" fontSize={10} fill="#999">0</text>
       <text x={PAD.left - 8} y={yScale(yMin * 0.8)} textAnchor="end" fontSize={10} fill="#999">-{fen2yuan(Math.round(yMax * 0.8))}</text>
       {/* 折线 */}
-      <polyline points={polyline} fill="none" stroke="#FF6B35" strokeWidth={2} />
+      <polyline points={polyline} fill="none" stroke={txColors.primary} strokeWidth={2} />
       {/* 数据点 + X轴标签 */}
       {data.map((d, i) => (
         <g key={d.date}>
@@ -749,7 +750,7 @@ function StoredValueTab() {
         </Col>
         <Col span={6}>
           <Card>
-            <Statistic title="消费汇总" value={fen2yuanNum(data.consume_total_fen)} prefix="¥" precision={2} valueStyle={{ color: '#FF6B35' }} />
+            <Statistic title="消费汇总" value={fen2yuanNum(data.consume_total_fen)} prefix="¥" precision={2} valueStyle={{ color: txColors.primary }} />
           </Card>
         </Col>
         <Col span={6}>
@@ -889,7 +890,7 @@ export function ReconciliationPage() {
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <Space direction="vertical" size={16} style={{ width: '100%', padding: 24 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Title level={3} style={{ margin: 0 }}>财务对账中心</Title>

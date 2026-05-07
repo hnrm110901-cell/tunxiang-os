@@ -17,18 +17,19 @@ import {
 } from 'antd';
 import { StatisticCard } from '@ant-design/pro-components';
 import { txFetchData } from '../api';
+import { txColors } from '@tx/tokens';
 
 const { Text, Paragraph } = Typography;
 
 // ─── Design Token 常量（屯象 tokens.md）───
 const C = {
-  primary:   '#FF6B35',
-  success:   '#0F6E56',
-  warning:   '#BA7517',
-  danger:    '#A32D2D',
-  info:      '#185FA5',
-  navy:      '#1E2A3A',
-  navyLight: '#2C3E50',
+  primary:   txColors.primary,
+  success:   txColors.success,
+  warning:   txColors.warning,
+  danger:    txColors.danger,
+  info:      txColors.info,
+  navy:      txColors.navy,
+  navyLight: txColors.navyLight,
   bgCard:    '#112228',
   bgInner:   '#0B1A20',
   bgRow:     '#1a2a33',
@@ -361,7 +362,7 @@ export function AgentMonitorPage() {
                     key={agent.id}
                     onClick={() => handleSelectAgent(agent.id)}
                     style={{
-                      background: isSelected ? C.navyLight ?? '#2C3E50' : C.bgCard,
+                      background: isSelected ? C.navyLight ?? txColors.navyLight : C.bgCard,
                       borderRadius: 8,
                       padding: '16px 18px',
                       cursor: 'pointer',

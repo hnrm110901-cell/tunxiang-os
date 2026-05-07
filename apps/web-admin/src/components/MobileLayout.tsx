@@ -6,6 +6,7 @@
  */
 import { ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -97,7 +98,7 @@ export function MobileLayout({ children, title }: MobileLayoutProps) {
           style={{
             marginTop: 8,
             padding: '10px 24px',
-            background: '#FF6B35',
+            background: txColors.primary,
             color: '#fff',
             border: 'none',
             borderRadius: 6,
@@ -125,7 +126,7 @@ export function MobileLayout({ children, title }: MobileLayoutProps) {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '12px 16px',
-          background: '#1E2A3A',
+          background: txColors.navy,
           color: '#fff',
           flexShrink: 0,
           paddingTop: 'calc(12px + env(safe-area-inset-top))',
@@ -134,7 +135,7 @@ export function MobileLayout({ children, title }: MobileLayoutProps) {
             <div style={{
               width: 28,
               height: 28,
-              background: '#FF6B35',
+              background: txColors.primary,
               borderRadius: 6,
               display: 'flex',
               alignItems: 'center',
@@ -188,7 +189,7 @@ export function MobileLayout({ children, title }: MobileLayoutProps) {
                   cursor: 'pointer',
                   minHeight: 56,
                   gap: 4,
-                  color: isActive ? '#FF6B35' : '#B4B2A9',
+                  color: isActive ? txColors.primary : '#B4B2A9',
                   transition: 'color 0.15s',
                 }}
               >

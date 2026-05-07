@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -132,7 +133,7 @@ function ServiceBellQueue({
         <span style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>
           服务呼叫
           {calls.length > 0 && (
-            <span style={{ marginLeft: 8, fontSize: 16, color: '#FF6B35', fontWeight: 400 }}>
+            <span style={{ marginLeft: 8, fontSize: 16, color: txColors.primary, fontWeight: 400 }}>
               ({calls.length}个待响应)
             </span>
           )}
@@ -199,7 +200,7 @@ function ServiceBellQueue({
                   style={{
                     minWidth: 72,
                     minHeight: 48,
-                    background: respondingIds.has(call.call_id) ? '#1a3040' : '#FF6B35',
+                    background: respondingIds.has(call.call_id) ? '#1a3040' : txColors.primary,
                     color: '#fff',
                     border: 'none',
                     borderRadius: 8,
@@ -384,7 +385,7 @@ export function ServiceBellBadge({ storeId }: { storeId: string }) {
             minWidth: 56,
             minHeight: 56,
             borderRadius: '50%',
-            background: '#FF6B35',
+            background: txColors.primary,
             border: 'none',
             cursor: 'pointer',
             zIndex: 999,

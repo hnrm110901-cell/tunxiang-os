@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * checkout/index.tsx — 结账确认页
  *
@@ -25,7 +26,7 @@ import { usePayment, PaymentMethod } from '../../../hooks/usePayment'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

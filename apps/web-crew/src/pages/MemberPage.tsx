@@ -19,19 +19,20 @@ import {
 } from '../api/memberLevelApi';
 import { getMemberPoints, type MemberPoints } from '../api/memberPointsApi';
 import { MemberPointsCard } from '../components/MemberPointsCard';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
   gold: '#facc15',
-  info: '#185FA5',
+  info: txColors.info,
   red: '#ef4444',
 };
 
@@ -121,7 +122,7 @@ function LevelBenefitSheet({ member, configs, levelHistory, onClose, onCheckUpgr
             {currentConfig?.level_name ?? member.level}
           </div>
           <div style={{ fontSize: 16, color: '#64748b', marginTop: 4 }}>
-            当前积分: <span style={{ color: '#FF6B35', fontWeight: 700 }}>{member.points.toLocaleString()}</span>
+            当前积分: <span style={{ color: txColors.primary, fontWeight: 700 }}>{member.points.toLocaleString()}</span>
             {nextLevel && (
               <span> / {nextLevel.min_points.toLocaleString()} 分升{nextLevel.level_name}</span>
             )}
@@ -137,7 +138,7 @@ function LevelBenefitSheet({ member, configs, levelHistory, onClose, onCheckUpgr
               <div style={{
                 height: '100%', borderRadius: 5,
                 width: `${progressPct}%`,
-                background: currentConfig ? getLevelColor(currentConfig.level_code) : '#FF6B35',
+                background: currentConfig ? getLevelColor(currentConfig.level_code) : txColors.primary,
                 transition: 'width 0.5s ease',
               }} />
             </div>
@@ -203,7 +204,7 @@ function LevelBenefitSheet({ member, configs, levelHistory, onClose, onCheckUpgr
               }}>
                 <span style={{ color: '#e2e8f0' }}>{h.from_level ?? '无'}</span>
                 <span style={{ margin: '0 8px' }}>→</span>
-                <span style={{ color: '#FF6B35', fontWeight: 700 }}>{h.to_level}</span>
+                <span style={{ color: txColors.primary, fontWeight: 700 }}>{h.to_level}</span>
                 <span style={{ marginLeft: 12 }}>{h.created_at.slice(0, 10)}</span>
               </div>
             ))}
@@ -216,7 +217,7 @@ function LevelBenefitSheet({ member, configs, levelHistory, onClose, onCheckUpgr
           disabled={upgrading}
           style={{
             width: '100%', minHeight: 52, borderRadius: 12, border: 'none',
-            background: upgrading ? '#64748b' : '#FF6B35',
+            background: upgrading ? '#64748b' : txColors.primary,
             color: '#ffffff', fontSize: 17, fontWeight: 700,
             cursor: upgrading ? 'default' : 'pointer', marginTop: 20,
           }}

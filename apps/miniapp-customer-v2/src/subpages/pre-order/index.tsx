@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pre-order/index.tsx — 预点餐 + 到店取餐
  *
@@ -20,7 +21,7 @@ import { txRequest } from '../../utils/request'
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryBg: 'rgba(255,107,44,0.12)',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

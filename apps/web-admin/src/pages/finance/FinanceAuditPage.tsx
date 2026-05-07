@@ -29,6 +29,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -95,10 +96,10 @@ interface HistoryRecord {
 // ─── 颜色映射 ───
 
 const RISK_COLOR: Record<RiskLevel, string> = {
-  critical: '#A32D2D',
-  high: '#BA7517',
+  critical: txColors.danger,
+  high: txColors.warning,
   medium: '#9B8000',
-  low: '#0F6E56',
+  low: txColors.success,
 };
 
 const RISK_LABEL: Record<RiskLevel, string> = {
@@ -198,14 +199,14 @@ function HardConstraintsRow({ constraints }: { constraints: HardConstraints }) {
             <Card
               size="small"
               style={{
-                borderColor: ok ? '#0F6E56' : '#A32D2D',
+                borderColor: ok ? txColors.success : txColors.danger,
                 borderWidth: 2,
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{
                   fontSize: 24,
-                  color: ok ? '#0F6E56' : '#A32D2D',
+                  color: ok ? txColors.success : txColors.danger,
                 }}>
                   {ok ? '✓' : '✗'}
                 </span>
@@ -266,7 +267,7 @@ function AnomalyTable({ anomalies }: { anomalies: AnomalyItem[] }) {
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={
-          <Text style={{ color: '#0F6E56', fontWeight: 500 }}>
+          <Text style={{ color: txColors.success, fontWeight: 500 }}>
             ✅ 未发现财务异常，经营状况良好
           </Text>
         }
@@ -471,7 +472,7 @@ export function FinanceAuditPage() {
             type="primary"
             loading={loading}
             onClick={handleAudit}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             🔍 开始 AI 稽核
           </Button>

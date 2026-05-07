@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { txFetchData } from '../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -161,7 +162,7 @@ interface QuickEntry {
 const quickEntries: QuickEntry[] = [
   { name: '门店管理', desc: '查看与配置门店', path: '/store/manage', iconBg: '#1890ff', iconSymbol: '\uD83C\uDFEA' },
   { name: '菜品管理', desc: '菜单与定价维护', path: '/catalog', iconBg: '#52c41a', iconSymbol: '\uD83C\uDF7D\uFE0F' },
-  { name: '订单查询', desc: '实时订单与退单', path: '/trade', iconBg: '#FF6B35', iconSymbol: '\uD83D\uDCCB' },
+  { name: '订单查询', desc: '实时订单与退单', path: '/trade', iconBg: txColors.primary, iconSymbol: '\uD83D\uDCCB' },
   { name: '会员管理', desc: '会员画像与运营', path: '/member/insight', iconBg: '#722ed1', iconSymbol: '\uD83D\uDC65' },
   { name: '营销活动', desc: '活动创建与效果', path: '/marketing/campaigns', iconBg: '#eb2f96', iconSymbol: '\uD83C\uDF89' },
   { name: '数据报表', desc: '经营数据与分析', path: '/analytics/dashboard', iconBg: '#13c2c2', iconSymbol: '\uD83D\uDCCA' },
@@ -235,11 +236,11 @@ function RevenueChart({ data }: RevenueChartProps) {
 
       {/* 今日实线 */}
       {todayPath && (
-        <path d={todayPath} fill="none" stroke="#FF6B35" strokeWidth={2.5} />
+        <path d={todayPath} fill="none" stroke={txColors.primary} strokeWidth={2.5} />
       )}
 
       {/* 图例 */}
-      <line x1={svgW - 180} y1={12} x2={svgW - 160} y2={12} stroke="#FF6B35" strokeWidth={2.5} />
+      <line x1={svgW - 180} y1={12} x2={svgW - 160} y2={12} stroke={txColors.primary} strokeWidth={2.5} />
       <text x={svgW - 155} y={16} fill="#ccc" fontSize={11}>今日</text>
       <line x1={svgW - 110} y1={12} x2={svgW - 90} y2={12} stroke="#666" strokeWidth={1.5} strokeDasharray="4 3" />
       <text x={svgW - 85} y={16} fill="#666" fontSize={11}>昨日</text>
@@ -360,10 +361,10 @@ export function HomePage() {
             {/* 今日营收 */}
             <div style={{
               background: '#112228', borderRadius: 10, padding: 20,
-              borderLeft: '4px solid #FF6B35',
+              borderLeft: `4px solid ${txColors.primary}`,
             }}>
               <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>今日营收</div>
-              <div style={{ fontSize: 28, fontWeight: 'bold', color: '#FF6B35', lineHeight: 1.2 }}>
+              <div style={{ fontSize: 28, fontWeight: 'bold', color: txColors.primary, lineHeight: 1.2 }}>
                 {fen2yuan(data.kpi.today_revenue_fen)}
               </div>
               {revenueChange && (

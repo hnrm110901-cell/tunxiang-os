@@ -28,6 +28,7 @@ import {
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -289,19 +290,19 @@ export function CampaignManagePage() {
         ];
         if (record.status === 'draft') {
           actions.push(
-            <a key="activate" style={{ color: '#0F6E56' }} onClick={() => handleActivate(record)}>
+            <a key="activate" style={{ color: txColors.success }} onClick={() => handleActivate(record)}>
               激活
             </a>,
           );
           actions.push(
-            <a key="edit" style={{ color: '#185FA5' }}>
+            <a key="edit" style={{ color: txColors.info }}>
               编辑
             </a>,
           );
         }
         if (record.status === 'active') {
           actions.push(
-            <a key="end" style={{ color: '#A32D2D' }} onClick={() => handleEnd(record)}>
+            <a key="end" style={{ color: txColors.danger }} onClick={() => handleEnd(record)}>
               结束
             </a>,
           );
@@ -510,7 +511,7 @@ export function CampaignManagePage() {
                   : 0
               }
               status="active"
-              strokeColor="#0F6E56"
+              strokeColor={txColors.success}
               format={(pct) => `${pct}%`}
             />
           </>
@@ -580,8 +581,8 @@ export function CampaignManagePage() {
                     padding: '3px 10px',
                     borderRadius: 4,
                     border: '1px solid #E8E6E1',
-                    background: notifyChannel === ch ? '#FFF3ED' : '#fff',
-                    color: notifyChannel === ch ? '#FF6B35' : '#5F5E5A',
+                    background: notifyChannel === ch ? txColors.primaryLight : '#fff',
+                    color: notifyChannel === ch ? txColors.primary : '#5F5E5A',
                     fontSize: 12,
                     cursor: 'pointer',
                   }}

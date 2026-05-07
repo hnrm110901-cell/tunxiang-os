@@ -52,6 +52,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -153,12 +154,12 @@ const STATUS_CONFIG: Record<string, { color: string; text: string }> = {
 };
 
 const ITEM_TYPE_COLOR: Record<string, string> = {
-  base: '#1E2A3A',
-  commission: '#FF6B35',
-  piece: '#BA7517',
-  perf: '#0F6E56',
-  deduction: '#A32D2D',
-  bonus: '#185FA5',
+  base: txColors.navy,
+  commission: txColors.primary,
+  piece: txColors.warning,
+  perf: txColors.success,
+  deduction: txColors.danger,
+  bonus: txColors.info,
 };
 
 const ITEM_TYPE_LABEL: Record<string, string> = {
@@ -203,7 +204,7 @@ function SummaryCards({ summary }: { summary: PayrollSummary | null }) {
             value={summary.mom_ratio ?? 0}
             precision={1}
             suffix="%"
-            valueStyle={{ color: (summary.mom_ratio ?? 0) >= 0 ? '#0F6E56' : '#A32D2D' }}
+            valueStyle={{ color: (summary.mom_ratio ?? 0) >= 0 ? txColors.success : txColors.danger }}
             prefix={(summary.mom_ratio ?? 0) >= 0 ? <ArrowUpOutlined /> : undefined}
           />
         </Card>
@@ -504,7 +505,7 @@ export function PayrollManagePage() {
     {
       title: '合计', dataIndex: 'total_salary_fen', width: 110, align: 'right', fixed: 'right',
       render: (v: number) => (
-        <Text strong style={{ color: '#FF6B35' }}>¥{fenToYuan(v)}</Text>
+        <Text strong style={{ color: txColors.primary }}>¥{fenToYuan(v)}</Text>
       ),
     },
     {
@@ -596,7 +597,7 @@ export function PayrollManagePage() {
       {contextHolder}
       <Row align="middle" justify="space-between" style={{ marginBottom: 20 }}>
         <Col>
-          <Title level={4} style={{ margin: 0, color: '#1E2A3A' }}>薪资管理</Title>
+          <Title level={4} style={{ margin: 0, color: txColors.navy }}>薪资管理</Title>
         </Col>
       </Row>
 
@@ -723,7 +724,7 @@ export function PayrollManagePage() {
                           <Table.Summary.Cell index={4} align="right">¥{fenToYuan(totalPiece)}</Table.Summary.Cell>
                           <Table.Summary.Cell index={5} align="right">¥{fenToYuan(totalPerf)}</Table.Summary.Cell>
                           <Table.Summary.Cell index={6} align="right">
-                            <Text strong style={{ color: '#FF6B35' }}>¥{fenToYuan(totalAll)}</Text>
+                            <Text strong style={{ color: txColors.primary }}>¥{fenToYuan(totalAll)}</Text>
                           </Table.Summary.Cell>
                           <Table.Summary.Cell index={7} />
                           <Table.Summary.Cell index={8} />
@@ -794,7 +795,7 @@ export function PayrollManagePage() {
                       <Row justify="center">
                         <Col style={{ textAlign: 'center' }}>
                           <div style={{ fontSize: 13, color: '#5F5E5A', marginBottom: 4 }}>实发合计</div>
-                          <div style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>
+                          <div style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>
                             ¥{fenToYuan(detailRecord.total_salary_fen)}
                           </div>
                         </Col>
@@ -846,7 +847,7 @@ export function PayrollManagePage() {
                             {
                               title: '金额', dataIndex: 'amount_fen', width: 100, align: 'right',
                               render: (v: number) => (
-                                <Text style={{ color: v < 0 ? '#A32D2D' : '#2C2C2A' }}>
+                                <Text style={{ color: v < 0 ? txColors.danger : '#2C2C2A' }}>
                                   {v < 0 ? '-' : '+'}¥{fenToYuan(v)}
                                 </Text>
                               ),
@@ -861,7 +862,7 @@ export function PayrollManagePage() {
                               <Table.Summary.Row style={{ fontWeight: 600 }}>
                                 <Table.Summary.Cell index={0} colSpan={2}>实发合计</Table.Summary.Cell>
                                 <Table.Summary.Cell index={2} align="right">
-                                  <Text strong style={{ color: '#FF6B35' }}>
+                                  <Text strong style={{ color: txColors.primary }}>
                                     ¥{fenToYuan(detailRecord.total_salary_fen)}
                                   </Text>
                                 </Table.Summary.Cell>

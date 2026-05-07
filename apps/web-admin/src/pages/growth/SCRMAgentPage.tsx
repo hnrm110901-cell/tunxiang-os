@@ -42,6 +42,7 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -100,9 +101,9 @@ interface PostOrderTask {
 const fmtPrice = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 
 const LEVEL_COLORS: Record<string, string> = {
-  super_vip: '#FF6B35',
-  VIP: '#185FA5',
-  regular: '#0F6E56',
+  super_vip: txColors.primary,
+  VIP: txColors.info,
+  regular: txColors.success,
 };
 
 const LEVEL_LABELS: Record<string, string> = {
@@ -121,10 +122,10 @@ const TEMPLATE_LABELS: Record<string, string> = {
 };
 
 const STATUS_MAP: Record<string, { color: string; icon: React.ReactNode; label: string }> = {
-  pending: { color: '#BA7517', icon: <ClockCircleOutlined />, label: '待发送' },
-  sent: { color: '#185FA5', icon: <CheckCircleOutlined />, label: '已发送' },
-  replied: { color: '#0F6E56', icon: <CheckCircleOutlined />, label: '已回复' },
-  failed: { color: '#A32D2D', icon: <CloseCircleOutlined />, label: '发送失败' },
+  pending: { color: txColors.warning, icon: <ClockCircleOutlined />, label: '待发送' },
+  sent: { color: txColors.info, icon: <CheckCircleOutlined />, label: '已发送' },
+  replied: { color: txColors.success, icon: <CheckCircleOutlined />, label: '已回复' },
+  failed: { color: txColors.danger, icon: <CloseCircleOutlined />, label: '发送失败' },
 };
 
 // ─── Tab1: 生日祝福 ──────────────────────────────────────────────────────────
@@ -203,7 +204,7 @@ function BirthdayTab() {
       key: 'birthday',
       render: (_: unknown, row: BirthdayMember) => (
         <div>
-          <Text><CalendarOutlined style={{ marginRight: 4, color: '#FF6B35' }} />{row.birthday}</Text>
+          <Text><CalendarOutlined style={{ marginRight: 4, color: txColors.primary }} />{row.birthday}</Text>
           <br />
           <Tag color={row.days_until <= 2 ? 'red' : row.days_until <= 5 ? 'orange' : 'blue'}>
             还有 {row.days_until} 天
@@ -254,8 +255,8 @@ function BirthdayTab() {
               title="即将生日（7天内）"
               value={members.length}
               suffix="位会员"
-              prefix={<GiftOutlined style={{ color: '#FF6B35' }} />}
-              valueStyle={{ color: '#FF6B35' }}
+              prefix={<GiftOutlined style={{ color: txColors.primary }} />}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>
@@ -265,8 +266,8 @@ function BirthdayTab() {
               title="企微已绑定"
               value={members.filter(m => m.wecom_connected).length}
               suffix="位"
-              prefix={<CheckCircleOutlined style={{ color: '#0F6E56' }} />}
-              valueStyle={{ color: '#0F6E56' }}
+              prefix={<CheckCircleOutlined style={{ color: txColors.success }} />}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>
@@ -276,8 +277,8 @@ function BirthdayTab() {
               title="今月生日转化率"
               value={63.2}
               suffix="%"
-              prefix={<TrophyOutlined style={{ color: '#185FA5' }} />}
-              valueStyle={{ color: '#185FA5' }}
+              prefix={<TrophyOutlined style={{ color: txColors.info }} />}
+              valueStyle={{ color: txColors.info }}
             />
           </Card>
         </Col>
@@ -310,7 +311,7 @@ function BirthdayTab() {
               loading={sending}
               onClick={handleSend}
               disabled={selectedKeys.length === 0}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               批量发送 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ''}
             </Button>
@@ -391,9 +392,9 @@ function DormantTab() {
   };
 
   const getRiskColor = (risk?: string) => {
-    if (risk === 'high') return '#A32D2D';
-    if (risk === 'medium') return '#BA7517';
-    return '#0F6E56';
+    if (risk === 'high') return txColors.danger;
+    if (risk === 'medium') return txColors.warning;
+    return txColors.success;
   };
 
   const columns: ColumnsType<DormantMember> = [
@@ -434,7 +435,7 @@ function DormantTab() {
       key: 'spend',
       render: (_: unknown, row: DormantMember) => (
         <div>
-          <Text strong style={{ color: '#FF6B35' }}>{fmtPrice(row.total_spend_fen)}</Text>
+          <Text strong style={{ color: txColors.primary }}>{fmtPrice(row.total_spend_fen)}</Text>
           <br />
           <Text type="secondary" style={{ fontSize: 12 }}>均消 {fmtPrice(row.avg_spend_per_visit_fen)} / 次</Text>
         </div>
@@ -453,7 +454,7 @@ function DormantTab() {
           <Progress
             percent={Math.round(rate * 100)}
             size="small"
-            strokeColor={rate >= 0.30 ? '#0F6E56' : rate >= 0.15 ? '#BA7517' : '#A32D2D'}
+            strokeColor={rate >= 0.30 ? txColors.success : rate >= 0.15 ? txColors.warning : txColors.danger}
             format={(p) => `${p}%`}
           />
           <Text
@@ -527,7 +528,7 @@ function DormantTab() {
                 loading={sending}
                 onClick={handleWake}
                 disabled={selectedKeys.length === 0}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                style={{ background: txColors.primary, borderColor: txColors.primary }}
               >
                 发送唤醒 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ''}
               </Button>
@@ -593,9 +594,9 @@ function PostOrderTab() {
   if (!stats) return null;
 
   const funnelStages = [
-    { label: '已发送', value: stats.tasks_sent, color: '#185FA5' },
-    { label: '已回复', value: Math.round(stats.tasks_sent * stats.reply_rate), color: '#0F6E56' },
-    { label: '已转化', value: Math.round(stats.tasks_sent * stats.conversion_rate), color: '#FF6B35' },
+    { label: '已发送', value: stats.tasks_sent, color: txColors.info },
+    { label: '已回复', value: Math.round(stats.tasks_sent * stats.reply_rate), color: txColors.success },
+    { label: '已转化', value: Math.round(stats.tasks_sent * stats.conversion_rate), color: txColors.primary },
   ];
   const maxVal = funnelStages[0].value;
 
@@ -618,7 +619,7 @@ function PostOrderTab() {
     {
       title: '消费金额',
       dataIndex: 'spend_fen',
-      render: (fen: number) => <Text strong style={{ color: '#FF6B35' }}>{fmtPrice(fen)}</Text>,
+      render: (fen: number) => <Text strong style={{ color: txColors.primary }}>{fmtPrice(fen)}</Text>,
     },
     {
       title: '模板',
@@ -698,14 +699,14 @@ function PostOrderTab() {
             <Statistic
               title="回访带来营收"
               value={fmtPrice(stats.revenue_from_conversion_fen)}
-              valueStyle={{ color: '#FF6B35', fontSize: 24 }}
+              valueStyle={{ color: txColors.primary, fontSize: 24 }}
             />
             <Divider style={{ margin: '12px 0' }} />
             <Statistic
               title="回访ROI"
               value={stats.roi}
               suffix="x"
-              valueStyle={{ color: '#0F6E56', fontSize: 20 }}
+              valueStyle={{ color: txColors.success, fontSize: 20 }}
             />
           </Card>
         </Col>
@@ -719,20 +720,20 @@ function PostOrderTab() {
               <Card
                 size="small"
                 style={{ border: '1px solid #E8E6E1', borderRadius: 8 }}
-                title={<Tag color="#185FA5">{TEMPLATE_LABELS[tpl] || tpl}</Tag>}
+                title={<Tag color={txColors.info}>{TEMPLATE_LABELS[tpl] || tpl}</Tag>}
               >
                 <Paragraph style={{ fontSize: 12, color: '#5F5E5A', marginBottom: 8 }}>
                   {TEMPLATE_DESCS[tpl]}
                 </Paragraph>
                 <Row gutter={8}>
                   <Col span={8}><Statistic title="发送" value={tplStats.sent} valueStyle={{ fontSize: 16 }} /></Col>
-                  <Col span={8}><Statistic title="回复" value={tplStats.replied} valueStyle={{ fontSize: 16, color: '#0F6E56' }} /></Col>
-                  <Col span={8}><Statistic title="转化" value={tplStats.converted} valueStyle={{ fontSize: 16, color: '#FF6B35' }} /></Col>
+                  <Col span={8}><Statistic title="回复" value={tplStats.replied} valueStyle={{ fontSize: 16, color: txColors.success }} /></Col>
+                  <Col span={8}><Statistic title="转化" value={tplStats.converted} valueStyle={{ fontSize: 16, color: txColors.primary }} /></Col>
                 </Row>
                 <Progress
                   percent={Math.round(tplStats.reply_rate * 100)}
                   size="small"
-                  strokeColor="#185FA5"
+                  strokeColor={txColors.info}
                   format={p => `回复率 ${p}%`}
                   style={{ marginTop: 8 }}
                 />
@@ -743,7 +744,7 @@ function PostOrderTab() {
       </Card>
 
       {/* 今日待回访订单 */}
-      <Card title={<Space><MessageOutlined style={{ color: '#FF6B35' }} />今日待回访订单</Space>}>
+      <Card title={<Space><MessageOutlined style={{ color: txColors.primary }} />今日待回访订单</Space>}>
         <Table
           columns={pendingColumns}
           dataSource={stats.pending_today}
@@ -784,26 +785,26 @@ function PerformanceBar() {
         <Row gutter={24} style={{ width: '100%' }}>
           <Col>
             <Text strong>本月SCRM总营收：</Text>
-            <Text strong style={{ color: '#FF6B35', fontSize: 16 }}>{fmtPrice(data.total_revenue_fen)}</Text>
+            <Text strong style={{ color: txColors.primary, fontSize: 16 }}>{fmtPrice(data.total_revenue_fen)}</Text>
           </Col>
           <Col>
             <Text>生日祝福转化率：</Text>
-            <Text strong style={{ color: '#0F6E56' }}>{(data.birthday.conversion_rate * 100).toFixed(1)}%</Text>
+            <Text strong style={{ color: txColors.success }}>{(data.birthday.conversion_rate * 100).toFixed(1)}%</Text>
             <Text type="secondary" style={{ fontSize: 12 }}> {data.birthday.trend}</Text>
           </Col>
           <Col>
             <Text>沉睡唤醒ROI：</Text>
-            <Text strong style={{ color: '#0F6E56' }}>{data.dormant_wake.roi}x</Text>
+            <Text strong style={{ color: txColors.success }}>{data.dormant_wake.roi}x</Text>
             <Text type="secondary" style={{ fontSize: 12 }}> {data.dormant_wake.trend}</Text>
           </Col>
           <Col>
             <Text>回访复购提升：</Text>
-            <Text strong style={{ color: '#0F6E56' }}>+{(data.post_order.repurchase_lift * 100).toFixed(1)}%</Text>
+            <Text strong style={{ color: txColors.success }}>+{(data.post_order.repurchase_lift * 100).toFixed(1)}%</Text>
             <Text type="secondary" style={{ fontSize: 12 }}> {data.post_order.trend}</Text>
           </Col>
           <Col>
             <Text>整体ROI：</Text>
-            <Text strong style={{ color: '#FF6B35', fontSize: 15 }}>{data.overall_roi}x</Text>
+            <Text strong style={{ color: txColors.primary, fontSize: 15 }}>{data.overall_roi}x</Text>
           </Col>
         </Row>
       }

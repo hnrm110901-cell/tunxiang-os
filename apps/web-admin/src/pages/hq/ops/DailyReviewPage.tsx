@@ -4,6 +4,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -64,17 +65,17 @@ function getStatusConfig(status: NodeStatus): {
   icon: string;
 } {
   switch (status) {
-    case 'completed':   return { label: '已完成', color: '#0F6E56', bg: '#0F6E5622', icon: '✅' };
+    case 'completed':   return { label: '已完成', color: txColors.success, bg: `${txColors.success}22`, icon: '✅' };
     case 'overdue':     return { label: '已超时', color: '#FF4D4D', bg: '#FF4D4D22', icon: '⚠️' };
-    case 'in_progress': return { label: '进行中', color: '#185FA5', bg: '#185FA522', icon: '🔵' };
+    case 'in_progress': return { label: '进行中', color: txColors.info, bg: `${txColors.info}22`, icon: '🔵' };
     case 'skipped':     return { label: '已跳过', color: '#888',    bg: '#88888822', icon: '⏭️' };
     default:            return { label: '待完成', color: '#555',    bg: '#55555522', icon: '⏳' };
   }
 }
 
 function getHealthColor(score: number): string {
-  if (score >= 70) return '#0F6E56';
-  if (score >= 40) return '#BA7517';
+  if (score >= 70) return txColors.success;
+  if (score >= 40) return txColors.warning;
   return '#FF4D4D';
 }
 
@@ -254,7 +255,7 @@ function CompleteModal({ node, storeId, onClose, onSuccess }: CompleteModalProps
             disabled={loading || !operatorId.trim()}
             style={{
               padding: '8px 16px', borderRadius: 6, border: 'none',
-              background: loading ? '#2a3a44' : '#0F6E56', color: '#fff',
+              background: loading ? '#2a3a44' : txColors.success, color: '#fff',
               cursor: loading ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
             }}
           >
@@ -370,7 +371,7 @@ export function DailyReviewPage() {
             style={{
               padding: '7px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600,
               border: 'none', cursor: 'pointer',
-              background: tab === t ? '#0F6E56' : '#1a2a33',
+              background: tab === t ? txColors.success : '#1a2a33',
               color: tab === t ? '#fff' : '#888',
             }}
           >
@@ -519,7 +520,7 @@ export function DailyReviewPage() {
                           <div style={{ fontSize: 12, color: '#888' }}>
                             {formatTime(node.completed_at)} 完成
                             {node.completed_by && (
-                              <span style={{ marginLeft: 8, color: '#0F6E56' }}>
+                              <span style={{ marginLeft: 8, color: txColors.success }}>
                                 {formatCompletedBy(node.completed_by)}
                               </span>
                             )}
@@ -538,9 +539,9 @@ export function DailyReviewPage() {
                           onClick={() => setCompletingNode(node)}
                           style={{
                             padding: '6px 14px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                            border: `1px solid ${isOverdue ? '#FF4D4D' : '#0F6E56'}`,
+                            border: `1px solid ${isOverdue ? '#FF4D4D' : txColors.success}`,
                             background: 'transparent',
-                            color: isOverdue ? '#FF4D4D' : '#0F6E56',
+                            color: isOverdue ? '#FF4D4D' : txColors.success,
                             cursor: 'pointer', flexShrink: 0,
                             whiteSpace: 'nowrap',
                           }}
@@ -555,8 +556,8 @@ export function DailyReviewPage() {
 
               {/* 图例 */}
               <div style={{ display: 'flex', gap: 20, marginTop: 14, color: '#888', fontSize: 12, flexWrap: 'wrap' }}>
-                <span>● <span style={{ color: '#0F6E56' }}>已完成</span></span>
-                <span>● <span style={{ color: '#185FA5' }}>进行中</span></span>
+                <span>● <span style={{ color: txColors.success }}>已完成</span></span>
+                <span>● <span style={{ color: txColors.info }}>进行中</span></span>
                 <span>● <span style={{ color: '#555' }}>待完成</span></span>
                 <span>● <span style={{ color: '#FF4D4D' }}>超时未完成</span></span>
               </div>
@@ -642,7 +643,7 @@ export function DailyReviewPage() {
                           </span>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
-                          <span style={{ color: '#0F6E56', fontWeight: 600 }}>{item.completed_count}</span>
+                          <span style={{ color: txColors.success, fontWeight: 600 }}>{item.completed_count}</span>
                           <span style={{ color: '#888' }}>/8</span>
                         </td>
                         <td style={{ padding: '14px 16px' }}>
@@ -655,7 +656,7 @@ export function DailyReviewPage() {
                               {item.overdue_count} 超时
                             </span>
                           ) : (
-                            <span style={{ color: '#0F6E56', fontSize: 13 }}>✓ 无超时</span>
+                            <span style={{ color: txColors.success, fontSize: 13 }}>✓ 无超时</span>
                           )}
                         </td>
                         <td style={{ padding: '14px 16px' }}>

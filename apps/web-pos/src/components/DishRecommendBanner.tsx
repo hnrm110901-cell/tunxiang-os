@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * DishRecommendBanner — AI 个性化菜品推荐横幅
  *
@@ -129,7 +130,7 @@ export default function DishRecommendBanner({
             </div>
 
             {/* 价格 */}
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#FF6B35' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: txColors.primary }}>
               ¥{dish.price}
             </div>
 
@@ -158,7 +159,7 @@ export default function DishRecommendBanner({
                 minHeight: 44,
                 border: 'none',
                 borderRadius: 6,
-                background: '#FF6B35',
+                background: txColors.primary,
                 color: '#fff',
                 fontSize: 13,
                 fontWeight: 700,

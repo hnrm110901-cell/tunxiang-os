@@ -40,6 +40,7 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable, StatisticCard } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -145,7 +146,7 @@ function fenToYuanShort(fen: number): string {
 
 function formatGrowth(rate: number): React.ReactNode {
   const pct = (rate * 100).toFixed(1);
-  const color = rate >= 0 ? '#0F6E56' : '#A32D2D';
+  const color = rate >= 0 ? txColors.success : txColors.danger;
   return <span style={{ color }}>{rate >= 0 ? '+' : ''}{pct}%</span>;
 }
 
@@ -339,7 +340,7 @@ function OrderDetailDrawer({
               {(detail.discount_detail.discount_rate * 100).toFixed(1)}%
             </Descriptions.Item>
             <Descriptions.Item label="实付金额">
-              <Text strong style={{ color: '#0F6E56' }}>{fenToYuan(detail.paid_fen)}</Text>
+              <Text strong style={{ color: txColors.success }}>{fenToYuan(detail.paid_fen)}</Text>
             </Descriptions.Item>
           </Descriptions>
 
@@ -606,7 +607,7 @@ export default function OmniOrderCenterPage() {
                 <span>{t.label}</span>
                 {channelCounts[t.key] !== undefined && (
                   <Badge count={channelCounts[t.key]} showZero={false}
-                    style={{ backgroundColor: '#FF6B35' }} />
+                    style={{ backgroundColor: txColors.primary }} />
                 )}
               </Space>
             ),
@@ -671,9 +672,9 @@ export default function OmniOrderCenterPage() {
           {/* 搜索模式提示 */}
           {searchResults !== null && (
             <div style={{ marginBottom: 8, padding: '6px 8px',
-              background: '#FFF3ED', borderRadius: 4, fontSize: 12 }}>
+              background: txColors.primaryLight, borderRadius: 4, fontSize: 12 }}>
               搜索 "{searchQ}" 找到 {searchResults.length} 条结果
-              <a style={{ marginLeft: 8, color: '#FF6B35' }} onClick={handleClearSearch}>
+              <a style={{ marginLeft: 8, color: txColors.primary }} onClick={handleClearSearch}>
                 清除搜索
               </a>
             </div>

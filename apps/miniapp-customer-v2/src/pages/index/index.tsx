@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/index/index.tsx — 首页
  *
@@ -102,7 +103,7 @@ function dishToCard(d: Dish): MockDish {
 const C = {
   bg:       '#0B1A20',
   card:     '#132029',
-  primary:  '#FF6B35',
+  primary:  txColors.primary,
   text1:    '#E8F4F8',
   text2:    '#9EB5C0',
 }

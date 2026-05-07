@@ -7,17 +7,18 @@
  */
 import { useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token（CSS 变量）────────────────────────────────────────────────
 const TOKEN = {
-  primary: '#FF6B35',
-  primaryActive: '#E55A28',
-  navy: '#1E2A3A',
-  navyLight: '#2C3E50',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  primaryActive: txColors.primaryActive,
+  navy: txColors.navy,
+  navyLight: txColors.navyLight,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
   textPrimary: '#2C2C2A',
   textSecondary: '#5F5E5A',
   bgPrimary: '#FFFFFF',
@@ -123,7 +124,7 @@ function OutletSelectorCard({
         minWidth: 140,
         borderRadius: 12,
         border: selected ? `2px solid ${TOKEN.primary}` : `1px solid ${TOKEN.border}`,
-        background: selected ? '#FFF3ED' : TOKEN.bgPrimary,
+        background: selected ? txColors.primaryLight : TOKEN.bgPrimary,
         cursor: 'pointer',
         transition: 'all 200ms ease',
         transform: selected ? 'scale(1)' : 'scale(1)',
@@ -181,7 +182,7 @@ function DishButton({
         minHeight: 80,
         borderRadius: 12,
         border: count > 0 ? `2px solid ${TOKEN.primary}` : `1px solid ${TOKEN.border}`,
-        background: count > 0 ? '#FFF3ED' : TOKEN.bgPrimary,
+        background: count > 0 ? txColors.primaryLight : TOKEN.bgPrimary,
         cursor: 'pointer',
         transition: 'all 200ms ease',
         position: 'relative',
@@ -379,7 +380,7 @@ function CheckoutPanel({
                 marginTop: 8,
                 padding: '8px 12px',
                 borderRadius: 8,
-                background: '#0F6E5610',
+                background: `${txColors.success}10`,
                 color: TOKEN.success,
                 fontSize: 16,
                 fontWeight: 600,
@@ -392,7 +393,7 @@ function CheckoutPanel({
                 marginTop: 8,
                 padding: '8px 12px',
                 borderRadius: 8,
-                background: '#A32D2D10',
+                background: `${txColors.danger}10`,
                 color: TOKEN.danger,
                 fontSize: 14,
               }}>

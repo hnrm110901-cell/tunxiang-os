@@ -24,10 +24,11 @@ import { Line, Pie } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token ────────────────────────────────────────────────────────────
-const TX_PRIMARY = '#FF6B35';
-const TX_DANGER = '#A32D2D';
+const TX_PRIMARY = txColors.primary;
+const TX_DANGER = txColors.danger;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

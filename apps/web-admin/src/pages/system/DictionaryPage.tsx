@@ -9,6 +9,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Badge,
   Button,
@@ -401,7 +402,7 @@ export function DictionaryPage() {
               style={{
                 marginBottom: 8,
                 borderColor:
-                  selectedDict?.id === dict.id ? '#FF6B35' : undefined,
+                  selectedDict?.id === dict.id ? txColors.primary : undefined,
                 borderWidth: selectedDict?.id === dict.id ? 2 : 1,
               }}
               bodyStyle={{ padding: '10px 12px' }}
@@ -466,7 +467,7 @@ export function DictionaryPage() {
               <Tag color="default">{selectedDict.code}</Tag>
               <Badge
                 count={items.length}
-                style={{ backgroundColor: '#FF6B35' }}
+                style={{ backgroundColor: txColors.primary }}
               />
             </Space>
           ) : (

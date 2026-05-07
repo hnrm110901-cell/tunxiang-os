@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { StoreHeatmap, type TableInfo } from '../components/StoreHeatmap';
+import { txColors } from '@tx/tokens';
 
 // ─── Mock 数据 ──────────────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ export function StoreTwinPage() {
             onClick={refresh}
             style={{
               padding: '8px 16px', minHeight: 40,
-              background: '#185FA5', color: '#fff', border: 'none',
+              background: txColors.info, color: '#fff', border: 'none',
               borderRadius: 8, cursor: 'pointer', fontSize: 13, fontWeight: 600,
             }}
           >
@@ -111,7 +112,7 @@ export function StoreTwinPage() {
           marginBottom: 16,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         }}>
-          <span style={{ fontSize: 13, color: '#FF6B35' }}>
+          <span style={{ fontSize: 13, color: txColors.primary }}>
             选中: {selectedTable.tableNo}（{selectedTable.area} · {selectedTable.seats}人台）— 点击进入详情
           </span>
           <button

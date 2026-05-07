@@ -4,6 +4,7 @@
  * 品牌色 #FF6B35，深色主题适配
  */
 import { Fragment, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface Props {
   data: {
@@ -34,7 +35,7 @@ export function TxHeatmap({
   data,
   height,
   unit = '',
-  colorRange = ['#112228', '#FF6B35'],
+  colorRange = ['#112228', txColors.primary],
 }: Props) {
   const [hover, setHover] = useState<{ row: number; col: number } | null>(null);
 
@@ -94,7 +95,7 @@ export function TxHeatmap({
                     transform: isHover ? 'scale(1.08)' : 'scale(1)',
                     position: 'relative',
                     zIndex: isHover ? 2 : 1,
-                    border: isHover ? '1px solid #FF6B35' : '1px solid transparent',
+                    border: isHover ? `1px solid ${txColors.primary}` : '1px solid transparent',
                   }}
                 >
                   {isHover && (

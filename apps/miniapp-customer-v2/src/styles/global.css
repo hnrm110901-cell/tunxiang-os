@@ -4,10 +4,10 @@
 
 /* Brand CSS custom properties */
 :root {
-  --color-brand: #FF6B35;
-  --color-brand-active: #E55A28;
-  --color-brand-dark: #E55A28;
-  --color-brand-light: #FFF3ED;
+  --color-brand: var(--tx-primary);
+  --color-brand-active: var(--tx-primary-active);
+  --color-brand-dark: var(--tx-primary-active);
+  --color-brand-light: var(--tx-primary-light);
 
   --color-app-bg: #0B1A20;
   --color-card-bg: #132029;

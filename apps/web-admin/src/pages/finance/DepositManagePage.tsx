@@ -78,6 +78,7 @@ import { txFetchData } from '../../api';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -184,7 +185,7 @@ function StatCard({ title, value, prefix, suffix, valueColor, icon, extra, warni
       styles={{ body: { padding: '20px 24px' } }}
       style={{
         borderRadius: 8,
-        border: warning ? '1px solid #A32D2D' : undefined,
+        border: warning ? `1px solid ${txColors.danger}` : undefined,
         background: warning ? '#FFF5F5' : undefined,
       }}
     >
@@ -205,11 +206,11 @@ function StatCard({ title, value, prefix, suffix, valueColor, icon, extra, warni
             width: 44,
             height: 44,
             borderRadius: 8,
-            background: warning ? '#A32D2D' : '#FFF3ED',
+            background: warning ? txColors.danger : txColors.primaryLight,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: warning ? '#fff' : '#FF6B35',
+            color: warning ? '#fff' : txColors.primary,
             fontSize: 20,
           }}>
             {icon}
@@ -508,7 +509,7 @@ export function DepositManagePage() {
       width: 110,
       search: false,
       render: (_, record) => (
-        <Text strong style={{ color: '#0F6E56' }}>¥{fen2yuan(record.amount_fen)}</Text>
+        <Text strong style={{ color: txColors.success }}>¥{fen2yuan(record.amount_fen)}</Text>
       ),
     },
     {
@@ -538,7 +539,7 @@ export function DepositManagePage() {
       render: (_, record) => (
         <Text
           strong
-          style={{ color: record.remaining_fen > 0 ? '#BA7517' : '#B4B2A9' }}
+          style={{ color: record.remaining_fen > 0 ? txColors.warning : '#B4B2A9' }}
         >
           ¥{fen2yuan(record.remaining_fen)}
         </Text>
@@ -715,7 +716,7 @@ export function DepositManagePage() {
           <Button
             type="primary"
             icon={<PlusOutlined />}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             onClick={() => {
               void loadSessions();
               collectForm.resetFields();
@@ -743,7 +744,7 @@ export function DepositManagePage() {
             title="今日押金金额"
             value={fen2yuan(todayAmountFen)}
             prefix="¥"
-            valueColor="#0F6E56"
+            valueColor={txColors.success}
             icon={<CheckCircleOutlined />}
           />
         </Col>
@@ -752,7 +753,7 @@ export function DepositManagePage() {
             title="本月押金总额"
             value={fen2yuan(monthTotalFen)}
             prefix="¥"
-            valueColor="#185FA5"
+            valueColor={txColors.info}
             icon={<DollarOutlined />}
           />
         </Col>
@@ -761,7 +762,7 @@ export function DepositManagePage() {
             title="待结押金数量"
             value={pendingCount}
             suffix="笔"
-            valueColor="#BA7517"
+            valueColor={txColors.warning}
             icon={<ClockCircleOutlined />}
           />
         </Col>
@@ -770,12 +771,12 @@ export function DepositManagePage() {
             title="即将逾期"
             value={expiringCount}
             suffix="笔"
-            valueColor={expiringCount > 0 ? '#A32D2D' : '#2C2C2A'}
+            valueColor={expiringCount > 0 ? txColors.danger : '#2C2C2A'}
             icon={<ExclamationCircleOutlined />}
             warning={expiringCount > 0}
             extra={
               expiringCount > 0 ? (
-                <Text style={{ fontSize: 12, color: '#A32D2D' }}>
+                <Text style={{ fontSize: 12, color: txColors.danger }}>
                   含30天以上未结 {expiringCount} 笔，请及时处理
                 </Text>
               ) : null
@@ -831,7 +832,7 @@ export function DepositManagePage() {
         onOk={handleCollectSubmit}
         confirmLoading={collectLoading}
         okText="确认收取"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={560}
         destroyOnClose
       >
@@ -931,7 +932,7 @@ export function DepositManagePage() {
         onOk={handleApplySubmit}
         confirmLoading={applyLoading}
         okText="确认抵扣"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={480}
         destroyOnClose
       >
@@ -951,7 +952,7 @@ export function DepositManagePage() {
                 <Col span={12}>
                   <Text type="secondary" style={{ fontSize: 12 }}>可抵扣余额</Text>
                   <div>
-                    <Text strong style={{ color: '#BA7517', fontSize: 16 }}>
+                    <Text strong style={{ color: txColors.warning, fontSize: 16 }}>
                       ¥{fen2yuan(applyTarget.remaining_fen)}
                     </Text>
                   </div>
@@ -1002,7 +1003,7 @@ export function DepositManagePage() {
         onOk={handleRefundSubmit}
         confirmLoading={refundLoading}
         okText="确认退还"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={480}
         destroyOnClose
       >
@@ -1026,7 +1027,7 @@ export function DepositManagePage() {
                 <Col span={8}>
                   <Text type="secondary" style={{ fontSize: 12 }}>可退余额</Text>
                   <div>
-                    <Text strong style={{ color: '#BA7517', fontSize: 16 }}>
+                    <Text strong style={{ color: txColors.warning, fontSize: 16 }}>
                       ¥{fen2yuan(refundTarget.remaining_fen)}
                     </Text>
                   </div>
@@ -1110,7 +1111,7 @@ export function DepositManagePage() {
                   title="已收定金"
                   value={fen2yuan(banquetSummary.total_collected_fen)}
                   prefix="¥"
-                  valueStyle={{ color: '#0F6E56' }}
+                  valueStyle={{ color: txColors.success }}
                 />
               </Col>
               <Col span={8}>
@@ -1118,7 +1119,7 @@ export function DepositManagePage() {
                   title="剩余应付"
                   value={fen2yuan(banquetSummary.remaining_payable_fen)}
                   prefix="¥"
-                  valueStyle={{ color: banquetSummary.remaining_payable_fen > 0 ? '#BA7517' : '#0F6E56' }}
+                  valueStyle={{ color: banquetSummary.remaining_payable_fen > 0 ? txColors.warning : txColors.success }}
                 />
               </Col>
             </Row>
@@ -1149,7 +1150,7 @@ export function DepositManagePage() {
                   </Space>
                   <Space>
                     <Text>¥{fen2yuan(rec.amount_fen)}</Text>
-                    <Text style={{ color: '#BA7517' }}>余¥{fen2yuan(rec.balance_fen)}</Text>
+                    <Text style={{ color: txColors.warning }}>余¥{fen2yuan(rec.balance_fen)}</Text>
                   </Space>
                 </div>
               ))}

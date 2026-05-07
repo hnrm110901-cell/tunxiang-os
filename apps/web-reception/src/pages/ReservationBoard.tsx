@@ -4,6 +4,7 @@
  * 状态: 待到店/已到店/已入座/已取消
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 type ReservationStatus = 'pending' | 'arrived' | 'seated' | 'cancelled';
 
@@ -23,7 +24,7 @@ interface Reservation {
 const STATUS_MAP: Record<ReservationStatus, { label: string; color: string; bg: string }> = {
   pending:   { label: '待到店', color: 'var(--tx-info)',    bg: '#EBF3FF' },
   arrived:   { label: '已到店', color: 'var(--tx-primary)', bg: 'var(--tx-primary-light)' },
-  seated:    { label: '已入座', color: 'var(--tx-success)', bg: '#E8F5F0' },
+  seated:    { label: '已入座', color: 'var(--tx-success)', bg: txColors.successLight },
   cancelled: { label: '已取消', color: 'var(--tx-text-3)',  bg: '#F0F0F0' },
 };
 

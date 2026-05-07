@@ -6,19 +6,20 @@
  */
 import { useState, useEffect } from 'react';
 import { fetchTables, transferTable, mergeTables, TableInfo } from '../api/tablesApi';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  danger: txColors.danger,
+  info: txColors.info,
 };
 
 type Mode = 'transfer' | 'merge';

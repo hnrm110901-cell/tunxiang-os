@@ -10,6 +10,7 @@ import { Card, Col, Row, Tag, message } from 'antd';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export default function GovernanceStaffing() {
       dataIndex: 'shortage',
       width: 80,
       render: (_, r) => (
-        <span style={{ color: r.shortage > 2 ? '#A32D2D' : undefined, fontWeight: r.shortage > 2 ? 600 : 400 }}>
+        <span style={{ color: r.shortage > 2 ? txColors.danger : undefined, fontWeight: r.shortage > 2 ? 600 : 400 }}>
           {r.shortage}
         </span>
       ),
@@ -60,7 +61,7 @@ export default function GovernanceStaffing() {
       dataIndex: 'surplus',
       width: 80,
       render: (_, r) => (
-        <span style={{ color: r.surplus > 0 ? '#BA7517' : undefined }}>
+        <span style={{ color: r.surplus > 0 ? txColors.warning : undefined }}>
           {r.surplus}
         </span>
       ),
@@ -96,7 +97,7 @@ export default function GovernanceStaffing() {
               seriesField="type"
               isGroup
               height={320}
-              color={['#185FA5', '#FF6B35']}
+              color={[txColors.info, txColors.primary]}
               xAxis={{ label: { autoRotate: true } }}
               legend={{ position: 'top-right' }}
             />

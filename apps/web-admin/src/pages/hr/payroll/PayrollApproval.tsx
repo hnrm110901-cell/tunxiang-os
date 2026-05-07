@@ -29,6 +29,7 @@ import {
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
 
@@ -209,7 +210,7 @@ export default function PayrollApproval() {
             loading={batchLoading}
             disabled={selectedRowKeys.length === 0}
             onClick={handleBatchApprove}
-            style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
           >
             批量审批 ({selectedRowKeys.length})
           </Button>,
@@ -266,7 +267,7 @@ export default function PayrollApproval() {
               </span>
             </Descriptions.Item>
             <Descriptions.Item label="实发合计" span={2}>
-              <span style={{ fontWeight: 'bold', fontSize: 16, color: '#FF6B35' }}>
+              <span style={{ fontWeight: 'bold', fontSize: 16, color: txColors.primary }}>
                 {fenToYuan(detailRecord.net_amount_fen)}
               </span>
             </Descriptions.Item>

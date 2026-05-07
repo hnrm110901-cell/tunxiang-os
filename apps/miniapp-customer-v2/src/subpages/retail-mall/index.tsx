@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * subpages/retail-mall/index.tsx — 零售商城
  *
@@ -20,7 +21,7 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDk:  '#E55A1F',
   primaryBg:  'rgba(255,107,53,0.12)',
   bgDeep:     '#0B1A20',

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 import { View, Text } from '@tarojs/components'
 import React from 'react'
 
@@ -61,7 +62,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
                 width: '64rpx',
                 height: '64rpx',
                 borderRadius: '32rpx',
-                background: '#FF6B35',
+                background: txColors.primary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -105,7 +106,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
           <View>
             <Text
               style={{
-                color: '#FF6B35',
+                color: txColors.primary,
                 fontSize: '36rpx',
                 fontWeight: '700',
               }}
@@ -127,7 +128,7 @@ const CartBar: React.FC<CartBarProps> = ({ totalFen, count, onViewCart, onChecko
         {/* Right: checkout button */}
         <View
           style={{
-            background: canCheckout ? '#FF6B35' : '#2A4050',
+            background: canCheckout ? txColors.primary : '#2A4050',
             borderRadius: '44rpx',
             height: '88rpx',
             minWidth: '216rpx',

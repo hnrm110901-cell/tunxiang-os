@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -166,7 +167,7 @@ function PatrolTimeline({
         <span style={{ fontSize: 17, fontWeight: 700, color: '#fff' }}>
           今日巡台记录
           {summary && (
-            <span style={{ marginLeft: 8, fontSize: 16, color: '#FF6B35', fontWeight: 400 }}>
+            <span style={{ marginLeft: 8, fontSize: 16, color: txColors.primary, fontWeight: 400 }}>
               共{summary.tables_visited_count}桌
             </span>
           )}
@@ -219,7 +220,7 @@ function PatrolTimeline({
                     width: 10,
                     height: 10,
                     borderRadius: '50%',
-                    background: '#FF6B35',
+                    background: txColors.primary,
                     marginTop: 4,
                   }} />
                   {idx < summary.timeline.length - 1 && (
@@ -466,7 +467,7 @@ export function PatrolAutoCheckin({
           <span style={{ fontSize: 16, color: '#94a3b8', whiteSpace: 'nowrap' }}>
             {statusLabel}
           </span>
-          <span style={{ fontSize: 16, fontWeight: 700, color: '#FF6B35', marginLeft: 4 }}>
+          <span style={{ fontSize: 16, fontWeight: 700, color: txColors.primary, marginLeft: 4 }}>
             {visitedCount}桌
           </span>
         </button>

@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
+import { txColors } from '@tx/tokens';
 import {
   preBill, fireToKitchen,
   giftOrder, returnOrder, rushOrder, modifyTableOpen,
@@ -20,12 +21,12 @@ const C = {
   panel: '#0D2229',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
-  green: '#0F6E56',
-  blue: '#185FA5',
-  yellow: '#BA7517',
-  danger: '#A32D2D',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
+  green: txColors.success,
+  blue: txColors.info,
+  yellow: txColors.warning,
+  danger: txColors.danger,
   purple: '#722ed1',
   muted: '#64748b',
   text: '#E0E0E0',

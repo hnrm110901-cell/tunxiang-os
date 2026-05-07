@@ -8,6 +8,7 @@
  * 最小点击区域 48×48px，字体 ≥ 16px，无 hover 依赖。
  */
 import { useState, useEffect, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -47,19 +48,19 @@ const DECISION_CONFIG = {
   allow: {
     icon: '✓',
     label: '可以操作',
-    color: '#0F6E56',
+    color: txColors.success,
     bgColor: 'rgba(15,110,86,0.18)',
   },
   warn: {
     icon: '⚠',
     label: '需要注意',
-    color: '#BA7517',
+    color: txColors.warning,
     bgColor: 'rgba(186,117,23,0.18)',
   },
   reject: {
     icon: '✗',
     label: '无法执行',
-    color: '#A32D2D',
+    color: txColors.danger,
     bgColor: 'rgba(163,45,45,0.18)',
   },
 } as const;
@@ -185,7 +186,7 @@ export function DiscountPreviewSheet({
           left: 0,
           right: 0,
           zIndex: 901,
-          background: '#1E2A3A',
+          background: txColors.navy,
           borderRadius: '16px 16px 0 0',
           transform: visible ? 'translateY(0)' : 'translateY(100%)',
           transition: 'transform 0.3s ease',
@@ -213,7 +214,7 @@ export function DiscountPreviewSheet({
               padding: '2px 8px',
               borderRadius: 4,
               background: 'rgba(255,107,53,0.2)',
-              color: '#FF6B35',
+              color: txColors.primary,
               fontWeight: 600,
             }}>
               AI 风险评估
@@ -263,7 +264,7 @@ export function DiscountPreviewSheet({
                 width: 48,
                 height: 48,
                 border: '4px solid rgba(255,107,53,0.2)',
-                borderTopColor: '#FF6B35',
+                borderTopColor: txColors.primary,
                 borderRadius: '50%',
                 animation: 'tx-spin 0.8s linear infinite',
               }} />
@@ -283,7 +284,7 @@ export function DiscountPreviewSheet({
               textAlign: 'center',
             }}>
               <div style={{ fontSize: 40 }}>📡</div>
-              <div style={{ fontSize: 17, color: '#BA7517', fontWeight: 600 }}>
+              <div style={{ fontSize: 17, color: txColors.warning, fontWeight: 600 }}>
                 分析服务暂时不可用
               </div>
               <div style={{ fontSize: 16, color: '#8A94A4', lineHeight: 1.5 }}>
@@ -408,7 +409,7 @@ export function DiscountPreviewSheet({
                           width: 24,
                           height: 24,
                           borderRadius: '50%',
-                          background: passed ? '#0F6E56' : '#A32D2D',
+                          background: passed ? txColors.success : txColors.danger,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -481,7 +482,7 @@ export function DiscountPreviewSheet({
               height: 56,
               border: 'none',
               borderRadius: 10,
-              background: canConfirm ? '#FF6B35' : '#3A3A3A',
+              background: canConfirm ? txColors.primary : '#3A3A3A',
               color: canConfirm ? '#fff' : '#666',
               fontSize: 18,
               fontWeight: 700,

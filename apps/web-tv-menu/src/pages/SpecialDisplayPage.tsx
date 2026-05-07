@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, type CSSProperties } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ======================== 类型 ======================== */
 interface SpecialDish {
@@ -20,7 +21,7 @@ interface SpecialDish {
 
 /* ======================== Mock数据 ======================== */
 const MOCK_SPECIALS: SpecialDish[] = [
-  { id: '1', name: '招牌剁椒鱼头', originalPrice_fen: 11800, specialPrice_fen: 8800, spec: '1个（约2.5斤）', tag: '今日推荐', tagColor: '#FF6B35' },
+  { id: '1', name: '招牌剁椒鱼头', originalPrice_fen: 11800, specialPrice_fen: 8800, spec: '1个（约2.5斤）', tag: '今日推荐', tagColor: txColors.primary },
   { id: '2', name: '清蒸大闸蟹', originalPrice_fen: 12800, specialPrice_fen: 9800, spec: '只（约3两）', tag: '限时特价', tagColor: '#E53935' },
   { id: '3', name: '蒜蓉龙虾套餐', originalPrice_fen: 38800, specialPrice_fen: 29800, spec: '2人套餐', tag: '超值套餐', tagColor: '#9C27B0' },
   { id: '4', name: '松鼠桂鱼', originalPrice_fen: 13800, specialPrice_fen: 9800, spec: '条（约0.8斤）', tag: '限量20份', tagColor: '#F57C00' },
@@ -114,7 +115,7 @@ function SpecialCard({ dish, index }: { dish: SpecialDish; index: number }) {
   const specialPriceStyle: CSSProperties = {
     fontSize: 48,
     fontWeight: 900,
-    color: '#FF6B35',
+    color: txColors.primary,
     lineHeight: 1,
   };
 
@@ -194,7 +195,7 @@ export default function SpecialDisplayPage() {
   const titleStyle: CSSProperties = {
     fontSize: 60,
     fontWeight: 900,
-    color: '#FF6B35',
+    color: txColors.primary,
     letterSpacing: 8,
     textShadow: '0 0 40px rgba(255, 107, 53, 0.5)',
     lineHeight: 1,
@@ -214,7 +215,7 @@ export default function SpecialDisplayPage() {
   const clockTimeStyle: CSSProperties = {
     fontSize: 40,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
     fontVariantNumeric: 'tabular-nums',
     letterSpacing: 2,
     display: 'block',
@@ -255,7 +256,7 @@ export default function SpecialDisplayPage() {
   const countdownValueStyle: CSSProperties = {
     fontSize: 44,
     fontWeight: 800,
-    color: '#FF6B35',
+    color: txColors.primary,
     fontVariantNumeric: 'tabular-nums',
     letterSpacing: 4,
     textShadow: '0 0 20px rgba(255, 107, 53, 0.4)',

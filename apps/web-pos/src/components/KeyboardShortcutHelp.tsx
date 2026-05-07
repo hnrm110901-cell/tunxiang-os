@@ -16,6 +16,7 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { SHORTCUT_CATEGORIES, type ShortcutDefinition } from '../hooks/useKeyboardShortcuts';
+import { txColors } from '@tx/tokens';
 
 // ─── 颜色常量 ────────────────────────────────────────────────────────────────
 
@@ -23,22 +24,22 @@ const C = {
   bg: 'rgba(11, 26, 32, 0.96)',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   accentLight: 'rgba(255, 107, 53, 0.15)',
   text: '#E0E0E0',
   textDim: '#8899A6',
-  success: '#0F6E56',
-  warning: '#BA7517',
+  success: txColors.success,
+  warning: txColors.warning,
   keyBg: '#1E3A48',
-  keyActive: '#FF6B35',
+  keyActive: txColors.primary,
   searchBg: 'rgba(255,255,255,0.06)',
   searchBorder: 'rgba(255,255,255,0.15)',
 } as const;
 
 const CATEGORY_COLORS: Record<string, string> = {
-  cashier: '#0F6E56',
-  dish: '#185FA5',
-  system: '#BA7517',
+  cashier: txColors.success,
+  dish: txColors.info,
+  system: txColors.warning,
 };
 
 const CATEGORY_BADGE_LABELS: Record<string, string> = {

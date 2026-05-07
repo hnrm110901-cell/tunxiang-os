@@ -29,6 +29,7 @@ import type { ActionType } from '@ant-design/pro-components';
 import { Radar, Line } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -103,9 +104,9 @@ function periodRange(mode: string): [string, string] {
 
 function TrendIcon({ trend, delta }: { trend: string; delta: number }) {
   if (trend === 'up')
-    return <span style={{ color: '#0F6E56' }}><ArrowUpOutlined /> +{delta}</span>;
+    return <span style={{ color: txColors.success }}><ArrowUpOutlined /> +{delta}</span>;
   if (trend === 'down')
-    return <span style={{ color: '#A32D2D' }}><ArrowDownOutlined /> {delta}</span>;
+    return <span style={{ color: txColors.danger }}><ArrowDownOutlined /> {delta}</span>;
   return <span style={{ color: '#B4B2A9' }}><MinusOutlined /> 0</span>;
 }
 
@@ -181,7 +182,7 @@ export default function ContributionDashboard() {
       sorter: true,
       render: (_, r) => (
         <Space>
-          <span style={{ fontWeight: 700, fontSize: 16, color: '#FF6B35' }}>
+          <span style={{ fontWeight: 700, fontSize: 16, color: txColors.primary }}>
             {r.total_score}
           </span>
           {gradeTag(r.total_score)}
@@ -248,7 +249,7 @@ export default function ContributionDashboard() {
     meta: { score: { min: 0, max: 100 } },
     area: { style: { fillOpacity: 0.3 } },
     point: { size: 3 },
-    color: '#FF6B35',
+    color: txColors.primary,
     height: 280,
   };
 
@@ -264,7 +265,7 @@ export default function ContributionDashboard() {
     xField: 'period',
     yField: 'score',
     smooth: true,
-    color: '#FF6B35',
+    color: txColors.primary,
     point: { size: 4, shape: 'circle' },
     yAxis: { min: 0, max: 100 },
     height: 200,
@@ -277,7 +278,7 @@ export default function ContributionDashboard() {
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Title level={4} style={{ margin: 0 }}>
-            <ThunderboltOutlined style={{ color: '#FF6B35', marginRight: 8 }} />
+            <ThunderboltOutlined style={{ color: txColors.primary, marginRight: 8 }} />
             员工经营贡献度排名
             <Tag color="blue" style={{ marginLeft: 12, fontSize: 12 }}>AI实时计算</Tag>
           </Title>
@@ -322,7 +323,7 @@ export default function ContributionDashboard() {
               value: stats.max,
               precision: 1,
               suffix: '分',
-              valueStyle: { color: '#0F6E56' },
+              valueStyle: { color: txColors.success },
             }}
           />
         </Col>
@@ -333,7 +334,7 @@ export default function ContributionDashboard() {
               value: stats.min,
               precision: 1,
               suffix: '分',
-              valueStyle: { color: '#A32D2D' },
+              valueStyle: { color: txColors.danger },
             }}
           />
         </Col>
@@ -375,7 +376,7 @@ export default function ContributionDashboard() {
               style: {
                 cursor: 'pointer',
                 background: selectedEmployee?.employee_id === record.employee_id
-                  ? '#FFF3ED'
+                  ? txColors.primaryLight
                   : undefined,
               },
             })}
@@ -393,7 +394,7 @@ export default function ContributionDashboard() {
                 <Space>
                   <span style={{ fontWeight: 700 }}>{selectedEmployee.name}</span>
                   <Tag>{selectedEmployee.role}</Tag>
-                  <span style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35' }}>
+                  <span style={{ fontSize: 20, fontWeight: 700, color: txColors.primary }}>
                     {selectedEmployee.total_score}分
                   </span>
                   {gradeTag(selectedEmployee.total_score)}

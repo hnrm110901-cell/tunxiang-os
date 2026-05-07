@@ -22,6 +22,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
@@ -123,7 +124,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
         showIcon
         action={
           <Text
-            style={{ cursor: 'pointer', color: '#FF6B35' }}
+            style={{ cursor: 'pointer', color: txColors.primary }}
             onClick={() => { setLoading(true); void fetchData(); }}
           >
             <ReloadOutlined /> 重试
@@ -141,8 +142,8 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
 
   // ── 翻台率颜色 ──
   const turnoverColor =
-    data.table_turnover >= 2.5 ? '#0F6E56' :
-    data.table_turnover >= 1.5 ? '#BA7517' : '#A32D2D';
+    data.table_turnover >= 2.5 ? txColors.success :
+    data.table_turnover >= 1.5 ? txColors.warning : txColors.danger;
 
   // ── compact 模式（3个核心指标） ──────────────────────────────
   if (compact) {
@@ -155,7 +156,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               title: '当日营收',
               value: fenToYuan(data.revenue_fen),
               prefix: '¥',
-              valueStyle: { fontSize: 20, fontWeight: 700, color: '#FF6B35' },
+              valueStyle: { fontSize: 20, fontWeight: 700, color: txColors.primary },
             }}
             style={{ minWidth: 160 }}
           />
@@ -216,7 +217,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
         }}
       >
         <Space>
-          <ThunderboltOutlined style={{ color: '#FF6B35' }} />
+          <ThunderboltOutlined style={{ color: txColors.primary }} />
           <Text strong style={{ color: '#2C2C2A' }}>
             实时经营数据
           </Text>
@@ -254,7 +255,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               valueStyle: {
                 fontSize: 32,
                 fontWeight: 700,
-                color: '#FF6B35',
+                color: txColors.primary,
                 letterSpacing: '-0.5px',
               },
               description: (
@@ -281,7 +282,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               ),
             }}
             // @ts-ignore - icon is a valid StatisticCard prop
-            icon={<ShopOutlined style={{ fontSize: 24, color: '#185FA5' }} />}
+            icon={<ShopOutlined style={{ fontSize: 24, color: txColors.info }} />}
           />
         </Col>
 
@@ -325,7 +326,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
                       style={{
                         width: `${Math.round((data.occupied_tables / data.total_tables) * 100)}%`,
                         height: '100%',
-                        background: '#FF6B35',
+                        background: txColors.primary,
                         borderRadius: 3,
                         transition: 'width 0.6s ease',
                       }}
@@ -351,7 +352,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
                     <Badge
                       status="error"
                       text={
-                        <Text style={{ fontSize: 11, color: '#A32D2D' }}>
+                        <Text style={{ fontSize: 11, color: txColors.danger }}>
                           积压！
                         </Text>
                       }
@@ -361,7 +362,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
                     <Badge
                       status="warning"
                       text={
-                        <Text style={{ fontSize: 11, color: '#BA7517' }}>
+                        <Text style={{ fontSize: 11, color: txColors.warning }}>
                           偏多
                         </Text>
                       }
@@ -374,7 +375,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               valueStyle: {
                 fontSize: 32,
                 fontWeight: 700,
-                color: kitchenQueueDanger ? '#A32D2D' : kitchenQueueWarning ? '#BA7517' : '#0F6E56',
+                color: kitchenQueueDanger ? txColors.danger : kitchenQueueWarning ? txColors.warning : txColors.success,
                 // critical 时脉冲动画
                 animation: kitchenQueueDanger
                   ? 'tx-pulse 1.5s ease-in-out infinite'
@@ -386,7 +387,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               <AlertOutlined
                 style={{
                   fontSize: 24,
-                  color: kitchenQueueDanger ? '#A32D2D' : '#185FA5',
+                  color: kitchenQueueDanger ? txColors.danger : txColors.info,
                 }}
               />
             }
@@ -404,8 +405,8 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
                 fontSize: 32,
                 fontWeight: 700,
                 color:
-                  data.avg_wait_minutes <= 15 ? '#0F6E56' :
-                  data.avg_wait_minutes <= 25 ? '#BA7517' : '#A32D2D',
+                  data.avg_wait_minutes <= 15 ? txColors.success :
+                  data.avg_wait_minutes <= 25 ? txColors.warning : txColors.danger,
               },
               description: (
                 <Text type="secondary" style={{ fontSize: 12 }}>
@@ -414,7 +415,7 @@ const RealtimeDashboard: React.FC<RealtimeDashboardProps> = ({
               ),
             }}
             // @ts-ignore - icon is a valid StatisticCard prop
-            icon={<ClockCircleOutlined style={{ fontSize: 24, color: '#185FA5' }} />}
+            icon={<ClockCircleOutlined style={{ fontSize: 24, color: txColors.info }} />}
           />
         </Col>
       </Row>

@@ -13,6 +13,7 @@ import { fetchTableStatus } from '../api';
 import type { TableInfo } from '../api';
 import { useCrewStore } from '../store/crewStore';
 import { SlimModeToggle } from '../components/SlimModeToggle';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ───────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ export function TablesView() {
 
   const statsItems: StatusBarItem[] = [
     { label: '空闲', value: idleCount, suffix: '台', color: '#52c41a' },
-    { label: '在座', value: occupiedCount, suffix: '台', color: 'var(--tx-primary, #FF6B35)' },
+    { label: '在座', value: occupiedCount, suffix: '台', color: `var(--tx-primary, ${txColors.primary})` },
     { label: '预定', value: reservedCount, suffix: '台', color: '#faad14' },
     { label: '总计', value: total, suffix: '台' },
   ];
@@ -387,7 +388,7 @@ export function TablesView() {
             borderBottom: '1px solid rgba(255,107,35,0.3)',
             padding: '6px 16px',
             fontSize: 13,
-            color: '#FF6B35',
+            color: txColors.primary,
             fontWeight: 600,
             display: 'flex',
             alignItems: 'center',

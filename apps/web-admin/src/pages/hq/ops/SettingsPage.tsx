@@ -3,6 +3,7 @@
  */
 import { useState, useEffect } from 'react';
 import { apiGet, apiPost } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 type SettingsTab = 'checklist' | 'threshold' | 'margin' | 'roles';
 
@@ -149,8 +150,8 @@ export function SettingsPage() {
             padding: '8px 20px', border: 'none', cursor: 'pointer',
             fontSize: 13, fontWeight: 600,
             background: 'transparent',
-            color: tab === t.key ? '#FF6B35' : '#999',
-            borderBottom: tab === t.key ? '2px solid #FF6B35' : '2px solid transparent',
+            color: tab === t.key ? txColors.primary : '#999',
+            borderBottom: tab === t.key ? `2px solid ${txColors.primary}` : '2px solid transparent',
             marginBottom: -1,
           }}>{t.label}</button>
         ))}
@@ -167,7 +168,7 @@ export function SettingsPage() {
             <h3 style={{ margin: 0, fontSize: 16 }}>检查表模板</h3>
             <button style={{
               padding: '6px 16px', borderRadius: 6, border: 'none',
-              background: '#FF6B35', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: txColors.primary, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}>+ 新建模板</button>
           </div>
           {checklists.length === 0 ? (
@@ -197,7 +198,7 @@ export function SettingsPage() {
                       }}>{cl.enabled ? '启用' : '停用'}</span>
                     </td>
                     <td style={{ padding: '12px 4px', textAlign: 'right' }}>
-                      <span style={{ color: '#FF6B35', cursor: 'pointer', fontSize: 12, marginRight: 12 }}>编辑</span>
+                      <span style={{ color: txColors.primary, cursor: 'pointer', fontSize: 12, marginRight: 12 }}>编辑</span>
                       <span
                         style={{ color: '#999', cursor: 'pointer', fontSize: 12 }}
                         onClick={() => handleToggleChecklist(cl.id, cl.enabled)}
@@ -237,11 +238,11 @@ export function SettingsPage() {
                       padding: '4px 12px', borderRadius: 6, background: '#112228',
                       border: '1px solid #1a2a33',
                     }}>
-                      <span style={{ fontSize: 18, fontWeight: 'bold', color: '#FF6B35' }}>{t.value}</span>
+                      <span style={{ fontSize: 18, fontWeight: 'bold', color: txColors.primary }}>{t.value}</span>
                       <span style={{ fontSize: 11, color: '#999' }}>{t.unit}</span>
                     </div>
                     <span
-                      style={{ color: '#FF6B35', cursor: 'pointer', fontSize: 12 }}
+                      style={{ color: txColors.primary, cursor: 'pointer', fontSize: 12 }}
                       onClick={() => handleEditThreshold(t.id, t.value)}
                     >
                       修改
@@ -283,7 +284,7 @@ export function SettingsPage() {
                   return (
                     <tr key={m.category} style={{ borderTop: '1px solid #1a2a33' }}>
                       <td style={{ padding: '12px 4px', fontWeight: 600 }}>{m.category}</td>
-                      <td style={{ padding: '12px 4px', textAlign: 'center', color: '#FF6B35', fontWeight: 600 }}>{m.minMargin}%</td>
+                      <td style={{ padding: '12px 4px', textAlign: 'center', color: txColors.primary, fontWeight: 600 }}>{m.minMargin}%</td>
                       <td style={{ padding: '12px 4px', textAlign: 'center' }}>{m.currentAvg}%</td>
                       <td style={{ padding: '12px 4px', textAlign: 'center' }}>
                         <span style={{
@@ -300,7 +301,7 @@ export function SettingsPage() {
                       </td>
                       <td style={{ padding: '12px 4px', textAlign: 'right' }}>
                         <span
-                          style={{ color: '#FF6B35', cursor: 'pointer', fontSize: 12 }}
+                          style={{ color: txColors.primary, cursor: 'pointer', fontSize: 12 }}
                           onClick={() => handleEditMargin(m.category, m.minMargin)}
                         >
                           修改
@@ -322,7 +323,7 @@ export function SettingsPage() {
             <h3 style={{ margin: 0, fontSize: 16 }}>角色权限管理</h3>
             <button style={{
               padding: '6px 16px', borderRadius: 6, border: 'none',
-              background: '#FF6B35', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: txColors.primary, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer',
             }}>+ 新建角色</button>
           </div>
           {roles.length === 0 ? (
@@ -343,7 +344,7 @@ export function SettingsPage() {
                       }}>{r.users} 人</span>
                     </div>
                     <div style={{ display: 'flex', gap: 12 }}>
-                      <span style={{ color: '#FF6B35', cursor: 'pointer', fontSize: 12 }}>编辑权限</span>
+                      <span style={{ color: txColors.primary, cursor: 'pointer', fontSize: 12 }}>编辑权限</span>
                       <span style={{ color: '#999', cursor: 'pointer', fontSize: 12 }}>查看成员</span>
                     </div>
                   </div>
@@ -351,7 +352,7 @@ export function SettingsPage() {
                     {r.permissions.map((p) => (
                       <span key={p} style={{
                         padding: '2px 8px', borderRadius: 4, fontSize: 10,
-                        background: 'rgba(255,107,44,0.08)', color: '#FF6B35',
+                        background: 'rgba(255,107,44,0.08)', color: txColors.primary,
                       }}>{p}</span>
                     ))}
                   </div>

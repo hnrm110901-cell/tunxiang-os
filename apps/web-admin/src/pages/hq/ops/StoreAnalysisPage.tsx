@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxHeatmap } from '../../../components/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const STORES = ['芙蓉路店', '岳麓店', '星沙店', '河西店', '开福店'];
 
@@ -104,7 +105,7 @@ export function StoreAnalysisPage() {
             <button key={p} onClick={() => setPeriod(p)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === p ? '#FF6B35' : '#1a2a33',
+              background: period === p ? txColors.primary : '#1a2a33',
               color: period === p ? '#fff' : '#999',
             }}>
               {p === 'day' ? '日' : p === 'week' ? '周' : '月'}
@@ -119,9 +120,9 @@ export function StoreAnalysisPage() {
           <button key={s} onClick={() => toggleStore(s)} style={{
             padding: '5px 14px', borderRadius: 16, border: '1px solid',
             cursor: 'pointer', fontSize: 12,
-            borderColor: selectedStores.includes(s) ? '#FF6B35' : '#1a2a33',
+            borderColor: selectedStores.includes(s) ? txColors.primary : '#1a2a33',
             background: selectedStores.includes(s) ? 'rgba(255,107,44,0.1)' : '#112228',
-            color: selectedStores.includes(s) ? '#FF6B35' : '#999',
+            color: selectedStores.includes(s) ? txColors.primary : '#999',
           }}>
             {s}
           </button>

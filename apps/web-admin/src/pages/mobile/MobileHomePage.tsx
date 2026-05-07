@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -97,7 +98,7 @@ function MiniTrend5Day({ data }: { data: DashboardStats['trend_5day'] }) {
                   left: '50%',
                   transform: 'translateX(-50%)',
                   fontSize: 9,
-                  color: '#FF6B35',
+                  color: txColors.primary,
                   fontWeight: 700,
                   whiteSpace: 'nowrap',
                 }}>
@@ -231,7 +232,7 @@ export function MobileHomePage() {
               onClick={() => navigate('/m/stores')}
               style={{
                 fontSize: 12,
-                color: '#FF6B35',
+                color: txColors.primary,
                 background: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
@@ -264,7 +265,7 @@ export function MobileHomePage() {
                   width: 10,
                   height: 10,
                   borderRadius: '50%',
-                  background: store.online ? '#0F6E56' : '#B4B2A9',
+                  background: store.online ? txColors.success : '#B4B2A9',
                   flexShrink: 0,
                   boxShadow: store.online ? '0 0 6px rgba(15,110,86,0.4)' : 'none',
                 }} />
@@ -275,7 +276,7 @@ export function MobileHomePage() {
                   <div style={{ fontSize: 14, fontWeight: 600, color: store.online ? '#2C2C2A' : '#B4B2A9' }}>
                     ¥{fen2yuan(store.today_revenue_fen)}
                   </div>
-                  <div style={{ fontSize: 11, color: store.online ? '#0F6E56' : '#B4B2A9' }}>
+                  <div style={{ fontSize: 11, color: store.online ? txColors.success : '#B4B2A9' }}>
                     {store.online ? '营业中' : '离线'}
                   </div>
                 </div>
@@ -293,7 +294,7 @@ export function MobileHomePage() {
             borderRadius: 12,
             padding: 16,
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            border: totalAnomalies > 0 ? '1.5px solid #BA7517' : '1px solid #E8E6E1',
+            border: totalAnomalies > 0 ? `1.5px solid ${txColors.warning}` : '1px solid #E8E6E1',
             cursor: 'pointer',
             textAlign: 'left',
             width: '100%',
@@ -310,7 +311,7 @@ export function MobileHomePage() {
               {totalAnomalies > 0 && (
                 <span style={{
                   marginLeft: 8,
-                  background: '#A32D2D',
+                  background: txColors.danger,
                   color: '#fff',
                   fontSize: 11,
                   fontWeight: 700,
@@ -325,9 +326,9 @@ export function MobileHomePage() {
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {[
-              { label: '折扣异常', count: d.anomaly_discount, color: '#A32D2D' },
-              { label: '退单异常', count: d.anomaly_refund, color: '#BA7517' },
-              { label: '库存预警', count: d.anomaly_inventory, color: '#185FA5' },
+              { label: '折扣异常', count: d.anomaly_discount, color: txColors.danger },
+              { label: '退单异常', count: d.anomaly_refund, color: txColors.warning },
+              { label: '库存预警', count: d.anomaly_inventory, color: txColors.info },
             ].map(item => (
               <div key={item.label} style={{
                 flex: 1,

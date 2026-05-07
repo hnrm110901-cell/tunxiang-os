@@ -14,6 +14,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -172,7 +173,7 @@ export function RouteOptimizePage() {
         <div style={{
           fontSize: 28,
           fontWeight: 'bold',
-          color: '#FF6B35',
+          color: txColors.primary,
           textAlign: 'center',
         }}>
           全部上菜完成
@@ -186,7 +187,7 @@ export function RouteOptimizePage() {
             marginTop: 16,
             padding: '14px 40px',
             minHeight: 52,
-            background: '#FF6B35',
+            background: txColors.primary,
             color: '#fff',
             border: 'none',
             borderRadius: 12,
@@ -253,7 +254,7 @@ export function RouteOptimizePage() {
           {/* 待送菜品数量 badge */}
           {tasks.length > 0 && (
             <span style={{
-              background: '#FF6B35',
+              background: txColors.primary,
               color: '#fff',
               borderRadius: 12,
               padding: '2px 10px',
@@ -275,8 +276,8 @@ export function RouteOptimizePage() {
             minWidth: 80,
             minHeight: 48,
             background: loading ? '#1a3340' : 'rgba(255,107,53,0.15)',
-            color: loading ? '#8fa8b3' : '#FF6B35',
-            border: `1px solid ${loading ? '#1a3340' : '#FF6B35'}`,
+            color: loading ? '#8fa8b3' : txColors.primary,
+            border: `1px solid ${loading ? '#1a3340' : txColors.primary}`,
             borderRadius: 10,
             fontSize: 16,
             fontWeight: 'bold',
@@ -375,7 +376,7 @@ function TaskCard({ task, delivering, onDeliver }: {
           width: 32,
           height: 32,
           borderRadius: '50%',
-          background: task.priority === 1 ? '#FF6B35' : task.priority === 2 ? '#fa8c16' : '#334e5a',
+          background: task.priority === 1 ? txColors.primary : task.priority === 2 ? '#fa8c16' : '#334e5a',
           color: '#fff',
           fontSize: 16,
           fontWeight: 'bold',
@@ -423,7 +424,7 @@ function TaskCard({ task, delivering, onDeliver }: {
           style={{
             width: '100%',
             minHeight: 52,
-            background: delivering ? '#1a3340' : '#FF6B35',
+            background: delivering ? '#1a3340' : txColors.primary,
             color: delivering ? '#8fa8b3' : '#fff',
             border: 'none',
             borderRadius: 10,
@@ -466,7 +467,7 @@ function RouteHintPanel({ tasks }: { tasks: ScoredTask[] }) {
       <div style={{
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FF6B35',
+        color: txColors.primary,
         marginBottom: 12,
         display: 'flex',
         alignItems: 'center',
@@ -490,7 +491,7 @@ function RouteHintPanel({ tasks }: { tasks: ScoredTask[] }) {
               minWidth: 24,
               height: 24,
               borderRadius: '50%',
-              background: task.priority === 1 ? '#FF6B35' : '#334e5a',
+              background: task.priority === 1 ? txColors.primary : '#334e5a',
               color: '#fff',
               fontSize: 14,
               fontWeight: 'bold',
@@ -520,7 +521,7 @@ function RouteHintPanel({ tasks }: { tasks: ScoredTask[] }) {
         color: '#8fa8b3',
         lineHeight: 1.6,
       }}>
-        <span style={{ color: '#FF6B35', fontWeight: 'bold' }}>提示：</span>
+        <span style={{ color: txColors.primary, fontWeight: 'bold' }}>提示：</span>
         {restNearby.length > 0
           ? `先送 ${first.table}，再顺路送 ${restNearby.map(t => t.table).join('、')}，可减少折返。`
           : `优先送 ${first.table}，该桌等待时间最长。`

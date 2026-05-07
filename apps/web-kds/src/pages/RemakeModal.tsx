@@ -6,6 +6,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -43,9 +44,9 @@ interface RemakeRecord {
 // ─── Constants ───
 
 const REASONS: RemakeReasonOption[] = [
-  { id: 'complaint', label: '客诉退回', description: '顾客投诉菜品不满意', color: '#A32D2D' },
-  { id: 'quality', label: '品质问题', description: '菜品不符合出品标准', color: '#BA7517' },
-  { id: 'wrong_dish', label: '错菜', description: '做错了菜品', color: '#185FA5' },
+  { id: 'complaint', label: '客诉退回', description: '顾客投诉菜品不满意', color: txColors.danger },
+  { id: 'quality', label: '品质问题', description: '菜品不符合出品标准', color: txColors.warning },
+  { id: 'wrong_dish', label: '错菜', description: '做错了菜品', color: txColors.info },
   { id: 'wrong_spec', label: '规格错误', description: '做法/口味/分量不对', color: '#722ed1' },
   { id: 'other', label: '其他', description: '其他需要重做的原因', color: '#666' },
 ];
@@ -116,9 +117,9 @@ export function RemakeModal() {
     }}>
       {/* 顶栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>重做管理</h1>
+        <h1 style={{ margin: 0, fontSize: 28, color: txColors.primary }}>重做管理</h1>
         <span style={{ fontSize: 18, color: '#888' }}>
-          今日重做 <b style={{ color: '#A32D2D', fontSize: 24 }}>{records.length}</b> 次
+          今日重做 <b style={{ color: txColors.danger, fontSize: 24 }}>{records.length}</b> 次
         </span>
       </div>
 
@@ -129,7 +130,7 @@ export function RemakeModal() {
           style={{
             padding: '12px 28px', minHeight: 48,
             fontSize: 18, fontWeight: 'bold',
-            background: tab === 'remake' ? '#A32D2D' : '#1a1a1a',
+            background: tab === 'remake' ? txColors.danger : '#1a1a1a',
             color: tab === 'remake' ? '#fff' : '#888',
             border: 'none', borderRadius: 8, cursor: 'pointer',
           }}
@@ -174,7 +175,7 @@ export function RemakeModal() {
                   <span style={{ fontSize: 16, color: '#666' }}>#{t.orderNo}</span>
                 </div>
                 <div style={{ fontSize: 22, fontWeight: 'bold', marginBottom: 6 }}>
-                  {t.dishName} <span style={{ color: '#FF6B35' }}>x{t.qty}</span>
+                  {t.dishName} <span style={{ color: txColors.primary }}>x{t.qty}</span>
                 </div>
                 <div style={{ fontSize: 16, color: '#888' }}>
                   {t.dept} | {t.originalChef}
@@ -199,14 +200,14 @@ export function RemakeModal() {
             {/* 工单信息 */}
             <div style={{
               background: '#1a1a1a', borderRadius: 10, padding: 16, marginBottom: 20,
-              borderLeft: '6px solid #A32D2D',
+              borderLeft: `6px solid ${txColors.danger}`,
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                 <span style={{ fontSize: 24, fontWeight: 'bold', color: '#fff' }}>{selectedTicket.tableNo}</span>
                 <span style={{ fontSize: 16, color: '#666' }}>#{selectedTicket.orderNo}</span>
               </div>
               <div style={{ fontSize: 22, fontWeight: 'bold' }}>
-                {selectedTicket.dishName} <span style={{ color: '#FF6B35' }}>x{selectedTicket.qty}</span>
+                {selectedTicket.dishName} <span style={{ color: txColors.primary }}>x{selectedTicket.qty}</span>
               </div>
             </div>
 
@@ -263,7 +264,7 @@ export function RemakeModal() {
                 disabled={!selectedReason || submitting}
                 style={{
                   flex: 1, padding: '14px 0',
-                  background: selectedReason ? '#A32D2D' : '#333',
+                  background: selectedReason ? txColors.danger : '#333',
                   color: '#fff', border: 'none', borderRadius: 8,
                   cursor: !selectedReason || submitting ? 'not-allowed' : 'pointer',
                   fontSize: 20, fontWeight: 'bold', minHeight: 56,
@@ -314,8 +315,8 @@ export function RemakeModal() {
                   </div>
                   <span style={{
                     fontSize: 16, padding: '4px 12px', borderRadius: 6,
-                    background: r.status === 'remaking' ? '#BA751722' : '#0F6E5622',
-                    color: r.status === 'remaking' ? '#BA7517' : '#0F6E56',
+                    background: r.status === 'remaking' ? `${txColors.warning}22` : `${txColors.success}22`,
+                    color: r.status === 'remaking' ? txColors.warning : txColors.success,
                     fontWeight: 'bold',
                   }}>
                     {r.status === 'remaking' ? '重做中' : '已完成'}

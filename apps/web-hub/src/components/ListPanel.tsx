@@ -4,6 +4,7 @@
  */
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { ListItem } from '../types/hub';
+import { txColors } from '@tx/tokens';
 
 /* ─── 状态颜色映射 ─── */
 const STATUS_COLOR: Record<ListItem['status'], string> = {
@@ -75,9 +76,9 @@ const sty = {
     fontSize: 12,
     cursor: 'pointer',
     border: '1px solid',
-    borderColor: active ? '#FF6B35' : '#1A3540',
+    borderColor: active ? txColors.primary : '#1A3540',
     background: active ? 'rgba(255,107,44,0.15)' : 'transparent',
-    color: active ? '#FF6B35' : '#94A8B3',
+    color: active ? txColors.primary : '#94A8B3',
     transition: 'all 0.15s',
   }),
 
@@ -93,7 +94,7 @@ const sty = {
     gap: 10,
     padding: '10px 16px',
     cursor: 'pointer',
-    borderLeft: `3px solid ${selected ? '#FF6B35' : 'transparent'}`,
+    borderLeft: `3px solid ${selected ? txColors.primary : 'transparent'}`,
     background: selected ? 'rgba(255,107,44,0.08)' : 'transparent',
     transition: 'all 0.15s',
   }),

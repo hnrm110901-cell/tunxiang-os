@@ -41,6 +41,7 @@ import type { ProColumns, RequestData } from '@ant-design/pro-components';
 
 import { formatPrice } from '@tx-ds/utils';
 import { fenToYuan, pctDisplay } from '../../../utils/format';
+import { txColors } from '@tx/tokens';
 import {
   getBrandStorePerformance,
   getBrandsOverview,
@@ -58,11 +59,11 @@ const { Option } = Select;
 
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
   },
   components: {
@@ -102,9 +103,9 @@ function targetRateColor(rate: number): 'red' | 'orange' | 'green' {
 }
 
 function TrendIcon({ trend }: { trend: 'up' | 'down' | 'flat' }) {
-  if (trend === 'up') return <ArrowUpOutlined style={{ color: '#0F6E56' }} />;
-  if (trend === 'down') return <ArrowDownOutlined style={{ color: '#A32D2D' }} />;
-  return <MinusOutlined style={{ color: '#BA7517' }} />;
+  if (trend === 'up') return <ArrowUpOutlined style={{ color: txColors.success }} />;
+  if (trend === 'down') return <ArrowDownOutlined style={{ color: txColors.danger }} />;
+  return <MinusOutlined style={{ color: txColors.warning }} />;
 }
 
 // ─── 门店 P&L Drawer ─────────────────────────────────────────────────────────
@@ -154,7 +155,7 @@ function StorePnlDrawer({ storeId, storeName, period, open, onClose }: StorePnlD
               <Statistic
                 title="营收"
                 value={fenToYuan(pnl.revenue_fen)}
-                valueStyle={{ color: '#FF6B35', fontSize: 16 }}
+                valueStyle={{ color: txColors.primary, fontSize: 16 }}
               />
             </Col>
             <Col span={12}>
@@ -162,7 +163,7 @@ function StorePnlDrawer({ storeId, storeName, period, open, onClose }: StorePnlD
                 title="毛利润"
                 value={fenToYuan(pnl.gross_profit_fen)}
                 valueStyle={{
-                  color: pnl.gross_margin >= 0.4 ? '#0F6E56' : '#A32D2D',
+                  color: pnl.gross_margin >= 0.4 ? txColors.success : txColors.danger,
                   fontSize: 16,
                 }}
               />
@@ -172,8 +173,8 @@ function StorePnlDrawer({ storeId, storeName, period, open, onClose }: StorePnlD
                 title="毛利率"
                 value={pctDisplay(pnl.gross_margin)}
                 valueStyle={{
-                  color: marginTagColor(pnl.gross_margin) === 'green' ? '#0F6E56'
-                    : marginTagColor(pnl.gross_margin) === 'orange' ? '#BA7517' : '#A32D2D',
+                  color: marginTagColor(pnl.gross_margin) === 'green' ? txColors.success
+                    : marginTagColor(pnl.gross_margin) === 'orange' ? txColors.warning : txColors.danger,
                   fontSize: 16,
                 }}
               />
@@ -183,7 +184,7 @@ function StorePnlDrawer({ storeId, storeName, period, open, onClose }: StorePnlD
                 title="净利率"
                 value={pctDisplay(pnl.net_margin)}
                 valueStyle={{
-                  color: pnl.net_margin >= 0.1 ? '#0F6E56' : pnl.net_margin >= 0 ? '#BA7517' : '#A32D2D',
+                  color: pnl.net_margin >= 0.1 ? txColors.success : pnl.net_margin >= 0 ? txColors.warning : txColors.danger,
                   fontSize: 16,
                 }}
               />
@@ -219,7 +220,7 @@ function StorePnlDrawer({ storeId, storeName, period, open, onClose }: StorePnlD
               <Text>{fenToYuan(pnl.operating_expense_fen)}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="净利润">
-              <Text strong style={{ color: pnl.net_profit_fen >= 0 ? '#0F6E56' : '#A32D2D' }}>
+              <Text strong style={{ color: pnl.net_profit_fen >= 0 ? txColors.success : txColors.danger }}>
                 {fenToYuan(pnl.net_profit_fen)}（{pctDisplay(pnl.net_margin)}）
               </Text>
             </Descriptions.Item>
@@ -296,7 +297,7 @@ export function StorePerformanceMatrix() {
       width: 56,
       align: 'center',
       render: (_, record) => (
-        <Text strong style={{ color: record.rank <= 3 ? '#FF6B35' : undefined }}>
+        <Text strong style={{ color: record.rank <= 3 ? txColors.primary : undefined }}>
           {record.rank}
         </Text>
       ),
@@ -324,7 +325,7 @@ export function StorePerformanceMatrix() {
       dataIndex: 'today_revenue_fen',
       width: 120,
       render: (_, record) => (
-        <Text strong style={{ color: '#FF6B35' }}>
+        <Text strong style={{ color: txColors.primary }}>
           {fenToYuan(record.today_revenue_fen)}
         </Text>
       ),

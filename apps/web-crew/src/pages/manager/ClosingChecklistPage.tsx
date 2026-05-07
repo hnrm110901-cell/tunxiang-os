@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -179,11 +180,11 @@ export function ClosingChecklistPage() {
           <div style={{ fontSize: 56, marginBottom: 16 }}>🌙</div>
           <div style={{ fontSize: 22, fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>闭店检查已完成</div>
           <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 6 }}>
-            今日营业额: <strong style={{ color: '#FF6B35' }}>{fen2yuan(preCheck.todayRevenueFen)}</strong> · {preCheck.todayOrders}单
+            今日营业额: <strong style={{ color: txColors.primary }}>{fen2yuan(preCheck.todayRevenueFen)}</strong> · {preCheck.todayOrders}单
           </div>
           <div style={{ fontSize: 14, color: '#6B7280' }}>{today()}</div>
           <button type="button" onClick={() => navigate(-1)}
-            style={{ marginTop: 32, padding: '14px 48px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
+            style={{ marginTop: 32, padding: '14px 48px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
             返回
           </button>
         </div>
@@ -208,7 +209,7 @@ export function ClosingChecklistPage() {
       <div style={{ background: '#112228', borderRadius: 10, padding: 16, marginBottom: 16 }}>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 10 }}>今日营业概览</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-          <SummaryCard label="营业额" value={fen2yuan(preCheck.todayRevenueFen)} color="#FF6B35" />
+          <SummaryCard label="营业额" value={fen2yuan(preCheck.todayRevenueFen)} color={txColors.primary} />
           <SummaryCard label="订单数" value={`${preCheck.todayOrders} 单`} color="#fff" />
         </div>
       </div>
@@ -244,10 +245,10 @@ export function ClosingChecklistPage() {
       <div style={{ background: '#112228', borderRadius: 10, padding: 14, marginBottom: 16 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
           <span style={{ fontSize: 14, fontWeight: 500 }}>检查进度</span>
-          <span style={{ fontSize: 14, fontWeight: 600, color: progress === 100 ? '#52c41a' : '#FF6B35' }}>{progress}%</span>
+          <span style={{ fontSize: 14, fontWeight: 600, color: progress === 100 ? '#52c41a' : txColors.primary }}>{progress}%</span>
         </div>
         <div style={{ height: 6, background: '#1a2a33', borderRadius: 3, overflow: 'hidden' }}>
-          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#52c41a' : '#FF6B35', borderRadius: 3, transition: 'width 300ms ease' }} />
+          <div style={{ height: '100%', width: `${progress}%`, background: progress === 100 ? '#52c41a' : txColors.primary, borderRadius: 3, transition: 'width 300ms ease' }} />
         </div>
       </div>
 
@@ -307,7 +308,7 @@ export function ClosingChecklistPage() {
         <button type="button" onClick={handleSubmit} disabled={submitting || checked === 0}
           style={{
             width: '100%', padding: '16px 0', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 56,
-            background: checked > 0 && !submitting ? '#FF6B35' : '#444', color: '#fff', opacity: submitting ? 0.6 : 1,
+            background: checked > 0 && !submitting ? txColors.primary : '#444', color: '#fff', opacity: submitting ? 0.6 : 1,
           }}>
           {submitting ? '提交中...' : `提交闭店检查 (${checked}/${total}${failed > 0 ? ` · ${failed}异常` : ''})`}
         </button>
@@ -329,7 +330,7 @@ export function ClosingChecklistPage() {
               <button type="button" onClick={() => setNoteModal(null)}
                 style={{ flex: 1, padding: '12px 0', background: '#333', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, cursor: 'pointer', minHeight: 48 }}>取消</button>
               <button type="button" onClick={() => saveNote(noteModal)}
-                style={{ flex: 1, padding: '12px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>保存</button>
+                style={{ flex: 1, padding: '12px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 48 }}>保存</button>
             </div>
           </div>
         </div>

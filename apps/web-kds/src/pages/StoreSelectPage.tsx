@@ -9,27 +9,28 @@
  *   或 /board?store=wh（正式模式）
  */
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const STORES = [
   {
     id: 'wh',
     name: '文化城店',
     subtitle: '长沙市芙蓉区文化城',
-    color: '#FF6B35',
+    color: txColors.primary,
     icon: '🍜',
   },
   {
     id: 'lx',
     name: '浏小鲜',
     subtitle: '长沙市开福区浏阳河路',
-    color: '#0F6E56',
+    color: txColors.success,
     icon: '🦞',
   },
   {
     id: 'ya',
     name: '永安店',
     subtitle: '长沙市天心区永安路',
-    color: '#185FA5',
+    color: txColors.info,
     icon: '🥘',
   },
 ] as const;
@@ -96,7 +97,7 @@ export function StoreSelectPage() {
               borderRadius: 20,
               background: 'rgba(255,107,53,0.15)',
               border: '1px solid rgba(255,107,53,0.4)',
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: 16,
               fontWeight: 600,
             }}
@@ -106,7 +107,7 @@ export function StoreSelectPage() {
                 width: 8,
                 height: 8,
                 borderRadius: '50%',
-                background: '#FF6B35',
+                background: txColors.primary,
                 display: 'inline-block',
                 animation: 'pulse 1.5s infinite',
               }}

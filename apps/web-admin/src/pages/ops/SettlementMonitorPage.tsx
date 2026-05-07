@@ -19,12 +19,13 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
 // ─── 主题色 ──────────────────────────────────────────────────────────────────
 
-const PRIMARY_COLOR = '#FF6B35';
+const PRIMARY_COLOR = txColors.primary;
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────
 

@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Select, DatePicker, Spin } from 'antd';
 import dayjs, { Dayjs } from 'dayjs';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ────────────────────────────────────────────────────
 interface OverviewData {
@@ -68,7 +69,7 @@ const BRAND_OPTIONS = [
 ];
 
 // 图表颜色序列
-const CHART_COLORS = ['#FF6B35', '#0F6E56', '#1B6DAB', '#8B6914', '#6B3A8B'];
+const CHART_COLORS = [txColors.primary, txColors.success, '#1B6DAB', '#8B6914', '#6B3A8B'];
 
 // ─── 工具函数 ─────────────────────────────────────────────────────
 function formatRevenue(val: number): string {
@@ -125,7 +126,7 @@ function KPICard({ title, value, unit, change, extra }: KPICardProps) {
   const ch = change != null ? formatChange(change) : null;
   return (
     <div style={{
-      background: '#1E2A3A',
+      background: txColors.navy,
       borderRadius: 8,
       padding: '18px 20px',
       display: 'flex',
@@ -139,7 +140,7 @@ function KPICard({ title, value, unit, change, extra }: KPICardProps) {
         <span style={{
           fontSize: 32,
           fontWeight: 700,
-          color: '#FF6B35',
+          color: txColors.primary,
           fontVariantNumeric: 'tabular-nums',
           lineHeight: 1,
         }}>
@@ -151,7 +152,7 @@ function KPICard({ title, value, unit, change, extra }: KPICardProps) {
         {ch && (
           <span style={{
             fontSize: 12,
-            color: ch.up ? '#0F6E56' : '#A32D2D',
+            color: ch.up ? txColors.success : txColors.danger,
             display: 'flex',
             alignItems: 'center',
             gap: 2,
@@ -207,7 +208,7 @@ function StoreRankingChart({ data }: StoreRankingChartProps) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 3,
-                background: isChamp ? '#FF6B35' : '#1E2A3A',
+                background: isChamp ? txColors.primary : txColors.navy,
                 color: isChamp ? '#fff' : '#B0B8C0',
                 fontWeight: 700,
                 flexShrink: 0,
@@ -247,7 +248,7 @@ function StoreRankingChart({ data }: StoreRankingChartProps) {
             {/* 金额 */}
             <div style={{
               fontSize: 12,
-              color: isChamp ? '#FF6B35' : '#B0B8C0',
+              color: isChamp ? txColors.primary : '#B0B8C0',
               textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
               fontWeight: isChamp ? 700 : 400,
@@ -322,7 +323,7 @@ function CategoryPieChart({ data }: CategoryPieChartProps) {
             pointerEvents: 'none',
           }}>
             <div style={{ fontSize: 11, color: '#B0B8C0', whiteSpace: 'nowrap' }}>最高</div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: '#FF6B35', whiteSpace: 'nowrap' }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: txColors.primary, whiteSpace: 'nowrap' }}>
               {topCategory.category}
             </div>
             <div style={{ fontSize: 12, color: '#E0E0E0' }}>{topCategory.percentage}%</div>
@@ -364,8 +365,8 @@ interface AlertListProps {
 
 function AlertList({ alerts }: AlertListProps) {
   const levelColor: Record<Alert['level'], string> = {
-    critical: '#A32D2D',
-    warn: '#BA7517',
+    critical: txColors.danger,
+    warn: txColors.warning,
     info: 'transparent',
   };
   const levelBg: Record<Alert['level'], string> = {
@@ -532,7 +533,7 @@ export function AnalyticsDashboardPage() {
         }
       `}</style>
 
-      <Spin spinning={loading} tip="加载中..." style={{ color: '#FF6B35' }}>
+      <Spin spinning={loading} tip="加载中..." style={{ color: txColors.primary }}>
       <div
         ref={containerRef}
         style={{
@@ -562,7 +563,7 @@ export function AnalyticsDashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 16 }}>
             <div style={{
               width: 32, height: 32,
-              background: '#FF6B35',
+              background: txColors.primary,
               borderRadius: 6,
               display: 'flex',
               alignItems: 'center',
@@ -590,7 +591,7 @@ export function AnalyticsDashboardPage() {
             style={{ width: 140 }}
             styles={{
               popup: {
-                root: { background: '#1E2A3A' }
+                root: { background: txColors.navy }
               }
             }}
           />
@@ -687,7 +688,7 @@ export function AnalyticsDashboardPage() {
         }}>
           {/* 门店营收排行 */}
           <div style={{
-            background: '#1E2A3A',
+            background: txColors.navy,
             borderRadius: 8,
             padding: '16px 20px',
             display: 'flex',
@@ -718,7 +719,7 @@ export function AnalyticsDashboardPage() {
 
           {/* 品类销售占比 */}
           <div style={{
-            background: '#1E2A3A',
+            background: txColors.navy,
             borderRadius: 8,
             padding: '16px 20px',
             display: 'flex',
@@ -747,7 +748,7 @@ export function AnalyticsDashboardPage() {
         <div style={{
           gridColumn: '2',
           gridRow: '3',
-          background: '#1E2A3A',
+          background: txColors.navy,
           borderRadius: 8,
           margin: '0 24px 16px 0',
           padding: '16px',

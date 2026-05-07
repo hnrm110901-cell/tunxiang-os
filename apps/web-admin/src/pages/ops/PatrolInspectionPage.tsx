@@ -20,6 +20,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -97,10 +98,10 @@ const STORE_OPTIONS = [
 ];
 
 const RISK_LEVEL_CONFIG: Record<RiskLevel, { label: string; color: string; badgeStatus: 'error' | 'warning' | 'processing' | 'success' }> = {
-  critical: { label: '严重风险', color: '#A32D2D', badgeStatus: 'error' },
-  high:     { label: '高风险',   color: '#BA7517', badgeStatus: 'warning' },
+  critical: { label: '严重风险', color: txColors.danger, badgeStatus: 'error' },
+  high:     { label: '高风险',   color: txColors.warning, badgeStatus: 'warning' },
   medium:   { label: '中风险',   color: '#d48806', badgeStatus: 'processing' },
-  low:      { label: '低风险',   color: '#0F6E56', badgeStatus: 'success' },
+  low:      { label: '低风险',   color: txColors.success, badgeStatus: 'success' },
 };
 
 const SEVERITY_COLOR: Record<Severity, string> = {
@@ -475,8 +476,8 @@ export function PatrolInspectionPage() {
     <div style={{ padding: '24px 32px', background: '#F8F7F5', minHeight: '100vh' }}>
       {/* 页面标题 */}
       <div style={{ marginBottom: 24 }}>
-        <Title level={4} style={{ margin: 0, color: '#1E2A3A' }}>
-          <RobotOutlined style={{ color: '#185FA5', marginRight: 8 }} />
+        <Title level={4} style={{ margin: 0, color: txColors.navy }}>
+          <RobotOutlined style={{ color: txColors.info, marginRight: 8 }} />
           AI巡店质检
         </Title>
         <Text type="secondary" style={{ fontSize: 13 }}>
@@ -494,7 +495,7 @@ export function PatrolInspectionPage() {
             icon={<RobotOutlined />}
             loading={analyzing}
             onClick={handleAnalyze}
-            style={{ background: '#185FA5', borderColor: '#185FA5' }}
+            style={{ background: txColors.info, borderColor: txColors.info }}
           >
             提交AI分析
           </Button>
@@ -615,10 +616,10 @@ export function PatrolInspectionPage() {
                   suffix="/ 100"
                   valueStyle={{
                     color: analyzeResult.overall_score >= 80
-                      ? '#0F6E56'
+                      ? txColors.success
                       : analyzeResult.overall_score >= 60
-                      ? '#BA7517'
-                      : '#A32D2D',
+                      ? txColors.warning
+                      : txColors.danger,
                     fontSize: 32,
                   }}
                 />
@@ -629,17 +630,17 @@ export function PatrolInspectionPage() {
                 size="small"
                 style={{
                   borderRadius: 8,
-                  borderColor: analyzeResult.food_safety_ok ? '#0F6E56' : '#A32D2D',
+                  borderColor: analyzeResult.food_safety_ok ? txColors.success : txColors.danger,
                   background: analyzeResult.food_safety_ok ? '#f0faf7' : '#fff5f5',
                 }}
               >
                 <div style={{ textAlign: 'center' }}>
                   {analyzeResult.food_safety_ok
-                    ? <CheckCircleOutlined style={{ fontSize: 24, color: '#0F6E56' }} />
-                    : <CloseCircleOutlined style={{ fontSize: 24, color: '#A32D2D' }} />
+                    ? <CheckCircleOutlined style={{ fontSize: 24, color: txColors.success }} />
+                    : <CloseCircleOutlined style={{ fontSize: 24, color: txColors.danger }} />
                   }
                   <div style={{ marginTop: 6, fontWeight: 600, fontSize: 13 }}>食品安全合规</div>
-                  <div style={{ fontSize: 12, color: analyzeResult.food_safety_ok ? '#0F6E56' : '#A32D2D' }}>
+                  <div style={{ fontSize: 12, color: analyzeResult.food_safety_ok ? txColors.success : txColors.danger }}>
                     {analyzeResult.food_safety_ok ? '通过' : '未通过'}
                   </div>
                 </div>
@@ -650,17 +651,17 @@ export function PatrolInspectionPage() {
                 size="small"
                 style={{
                   borderRadius: 8,
-                  borderColor: analyzeResult.fire_safety_ok ? '#0F6E56' : '#A32D2D',
+                  borderColor: analyzeResult.fire_safety_ok ? txColors.success : txColors.danger,
                   background: analyzeResult.fire_safety_ok ? '#f0faf7' : '#fff5f5',
                 }}
               >
                 <div style={{ textAlign: 'center' }}>
                   {analyzeResult.fire_safety_ok
-                    ? <CheckCircleOutlined style={{ fontSize: 24, color: '#0F6E56' }} />
-                    : <CloseCircleOutlined style={{ fontSize: 24, color: '#A32D2D' }} />
+                    ? <CheckCircleOutlined style={{ fontSize: 24, color: txColors.success }} />
+                    : <CloseCircleOutlined style={{ fontSize: 24, color: txColors.danger }} />
                   }
                   <div style={{ marginTop: 6, fontWeight: 600, fontSize: 13 }}>消防安全合规</div>
-                  <div style={{ fontSize: 12, color: analyzeResult.fire_safety_ok ? '#0F6E56' : '#A32D2D' }}>
+                  <div style={{ fontSize: 12, color: analyzeResult.fire_safety_ok ? txColors.success : txColors.danger }}>
                     {analyzeResult.fire_safety_ok ? '通过' : '未通过'}
                   </div>
                 </div>
@@ -671,17 +672,17 @@ export function PatrolInspectionPage() {
                 size="small"
                 style={{
                   borderRadius: 8,
-                  borderColor: analyzeResult.hygiene_ok ? '#0F6E56' : '#A32D2D',
+                  borderColor: analyzeResult.hygiene_ok ? txColors.success : txColors.danger,
                   background: analyzeResult.hygiene_ok ? '#f0faf7' : '#fff5f5',
                 }}
               >
                 <div style={{ textAlign: 'center' }}>
                   {analyzeResult.hygiene_ok
-                    ? <CheckCircleOutlined style={{ fontSize: 24, color: '#0F6E56' }} />
-                    : <CloseCircleOutlined style={{ fontSize: 24, color: '#A32D2D' }} />
+                    ? <CheckCircleOutlined style={{ fontSize: 24, color: txColors.success }} />
+                    : <CloseCircleOutlined style={{ fontSize: 24, color: txColors.danger }} />
                   }
                   <div style={{ marginTop: 6, fontWeight: 600, fontSize: 13 }}>卫生合规</div>
-                  <div style={{ fontSize: 12, color: analyzeResult.hygiene_ok ? '#0F6E56' : '#A32D2D' }}>
+                  <div style={{ fontSize: 12, color: analyzeResult.hygiene_ok ? txColors.success : txColors.danger }}>
                     {analyzeResult.hygiene_ok ? '通过' : '未通过'}
                   </div>
                 </div>
@@ -741,7 +742,7 @@ export function PatrolInspectionPage() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                         width: 20, height: 20, borderRadius: '50%',
-                        background: '#185FA5', color: '#fff', fontSize: 11, flexShrink: 0,
+                        background: txColors.info, color: '#fff', fontSize: 11, flexShrink: 0,
                       }}>
                         {index + 1}
                       </span>
@@ -886,10 +887,10 @@ export function PatrolInspectionPage() {
               <Descriptions.Item label="综合评分">
                 <Text strong style={{
                   color: detailRecord.overall_score >= 80
-                    ? '#0F6E56'
+                    ? txColors.success
                     : detailRecord.overall_score >= 60
-                    ? '#BA7517'
-                    : '#A32D2D',
+                    ? txColors.warning
+                    : txColors.danger,
                 }}>
                   {detailRecord.overall_score} 分
                 </Text>
@@ -991,7 +992,7 @@ export function PatrolInspectionPage() {
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                           width: 18, height: 18, borderRadius: '50%',
-                          background: '#185FA5', color: '#fff', fontSize: 11, flexShrink: 0,
+                          background: txColors.info, color: '#fff', fontSize: 11, flexShrink: 0,
                         }}>
                           {i + 1}
                         </span>

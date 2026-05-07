@@ -7,6 +7,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -46,9 +47,9 @@ function getLoadLevel(dept: Department): LoadLevel {
 }
 
 const LOAD_COLORS: Record<LoadLevel, string> = {
-  low: '#0F6E56',
-  medium: '#BA7517',
-  high: '#A32D2D',
+  low: txColors.success,
+  medium: txColors.warning,
+  high: txColors.danger,
 };
 
 const LOAD_LABELS: Record<LoadLevel, string> = {
@@ -98,10 +99,10 @@ export function DeptSelector() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         marginBottom: 24,
       }}>
-        <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>选择档口</h1>
+        <h1 style={{ margin: 0, fontSize: 28, color: txColors.primary }}>选择档口</h1>
         <div style={{ display: 'flex', gap: 24, fontSize: 18 }}>
           <span>
-            全部待制作 <b style={{ color: '#BA7517', fontSize: 24 }}>{totalPending}</b>
+            全部待制作 <b style={{ color: txColors.warning, fontSize: 24 }}>{totalPending}</b>
           </span>
           <span>
             全部制作中 <b style={{ color: '#1890ff', fontSize: 24 }}>{totalCooking}</b>
@@ -114,8 +115,8 @@ export function DeptSelector() {
         onClick={() => { window.location.href = '/board?dept=all'; }}
         style={{
           width: '100%', padding: '18px 0', marginBottom: 20,
-          background: '#1a1a1a', border: '2px solid #FF6B35', borderRadius: 12,
-          color: '#FF6B35', fontSize: 22, fontWeight: 'bold',
+          background: '#1a1a1a', border: `2px solid ${txColors.primary}`, borderRadius: 12,
+          color: txColors.primary, fontSize: 22, fontWeight: 'bold',
           cursor: 'pointer', minHeight: 64,
           transition: 'transform 200ms ease',
         }}
@@ -145,7 +146,7 @@ export function DeptSelector() {
                 background: isOffline ? '#1a1a1a' : selectedId === dept.id ? '#1a2a1a' : '#111',
                 borderRadius: 16,
                 padding: 20,
-                border: selectedId === dept.id ? '3px solid #FF6B35' : '2px solid #222',
+                border: selectedId === dept.id ? `3px solid ${txColors.primary}` : '2px solid #222',
                 borderLeft: `6px solid ${isOffline ? '#444' : LOAD_COLORS[load]}`,
                 cursor: isOffline ? 'not-allowed' : 'pointer',
                 opacity: isOffline ? 0.4 : 1,
@@ -185,7 +186,7 @@ export function DeptSelector() {
                 <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
                   <div>
                     <div style={{ fontSize: 16, color: '#888' }}>待制作</div>
-                    <div style={{ fontSize: 28, fontWeight: 'bold', color: '#BA7517', fontFamily: 'JetBrains Mono, monospace' }}>
+                    <div style={{ fontSize: 28, fontWeight: 'bold', color: txColors.warning, fontFamily: 'JetBrains Mono, monospace' }}>
                       {dept.pendingCount}
                     </div>
                   </div>

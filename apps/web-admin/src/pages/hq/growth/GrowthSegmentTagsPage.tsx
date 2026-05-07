@@ -9,6 +9,7 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 import {
   Card, Table, Tag, Button, Space, Row, Col, Spin, message,
   Modal, Select, Form, Input, Switch, Divider,
@@ -34,14 +35,14 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 const WARNING_ORANGE = '#faad14';
 const DANGER_RED = '#ff4d4f';
 const INFO_BLUE = '#1890ff';
 
 // ---- 饼图颜色 ----
-const PIE_COLORS = ['#FF6B35', '#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96'];
+const PIE_COLORS = [txColors.primary, '#1890ff', '#52c41a', '#faad14', '#ff4d4f', '#722ed1', '#13c2c2', '#eb2f96'];
 
 // ---- 优先级颜色映射 ----
 const PRIORITY_COLORS: Record<string, string> = {

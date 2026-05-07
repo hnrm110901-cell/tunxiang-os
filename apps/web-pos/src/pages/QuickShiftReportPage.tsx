@@ -22,20 +22,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const T = {
-  primary:    '#FF6B35',
-  primaryAct: '#E55A28',
+  primary:    txColors.primary,
+  primaryAct: txColors.primaryActive,
   bg:         '#0B1A20',
   card:       '#112228',
   card2:      '#162A38',
   border:     '#1A3A48',
-  success:    '#0F6E56',
+  success:    txColors.success,
   successLt:  '#4ADE80',
-  warning:    '#BA7517',
-  danger:     '#A32D2D',
-  info:       '#185FA5',
+  warning:    txColors.warning,
+  danger:     txColors.danger,
+  info:       txColors.info,
   muted:      '#64748B',
   text:       '#E0E0E0',
   textSub:    '#94A3B8',

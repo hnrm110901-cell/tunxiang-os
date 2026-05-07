@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { apiGet, apiPatch } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 type AlertSeverity = 'critical' | 'warning' | 'info';
 type AlertCategory = 'cost' | 'quality' | 'efficiency' | 'compliance' | 'equipment';
@@ -189,7 +190,7 @@ export function AlertCenterPage() {
                   style={{
                     padding: 14, borderRadius: 8, cursor: 'pointer',
                     background: selectedId === a.id ? 'rgba(255,107,44,0.08)' : '#0B1A20',
-                    border: selectedId === a.id ? '1px solid #FF6B35' : '1px solid #1a2a33',
+                    border: selectedId === a.id ? `1px solid ${txColors.primary}` : '1px solid #1a2a33',
                     borderLeft: `3px solid ${SEVERITY_CONFIG[a.severity].color}`,
                   }}
                 >
@@ -259,7 +260,7 @@ export function AlertCenterPage() {
                       <div style={{
                         position: 'absolute', left: -20, top: 4,
                         width: 8, height: 8, borderRadius: '50%',
-                        background: i === selected.logs.length - 1 ? '#FF6B35' : '#1a2a33',
+                        background: i === selected.logs.length - 1 ? txColors.primary : '#1a2a33',
                       }} />
                       {i < selected.logs.length - 1 && (
                         <div style={{
@@ -269,7 +270,7 @@ export function AlertCenterPage() {
                       )}
                       <div style={{ fontSize: 12 }}>
                         <span style={{ color: '#999' }}>{log.time}</span>
-                        <span style={{ color: '#FF6B35', marginLeft: 8 }}>{log.operator}</span>
+                        <span style={{ color: txColors.primary, marginLeft: 8 }}>{log.operator}</span>
                         <div style={{ color: '#ccc', marginTop: 2 }}>{log.action}</div>
                       </div>
                     </div>
@@ -282,7 +283,7 @@ export function AlertCenterPage() {
                   onClick={() => handleResolve(selected.id)}
                   style={{
                     width: '100%', padding: '10px 0', borderRadius: 8, border: 'none',
-                    background: '#FF6B35', color: '#fff', fontSize: 14, fontWeight: 600,
+                    background: txColors.primary, color: '#fff', fontSize: 14, fontWeight: 600,
                     cursor: 'pointer',
                   }}>标记为已解决</button>
               )}

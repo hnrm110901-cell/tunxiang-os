@@ -5,6 +5,7 @@
  */
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ======================== 类型 ======================== */
 interface Category {
@@ -153,7 +154,7 @@ function DishCardTV({ dish }: { dish: Dish }) {
   const priceStyle: CSSProperties = {
     fontSize: 32,
     fontWeight: 800,
-    color: '#FF6B35',
+    color: txColors.primary,
     lineHeight: 1.2,
     marginTop: 'auto',
   };
@@ -312,7 +313,7 @@ export default function MenuDisplayPage() {
   const logoStyle: CSSProperties = {
     fontSize: 36,
     fontWeight: 900,
-    color: '#FF6B35',
+    color: txColors.primary,
     letterSpacing: 2,
   };
 
@@ -329,7 +330,7 @@ export default function MenuDisplayPage() {
   const clockStyle: CSSProperties = {
     fontSize: 36,
     fontWeight: 700,
-    color: '#FF6B35',
+    color: txColors.primary,
     fontVariantNumeric: 'tabular-nums',
     letterSpacing: 2,
   };
@@ -373,11 +374,11 @@ export default function MenuDisplayPage() {
   const tickerStyle: CSSProperties = {
     height: 100,
     flexShrink: 0,
-    background: '#FF6B35',
+    background: txColors.primary,
     display: 'flex',
     alignItems: 'center',
     overflow: 'hidden',
-    borderTop: '2px solid #e55a28',
+    borderTop: `2px solid ${txColors.primaryActive}`,
   };
 
   const tickerLabelStyle: CSSProperties = {
@@ -390,7 +391,7 @@ export default function MenuDisplayPage() {
     height: '100%',
     display: 'flex',
     alignItems: 'center',
-    borderRight: '2px solid #e55a28',
+    borderRight: `2px solid ${txColors.primaryActive}`,
     letterSpacing: 2,
   };
 
@@ -432,9 +433,9 @@ export default function MenuDisplayPage() {
               paddingLeft: isActive ? 20 : 24,
               fontSize: 24,
               fontWeight: isActive ? 700 : 400,
-              color: isActive ? '#FF6B35' : '#c8a882',
+              color: isActive ? txColors.primary : '#c8a882',
               background: isActive ? 'rgba(255, 107, 53, 0.12)' : 'transparent',
-              borderLeft: isActive ? '5px solid #FF6B35' : '5px solid transparent',
+              borderLeft: isActive ? `5px solid ${txColors.primary}` : '5px solid transparent',
               cursor: 'none',
               transition: 'all 0.3s ease',
               letterSpacing: 1,

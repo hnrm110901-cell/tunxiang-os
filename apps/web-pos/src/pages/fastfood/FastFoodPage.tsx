@@ -23,17 +23,18 @@ import { txFetch } from '../../api/index';
 import { useTouchFeedback } from '../../hooks/useTouchFeedback';
 import { TxButton } from '../../components/TxButton';
 import { VoiceCommandBar, matchVoiceCommand } from '../../components/VoiceCommandBar';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  info: '#185FA5',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
+  success: txColors.success,
+  warning: txColors.warning,
+  info: txColors.info,
   muted: '#64748b',
   text: '#E0E0E0',
   white: '#FFFFFF',

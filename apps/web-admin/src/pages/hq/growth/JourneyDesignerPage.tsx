@@ -7,13 +7,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { txFetchData } from '../../../api/client';
 import type { Journey, JourneyNode, JourneyStatus, NodeType } from '../../../api/couponBenefitApi';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量 ----
-const PRIMARY = '#FF6B35';
-const SUCCESS = '#0F6E56';
-const WARNING = '#BA7517';
-const ERROR = '#A32D2D';
-const INFO = '#185FA5';
+const PRIMARY = txColors.primary;
+const SUCCESS = txColors.success;
+const WARNING = txColors.warning;
+const ERROR = txColors.danger;
+const INFO = txColors.info;
 const BG_PAGE = '#0d1b21';
 const BG_CARD = '#112228';
 const BG_INPUT = '#1a2a33';

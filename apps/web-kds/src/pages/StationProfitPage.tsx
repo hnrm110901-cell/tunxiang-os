@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -39,9 +40,9 @@ const API_BASE = (window as any).__STORE_API_BASE__ || '';
 const STORE_ID = (window as any).__STORE_ID__ || '';
 
 const STATUS_COLORS = {
-  healthy: { bg: '#0A1A10', border: '#0F6E56', text: '#30D158' },
-  warning: { bg: '#1A1500', border: '#BA7517', text: '#FF9F0A' },
-  danger:  { bg: '#1A0A0A', border: '#A32D2D', text: '#FF3B30' },
+  healthy: { bg: '#0A1A10', border: txColors.success, text: '#30D158' },
+  warning: { bg: '#1A1500', border: txColors.warning, text: '#FF9F0A' },
+  danger:  { bg: '#1A0A0A', border: txColors.danger, text: '#FF3B30' },
 };
 
 const MOCK_SUMMARY: ProfitSummary = {
@@ -203,7 +204,7 @@ export function StationProfitPage() {
               style={{
                 padding: '8px 16px',
                 minHeight: 48,
-                background: period === p ? '#FF6B35' : '#1A1A1A',
+                background: period === p ? txColors.primary : '#1A1A1A',
                 color: period === p ? '#fff' : '#888',
                 border: 'none',
                 borderRadius: 8,

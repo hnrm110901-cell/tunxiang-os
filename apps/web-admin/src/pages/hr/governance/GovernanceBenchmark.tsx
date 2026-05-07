@@ -10,6 +10,7 @@ import { Card, Col, Row, Tag } from 'antd';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { Column } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ export default function GovernanceBenchmark() {
           {metricOptions.map((opt) => (
             <Col key={opt.value}>
               <Tag
-                color={metric === opt.value ? '#FF6B35' : 'default'}
+                color={metric === opt.value ? txColors.primary : 'default'}
                 style={{ cursor: 'pointer', padding: '4px 12px' }}
                 onClick={() => {
                   setMetric(opt.value);
@@ -119,7 +120,7 @@ export default function GovernanceBenchmark() {
               xField="store_name"
               yField="value"
               height={400}
-              color="#FF6B35"
+              color={txColors.primary}
               annotations={
                 benchData
                   ? [
@@ -127,8 +128,8 @@ export default function GovernanceBenchmark() {
                         type: 'line',
                         start: ['min', benchData.average],
                         end: ['max', benchData.average],
-                        style: { stroke: '#185FA5', lineWidth: 2, lineDash: [4, 4] },
-                        text: { content: `均值 ${benchData.average.toFixed(1)}`, position: 'end', style: { fill: '#185FA5' } },
+                        style: { stroke: txColors.info, lineWidth: 2, lineDash: [4, 4] },
+                        text: { content: `均值 ${benchData.average.toFixed(1)}`, position: 'end', style: { fill: txColors.info } },
                       },
                     ]
                   : []

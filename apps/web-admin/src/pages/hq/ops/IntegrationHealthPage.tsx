@@ -16,6 +16,7 @@ import {
   fetchRecentWebhooks,
 } from '../../../api/integrationHealthApi';
 import type { AdapterHealth, AdapterStatus, WebhookEvent } from '../../../api/integrationHealthApi';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ───
 
@@ -35,27 +36,27 @@ const ADAPTERS = [
 const REFRESH_INTERVAL = 30_000;
 
 const STATUS_MAP: Record<AdapterStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  online:   { label: '正常',  color: '#0F6E56', icon: <CheckCircleFilled style={{ color: '#0F6E56' }} /> },
-  degraded: { label: '降级',  color: '#BA7517', icon: <WarningFilled style={{ color: '#BA7517' }} /> },
-  offline:  { label: '离线',  color: '#A32D2D', icon: <CloseCircleFilled style={{ color: '#A32D2D' }} /> },
+  online:   { label: '正常',  color: txColors.success, icon: <CheckCircleFilled style={{ color: txColors.success }} /> },
+  degraded: { label: '降级',  color: txColors.warning, icon: <WarningFilled style={{ color: txColors.warning }} /> },
+  offline:  { label: '离线',  color: txColors.danger, icon: <CloseCircleFilled style={{ color: txColors.danger }} /> },
 };
 
 const WEBHOOK_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  processed: { label: '成功', color: '#0F6E56' },
-  failed:    { label: '失败', color: '#A32D2D' },
-  pending:   { label: '待处理', color: '#BA7517' },
+  processed: { label: '成功', color: txColors.success },
+  failed:    { label: '失败', color: txColors.danger },
+  pending:   { label: '待处理', color: txColors.warning },
 };
 
 // ─── 工具函数 ───
 
 function formatSyncDelay(seconds: number): { text: string; color: string } {
-  if (seconds < 0) return { text: '未同步', color: '#A32D2D' };
-  if (seconds < 60) return { text: `${seconds}秒前`, color: '#0F6E56' };
+  if (seconds < 0) return { text: '未同步', color: txColors.danger };
+  if (seconds < 60) return { text: `${seconds}秒前`, color: txColors.success };
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 30) return { text: `${minutes}分钟前`, color: '#0F6E56' };
+  if (minutes < 30) return { text: `${minutes}分钟前`, color: txColors.success };
   const hours = Math.floor(minutes / 60);
-  if (minutes < 120) return { text: `${minutes}分钟前`, color: '#BA7517' };
-  return { text: `${hours}小时前`, color: '#A32D2D' };
+  if (minutes < 120) return { text: `${minutes}分钟前`, color: txColors.warning };
+  return { text: `${hours}小时前`, color: txColors.danger };
 }
 
 function formatNumber(n: number): string {
@@ -235,8 +236,8 @@ function AdapterDetailDrawer({
                           precision={2}
                           suffix="%"
                           valueStyle={{
-                            color: detail.error_rate_24h > 5 ? '#A32D2D'
-                              : detail.error_rate_24h > 1 ? '#BA7517' : '#0F6E56',
+                            color: detail.error_rate_24h > 5 ? txColors.danger
+                              : detail.error_rate_24h > 1 ? txColors.warning : txColors.success,
                           }}
                         />
                       </Col>
@@ -274,7 +275,7 @@ function AdapterDetailDrawer({
                     <Timeline
                       items={detail.recent_logs.map((log, i) => ({
                         key: i,
-                        color: log.status === 'success' ? '#0F6E56' : '#A32D2D',
+                        color: log.status === 'success' ? txColors.success : txColors.danger,
                         children: (
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -290,7 +291,7 @@ function AdapterDetailDrawer({
                               {formatTime(log.time)} | 耗时 {formatDuration(log.duration_ms)}
                             </div>
                             {log.error && (
-                              <div style={{ fontSize: 12, color: '#A32D2D', marginTop: 4 }}>
+                              <div style={{ fontSize: 12, color: txColors.danger, marginTop: 4 }}>
                                 {log.error}
                               </div>
                             )}
@@ -336,7 +337,7 @@ function AdapterDetailDrawer({
                       ellipsis: true,
                       render: (v: string) => (
                         <Tooltip title={v}>
-                          <span style={{ color: '#A32D2D' }}>{v || '-'}</span>
+                          <span style={{ color: txColors.danger }}>{v || '-'}</span>
                         </Tooltip>
                       ),
                     },
@@ -366,7 +367,7 @@ function AdapterDetailDrawer({
                         <Progress
                           percent={Math.round((item.count / maxVolume) * 100)}
                           showInfo={false}
-                          strokeColor="#FF6B35"
+                          strokeColor={txColors.primary}
                           style={{ flex: 1 }}
                         />
                         <span style={{ width: 70, fontSize: 13, textAlign: 'right', flexShrink: 0 }}>
@@ -495,14 +496,14 @@ export function IntegrationHealthPage() {
           <div style={{
             background: '#1a2a33', borderRadius: 12, padding: '20px 24px', marginBottom: 24,
             display: 'flex', alignItems: 'center', gap: 32,
-            border: `1px solid ${healthPercent >= 80 ? '#0F6E5644' : healthPercent >= 50 ? '#BA751744' : '#A32D2D44'}`,
+            border: `1px solid ${healthPercent >= 80 ? `${txColors.success}44` : healthPercent >= 50 ? `${txColors.warning}44` : `${txColors.danger}44`}`,
           }}>
             <div style={{ textAlign: 'center', minWidth: 100 }}>
               <Progress
                 type="circle"
                 percent={healthPercent}
                 size={80}
-                strokeColor={healthPercent >= 80 ? '#0F6E56' : healthPercent >= 50 ? '#BA7517' : '#A32D2D'}
+                strokeColor={healthPercent >= 80 ? txColors.success : healthPercent >= 50 ? txColors.warning : txColors.danger}
                 trailColor="#2a3a44"
                 format={(p) => <span style={{ color: '#fff', fontSize: 20, fontWeight: 700 }}>{p}%</span>}
               />
@@ -511,23 +512,23 @@ export function IntegrationHealthPage() {
 
             <div style={{ display: 'flex', gap: 40, flex: 1 }}>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#0F6E56' }}>{onlineCount}</div>
+                <div style={{ fontSize: 32, fontWeight: 700, color: txColors.success }}>{onlineCount}</div>
                 <div style={{ color: '#888', fontSize: 13, marginTop: 4 }}>
-                  <CheckCircleFilled style={{ color: '#0F6E56', marginRight: 4 }} />
+                  <CheckCircleFilled style={{ color: txColors.success, marginRight: 4 }} />
                   正常
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#BA7517' }}>{degradedCount}</div>
+                <div style={{ fontSize: 32, fontWeight: 700, color: txColors.warning }}>{degradedCount}</div>
                 <div style={{ color: '#888', fontSize: 13, marginTop: 4 }}>
-                  <WarningFilled style={{ color: '#BA7517', marginRight: 4 }} />
+                  <WarningFilled style={{ color: txColors.warning, marginRight: 4 }} />
                   降级
                 </div>
               </div>
               <div style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 32, fontWeight: 700, color: '#A32D2D' }}>{offlineCount}</div>
+                <div style={{ fontSize: 32, fontWeight: 700, color: txColors.danger }}>{offlineCount}</div>
                 <div style={{ color: '#888', fontSize: 13, marginTop: 4 }}>
-                  <CloseCircleFilled style={{ color: '#A32D2D', marginRight: 4 }} />
+                  <CloseCircleFilled style={{ color: txColors.danger, marginRight: 4 }} />
                   离线
                 </div>
               </div>
@@ -546,7 +547,7 @@ export function IntegrationHealthPage() {
               onClick={() => setActiveTab('adapters')}
               style={{
                 padding: '8px 20px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 14,
-                background: activeTab === 'adapters' ? '#FF6B35' : '#1a2a33',
+                background: activeTab === 'adapters' ? txColors.primary : '#1a2a33',
                 color: activeTab === 'adapters' ? '#fff' : '#888',
                 fontWeight: activeTab === 'adapters' ? 600 : 400,
               }}
@@ -557,7 +558,7 @@ export function IntegrationHealthPage() {
               onClick={() => setActiveTab('webhooks')}
               style={{
                 padding: '8px 20px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 14,
-                background: activeTab === 'webhooks' ? '#FF6B35' : '#1a2a33',
+                background: activeTab === 'webhooks' ? txColors.primary : '#1a2a33',
                 color: activeTab === 'webhooks' ? '#fff' : '#888',
                 fontWeight: activeTab === 'webhooks' ? 600 : 400,
               }}
@@ -651,7 +652,7 @@ export function IntegrationHealthPage() {
                     dataIndex: 'response_ms',
                     width: 100,
                     render: (v: number) => (
-                      <span style={{ color: v > 3000 ? '#A32D2D' : v > 1000 ? '#BA7517' : '#0F6E56' }}>
+                      <span style={{ color: v > 3000 ? txColors.danger : v > 1000 ? txColors.warning : txColors.success }}>
                         {formatDuration(v)}
                       </span>
                     ),

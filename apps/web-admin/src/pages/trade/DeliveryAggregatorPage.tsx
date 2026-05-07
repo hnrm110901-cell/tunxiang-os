@@ -41,6 +41,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -51,11 +52,11 @@ const { Option } = Select;
 
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
@@ -342,7 +343,7 @@ const OrdersTab: React.FC = () => {
         (record.status === 'new' || record.status === 'accepted') && (
           <a
             key="cancel"
-            style={{ color: '#A32D2D' }}
+            style={{ color: txColors.danger }}
             onClick={() => handleAction(record, 'cancel')}
           >
             取消
@@ -414,7 +415,7 @@ const OrdersTab: React.FC = () => {
               />
             </Descriptions.Item>
             <Descriptions.Item label="订单金额">
-              <Text strong style={{ color: '#FF6B35', fontSize: 16 }}>
+              <Text strong style={{ color: txColors.primary, fontSize: 16 }}>
                 ¥{(detailOrder.total_fen / 100).toFixed(2)}
               </Text>
             </Descriptions.Item>
@@ -509,10 +510,10 @@ const PlatformsStatusTab: React.FC = () => {
               valueStyle={{
                 color:
                   (globalMetrics.success_rate ?? 1) >= 0.99
-                    ? '#0F6E56'
+                    ? txColors.success
                     : (globalMetrics.success_rate ?? 1) >= 0.95
-                      ? '#BA7517'
-                      : '#A32D2D',
+                      ? txColors.warning
+                      : txColors.danger,
               }}
             />
           </Col>
@@ -529,7 +530,7 @@ const PlatformsStatusTab: React.FC = () => {
               value={(globalMetrics.p99_latency_ms ?? 0).toFixed(1)}
               suffix="ms"
               valueStyle={{
-                color: (globalMetrics.p99_latency_ms ?? 0) > 1000 ? '#A32D2D' : undefined,
+                color: (globalMetrics.p99_latency_ms ?? 0) > 1000 ? txColors.danger : undefined,
               }}
             />
           </Col>
@@ -573,10 +574,10 @@ const PlatformsStatusTab: React.FC = () => {
                     style={{
                       borderTop: `3px solid ${
                         p.platform === 'meituan'
-                          ? '#FF6B35'
+                          ? txColors.primary
                           : p.platform === 'eleme'
-                            ? '#185FA5'
-                            : '#A32D2D'
+                            ? txColors.info
+                            : txColors.danger
                       }`,
                     }}
                   >
@@ -596,10 +597,10 @@ const PlatformsStatusTab: React.FC = () => {
                           valueStyle={{
                             color:
                               p.today_success_rate >= 0.99
-                                ? '#0F6E56'
+                                ? txColors.success
                                 : p.today_success_rate >= 0.95
-                                  ? '#BA7517'
-                                  : '#A32D2D',
+                                  ? txColors.warning
+                                  : txColors.danger,
                           }}
                         />
                       </Col>
@@ -780,7 +781,7 @@ const ReconcileTab: React.FC = () => {
       search: false,
       width: 120,
       render: (_, record) => (
-        <Text strong style={{ color: '#A32D2D' }}>
+        <Text strong style={{ color: txColors.danger }}>
           ¥{(record.discrepancy_amount_fen / 100).toFixed(2)}
         </Text>
       ),
@@ -832,7 +833,7 @@ const ReconcileTab: React.FC = () => {
       <Card
         title={
           <Space>
-            <ExclamationCircleOutlined style={{ color: '#BA7517' }} />
+            <ExclamationCircleOutlined style={{ color: txColors.warning }} />
             手动触发对账
           </Space>
         }
@@ -929,7 +930,7 @@ const ReconcileTab: React.FC = () => {
       <Modal
         title={
           <Space>
-            <WarningOutlined style={{ color: '#BA7517' }} />
+            <WarningOutlined style={{ color: txColors.warning }} />
             处理差异单
           </Space>
         }
@@ -960,7 +961,7 @@ const ReconcileTab: React.FC = () => {
               {resolveTarget.platform_order_id}
             </Descriptions.Item>
             <Descriptions.Item label="差异金额">
-              <Text strong style={{ color: '#A32D2D' }}>
+              <Text strong style={{ color: txColors.danger }}>
                 ¥{(resolveTarget.discrepancy_amount_fen / 100).toFixed(2)}
               </Text>
             </Descriptions.Item>

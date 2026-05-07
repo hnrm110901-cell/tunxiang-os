@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * social/group-order — 社群拼单
  *
@@ -17,7 +18,7 @@ import { useStoreInfo } from '../../../store/useStoreInfo'
 import { useUserStore } from '../../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryBg: 'rgba(255,107,44,0.12)',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

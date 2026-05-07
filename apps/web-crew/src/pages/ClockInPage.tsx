@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ─────────────────────────────────────────
    Tokens
@@ -22,10 +23,10 @@ const T = {
   text:       '#E0E0E0',
   muted:      '#64748b',
   dim:        '#334155',
-  primary:    '#FF6B35',
-  primaryAct: '#E55A28',
-  navy:       '#1E2A3A',
-  success:    '#0F6E56',
+  primary:    txColors.primary,
+  primaryAct: txColors.primaryActive,
+  navy:       txColors.navy,
+  success:    txColors.success,
   successBg:  '#0a2820',
   successTxt: '#30D158',
 };

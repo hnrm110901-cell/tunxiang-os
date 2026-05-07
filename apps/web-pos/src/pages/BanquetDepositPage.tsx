@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import React from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -68,7 +69,7 @@ const S = {
     color: '#2C2C2A',
   } as React.CSSProperties,
   header: {
-    background: '#1E2A3A',
+    background: txColors.navy,
     padding: '16px 20px',
     display: 'flex',
     alignItems: 'center',
@@ -90,8 +91,8 @@ const S = {
     padding: '14px 0',
     background: 'none',
     border: 'none',
-    borderBottom: active ? '3px solid #FF6B35' : '3px solid transparent',
-    color: active ? '#FF6B35' : '#888',
+    borderBottom: active ? `3px solid ${txColors.primary}` : '3px solid transparent',
+    color: active ? txColors.primary : '#888',
     fontSize: 15,
     fontWeight: active ? 700 : 400,
     cursor: 'pointer',
@@ -156,9 +157,9 @@ const S = {
   pmBtn: (active: boolean): React.CSSProperties => ({
     height: 44,
     borderRadius: 8,
-    border: `2px solid ${active ? '#FF6B35' : '#D5D2CC'}`,
+    border: `2px solid ${active ? txColors.primary : '#D5D2CC'}`,
     background: active ? '#FFF5F0' : '#FFF',
-    color: active ? '#FF6B35' : '#2C2C2A',
+    color: active ? txColors.primary : '#2C2C2A',
     fontSize: 15,
     fontWeight: active ? 700 : 400,
     cursor: 'pointer',
@@ -306,7 +307,7 @@ function CollectTab() {
         )}
 
         <button
-          style={S.btn('#FF6B35', loading || !sessionId || !amountYuan)}
+          style={S.btn(txColors.primary, loading || !sessionId || !amountYuan)}
           disabled={loading || !sessionId || !amountYuan}
           onClick={handleSubmit}
         >
@@ -413,7 +414,7 @@ function BalanceTab() {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                 <span style={{ color: '#888', fontSize: 14 }}>可用余额</span>
-                <span style={{ color: '#FF6B35', fontSize: 22, fontWeight: 700 }}>
+                <span style={{ color: txColors.primary, fontSize: 22, fontWeight: 700 }}>
                   {fmtYuan(balance.total_balance_fen)}
                 </span>
               </div>
@@ -574,7 +575,7 @@ function RefundTab() {
             background: '#FFF5F0', borderRadius: 8, padding: '12px 16px', marginBottom: 16,
           }}>
             <span style={{ color: '#888', fontSize: 14 }}>可退余额</span>
-            <span style={{ color: '#FF6B35', fontSize: 22, fontWeight: 700 }}>
+            <span style={{ color: txColors.primary, fontSize: 22, fontWeight: 700 }}>
               {fmtYuan(balance)}
             </span>
           </div>

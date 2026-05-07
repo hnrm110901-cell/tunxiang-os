@@ -7,13 +7,14 @@ import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',

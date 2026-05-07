@@ -3,6 +3,7 @@
  */
 import { useState } from 'react';
 import { Card, Input, Button, Select, Typography, Space, Tag, Empty, List } from 'antd';
+import { txColors } from '@tx/tokens';
 import {
   SearchOutlined,
   ThunderboltOutlined,
@@ -13,10 +14,10 @@ const { TextArea } = Input;
 const { Text, Paragraph } = Typography;
 
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  info: txColors.info,
   textSub: '#5F5E5A',
   textMuted: '#B4B2A9',
   border: '#E8E6E1',

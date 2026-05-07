@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 interface CourseStatus {
   course_name: string;
@@ -27,7 +28,7 @@ function statusIcon(status: CourseStatus['status']): string {
 
 function statusColor(status: CourseStatus['status']): string {
   if (status === 'completed') return '#22c55e';
-  if (status === 'fired') return '#FF6B35';
+  if (status === 'fired') return txColors.primary;
   return '#64748b';
 }
 
@@ -98,7 +99,7 @@ export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
       {suggestion && (
         <div style={{
           background: '#1a2a33',
-          borderLeft: '3px solid #FF6B35',
+          borderLeft: `3px solid ${txColors.primary}`,
           padding: '10px 16px',
           display: 'flex',
           alignItems: 'center',
@@ -110,7 +111,7 @@ export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
             <button
               onClick={handleSuggestionFire}
               style={{
-                background: '#FF6B35',
+                background: txColors.primary,
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
@@ -177,7 +178,7 @@ export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
             <button
               onClick={() => setConfirmCourse(course)}
               style={{
-                background: '#FF6B35',
+                background: txColors.primary,
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
@@ -195,7 +196,7 @@ export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
           )}
 
           {course.status === 'fired' && (
-            <div style={{ color: '#FF6B35', fontSize: 14, textAlign: 'right', whiteSpace: 'nowrap' }}>
+            <div style={{ color: txColors.primary, fontSize: 14, textAlign: 'right', whiteSpace: 'nowrap' }}>
               已开火，等待出餐
             </div>
           )}
@@ -237,7 +238,7 @@ export function CourseFiringPanel({ orderId: _orderId, onFire }: Props) {
                 disabled={loading}
                 style={{
                   flex: 1,
-                  background: '#FF6B35',
+                  background: txColors.primary,
                   color: '#fff',
                   border: 'none',
                   borderRadius: 10,

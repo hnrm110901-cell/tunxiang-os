@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * order-detail/review/index.tsx — 订单评价页
  *
@@ -23,7 +24,7 @@ import { txRequest } from '../../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
   bgDeep:     '#0B1A20',
   bgCard:     '#132029',
@@ -36,7 +37,7 @@ const C = {
   successDim: 'rgba(76,175,80,0.15)',
   white:      '#fff',
   disabled:   '#2A4050',
-  star:       '#FF6B35',
+  star:       txColors.primary,
   starEmpty:  '#2A4050',
 } as const
 

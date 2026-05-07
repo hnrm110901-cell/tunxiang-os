@@ -18,6 +18,7 @@
  */
 
 import { txFetchData } from './client';
+import { txColors } from '@tx/tokens';
 
 // ─── 公共工具 ──────────────────────────────────────────────────────────────
 
@@ -301,13 +302,13 @@ export interface KDSCallConfig {
 export const DEFAULT_KDS_CALL_CONFIG: Omit<KDSCallConfig, 'store_id'> = {
   push_mode: 'IMMEDIATE',
   timeout_warn_seconds: 300,
-  timeout_color: '#A32D2D',
-  warn_color: '#BA7517',
+  timeout_color: txColors.danger,
+  warn_color: txColors.warning,
   urgent_blink: true,
-  urgent_color: '#FF6B35',
-  channel_color_dine_in: '#0F6E56',
-  channel_color_takeaway: '#185FA5',
-  channel_color_delivery: '#BA7517',
+  urgent_color: txColors.primary,
+  channel_color_dine_in: txColors.success,
+  channel_color_takeaway: txColors.info,
+  channel_color_delivery: txColors.warning,
   channel_color_self_order: '#9B59B6',
   show_gift_badge: true,
   show_void_badge: true,

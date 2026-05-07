@@ -52,6 +52,7 @@ import {
 import dayjs, { Dayjs } from 'dayjs';
 import isoWeek from 'dayjs/plugin/isoWeek';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 dayjs.extend(isoWeek);
 
@@ -566,7 +567,7 @@ function MonthView({ storeId }: { storeId: string }) {
                       {dayjs(cell.date).format('D')}
                     </div>
                     <div style={{ marginTop: 4 }}>
-                      <Tag color="#FF6B35" style={{ fontSize: 14, padding: '2px 8px' }}>
+                      <Tag color={txColors.primary} style={{ fontSize: 14, padding: '2px 8px' }}>
                         {cell.total_scheduled}人
                       </Tag>
                     </div>
@@ -719,7 +720,7 @@ function TemplatePanel({ storeId }: { storeId: string }) {
                   <Button
                     type="link"
                     size="small"
-                    style={{ color: '#FF6B35' }}
+                    style={{ color: txColors.primary }}
                     onClick={() => setApplyModal(tpl.id)}
                   >
                     应用
@@ -894,7 +895,7 @@ function AIForecastCard({ storeId, weekStart }: { storeId: string; weekStart: Da
     <Card
       title={
         <Space>
-          <BulbOutlined style={{ color: '#FF6B35' }} />
+          <BulbOutlined style={{ color: txColors.primary }} />
           <span>智能排班建议</span>
         </Space>
       }
@@ -903,7 +904,7 @@ function AIForecastCard({ storeId, weekStart }: { storeId: string; weekStart: Da
           type="primary"
           icon={<CheckOutlined />}
           onClick={handleAdopt}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
         >
           采纳建议
         </Button>
@@ -1000,7 +1001,7 @@ export function SchedulePage() {
     <div style={{ padding: 24 }}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 24 }}>
         <Col>
-          <Title level={3} style={{ margin: 0, color: '#FF6B35' }}>
+          <Title level={3} style={{ margin: 0, color: txColors.primary }}>
             <CalendarOutlined style={{ marginRight: 8 }} />
             员工排班管理
           </Title>

@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'react';
 import { txFetch } from '../api/index';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -220,7 +221,7 @@ export function StoredValuePage() {
             outline: 'none',
             minWidth: 0,
           }}
-          onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
+          onFocus={(e) => { e.currentTarget.style.borderColor = txColors.primary; }}
           onBlur={(e) => { e.currentTarget.style.borderColor = '#E8E6E1'; }}
         />
 
@@ -257,7 +258,7 @@ export function StoredValuePage() {
             height: 52,
             padding: '0 28px',
             borderRadius: 12,
-            background: searching ? '#FFB895' : '#FF6B35',
+            background: searching ? '#FFB895' : txColors.primary,
             color: '#FFFFFF',
             fontSize: 18,
             fontWeight: 700,
@@ -283,7 +284,7 @@ export function StoredValuePage() {
             background: '#FFF0F0',
             border: '1.5px solid #FFCCCC',
             borderRadius: 12,
-            color: '#A32D2D',
+            color: txColors.danger,
             fontSize: 17,
             marginBottom: 20,
             fontWeight: 500,
@@ -297,9 +298,9 @@ export function StoredValuePage() {
           <div style={{
             padding: '16px 20px',
             background: depositResult.includes('成功') ? '#F0FFF8' : '#FFF0F0',
-            border: `1.5px solid ${depositResult.includes('成功') ? '#0F6E56' : '#FFCCCC'}`,
+            border: `1.5px solid ${depositResult.includes('成功') ? txColors.success : '#FFCCCC'}`,
             borderRadius: 12,
-            color: depositResult.includes('成功') ? '#0F6E56' : '#A32D2D',
+            color: depositResult.includes('成功') ? txColors.success : txColors.danger,
             fontSize: 17,
             marginBottom: 20,
             fontWeight: 600,
@@ -363,7 +364,7 @@ export function StoredValuePage() {
               <div style={{
                 fontSize: 52,
                 fontWeight: 800,
-                color: '#FF6B35',
+                color: txColors.primary,
                 letterSpacing: -1,
                 lineHeight: 1.1,
               }}>
@@ -379,8 +380,8 @@ export function StoredValuePage() {
               marginBottom: 24,
             }}>
               {[
-                { label: '累计充值', value: `¥${fenToYuan(account.total_deposit_fen)}`, color: '#0F6E56' },
-                { label: '累计消费', value: `¥${fenToYuan(account.total_spent_fen)}`, color: '#A32D2D' },
+                { label: '累计充值', value: `¥${fenToYuan(account.total_deposit_fen)}`, color: txColors.success },
+                { label: '累计消费', value: `¥${fenToYuan(account.total_spent_fen)}`, color: txColors.danger },
                 { label: '最后交易', value: formatDate(account.last_txn_at).split(' ')[0], color: '#5F5E5A' },
               ].map((item) => (
                 <div key={item.label} style={{
@@ -502,9 +503,9 @@ export function StoredValuePage() {
                       ...btnBase,
                       height: 72,
                       borderRadius: 14,
-                      border: `2px solid ${isSelected ? '#FF6B35' : '#E8E6E1'}`,
-                      background: isSelected ? '#FFF3ED' : '#F8F7F5',
-                      color: isSelected ? '#FF6B35' : '#2C2C2A',
+                      border: `2px solid ${isSelected ? txColors.primary : '#E8E6E1'}`,
+                      background: isSelected ? txColors.primaryLight : '#F8F7F5',
+                      color: isSelected ? txColors.primary : '#2C2C2A',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
@@ -545,7 +546,7 @@ export function StoredValuePage() {
                   color: '#2C2C2A',
                   outline: 'none',
                 }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = '#FF6B35'; }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = txColors.primary; }}
                 onBlur={(e) => { e.currentTarget.style.borderColor = '#E8E6E1'; }}
               />
             </div>
@@ -561,10 +562,10 @@ export function StoredValuePage() {
                 justifyContent: 'space-between',
                 alignItems: 'center',
               }}>
-                <span style={{ fontSize: 16, color: '#0F6E56' }}>
+                <span style={{ fontSize: 16, color: txColors.success }}>
                   充¥{depositYuan} 赠¥{bonusYuan}（赠5%）
                 </span>
-                <span style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>
+                <span style={{ fontSize: 18, fontWeight: 700, color: txColors.success }}>
                   实到¥{depositYuan + bonusYuan}
                 </span>
               </div>
@@ -724,7 +725,7 @@ export function StoredValuePage() {
                   <div style={{
                     fontSize: 18,
                     fontWeight: 700,
-                    color: txn.type === 'deposit' ? '#0F6E56' : '#A32D2D',
+                    color: txn.type === 'deposit' ? txColors.success : txColors.danger,
                   }}>
                     {txn.type === 'deposit' ? '+' : '-'}¥{fenToYuan(txn.amount_fen)}
                   </div>

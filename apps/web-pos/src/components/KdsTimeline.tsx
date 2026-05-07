@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * KdsTimeline — 出餐节奏引擎时间线视图
  *
@@ -40,7 +41,7 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',

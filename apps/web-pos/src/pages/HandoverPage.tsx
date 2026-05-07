@@ -10,19 +10,20 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  green: '#0F6E56',
+  accent: txColors.primary,
+  green: txColors.success,
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  danger: '#A32D2D',
-  warning: '#BA7517',
+  danger: txColors.danger,
+  warning: txColors.warning,
 };
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
@@ -43,7 +44,7 @@ const MOCK_SHIFT = {
     { name: '支付宝', fen: 486000, color: '#1677FF' },
     { name: '现金', fen: 215000, color: '#faad14' },
     { name: '银联刷卡', fen: 98000, color: '#e6002d' },
-    { name: '企业挂账', fen: 45000, color: '#185FA5' },
+    { name: '企业挂账', fen: 45000, color: txColors.info },
     { name: '退款', fen: -8000, color: '#ff4d4f' },
   ],
   systemCashFen: 215000, // 系统记录应有现金

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * settings/index.tsx — 设置页
  *
@@ -17,7 +18,7 @@ import { txRequest } from '../../utils/request'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * VideoPlayer — 菜品短视频展示组件
  *
@@ -14,7 +15,7 @@ import { View, Text, Video } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   border: '#1E3340',
@@ -60,8 +61,8 @@ export function VideoPlayer({ videos, dishName, liveStream, onVideoTap }: VideoP
 
   const typeLabels: Record<DishVideo['type'], { label: string; color: string }> = {
     cooking: { label: '烹饪过程', color: C.primary },
-    ingredient: { label: '食材展示', color: '#0F6E56' },
-    review: { label: '顾客评价', color: '#185FA5' },
+    ingredient: { label: '食材展示', color: txColors.success },
+    review: { label: '顾客评价', color: txColors.info },
     live: { label: '直播', color: C.live },
   }
 

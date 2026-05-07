@@ -44,14 +44,15 @@ import { ProTable, StatisticCard } from '@ant-design/pro-components';
 import type { ColumnsType } from 'antd/es/table';
 import { Bar } from '@ant-design/charts';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token（深色驾驶舱主题）───────────────────────────────────────────
 const C = {
-  primary:   '#FF6B35',
-  success:   '#0F6E56',
-  warning:   '#BA7517',
-  danger:    '#A32D2D',
-  info:      '#185FA5',
+  primary:   txColors.primary,
+  success:   txColors.success,
+  warning:   txColors.warning,
+  danger:    txColors.danger,
+  info:      txColors.info,
   cardBg:    '#112228',
   innerBg:   '#0B1A20',
   border:    '#1a2a33',

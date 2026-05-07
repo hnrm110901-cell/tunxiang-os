@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ─────────────────────────────────────────
    Design Tokens (与全局一致)
@@ -22,13 +23,13 @@ const T = {
   text:     '#E0E0E0',
   muted:    '#64748b',
   dim:      '#334155',
-  primary:  '#FF6B35',        // 主色 上班打卡按钮
-  primaryAct: '#E55A28',
-  navy:     '#1E2A3A',        // 下班打卡按钮底色
-  success:  '#0F6E56',        // 已完成绿色
+  primary:  txColors.primary,        // 主色 上班打卡按钮
+  primaryAct: txColors.primaryActive,
+  navy:     txColors.navy,        // 下班打卡按钮底色
+  success:  txColors.success,        // 已完成绿色
   successBg: '#0a2820',
   successTxt: '#30D158',
-  warning:  '#BA7517',
+  warning:  txColors.warning,
 };
 
 /* ─────────────────────────────────────────

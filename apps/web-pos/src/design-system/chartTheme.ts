@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * 屯象OS · ECharts 主题配置
  * 用法: <ReactECharts option={option} theme={txChartTheme(isDark)} />
@@ -5,7 +6,7 @@
  */
 
 const LIGHT_PALETTE = [
-  '#FF6B35', '#3B82F6', '#FFC244', '#FF7A3D', '#8B5CF6',
+  txColors.primary, '#3B82F6', '#FFC244', '#FF7A3D', '#8B5CF6',
   '#EC4899', '#1A7A52', '#C8923A', '#6366F1', '#84CC16',
 ];
 

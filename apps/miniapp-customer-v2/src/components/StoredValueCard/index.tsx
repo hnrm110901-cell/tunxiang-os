@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * StoredValueCard — gradient dark card for stored-value balance
  *
@@ -214,7 +215,7 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
             >
               <Text
                 style={{
-                  color: '#FF6B35',
+                  color: txColors.primary,
                   fontSize: '22rpx',
                   fontWeight: '600',
                 }}
@@ -224,7 +225,7 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
             </View>
             <Text
               style={{
-                color: '#FF6B35',
+                color: txColors.primary,
                 fontSize: '28rpx',
                 fontWeight: '600',
               }}
@@ -257,7 +258,7 @@ const StoredValueCard: React.FC<StoredValueCardProps> = ({
           style={{
             flex: 1,
             height: '88rpx',
-            background: '#FF6B35',
+            background: txColors.primary,
             borderRadius: '44rpx',
             display: 'flex',
             alignItems: 'center',

@@ -45,7 +45,7 @@
 
 .sidebar .item.active {
   background: var(--tx-bg-primary, #0B1A20);
-  border-left-color: #FF6B2C;
+  border-left-color: var(--tx-primary);
   color: var(--tx-text-primary, #e2e8f0);
 }
 
@@ -107,7 +107,7 @@
 }
 
 .topbar .item.active {
-  background: #FF6B2C;
+  background: var(--tx-primary);
   color: #fff;
   font-weight: 600;
 }

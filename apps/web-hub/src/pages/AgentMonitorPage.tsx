@@ -6,12 +6,13 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { hubGet } from '../api/hubApi';
+import { txColors } from '@tx/tokens';
 
 // ── 颜色常量（与 Hub 主题一致）──
 const BG_0 = '#0B1A20';
 const BG_1 = '#0D2129';
 const BG_2 = '#1A3540';
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 const GREEN = '#22C55E';
 const RED = '#EF4444';
 const YELLOW = '#F59E0B';

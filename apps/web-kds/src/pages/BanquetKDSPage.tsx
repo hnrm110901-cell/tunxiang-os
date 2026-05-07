@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { getStoreToken } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
 
@@ -434,7 +435,7 @@ export function BanquetKDSPage() {
         height: 56,
         display: 'flex', alignItems: 'center', gap: 16,
       }}>
-        <span style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35' }}>🍽 宴会出品</span>
+        <span style={{ fontSize: 18, fontWeight: 700, color: txColors.primary }}>🍽 宴会出品</span>
         <span style={{ color: '#718096', fontSize: 14 }}>
           共 {total} 场在进行
         </span>

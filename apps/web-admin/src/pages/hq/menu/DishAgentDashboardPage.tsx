@@ -10,6 +10,7 @@ import type { TabsProps } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { Progress } from 'antd';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface HealthRow {
@@ -92,7 +93,7 @@ const healthColumns: ProColumns<HealthRow>[] = [
   {
     title: '毛利率', dataIndex: 'margin', width: 90,
     render: (_, r) => (
-      <span style={{ color: r.margin < 30 ? '#A32D2D' : r.margin < 45 ? '#BA7517' : '#0F6E56', fontWeight: 600 }}>
+      <span style={{ color: r.margin < 30 ? txColors.danger : r.margin < 45 ? txColors.warning : txColors.success, fontWeight: 600 }}>
         {r.margin}%
       </span>
     ),
@@ -108,7 +109,7 @@ const healthColumns: ProColumns<HealthRow>[] = [
   {
     title: '健康评分', dataIndex: 'healthScore', width: 90,
     render: (_, r) => (
-      <span style={{ color: r.healthScore < 60 ? '#A32D2D' : '#2C2C2A', fontWeight: 700 }}>
+      <span style={{ color: r.healthScore < 60 ? txColors.danger : '#2C2C2A', fontWeight: 700 }}>
         {r.healthScore}
       </span>
     ),
@@ -139,7 +140,7 @@ const soldOutColumns: ProColumns<SoldOutRow>[] = [
   { title: '今日已售', dataIndex: 'soldToday',         width: 90, render: (_, r) => `${r.soldToday}份` },
   {
     title: '预计沽清时间', dataIndex: 'predictSoldOutTime', width: 130,
-    render: (_, r) => <span style={{ color: '#A32D2D', fontWeight: 600 }}>{r.predictSoldOutTime}</span>,
+    render: (_, r) => <span style={{ color: txColors.danger, fontWeight: 600 }}>{r.predictSoldOutTime}</span>,
   },
   { title: '替代菜品', dataIndex: 'alternative', width: 110 },
   {
@@ -160,7 +161,7 @@ const kitchenColumns: ProColumns<KitchenRow>[] = [
   {
     title: '缺口', dataIndex: 'gap', width: 80,
     render: (_, r) => (
-      <span style={{ color: r.gap === '无缺口' ? '#0F6E56' : '#A32D2D', fontWeight: 600 }}>
+      <span style={{ color: r.gap === '无缺口' ? txColors.success : txColors.danger, fontWeight: 600 }}>
         {r.gap}
       </span>
     ),
@@ -234,7 +235,7 @@ const tabItems: TabsProps['items'] = [
 // ---- 页面组件 ----
 export const DishAgentDashboardPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部 Alert */}
         <Alert
@@ -251,17 +252,17 @@ export const DishAgentDashboardPage: React.FC = () => {
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="本周新品" value={3} suffix="道" valueStyle={{ color: '#0F6E56' }} />
+              <Statistic title="本周新品" value={3} suffix="道" valueStyle={{ color: txColors.success }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="建议下架" value={2} suffix="道" valueStyle={{ color: '#A32D2D' }} />
+              <Statistic title="建议下架" value={2} suffix="道" valueStyle={{ color: txColors.danger }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
-              <Statistic title="毛利预警" value={8} suffix="道" valueStyle={{ color: '#BA7517' }} />
+              <Statistic title="毛利预警" value={8} suffix="道" valueStyle={{ color: txColors.warning }} />
             </Card>
           </Col>
         </Row>

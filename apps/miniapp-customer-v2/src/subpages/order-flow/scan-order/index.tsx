@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * scan-order/index.tsx — 扫码点餐入口
  *
@@ -18,7 +19,7 @@ import { useStoreInfo } from '../../../store/useStoreInfo'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgOverlay: 'rgba(11,26,32,0.75)',

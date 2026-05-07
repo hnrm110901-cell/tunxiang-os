@@ -32,6 +32,7 @@ import {
   type KDSRuleConfig,
 } from '../api/kdsRulesApi';
 import { DeliveryOrderBadge } from '../components/DeliveryOrderBadge';
+import { txColors } from '@tx/tokens';
 
 
 // ─── CSS Variables ──────────────────────────────────────
@@ -599,7 +600,7 @@ export function KDSBoardPage() {
             style={{
               fontSize: 22,
               fontWeight: 800,
-              color: '#FF6B35',
+              color: txColors.primary,
               letterSpacing: 1,
             }}
           >
@@ -611,7 +612,7 @@ export function KDSBoardPage() {
               borderRadius: 8,
               background: 'rgba(255,107,53,0.12)',
               border: '1px solid rgba(255,107,53,0.25)',
-              color: '#FF6B35',
+              color: txColors.primary,
               fontSize: 16,
               fontWeight: 600,
             }}
@@ -637,12 +638,12 @@ export function KDSBoardPage() {
         {/* 中：统计数字 + 视图切换 */}
         <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
           <div style={{ display: 'flex', gap: 32, alignItems: 'center' }}>
-            <StatItem label="待制作" value={pendingCount} color="#BA7517" />
-            <StatItem label="制作中" value={cookingCount} color="#185FA5" />
+            <StatItem label="待制作" value={pendingCount} color={txColors.warning} />
+            <StatItem label="制作中" value={cookingCount} color={txColors.info} />
             <StatItem
               label="超时"
               value={overtimeCount}
-              color={overtimeCount > 0 ? '#A32D2D' : '#444'}
+              color={overtimeCount > 0 ? txColors.danger : '#444'}
               blink={overtimeCount > 0}
             />
           </div>
@@ -963,7 +964,7 @@ function ToggleButton({ active, label, onClick }: { active: boolean; label: stri
         borderRadius: 6,
         border: 'none',
         background: active ? 'rgba(255,107,53,0.2)' : 'transparent',
-        color: active ? '#FF6B35' : 'rgba(255,255,255,0.4)',
+        color: active ? txColors.primary : 'rgba(255,255,255,0.4)',
         fontSize: 14,
         fontWeight: active ? 700 : 400,
         cursor: 'pointer',
@@ -1029,7 +1030,7 @@ function DishGroupCard({ dish }: { dish: GroupedDish }) {
           style={{
             fontSize: 28,
             fontWeight: 800,
-            color: '#FF6B35',
+            color: txColors.primary,
             fontFamily: 'JetBrains Mono, monospace',
           }}
         >
@@ -1143,11 +1144,11 @@ export function KDSBoardPageLegacy() {
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '10px 20px', background: '#111', borderBottom: '1px solid #222', minHeight: 56,
       }}>
-        <span style={{ fontWeight: 'bold', fontSize: 24, color: '#FF6B35' }}>后厨看板（旧版）</span>
+        <span style={{ fontWeight: 'bold', fontSize: 24, color: txColors.primary }}>后厨看板（旧版）</span>
         <div style={{ display: 'flex', gap: 32, fontSize: 18 }}>
-          <span>待制作 <b style={{ color: '#BA7517', fontSize: 28 }}>{pending.length}</b></span>
+          <span>待制作 <b style={{ color: txColors.warning, fontSize: 28 }}>{pending.length}</b></span>
           <span>制作中 <b style={{ color: '#4A9EFF', fontSize: 28 }}>{preparing.length}</b></span>
-          <span style={{ color: abnormal.length > 0 ? '#A32D2D' : '#555' }}>
+          <span style={{ color: abnormal.length > 0 ? txColors.danger : '#555' }}>
             异常 <b style={{ fontSize: 28 }}>{abnormal.length}</b>
           </span>
         </div>
@@ -1159,7 +1160,7 @@ export function KDSBoardPageLegacy() {
         <div style={{ ...COL_STYLE, background: '#111500' }}>
           <div style={{
             textAlign: 'center', padding: '8px 0', fontSize: 20,
-            fontWeight: 'bold', color: '#BA7517', borderBottom: '3px solid #BA7517',
+            fontWeight: 'bold', color: txColors.warning, borderBottom: `3px solid ${txColors.warning}`,
           }}>
             待制作 ({pending.length})
           </div>
@@ -1205,7 +1206,7 @@ export function KDSBoardPageLegacy() {
         <div style={{ ...COL_STYLE, background: '#150000' }}>
           <div style={{
             textAlign: 'center', padding: '8px 0', fontSize: 20,
-            fontWeight: 'bold', color: '#A32D2D', borderBottom: '3px solid #A32D2D',
+            fontWeight: 'bold', color: txColors.danger, borderBottom: `3px solid ${txColors.danger}`,
           }}>
             异常 ({abnormal.length})
           </div>

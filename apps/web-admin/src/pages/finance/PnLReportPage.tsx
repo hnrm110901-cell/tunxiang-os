@@ -42,6 +42,7 @@ import {
 } from '@ant-design/icons';
 import { txFetchData, getTenantId, getToken } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -49,11 +50,11 @@ const { Title, Text } = Typography;
 
 const TX_THEME = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
@@ -265,7 +266,7 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
         <polyline
           points={revPoints}
           fill="none"
-          stroke="#FF6B35"
+          stroke={txColors.primary}
           strokeWidth="2.5"
           strokeLinejoin="round"
         />
@@ -274,7 +275,7 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
         <polyline
           points={foodPoints}
           fill="none"
-          stroke="#185FA5"
+          stroke={txColors.info}
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -283,7 +284,7 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
         <polyline
           points={profitPoints}
           fill="none"
-          stroke="#0F6E56"
+          stroke={txColors.success}
           strokeWidth="2"
           strokeLinejoin="round"
         />
@@ -293,7 +294,7 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
           <g key={i}>
             <circle
               cx={toX(i)} cy={toY(d.net_revenue_fen)}
-              r="4" fill="#FF6B35"
+              r="4" fill={txColors.primary}
               style={{ cursor: 'pointer' }}
             >
               <title>
@@ -307,7 +308,7 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
             {d.gross_profit_fen !== null && (
               <circle
                 cx={toX(i)} cy={toY(d.gross_profit_fen)}
-                r="3" fill="#0F6E56"
+                r="3" fill={txColors.success}
                 style={{ cursor: 'pointer' }}
               >
                 <title>
@@ -321,11 +322,11 @@ function DailyTrendChart({ data, loading }: LineChartProps) {
 
         {/* 图例 */}
         <g transform={`translate(${PAD_L}, ${PAD_T - 5})`}>
-          <rect x="0" y="-8" width="12" height="3" fill="#FF6B35" rx="1" />
+          <rect x="0" y="-8" width="12" height="3" fill={txColors.primary} rx="1" />
           <text x="16" y="0" fontSize="11" fill="#5F5E5A">营收</text>
-          <rect x="52" y="-8" width="12" height="3" fill="#185FA5" rx="1" />
+          <rect x="52" y="-8" width="12" height="3" fill={txColors.info} rx="1" />
           <text x="68" y="0" fontSize="11" fill="#5F5E5A">食材成本</text>
-          <rect x="124" y="-8" width="12" height="3" fill="#0F6E56" rx="1" />
+          <rect x="124" y="-8" width="12" height="3" fill={txColors.success} rx="1" />
           <text x="140" y="0" fontSize="11" fill="#5F5E5A">毛利</text>
         </g>
       </svg>
@@ -345,7 +346,7 @@ interface BudgetRowProps {
 function BudgetRow({ label, targetFen, actualFen, overBudget }: BudgetRowProps) {
   const rate = targetFen > 0 ? Math.min((actualFen / targetFen) * 100, 150) : 0;
   const displayRate = targetFen > 0 ? ((actualFen / targetFen) * 100).toFixed(1) : '0.0';
-  const barColor = overBudget ? '#A32D2D' : rate >= 90 ? '#0F6E56' : '#BA7517';
+  const barColor = overBudget ? txColors.danger : rate >= 90 ? txColors.success : txColors.warning;
 
   return (
     <div style={{ marginBottom: 16 }}>
@@ -362,7 +363,7 @@ function BudgetRow({ label, targetFen, actualFen, overBudget }: BudgetRowProps) 
             style={{
               fontSize: 12,
               fontWeight: 600,
-              color: overBudget ? '#A32D2D' : rate >= 90 ? '#0F6E56' : '#BA7517',
+              color: overBudget ? txColors.danger : rate >= 90 ? txColors.success : txColors.warning,
             }}
           >
             {displayRate}%
@@ -529,7 +530,7 @@ export default function PnLReportPage() {
       dataIndex: ['revenue', 'total_fen'],
       width: 110,
       render: (_, r) => (
-        <Text style={{ color: '#FF6B35', fontWeight: 600 }}>
+        <Text style={{ color: txColors.primary, fontWeight: 600 }}>
           ¥{fenToWan(r.revenue.total_fen)}
         </Text>
       ),
@@ -578,7 +579,7 @@ export default function PnLReportPage() {
       width: 110,
       render: (_, r) => (
         <Text
-          style={{ color: r.gross_profit_fen < 0 ? '#A32D2D' : '#0F6E56', fontWeight: 600 }}
+          style={{ color: r.gross_profit_fen < 0 ? txColors.danger : txColors.success, fontWeight: 600 }}
         >
           ¥{fenToWan(r.gross_profit_fen)}
         </Text>
@@ -601,8 +602,8 @@ export default function PnLReportPage() {
   // 毛利率颜色
   const grossMarginColor =
     summary && summary.gross_margin_rate * 100 < 30
-      ? '#A32D2D'
-      : '#0F6E56';
+      ? txColors.danger
+      : txColors.success;
 
   return (
     <ConfigProvider theme={TX_THEME}>
@@ -668,7 +669,7 @@ export default function PnLReportPage() {
                   precision={2}
                   prefix="¥"
                   suffix="万"
-                  valueStyle={{ color: '#FF6B35', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.primary, fontWeight: 700 }}
                 />
                 <div style={{ marginTop: 8, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   <Tag color="blue" style={{ fontSize: 11 }}>
@@ -695,7 +696,7 @@ export default function PnLReportPage() {
                   precision={2}
                   prefix="¥"
                   suffix="万"
-                  valueStyle={{ color: '#185FA5', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.info, fontWeight: 700 }}
                 />
                 {summary && summary.revenue.total_fen > 0 && (
                   <div style={{ marginTop: 8 }}>
@@ -723,7 +724,7 @@ export default function PnLReportPage() {
                   precision={2}
                   prefix="¥"
                   suffix="万"
-                  valueStyle={{ color: '#BA7517', fontWeight: 700 }}
+                  valueStyle={{ color: txColors.warning, fontWeight: 700 }}
                 />
                 {summary && summary.revenue.total_fen > 0 && (
                   <div style={{ marginTop: 8 }}>
@@ -749,7 +750,7 @@ export default function PnLReportPage() {
                 style={{
                   height: '100%',
                   borderColor:
-                    summary && summary.gross_margin_rate * 100 < 30 ? '#A32D2D' : undefined,
+                    summary && summary.gross_margin_rate * 100 < 30 ? txColors.danger : undefined,
                 }}
               >
                 <Statistic
@@ -775,14 +776,14 @@ export default function PnLReportPage() {
                       毛利率 {pctDisplay(summary.gross_margin_rate)}
                     </Tag>
                     {summary.gross_margin_rate * 100 >= 50 ? (
-                      <ArrowUpOutlined style={{ color: '#0F6E56' }} />
+                      <ArrowUpOutlined style={{ color: txColors.success }} />
                     ) : (
-                      <ArrowDownOutlined style={{ color: '#A32D2D' }} />
+                      <ArrowDownOutlined style={{ color: txColors.danger }} />
                     )}
                   </div>
                 )}
                 {summary && summary.gross_margin_rate * 100 < 30 && (
-                  <div style={{ marginTop: 4, fontSize: 11, color: '#A32D2D' }}>
+                  <div style={{ marginTop: 4, fontSize: 11, color: txColors.danger }}>
                     ⚠ 毛利率低于30%，请关注成本控制
                   </div>
                 )}
@@ -902,10 +903,10 @@ export default function PnLReportPage() {
                       percent={Math.round(budgetExec.execution_rate * 100)}
                       strokeColor={
                         budgetExec.execution_rate >= 0.95
-                          ? '#0F6E56'
+                          ? txColors.success
                           : budgetExec.execution_rate >= 0.80
-                          ? '#BA7517'
-                          : '#A32D2D'
+                          ? txColors.warning
+                          : txColors.danger
                       }
                       style={{ flex: 1 }}
                       size="small"

@@ -6,6 +6,7 @@
  * 10秒轮询排队数据
  */
 import { useState, useEffect, useCallback, type CSSProperties } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ======================== 类型 ======================== */
 interface TableQueue {
@@ -191,7 +192,7 @@ export default function WaitingDisplayPage() {
     flexShrink: 0,
     height: 60,
     background: 'linear-gradient(90deg, #3d1200 0%, #2a0e00 50%, #3d1200 100%)',
-    borderBottom: '2px solid #FF6B35',
+    borderBottom: `2px solid ${txColors.primary}`,
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -258,7 +259,7 @@ export default function WaitingDisplayPage() {
           </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 30 }}>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35' }}>排队叫号</span>
+          <span style={{ fontSize: 20, fontWeight: 700, color: txColors.primary }}>排队叫号</span>
           <span style={{
             fontSize: 24, fontWeight: 600, color: '#c8a882',
             fontVariantNumeric: 'tabular-nums',
@@ -284,7 +285,7 @@ export default function WaitingDisplayPage() {
                 {q.label}
               </div>
               <div style={{
-                fontSize: 48, fontWeight: 900, color: '#FF6B35',
+                fontSize: 48, fontWeight: 900, color: txColors.primary,
                 fontVariantNumeric: 'tabular-nums',
                 textShadow: '0 0 20px rgba(255, 107, 53, 0.4)',
               }}>
@@ -325,13 +326,13 @@ export default function WaitingDisplayPage() {
             </div>
             {/* 菜品信息 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ fontSize: 20, color: '#FF6B35', fontWeight: 700, letterSpacing: 4 }}>
+              <div style={{ fontSize: 20, color: txColors.primary, fontWeight: 700, letterSpacing: 4 }}>
                 今日推荐
               </div>
               <div style={{ fontSize: 48, fontWeight: 900, color: '#fff', letterSpacing: 4 }}>
                 {currentDish.name}
               </div>
-              <div style={{ fontSize: 56, fontWeight: 900, color: '#FF6B35', fontVariantNumeric: 'tabular-nums' }}>
+              <div style={{ fontSize: 56, fontWeight: 900, color: txColors.primary, fontVariantNumeric: 'tabular-nums' }}>
                 {'\u00A5'}{currentDish.price}
               </div>
               <div style={{
@@ -370,14 +371,14 @@ export default function WaitingDisplayPage() {
             width: '100%',
           }}>
             {/* 装饰引号 */}
-            <div style={{ fontSize: 60, color: '#FF6B35', lineHeight: 0.6, opacity: 0.4 }}>{'\u201C'}</div>
+            <div style={{ fontSize: 60, color: txColors.primary, lineHeight: 0.6, opacity: 0.4 }}>{'\u201C'}</div>
             <div style={{ fontSize: 28, fontWeight: 800, color: '#fff', letterSpacing: 4 }}>
               {currentStory.title}
             </div>
             <div style={{ fontSize: 20, color: '#c8a882', lineHeight: 1.8, letterSpacing: 1 }}>
               {currentStory.content}
             </div>
-            <div style={{ fontSize: 60, color: '#FF6B35', lineHeight: 0.6, opacity: 0.4, textAlign: 'right' }}>{'\u201D'}</div>
+            <div style={{ fontSize: 60, color: txColors.primary, lineHeight: 0.6, opacity: 0.4, textAlign: 'right' }}>{'\u201D'}</div>
           </div>
           <div style={{ fontSize: 14, color: '#555', marginTop: 16 }}>
             {storyIndex + 1} / {BRAND_STORIES.length} \u00b7 每30秒自动切换

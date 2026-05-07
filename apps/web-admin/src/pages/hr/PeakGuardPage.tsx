@@ -63,6 +63,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -131,9 +132,9 @@ const PEAK_TYPE_OPTIONS = Object.entries(PEAK_TYPE_LABEL).map(([value, label]) =
 }));
 
 function coverageColor(score: number): string {
-  if (score < 60) return '#A32D2D';
-  if (score < 80) return '#BA7517';
-  return '#0F6E56';
+  if (score < 60) return txColors.danger;
+  if (score < 80) return txColors.warning;
+  return txColors.success;
 }
 
 function coverageStatus(score: number): 'exception' | 'normal' | 'success' {
@@ -338,7 +339,7 @@ export default function PeakGuardPage() {
           statistic={{
             title: '覆盖不足门店',
             value: dashboard?.low_coverage_count ?? 0,
-            valueStyle: { color: '#A32D2D' },
+            valueStyle: { color: txColors.danger },
           }}
         />
       </Col>
@@ -688,7 +689,7 @@ export default function PeakGuardPage() {
               title: '缺口',
               dataIndex: 'gap',
               render: (v: number) => (
-                <Text style={{ color: v > 0 ? '#A32D2D' : undefined }}>
+                <Text style={{ color: v > 0 ? txColors.danger : undefined }}>
                   {v > 0 ? `-${v}` : v}
                 </Text>
               ),
@@ -800,7 +801,7 @@ export default function PeakGuardPage() {
             保障效果:{' '}
             <Text
               strong
-              style={{ color: evalResult.effectiveness >= 0 ? '#0F6E56' : '#A32D2D' }}
+              style={{ color: evalResult.effectiveness >= 0 ? txColors.success : txColors.danger }}
             >
               {evalResult.effectiveness >= 0 ? '超预期' : '低于预期'}
               {' '}({evalResult.effectiveness > 0 ? '+' : ''}

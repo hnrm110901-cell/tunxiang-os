@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -114,8 +115,8 @@ function StatCard({
 
 function StatusBadge({ status }: { status: AttendanceRecord['status'] }) {
   const map: Record<AttendanceRecord['status'], { label: string; color: string; bg: string }> = {
-    normal:  { label: '正常',   color: '#0F6E56', bg: '#0F6E5622' },
-    late:    { label: '迟到',   color: '#BA7517', bg: '#BA751722' },
+    normal:  { label: '正常',   color: txColors.success, bg: `${txColors.success}22` },
+    late:    { label: '迟到',   color: txColors.warning, bg: `${txColors.warning}22` },
     absent:  { label: '缺勤',   color: '#FF4D4D', bg: '#FF4D4D22' },
     pending: { label: '待打卡', color: '#888',    bg: '#88888822' },
   };
@@ -135,7 +136,7 @@ function StatusBadge({ status }: { status: AttendanceRecord['status'] }) {
 function LeaveTypeBadge({ type }: { type: string }) {
   const colorMap: Record<string, { color: string; bg: string }> = {
     年假: { color: '#3B82F6', bg: '#3B82F622' },
-    病假: { color: '#BA7517', bg: '#BA751722' },
+    病假: { color: txColors.warning, bg: `${txColors.warning}22` },
     事假: { color: '#888',    bg: '#88888822' },
     婚假: { color: '#EC4899', bg: '#EC489922' },
     产假: { color: '#8B5CF6', bg: '#8B5CF622' },
@@ -155,8 +156,8 @@ function LeaveTypeBadge({ type }: { type: string }) {
 
 function LeaveStatusBadge({ status }: { status: LeaveRequest['status'] }) {
   const map: Record<LeaveRequest['status'], { label: string; color: string; bg: string }> = {
-    pending:   { label: '待审批', color: '#BA7517', bg: '#BA751722' },
-    approved:  { label: '已批准', color: '#0F6E56', bg: '#0F6E5622' },
+    pending:   { label: '待审批', color: txColors.warning, bg: `${txColors.warning}22` },
+    approved:  { label: '已批准', color: txColors.success, bg: `${txColors.success}22` },
     rejected:  { label: '已拒绝', color: '#FF4D4D', bg: '#FF4D4D22' },
     cancelled: { label: '已取消', color: '#888',    bg: '#88888822' },
   };
@@ -175,9 +176,9 @@ function LeaveStatusBadge({ status }: { status: LeaveRequest['status'] }) {
 
 function PayrollStatusBadge({ status }: { status: PayrollRecord['status'] }) {
   const map: Record<PayrollRecord['status'], { label: string; color: string; bg: string }> = {
-    draft:     { label: '待确认', color: '#BA7517', bg: '#BA751722' },
+    draft:     { label: '待确认', color: txColors.warning, bg: `${txColors.warning}22` },
     confirmed: { label: '已确认', color: '#3B82F6', bg: '#3B82F622' },
-    paid:      { label: '已发放', color: '#0F6E56', bg: '#0F6E5622' },
+    paid:      { label: '已发放', color: txColors.success, bg: `${txColors.success}22` },
   };
   const s = map[status];
   return (
@@ -233,8 +234,8 @@ function AttendanceTab({
       {/* 统计卡片行 */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
         <StatCard icon="👤" label="应出勤人数" value={summary?.total_expected ?? '-'} />
-        <StatCard icon="✅" label="已到岗" value={summary?.total_present ?? '-'} color="#0F6E56" />
-        <StatCard icon="⏰" label="迟到" value={summary?.total_late ?? '-'} color="#BA7517" />
+        <StatCard icon="✅" label="已到岗" value={summary?.total_present ?? '-'} color={txColors.success} />
+        <StatCard icon="⏰" label="迟到" value={summary?.total_late ?? '-'} color={txColors.warning} />
         <StatCard icon="❌" label="缺勤" value={summary?.total_absent ?? '-'} color="#FF4D4D" />
       </div>
 
@@ -271,7 +272,7 @@ function AttendanceTab({
                   <td style={{ padding: '12px 16px' }}>
                     <StatusBadge status={r.status} />
                   </td>
-                  <td style={{ padding: '12px 16px', color: r.late_minutes ? '#BA7517' : '#888', fontSize: 13 }}>
+                  <td style={{ padding: '12px 16px', color: r.late_minutes ? txColors.warning : '#888', fontSize: 13 }}>
                     {r.late_minutes ? `${r.late_minutes} 分钟` : '—'}
                   </td>
                 </tr>
@@ -292,7 +293,7 @@ function AttendanceTab({
           <div style={{ padding: '8px 16px' }}>
             {anomalies.map((a, idx) => {
               const typeMap: Record<string, { label: string; color: string }> = {
-                late:        { label: '迟到',   color: '#BA7517' },
+                late:        { label: '迟到',   color: txColors.warning },
                 early_leave: { label: '早退',   color: '#8B5CF6' },
                 absent:      { label: '缺勤',   color: '#FF4D4D' },
               };
@@ -373,7 +374,7 @@ function LeaveTab({
         <div style={{ fontSize: 14, color: '#ccc', fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
           待审批请假
           {pending.length > 0 && (
-            <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 12, background: '#BA751722', color: '#BA7517' }}>
+            <span style={{ padding: '2px 8px', borderRadius: 10, fontSize: 12, background: `${txColors.warning}22`, color: txColors.warning }}>
               {pending.length} 条
             </span>
           )}
@@ -387,7 +388,7 @@ function LeaveTab({
             {pending.map(req => (
               <div key={req.id} style={{
                 background: '#1a2a33', borderRadius: 10, padding: '16px 20px',
-                border: '1px solid #BA751744',
+                border: `1px solid ${txColors.warning}44`,
               }}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div style={{ flex: 1 }}>
@@ -397,7 +398,7 @@ function LeaveTab({
                       <span style={{ color: '#ccc', fontSize: 13 }}>
                         {req.start_date} 至 {req.end_date.slice(5)}
                       </span>
-                      <span style={{ color: '#BA7517', fontWeight: 600, fontSize: 13 }}>({req.days}天)</span>
+                      <span style={{ color: txColors.warning, fontWeight: 600, fontSize: 13 }}>({req.days}天)</span>
                     </div>
                     <div style={{ color: '#888', fontSize: 12 }}>
                       申请时间：{new Date(req.applied_at).toLocaleString('zh-CN')}
@@ -500,7 +501,7 @@ function LeaveTab({
                 <tr key={b.employee_id} style={{ borderBottom: '1px solid #2a3a4440' }}>
                   <td style={{ padding: '12px 16px', color: '#fff', fontWeight: 600 }}>{b.employee_name}</td>
                   <td style={{ padding: '12px 16px', color: '#3B82F6', fontWeight: 600 }}>{b.annual_leave}</td>
-                  <td style={{ padding: '12px 16px', color: '#BA7517', fontWeight: 600 }}>{b.sick_leave}</td>
+                  <td style={{ padding: '12px 16px', color: txColors.warning, fontWeight: 600 }}>{b.sick_leave}</td>
                 </tr>
               ))}
             </tbody>
@@ -598,12 +599,12 @@ function PayrollTab({
             <span style={{ color: '#888', fontSize: 13 }}>已确认 <strong style={{ color: '#3B82F6' }}>{payroll?.confirmed_count ?? 0}</strong> 人</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#BA7517', display: 'inline-block' }} />
-            <span style={{ color: '#888', fontSize: 13 }}>待确认 <strong style={{ color: '#BA7517' }}>{payroll?.pending_count ?? 0}</strong> 人</span>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: txColors.warning, display: 'inline-block' }} />
+            <span style={{ color: '#888', fontSize: 13 }}>待确认 <strong style={{ color: txColors.warning }}>{payroll?.pending_count ?? 0}</strong> 人</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0F6E56', display: 'inline-block' }} />
-            <span style={{ color: '#888', fontSize: 13 }}>已发放 <strong style={{ color: '#0F6E56' }}>{payroll?.paid_count ?? 0}</strong> 人</span>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: txColors.success, display: 'inline-block' }} />
+            <span style={{ color: '#888', fontSize: 13 }}>已发放 <strong style={{ color: txColors.success }}>{payroll?.paid_count ?? 0}</strong> 人</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#888', display: 'inline-block' }} />
@@ -631,7 +632,7 @@ function PayrollTab({
                   <span style={{ color: '#888', fontSize: 12 }}>应发：</span>
                   <span style={{ color: '#fff', fontWeight: 700, fontSize: 15 }}>¥{fenToYuan(rec.gross_fen)}</span>
                   <span style={{ color: '#888', fontSize: 12 }}>实发：</span>
-                  <span style={{ color: '#0F6E56', fontWeight: 700, fontSize: 15 }}>¥{fenToYuan(rec.net_fen)}</span>
+                  <span style={{ color: txColors.success, fontWeight: 700, fontSize: 15 }}>¥{fenToYuan(rec.net_fen)}</span>
                 </div>
                 <div style={{ color: '#888', fontSize: 12, marginBottom: 8 }}>
                   基本工资：¥{fenToYuan(rec.base_salary_fen)}
@@ -661,8 +662,8 @@ function PayrollTab({
                     disabled={!!actionLoading[rec.id]}
                     style={{
                       padding: '6px 14px', borderRadius: 6,
-                      border: '1px solid #0F6E5644', background: '#0F6E5622',
-                      color: '#0F6E56', cursor: 'pointer', fontSize: 12,
+                      border: `1px solid ${txColors.success}44`, background: `${txColors.success}22`,
+                      color: txColors.success, cursor: 'pointer', fontSize: 12,
                       opacity: actionLoading[rec.id] ? 0.5 : 1,
                     }}
                   >

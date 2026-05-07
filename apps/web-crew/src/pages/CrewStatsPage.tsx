@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 颜色常量 ---------- */
 const C = {
@@ -12,7 +13,7 @@ const C = {
   border: '#1A1A1A',
   text: '#E0E0E0',
   muted: '#555',
-  primary: '#FF6B35',
+  primary: txColors.primary,
   gold: '#FFD700',
   silver: '#C0C0C0',
   bronze: '#CD7F32',

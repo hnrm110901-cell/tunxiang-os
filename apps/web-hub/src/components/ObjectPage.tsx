@@ -5,6 +5,7 @@
  * 提供统一的 Header + Tab 栏 + 内容区结构，各 Workspace 注入 Tab 内容。
  */
 import { useRef, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ── 颜色常量 ──
 const SURFACE = '#0E1E24';
@@ -14,7 +15,7 @@ const BORDER = '#1A3540';
 const TEXT = '#E6EDF1';
 const TEXT2 = '#94A8B3';
 const TEXT3 = '#647985';
-const ORANGE = '#FF6B35';
+const ORANGE = txColors.primary;
 const GREEN = '#22C55E';
 const YELLOW = '#F59E0B';
 const RED = '#EF4444';

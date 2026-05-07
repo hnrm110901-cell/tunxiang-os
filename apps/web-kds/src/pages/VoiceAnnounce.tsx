@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -160,7 +161,7 @@ const SPEED_LABELS: Record<SpeedLevel, string> = {
 const C = {
   bg: '#0B1A20',
   card: '#112228',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22C55E',
   blue: '#3B82F6',
   orange: '#F59E0B',

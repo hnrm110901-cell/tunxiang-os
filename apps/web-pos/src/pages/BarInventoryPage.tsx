@@ -6,6 +6,7 @@
  * 规范: TXTouch 触控风格，大按钮大字体
  */
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── 卡片数据定义 ─────────────────────────────────────────────────────────────
 
@@ -25,7 +26,7 @@ const ENTRY_CARDS: EntryCard[] = [
     desc: '配置参与盘点的原料品项清单',
     icon: '📋',
     route: '/bar-inventory/item-setting',
-    color: '#FF6B35',
+    color: txColors.primary,
   },
   {
     key: 'requisition',

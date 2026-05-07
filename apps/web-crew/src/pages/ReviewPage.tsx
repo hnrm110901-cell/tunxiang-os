@@ -2,6 +2,7 @@
  * 复盘整改页 — Top3 问题 + Agent 建议 + 整改任务列表
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 类型 ---------- */
 interface TopIssue {
@@ -53,7 +54,7 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',

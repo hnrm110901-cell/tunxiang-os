@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import DOMPurify from 'dompurify';
+import { txColors } from '@tx/tokens';
 import {
   ConfigProvider, Tabs, List, Card, Row, Col, Statistic, Tag, Input, Button,
   Space, Modal, Form, TimePicker, Checkbox, Spin, Empty, Badge,
@@ -25,11 +26,11 @@ const { Text, Paragraph, Title } = Typography;
 
 // ─── 颜色常量 ───
 const COLOR = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  error: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  error: txColors.danger,
+  info: txColors.info,
   bg: '#F8F7F5',
   textSecondary: '#5F5E5A',
   textTertiary: '#B4B2A9',
@@ -717,7 +718,7 @@ export const BriefingCenterPage = () => {
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: COLOR.bg, minHeight: '100vh' }}>
         {/* 页面标题 */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>

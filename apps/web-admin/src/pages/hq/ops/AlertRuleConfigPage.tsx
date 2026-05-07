@@ -4,6 +4,7 @@
  * 调用 /api/v1/ops/alert-rules/*
  */
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Tabs, Table, Tag, Switch, Button, Modal, Form, Input, InputNumber, Select,
   Space, message, Tooltip, Badge, Descriptions, Timeline, Card, Row, Col,
@@ -299,13 +300,13 @@ export function AlertRuleConfigPage() {
       width: 220,
       render: (_: unknown, record: AlertRule) => (
         <Space size={4}>
-          <Tag color="#0F6E56" style={{ minWidth: 56, textAlign: 'center' }}>
+          <Tag color={txColors.success} style={{ minWidth: 56, textAlign: 'center' }}>
             绿 {record.thresholds.green}
           </Tag>
-          <Tag color="#BA7517" style={{ minWidth: 56, textAlign: 'center' }}>
+          <Tag color={txColors.warning} style={{ minWidth: 56, textAlign: 'center' }}>
             黄 {record.thresholds.yellow}
           </Tag>
-          <Tag color="#A32D2D" style={{ minWidth: 56, textAlign: 'center' }}>
+          <Tag color={txColors.danger} style={{ minWidth: 56, textAlign: 'center' }}>
             红 {record.thresholds.red}
           </Tag>
         </Space>
@@ -319,7 +320,7 @@ export function AlertRuleConfigPage() {
         if (record.scope === 'all') return <Tag>全部门店</Tag>;
         return (
           <Tooltip title={record.scope_names.join('、')}>
-            <Tag color="#185FA5">
+            <Tag color={txColors.info}>
               {record.scope === 'region' ? '区域' : '门店'}: {record.scope_names.length}个
             </Tag>
           </Tooltip>
@@ -347,7 +348,7 @@ export function AlertRuleConfigPage() {
       width: 90,
       align: 'center' as const,
       render: (count: number) => (
-        <Badge count={count} showZero style={{ backgroundColor: count > 0 ? '#A32D2D' : '#d9d9d9' }} />
+        <Badge count={count} showZero style={{ backgroundColor: count > 0 ? txColors.danger : '#d9d9d9' }} />
       ),
     },
     {
@@ -409,7 +410,7 @@ export function AlertRuleConfigPage() {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => handleOpenEdit()}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
         >
           新建规则
         </Button>
@@ -418,30 +419,30 @@ export function AlertRuleConfigPage() {
       {/* 统计概览卡片 */}
       <Row gutter={16} style={{ marginBottom: 20 }}>
         <Col span={6}>
-          <Card size="small" style={{ borderLeft: '3px solid #FF6B35' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>{rules.length}</div>
+          <Card size="small" style={{ borderLeft: `3px solid ${txColors.primary}` }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: txColors.primary }}>{rules.length}</div>
             <Text type="secondary" style={{ fontSize: 12 }}>当前域规则总数</Text>
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ borderLeft: '3px solid #0F6E56' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#0F6E56' }}>
+          <Card size="small" style={{ borderLeft: `3px solid ${txColors.success}` }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: txColors.success }}>
               {rules.filter((r) => r.enabled).length}
             </div>
             <Text type="secondary" style={{ fontSize: 12 }}>已启用</Text>
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ borderLeft: '3px solid #A32D2D' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#A32D2D' }}>
+          <Card size="small" style={{ borderLeft: `3px solid ${txColors.danger}` }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: txColors.danger }}>
               {rules.reduce((sum, r) => sum + r.trigger_count_7d, 0)}
             </div>
             <Text type="secondary" style={{ fontSize: 12 }}>近7日触发次数</Text>
           </Card>
         </Col>
         <Col span={6}>
-          <Card size="small" style={{ borderLeft: '3px solid #BA7517' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: '#BA7517' }}>
+          <Card size="small" style={{ borderLeft: `3px solid ${txColors.warning}` }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: txColors.warning }}>
               {rules.filter((r) => !r.enabled).length}
             </div>
             <Text type="secondary" style={{ fontSize: 12 }}>已禁用</Text>
@@ -478,7 +479,7 @@ export function AlertRuleConfigPage() {
         width={680}
         okText="保存"
         cancelText="取消"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         destroyOnClose
       >
         <Form form={editForm} layout="vertical" style={{ marginTop: 16 }}>
@@ -513,11 +514,11 @@ export function AlertRuleConfigPage() {
             <Col span={8}>
               <Form.Item
                 name="threshold_green"
-                label={<span style={{ color: '#0F6E56', fontWeight: 600 }}>绿 (正常)</span>}
+                label={<span style={{ color: txColors.success, fontWeight: 600 }}>绿 (正常)</span>}
                 rules={[{ required: true, message: '请输入' }]}
               >
                 <InputNumber
-                  style={{ width: '100%', borderColor: '#0F6E56' }}
+                  style={{ width: '100%', borderColor: txColors.success }}
                   placeholder="正常阈值"
                 />
               </Form.Item>
@@ -525,11 +526,11 @@ export function AlertRuleConfigPage() {
             <Col span={8}>
               <Form.Item
                 name="threshold_yellow"
-                label={<span style={{ color: '#BA7517', fontWeight: 600 }}>黄 (预警)</span>}
+                label={<span style={{ color: txColors.warning, fontWeight: 600 }}>黄 (预警)</span>}
                 rules={[{ required: true, message: '请输入' }]}
               >
                 <InputNumber
-                  style={{ width: '100%', borderColor: '#BA7517' }}
+                  style={{ width: '100%', borderColor: txColors.warning }}
                   placeholder="预警阈值"
                 />
               </Form.Item>
@@ -537,11 +538,11 @@ export function AlertRuleConfigPage() {
             <Col span={8}>
               <Form.Item
                 name="threshold_red"
-                label={<span style={{ color: '#A32D2D', fontWeight: 600 }}>红 (严重)</span>}
+                label={<span style={{ color: txColors.danger, fontWeight: 600 }}>红 (严重)</span>}
                 rules={[{ required: true, message: '请输入' }]}
               >
                 <InputNumber
-                  style={{ width: '100%', borderColor: '#A32D2D' }}
+                  style={{ width: '100%', borderColor: txColors.danger }}
                   placeholder="严重阈值"
                 />
               </Form.Item>
@@ -635,9 +636,9 @@ export function AlertRuleConfigPage() {
               </Descriptions.Item>
               <Descriptions.Item label="阈值">
                 <Space size={4}>
-                  <Tag color="#0F6E56">绿 {testingRule.thresholds.green}</Tag>
-                  <Tag color="#BA7517">黄 {testingRule.thresholds.yellow}</Tag>
-                  <Tag color="#A32D2D">红 {testingRule.thresholds.red}</Tag>
+                  <Tag color={txColors.success}>绿 {testingRule.thresholds.green}</Tag>
+                  <Tag color={txColors.warning}>黄 {testingRule.thresholds.yellow}</Tag>
+                  <Tag color={txColors.danger}>红 {testingRule.thresholds.red}</Tag>
                 </Space>
               </Descriptions.Item>
             </Descriptions>
@@ -663,7 +664,7 @@ export function AlertRuleConfigPage() {
                 onClick={handleRunTest}
                 loading={testing}
                 disabled={testValue === null}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35', height: 40 }}
+                style={{ background: txColors.primary, borderColor: txColors.primary, height: 40 }}
               >
                 执行测试
               </Button>
@@ -673,21 +674,21 @@ export function AlertRuleConfigPage() {
               <Card
                 size="small"
                 style={{
-                  borderColor: testResult.level === 'green' ? '#0F6E56'
-                    : testResult.level === 'yellow' ? '#BA7517' : '#A32D2D',
+                  borderColor: testResult.level === 'green' ? txColors.success
+                    : testResult.level === 'yellow' ? txColors.warning : txColors.danger,
                   borderWidth: 2,
                 }}
               >
                 <Result
                   icon={
-                    testResult.level === 'green' ? <CheckCircleOutlined style={{ color: '#0F6E56' }} />
-                      : testResult.level === 'yellow' ? <WarningOutlined style={{ color: '#BA7517' }} />
-                        : <CloseCircleOutlined style={{ color: '#A32D2D' }} />
+                    testResult.level === 'green' ? <CheckCircleOutlined style={{ color: txColors.success }} />
+                      : testResult.level === 'yellow' ? <WarningOutlined style={{ color: txColors.warning }} />
+                        : <CloseCircleOutlined style={{ color: txColors.danger }} />
                   }
                   title={
                     <span style={{
-                      color: testResult.level === 'green' ? '#0F6E56'
-                        : testResult.level === 'yellow' ? '#BA7517' : '#A32D2D',
+                      color: testResult.level === 'green' ? txColors.success
+                        : testResult.level === 'yellow' ? txColors.warning : txColors.danger,
                     }}>
                       {testResult.triggered ? '触发预警' : '未触发'}
                       {' — '}
@@ -720,7 +721,7 @@ export function AlertRuleConfigPage() {
           <Timeline
             style={{ marginTop: 16, paddingTop: 8 }}
             items={historyItems.map((item) => ({
-              color: item.action === '创建' ? '#0F6E56' : '#FF6B35',
+              color: item.action === '创建' ? txColors.success : txColors.primary,
               children: (
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -733,9 +734,9 @@ export function AlertRuleConfigPage() {
                       {Object.entries(item.diff).map(([field, changes]) => (
                         <div key={field}>
                           <Text type="secondary">{field}: </Text>
-                          <Text delete style={{ color: '#A32D2D' }}>{String(changes.before)}</Text>
+                          <Text delete style={{ color: txColors.danger }}>{String(changes.before)}</Text>
                           <Text> → </Text>
-                          <Text style={{ color: '#0F6E56' }}>{String(changes.after)}</Text>
+                          <Text style={{ color: txColors.success }}>{String(changes.after)}</Text>
                         </div>
                       ))}
                     </div>

@@ -15,6 +15,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useCommandPalette } from '../hooks/useCommandPalette';
 import type { Command, CommandGroup } from '../hooks/useCommandPalette';
 import { A2UIRenderer, parseA2UIFromAgent } from './a2ui/A2UIRenderer';
+import { txColors } from '@tx/tokens';
 
 // ─── 颜色常量 ──────────────────────────────────────────────────────────────────
 
@@ -28,7 +29,7 @@ const C = {
   text: 'rgba(255,255,255,0.92)',
   text2: 'rgba(255,255,255,0.55)',
   text3: 'rgba(255,255,255,0.3)',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   shortcutBg: 'rgba(255,255,255,0.08)',
   separator: 'rgba(255,255,255,0.06)',
   shadow: '0 24px 64px rgba(0,0,0,0.55)',

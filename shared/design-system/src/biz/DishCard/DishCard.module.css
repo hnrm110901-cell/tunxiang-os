@@ -220,7 +220,7 @@
 .price {
   font-size: var(--tx-font-md, 15px);
   font-weight: 700;
-  color: #FF6B2C;
+  color: var(--tx-primary);
   white-space: nowrap;
 }
 
@@ -243,7 +243,7 @@
   min-height: 36px;
   border-radius: 50%;
   border: none;
-  background: #FF6B2C;
+  background: var(--tx-primary);
   color: #fff;
   cursor: pointer;
   flex-shrink: 0;

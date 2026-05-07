@@ -37,6 +37,7 @@ import { StatisticCard } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
 import { useLang } from '../../i18n/LangContext';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 // TabPane removed (not used)
@@ -325,7 +326,7 @@ const OutputLedgerTab: React.FC = () => {
                 prefix: '¥',
                 suffix: '元',
                 valueStyle: {
-                  color: summary && summary.net_payable_fen > 0 ? '#A32D2D' : '#0F6E56',
+                  color: summary && summary.net_payable_fen > 0 ? txColors.danger : txColors.success,
                   fontWeight: 700,
                   fontSize: 24,
                 },
@@ -821,7 +822,7 @@ const TaxManagePage: React.FC = () => {
     <div style={{ padding: '24px', minWidth: 1280, background: '#F8F7F5', minHeight: '100vh' }}>
       <Row align="middle" style={{ marginBottom: 20 }}>
         <Col flex="auto">
-          <Title level={3} style={{ margin: 0, color: '#1E2A3A' }}>
+          <Title level={3} style={{ margin: 0, color: txColors.navy }}>
             {isMY ? 'Tax Management' : '税务管理'}
             {isMY && (
               <Tag color="purple" style={{ marginLeft: 8, fontSize: 11, verticalAlign: 'middle' }}>
@@ -853,8 +854,8 @@ const TaxManagePage: React.FC = () => {
               style={{
                 padding: '14px 20px',
                 cursor: 'pointer',
-                color: activeTab === tab.key ? '#FF6B35' : '#5F5E5A',
-                borderBottom: activeTab === tab.key ? '2px solid #FF6B35' : '2px solid transparent',
+                color: activeTab === tab.key ? txColors.primary : '#5F5E5A',
+                borderBottom: activeTab === tab.key ? `2px solid ${txColors.primary}` : '2px solid transparent',
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 fontSize: 14,
                 userSelect: 'none',

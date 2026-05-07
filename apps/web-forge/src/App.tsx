@@ -6,6 +6,7 @@ import WebhooksPage from './pages/WebhooksPage';
 import MarketplacePage from './pages/MarketplacePage';
 import ConsolePage from './pages/ConsolePage';
 import SandboxPage from './pages/SandboxPage';
+import { txColors } from '@tx/tokens';
 
 type Page = 'home' | 'docs' | 'sdk' | 'webhooks' | 'marketplace' | 'console' | 'sandbox';
 
@@ -19,7 +20,7 @@ const NAV_ITEMS: { key: Page; label: string }[] = [
   { key: 'sandbox', label: '沙箱' },
 ];
 
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 
 const styles: Record<string, React.CSSProperties> = {
   nav: {

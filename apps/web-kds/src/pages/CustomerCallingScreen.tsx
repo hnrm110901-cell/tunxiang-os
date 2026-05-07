@@ -13,6 +13,7 @@
  *   断线自动重连。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -74,7 +75,7 @@ function CurrentCallDisplay({ item }: { item: CallingItem | null }) {
         alignItems: 'center',
         justifyContent: 'center',
         background: '#1A0800',
-        borderBottom: '2px solid #FF6B35',
+        borderBottom: `2px solid ${txColors.primary}`,
       }}
     >
       <div style={{ fontSize: 22, color: '#888', marginBottom: 8 }}>请取餐</div>
@@ -82,7 +83,7 @@ function CurrentCallDisplay({ item }: { item: CallingItem | null }) {
         style={{
           fontSize: 120,
           fontWeight: 900,
-          color: '#FF6B35',
+          color: txColors.primary,
           fontFamily: 'monospace',
           lineHeight: 1,
           letterSpacing: 8,
@@ -244,7 +245,7 @@ export function CustomerCallingScreen() {
       {/* 顶部品牌栏 */}
       <div
         style={{
-          background: '#FF6B35',
+          background: txColors.primary,
           height: 56,
           display: 'flex',
           alignItems: 'center',

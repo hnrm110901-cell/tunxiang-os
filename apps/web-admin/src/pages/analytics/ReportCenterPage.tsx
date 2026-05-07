@@ -9,6 +9,7 @@
  * TC-P2-15  品牌自定义报表框架（AI叙事替代路线）
  */
 import { useState, useCallback, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Tabs,
   Card,
@@ -370,7 +371,7 @@ function ReportCenterTab() {
         <Tooltip title="运行报表" key="run">
           <Button
             type="text"
-            icon={<PlayCircleOutlined style={{ color: '#FF6B35' }} />}
+            icon={<PlayCircleOutlined style={{ color: txColors.primary }} />}
             onClick={() => void handleExecute(report)}
           >
             运行
@@ -390,7 +391,7 @@ function ReportCenterTab() {
             type="text"
             icon={
               report.is_favorite ? (
-                <StarFilled style={{ color: '#BA7517' }} />
+                <StarFilled style={{ color: txColors.warning }} />
               ) : (
                 <StarOutlined />
               )
@@ -481,7 +482,7 @@ function ReportCenterTab() {
             <Statistic
               title="已收藏"
               value={filtered.filter((r) => r.is_favorite).length}
-              prefix={<StarFilled style={{ color: '#BA7517' }} />}
+              prefix={<StarFilled style={{ color: txColors.warning }} />}
             />
           </Card>
         </Col>
@@ -504,7 +505,7 @@ function ReportCenterTab() {
               <Space>
                 <FileTextOutlined />
                 <span>标准报表</span>
-                <Badge count={standardReports.length} showZero style={{ backgroundColor: '#185FA5' }} />
+                <Badge count={standardReports.length} showZero style={{ backgroundColor: txColors.info }} />
               </Space>
             }
             loading={loading}
@@ -524,7 +525,7 @@ function ReportCenterTab() {
               <Space>
                 <BarChartOutlined />
                 <span>自定义报表</span>
-                <Badge count={customReports.length} showZero style={{ backgroundColor: '#FF6B35' }} />
+                <Badge count={customReports.length} showZero style={{ backgroundColor: txColors.primary }} />
               </Space>
             }
             extra={
@@ -550,7 +551,7 @@ function ReportCenterTab() {
       <Modal
         title={
           <Space>
-            <PlayCircleOutlined style={{ color: '#FF6B35' }} />
+            <PlayCircleOutlined style={{ color: txColors.primary }} />
             {execReport?.name ?? '报表结果'}
             {execResult && (
               <Tag color="green">
@@ -789,7 +790,7 @@ function ReportDesignerTab() {
                       }}
                       style={{
                         border: dataSource === opt.value
-                          ? '2px solid #FF6B35'
+                          ? `2px solid ${txColors.primary}`
                           : '1px solid #E8E6E1',
                         cursor: 'pointer',
                         marginBottom: 8,
@@ -799,7 +800,7 @@ function ReportDesignerTab() {
                         <span style={{ fontSize: 20 }}>{opt.icon}</span>
                         <Text strong={dataSource === opt.value}>{opt.label}</Text>
                         {dataSource === opt.value && (
-                          <CheckCircleOutlined style={{ color: '#FF6B35' }} />
+                          <CheckCircleOutlined style={{ color: txColors.primary }} />
                         )}
                       </Space>
                     </Card>
@@ -861,7 +862,7 @@ function ReportDesignerTab() {
                               {item.field}
                             </Text>
                           </Space>
-                          {selected && <CheckCircleOutlined style={{ color: '#FF6B35' }} />}
+                          {selected && <CheckCircleOutlined style={{ color: txColors.primary }} />}
                         </Space>
                       </List.Item>
                     );
@@ -891,7 +892,7 @@ function ReportDesignerTab() {
                               {item.agg}
                             </Text>
                           </Space>
-                          {selected && <CheckCircleOutlined style={{ color: '#FF6B35' }} />}
+                          {selected && <CheckCircleOutlined style={{ color: txColors.primary }} />}
                         </Space>
                       </List.Item>
                     );
@@ -919,7 +920,7 @@ function ReportDesignerTab() {
               <div style={{ marginBottom: 16 }}>
                 <Text strong>
                   维度
-                  <Badge count={selectedDimensions.length} style={{ marginLeft: 8, backgroundColor: '#185FA5' }} />
+                  <Badge count={selectedDimensions.length} style={{ marginLeft: 8, backgroundColor: txColors.info }} />
                 </Text>
                 {selectedDimensions.length === 0 ? (
                   <div
@@ -956,7 +957,7 @@ function ReportDesignerTab() {
               <div>
                 <Text strong>
                   指标
-                  <Badge count={selectedMetrics.length} style={{ marginLeft: 8, backgroundColor: '#FF6B35' }} />
+                  <Badge count={selectedMetrics.length} style={{ marginLeft: 8, backgroundColor: txColors.primary }} />
                 </Text>
                 {selectedMetrics.length === 0 ? (
                   <div
@@ -1018,7 +1019,7 @@ function ReportDesignerTab() {
         >
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={6}>
-              <Card size="small" style={{ background: '#FFF3ED' }}>
+              <Card size="small" style={{ background: txColors.primaryLight }}>
                 <Statistic title="报表名称" value={reportName} valueStyle={{ fontSize: 14 }} />
               </Card>
             </Col>
@@ -1189,7 +1190,7 @@ function NarrativeTemplateTab() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={5} style={{ margin: 0 }}>
-          <RobotOutlined style={{ color: '#185FA5', marginRight: 8 }} />
+          <RobotOutlined style={{ color: txColors.info, marginRight: 8 }} />
           AI叙事模板
         </Title>
         <Button
@@ -1288,11 +1289,11 @@ function NarrativeTemplateTab() {
         <Card
           title={
             <Space>
-              <RobotOutlined style={{ color: '#185FA5' }} />
+              <RobotOutlined style={{ color: txColors.info }} />
               叙事预览效果
             </Space>
           }
-          style={{ marginTop: 16, border: '1px solid #185FA5' }}
+          style={{ marginTop: 16, border: `1px solid ${txColors.info}` }}
           extra={<Button size="small" onClick={() => setPreviewText('')}>关闭</Button>}
         >
           <Paragraph style={{ fontSize: 15, lineHeight: 1.8, margin: 0 }}>
@@ -1497,7 +1498,7 @@ function SchedulePushTab() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
         <Title level={5} style={{ margin: 0 }}>
-          <ClockCircleOutlined style={{ color: '#FF6B35', marginRight: 8 }} />
+          <ClockCircleOutlined style={{ color: txColors.primary, marginRight: 8 }} />
           定时推送任务
         </Title>
         <Button
@@ -1532,7 +1533,7 @@ function SchedulePushTab() {
               title="推送中任务"
               value={tasks.filter((t) => t.enabled).length}
               prefix={<Badge status="processing" />}
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
             />
           </Col>
           <Col span={8}>
@@ -1547,7 +1548,7 @@ function SchedulePushTab() {
               title="今日推送次数"
               value={3}
               prefix={<ThunderboltOutlined />}
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Col>
         </Row>

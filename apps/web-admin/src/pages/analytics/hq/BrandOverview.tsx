@@ -35,6 +35,7 @@ import { Line } from '@ant-design/charts';
 
 import { formatPrice } from '@tx-ds/utils';
 import { fenToYuan, pctDisplay } from '../../../utils/format';
+import { txColors } from '@tx/tokens';
 import {
   getBrandsOverview,
   type BrandKpiCard,
@@ -48,11 +49,11 @@ const { Title, Text } = Typography;
 // ─── 主题 Token（通过 ConfigProvider 注入，不硬编码颜色） ─────────────────────
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
   },
   components: {
@@ -86,10 +87,10 @@ function targetRateColor(rate: number): string {
 
 function trendIcon(ratio: number) {
   if (ratio > 0) {
-    return <ArrowUpOutlined style={{ color: '#0F6E56' }} />;
+    return <ArrowUpOutlined style={{ color: txColors.success }} />;
   }
   if (ratio < 0) {
-    return <ArrowDownOutlined style={{ color: '#A32D2D' }} />;
+    return <ArrowDownOutlined style={{ color: txColors.danger }} />;
   }
   return null;
 }
@@ -121,8 +122,8 @@ function BrandKpiCardItem({ data, loading }: BrandKpiCardProps) {
           <Text strong style={{ fontSize: 15 }}>{data.brand_name}</Text>
           <Badge status={healthStatus} text={
             <Text style={{
-              color: healthStatus === 'success' ? '#0F6E56'
-                : healthStatus === 'warning' ? '#BA7517' : '#A32D2D',
+              color: healthStatus === 'success' ? txColors.success
+                : healthStatus === 'warning' ? txColors.warning : txColors.danger,
               fontSize: 12,
             }}>
               健康分 {data.health_score}
@@ -137,14 +138,14 @@ function BrandKpiCardItem({ data, loading }: BrandKpiCardProps) {
           <Statistic
             title="营收"
             value={fenToYuan(data.revenue_fen)}
-            valueStyle={{ fontSize: 18, color: '#FF6B35' }}
+            valueStyle={{ fontSize: 18, color: txColors.primary }}
           />
           <Space size={4} style={{ marginTop: 4 }}>
             {trendIcon(data.revenue_ratio)}
             <Text
               style={{
                 fontSize: 12,
-                color: data.revenue_ratio >= 0 ? '#0F6E56' : '#A32D2D',
+                color: data.revenue_ratio >= 0 ? txColors.success : txColors.danger,
               }}
             >
               环比 {ratioLabel}
@@ -235,7 +236,7 @@ export function BrandOverview() {
         formatter: (v: string) => `¥${Number(v).toLocaleString('zh-CN')}`,
       },
     },
-    color: ['#FF6B35', '#0F6E56', '#185FA5'],
+    color: [txColors.primary, txColors.success, txColors.info],
   };
 
   // ─── ProTable 列配置 ──────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ export function BrandOverview() {
       width: 56,
       align: 'center',
       render: (_, record) => (
-        <Text strong style={{ color: record.rank <= 3 ? '#FF6B35' : undefined }}>
+        <Text strong style={{ color: record.rank <= 3 ? txColors.primary : undefined }}>
           {record.rank}
         </Text>
       ),
@@ -274,7 +275,7 @@ export function BrandOverview() {
       width: 120,
       sorter: true,
       render: (_, record) => (
-        <Text strong style={{ color: '#FF6B35' }}>
+        <Text strong style={{ color: txColors.primary }}>
           {fenToYuan(record.today_revenue_fen)}
         </Text>
       ),

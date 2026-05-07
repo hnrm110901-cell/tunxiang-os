@@ -36,6 +36,7 @@ import {
 } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -478,7 +479,7 @@ const AdjustmentTab: React.FC = () => {
                 title: '调整后',
                 dataIndex: 'adjusted_amount_fen',
                 render: (_, r) => (
-                  <Text strong style={{ color: '#FF6B35' }}>
+                  <Text strong style={{ color: txColors.primary }}>
                     ¥{fenToYuan(r.adjusted_amount_fen)}
                   </Text>
                 ),
@@ -488,7 +489,7 @@ const AdjustmentTab: React.FC = () => {
                 render: (_, r) => {
                   const diff = r.adjusted_amount_fen - r.original_amount_fen;
                   return (
-                    <Text style={{ color: diff >= 0 ? '#0F6E56' : '#A32D2D' }}>
+                    <Text style={{ color: diff >= 0 ? txColors.success : txColors.danger }}>
                       {diff >= 0 ? '+' : ''}{fenToYuan(diff)}
                     </Text>
                   );
@@ -629,7 +630,7 @@ const PreviewTab: React.FC = () => {
                   <Text type="secondary">{rule.receiver_id}</Text>
                 </Col>
                 <Col>
-                  <Text strong style={{ color: '#FF6B35' }}>
+                  <Text strong style={{ color: txColors.primary }}>
                     {(rule.ratio / 100).toFixed(2)}%
                   </Text>
                 </Col>
@@ -641,8 +642,8 @@ const PreviewTab: React.FC = () => {
                 value={rule.ratio}
                 onChange={(v) => handleRatioChange(idx, v)}
                 tooltip={{ formatter: (v) => `${((v ?? 0) / 100).toFixed(2)}%` }}
-                trackStyle={{ background: '#FF6B35' }}
-                handleStyle={{ borderColor: '#FF6B35' }}
+                trackStyle={{ background: txColors.primary }}
+                handleStyle={{ borderColor: txColors.primary }}
               />
             </div>
           ))}
@@ -670,7 +671,7 @@ const PreviewTab: React.FC = () => {
                     title="总金额"
                     value={totalYuan.toFixed(2)}
                     prefix="¥"
-                    valueStyle={{ color: '#1E2A3A', fontWeight: 700 }}
+                    valueStyle={{ color: txColors.navy, fontWeight: 700 }}
                   />
                 </Col>
               </Row>
@@ -712,8 +713,8 @@ const PreviewTab: React.FC = () => {
                         item.receiver_type === 'brand'
                           ? '#722ED1'
                           : item.receiver_type === 'franchise'
-                          ? '#FF6B35'
-                          : '#185FA5'
+                          ? txColors.primary
+                          : txColors.info
                       }
                       size="small"
                     />
@@ -731,7 +732,7 @@ const PreviewTab: React.FC = () => {
                 <Col span={24}>
                   <Row justify="space-between">
                     <Text>验证：各方合计</Text>
-                    <Text strong style={{ color: '#0F6E56' }}>
+                    <Text strong style={{ color: txColors.success }}>
                       ¥{fenToYuan(preview.reduce((s, i) => s + i.amount_fen, 0))}
                       {preview.reduce((s, i) => s + i.amount_fen, 0) ===
                       Math.round(totalYuan * 100) ? (
@@ -770,7 +771,7 @@ const SplitPaymentPage: React.FC = () => {
     <div style={{ padding: '24px', minWidth: 1280, background: '#F8F7F5', minHeight: '100vh' }}>
       <Row align="middle" style={{ marginBottom: 20 }}>
         <Col flex="auto">
-          <Title level={3} style={{ margin: 0, color: '#1E2A3A' }}>
+          <Title level={3} style={{ margin: 0, color: txColors.navy }}>
             聚合支付 / 分账管理
           </Title>
           <Text type="secondary">微信/支付宝分账 · 差错账调账 · 分润试算</Text>
@@ -793,8 +794,8 @@ const SplitPaymentPage: React.FC = () => {
               style={{
                 padding: '14px 20px',
                 cursor: 'pointer',
-                color: activeTab === tab.key ? '#FF6B35' : '#5F5E5A',
-                borderBottom: activeTab === tab.key ? '2px solid #FF6B35' : '2px solid transparent',
+                color: activeTab === tab.key ? txColors.primary : '#5F5E5A',
+                borderBottom: activeTab === tab.key ? `2px solid ${txColors.primary}` : '2px solid transparent',
                 fontWeight: activeTab === tab.key ? 600 : 400,
                 fontSize: 14,
                 userSelect: 'none',

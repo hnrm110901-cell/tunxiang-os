@@ -4,6 +4,7 @@
  * 展示 A2UI 渲染引擎支持的全部组件类型，用于开发调试和回归验证。
  */
 import { A2UIRenderer, type A2UIDeclaration } from '../components/a2ui';
+import { txColors } from '@tx/tokens';
 
 const DEMO_DECLARATIONS: { label: string; decl: A2UIDeclaration }[] = [
   {
@@ -62,7 +63,7 @@ const DEMO_DECLARATIONS: { label: string; decl: A2UIDeclaration }[] = [
             props: { title: '品类分布' },
             children: [
               { id: 'c1', type: 'chart', props: { chartType: 'bar', title: '热销品类 Top 5', data: [
-                { label: '湘菜', value: 85, color: '#FF6B35' },
+                { label: '湘菜', value: 85, color: txColors.primary },
                 { label: '海鲜', value: 62, color: '#1890ff' },
                 { label: '蒸菜', value: 48, color: '#10B981' },
                 { label: '凉菜', value: 35, color: '#F59E0B' },
@@ -87,7 +88,7 @@ const DEMO_DECLARATIONS: { label: string; decl: A2UIDeclaration }[] = [
             id: 'kpi-chart',
             type: 'chart',
             props: { chartType: 'number', data: [
-              { label: '今日营收', value: 28600, color: '#FF6B35' },
+              { label: '今日营收', value: 28600, color: txColors.primary },
               { label: '订单数', value: 124, color: '#1890ff' },
               { label: '客单价', value: 230, color: '#10B981' },
               { label: '翻台', value: 3.2, color: '#F59E0B' },
@@ -126,7 +127,7 @@ export function A2UIDemoPage() {
       background: '#0B1A20', minHeight: '100vh', color: '#E0E0E0',
       fontFamily: 'Noto Sans SC, sans-serif', padding: 24,
     }}>
-      <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35', marginBottom: 20 }}>
+      <div style={{ fontSize: 18, fontWeight: 700, color: txColors.primary, marginBottom: 20 }}>
         A2UI 组件演示 — 全部白名单组件
       </div>
 

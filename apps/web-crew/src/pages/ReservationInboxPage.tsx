@@ -19,6 +19,7 @@ import {
 import type { Reservation, ReservationChannel, ReservationStatus } from '../api/reservationApi';
 import { useReservationWS } from '../hooks/useReservationWS';
 import type { ReservationWSMessage } from '../hooks/useReservationWS';
+import { txColors } from '@tx/tokens';
 
 // ─── 设计 Token ───────────────────────────────────────────────────────────────
 
@@ -26,7 +27,7 @@ const C = {
   bg:       '#0B1A20',
   card:     '#112228',
   border:   '#1a2a33',
-  accent:   '#FF6B35',
+  accent:   txColors.primary,
   green:    '#22c55e',
   danger:   '#ef4444',
   warning:  '#f97316',

@@ -40,6 +40,7 @@ import {
 } from '../../api/wineStorageApi';
 import { txFetchData } from '../../api';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -255,7 +256,7 @@ export function WineStoragePage() {
       render: (val: number, record: WineStorageRecord) => (
         <Text
           style={{
-            color: val === 0 ? '#A32D2D' : val < (record.original_qty ?? val) ? '#BA7517' : '#0F6E56',
+            color: val === 0 ? txColors.danger : val < (record.original_qty ?? val) ? txColors.warning : txColors.success,
             fontWeight: 600,
           }}
         >
@@ -280,7 +281,7 @@ export function WineStoragePage() {
         const isExpiringSoon = dayjs(val).diff(dayjs(), 'day') <= 7;
         const isExpired = dayjs(val).isBefore(dayjs());
         return (
-          <Text style={{ color: isExpired ? '#A32D2D' : isExpiringSoon ? '#BA7517' : '#2C2C2A' }}>
+          <Text style={{ color: isExpired ? txColors.danger : isExpiringSoon ? txColors.warning : '#2C2C2A' }}>
             {dayjs(val).format('YYYY-MM-DD')}
           </Text>
         );
@@ -382,7 +383,7 @@ export function WineStoragePage() {
           />
           <Button
             type="primary"
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             onClick={() => {
               if (!storeId) {
                 message.warning('请先选择门店');
@@ -406,7 +407,7 @@ export function WineStoragePage() {
               <Statistic
                 title="存储中总量（瓶）"
                 value={summary.total_quantity}
-                valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+                valueStyle={{ color: txColors.success, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -415,7 +416,7 @@ export function WineStoragePage() {
               <Statistic
                 title="存酒总数（条）"
                 value={summary.total_count}
-                valueStyle={{ color: '#185FA5', fontWeight: 700 }}
+                valueStyle={{ color: txColors.info, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -424,7 +425,7 @@ export function WineStoragePage() {
               <Statistic
                 title="即将到期（7天内）"
                 value={expiring.length}
-                valueStyle={{ color: expiring.length > 0 ? '#BA7517' : '#0F6E56', fontWeight: 700 }}
+                valueStyle={{ color: expiring.length > 0 ? txColors.warning : txColors.success, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -476,7 +477,7 @@ export function WineStoragePage() {
         onOk={handleRetrieveConfirm}
         confirmLoading={retrieveLoading}
         okText="确认取酒"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={480}
         destroyOnClose
       >
@@ -487,7 +488,7 @@ export function WineStoragePage() {
               <div><Text type="secondary">类型：</Text><Text>{retrieveTarget.wine_category}</Text></div>
               <div>
                 <Text type="secondary">当前剩余：</Text>
-                <Text strong style={{ color: '#0F6E56' }}>
+                <Text strong style={{ color: txColors.success }}>
                   {retrieveTarget.quantity} {retrieveTarget.unit}
                 </Text>
               </div>
@@ -531,7 +532,7 @@ export function WineStoragePage() {
         onOk={handleExtendConfirm}
         confirmLoading={extendLoading}
         okText="确认续存"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         width={480}
         destroyOnClose
       >

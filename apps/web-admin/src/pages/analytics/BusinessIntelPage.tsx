@@ -12,6 +12,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Card,
   Row,
@@ -98,23 +99,23 @@ interface AnomalyData {
 const INTEL_BASE = 'http://localhost:8011';
 
 const GRADE_COLOR: Record<string, string> = {
-  A: '#0F6E56',
-  B: '#185FA5',
-  C: '#BA7517',
-  D: '#A32D2D',
+  A: txColors.success,
+  B: txColors.info,
+  C: txColors.warning,
+  D: txColors.danger,
 };
 
 const GRADE_BG: Record<string, string> = {
   A: '#e6f7f1',
-  B: '#e8f0fb',
+  B: txColors.infoLight,
   C: '#fdf6e3',
   D: '#fde8e8',
 };
 
 const SEVERITY_COLOR: Record<string, string> = {
-  critical: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  critical: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
 const SEVERITY_LABEL: Record<string, string> = {
@@ -132,10 +133,10 @@ const ANOMALY_TYPE_LABEL: Record<string, string> = {
 };
 
 const QUADRANT_CONFIG = {
-  star: { label: '明星菜', color: '#0F6E56', bg: 'rgba(15, 110, 86, 0.08)', symbol: '⭐' },
-  cash_cow: { label: '现金牛', color: '#185FA5', bg: 'rgba(24, 95, 165, 0.08)', symbol: '🐄' },
-  question_mark: { label: '问题菜', color: '#BA7517', bg: 'rgba(186, 117, 23, 0.08)', symbol: '❓' },
-  dog: { label: '瘦狗菜', color: '#A32D2D', bg: 'rgba(163, 45, 45, 0.08)', symbol: '🐾' },
+  star: { label: '明星菜', color: txColors.success, bg: 'rgba(15, 110, 86, 0.08)', symbol: '⭐' },
+  cash_cow: { label: '现金牛', color: txColors.info, bg: 'rgba(24, 95, 165, 0.08)', symbol: '🐄' },
+  question_mark: { label: '问题菜', color: txColors.warning, bg: 'rgba(186, 117, 23, 0.08)', symbol: '❓' },
+  dog: { label: '瘦狗菜', color: txColors.danger, bg: 'rgba(163, 45, 45, 0.08)', symbol: '🐾' },
 };
 
 // ─── API 工具函数 ─────────────────────────────────────────────────────────────
@@ -165,7 +166,7 @@ async function dismissAnomalyApi(id: string): Promise<void> {
 // ─── 子组件：圆形评分仪表盘 ────────────────────────────────────────────────────
 
 function ScoreGauge({ score, grade }: { score: number; grade: string }) {
-  const color = GRADE_COLOR[grade] ?? '#FF6B35';
+  const color = GRADE_COLOR[grade] ?? txColors.primary;
   const pct = Math.min(100, Math.max(0, score));
   // conic-gradient 圆形进度
   const gradient = `conic-gradient(${color} ${pct}%, #f0ede6 0%)`;
@@ -238,7 +239,7 @@ function HealthScoreCard({
   if (!data) return null;
 
   const trendNum = parseFloat(data.trend);
-  const trendColor = trendNum >= 0 ? '#0F6E56' : '#A32D2D';
+  const trendColor = trendNum >= 0 ? txColors.success : txColors.danger;
   const trendSign = trendNum >= 0 ? '+' : '';
 
   return (
@@ -270,12 +271,12 @@ function HealthScoreCard({
             {data.dimensions.map((dim) => {
               const dimColor =
                 dim.score >= 75
-                  ? '#0F6E56'
+                  ? txColors.success
                   : dim.score >= 60
-                  ? '#185FA5'
+                  ? txColors.info
                   : dim.score >= 45
-                  ? '#BA7517'
-                  : '#A32D2D';
+                  ? txColors.warning
+                  : txColors.danger;
               return (
                 <div key={dim.key}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -313,7 +314,7 @@ function HealthScoreCard({
                 border: '1px solid #f5c6c6',
               }}
             >
-              <div style={{ fontSize: 13, fontWeight: 600, color: '#A32D2D', marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: txColors.danger, marginBottom: 8 }}>
                 <ExclamationCircleOutlined style={{ marginRight: 6 }} />
                 需关注（{data.alerts.length}项）
               </div>
@@ -328,7 +329,7 @@ function HealthScoreCard({
                   }}
                 >
                   <Tag color="red" style={{ flexShrink: 0, marginTop: 1 }}>!</Tag>
-                  <span style={{ fontSize: 12, color: '#A32D2D', lineHeight: 1.5 }}>{alert}</span>
+                  <span style={{ fontSize: 12, color: txColors.danger, lineHeight: 1.5 }}>{alert}</span>
                 </div>
               ))}
             </div>
@@ -344,8 +345,8 @@ function HealthScoreCard({
                 textAlign: 'center',
               }}
             >
-              <CheckCircleOutlined style={{ fontSize: 28, color: '#0F6E56', display: 'block', marginBottom: 8 }} />
-              <span style={{ color: '#0F6E56', fontSize: 13, fontWeight: 500 }}>运营状态健康</span>
+              <CheckCircleOutlined style={{ fontSize: 28, color: txColors.success, display: 'block', marginBottom: 8 }} />
+              <span style={{ color: txColors.success, fontSize: 13, fontWeight: 500 }}>运营状态健康</span>
               <br />
               <span style={{ color: '#5F5E5A', fontSize: 11 }}>所有指标在正常范围内</span>
             </div>
@@ -592,7 +593,7 @@ function AnomalyTimeline({
   if (!data || data.anomalies.length === 0) {
     return (
       <div style={{ textAlign: 'center', padding: '32px 0', color: '#5F5E5A' }}>
-        <CheckCircleOutlined style={{ fontSize: 32, color: '#0F6E56', marginBottom: 8, display: 'block' }} />
+        <CheckCircleOutlined style={{ fontSize: 32, color: txColors.success, marginBottom: 8, display: 'block' }} />
         最近7天无异常，运营状态良好
       </div>
     );
@@ -603,7 +604,7 @@ function AnomalyTimeline({
   return (
     <Timeline
       items={allWithDismissed.map((a) => ({
-        color: a.dismissed ? '#B4B2A9' : SEVERITY_COLOR[a.severity] ?? '#BA7517',
+        color: a.dismissed ? '#B4B2A9' : SEVERITY_COLOR[a.severity] ?? txColors.warning,
         dot: (
           <span style={{ fontSize: 14, color: a.dismissed ? '#B4B2A9' : SEVERITY_COLOR[a.severity] }}>
             <AnomalyIcon type={a.type} />
@@ -841,7 +842,7 @@ export default function BusinessIntelPage() {
         }}
       >
         <div>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1E2A3A' }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: txColors.navy }}>
             商业智能仪表盘
           </h2>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#5F5E5A' }}>
@@ -850,7 +851,7 @@ export default function BusinessIntelPage() {
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
           {criticalCount > 0 && (
-            <Badge count={criticalCount} color="#A32D2D">
+            <Badge count={criticalCount} color={txColors.danger}>
               <AntAlert
                 type="error"
                 message={`${criticalCount}项严重异常待处理`}
@@ -870,7 +871,7 @@ export default function BusinessIntelPage() {
               { value: 90, label: '近90天' },
             ]}
           />
-          <Button type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }} onClick={fetchAll}>
+          <Button type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }} onClick={fetchAll}>
             刷新
           </Button>
         </div>
@@ -968,7 +969,7 @@ export default function BusinessIntelPage() {
                 {undismissedCount > 0 && (
                   <Badge
                     count={undismissedCount}
-                    style={{ marginLeft: 8, backgroundColor: criticalCount > 0 ? '#A32D2D' : '#BA7517' }}
+                    style={{ marginLeft: 8, backgroundColor: criticalCount > 0 ? txColors.danger : txColors.warning }}
                   />
                 )}
                 {anomalyData?._is_mock && (

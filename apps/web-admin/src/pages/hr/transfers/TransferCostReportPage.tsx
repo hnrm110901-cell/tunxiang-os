@@ -39,9 +39,10 @@ import type {
   StoreSummary,
 } from '../../../api/transferApi';
 import { fetchCostReport } from '../../../api/transferApi';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 /** 分转元 */
 const fen2yuan = (fen: number): string => (fen / 100).toFixed(2);

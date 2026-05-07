@@ -46,6 +46,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 const { TextArea } = Input;
@@ -164,10 +165,10 @@ async function apiPost<T>(path: string, body: Record<string, unknown>): Promise<
 // 颜色 / 配置
 // ============================================================
 
-const PRIMARY = '#FF6B35';
+const PRIMARY = txColors.primary;
 
 const TAG_COLORS: Record<CustomerTag, string> = {
-  VIP: '#FF6B35',
+  VIP: txColors.primary,
   '投诉': '#f5222d',
   '咨询': '#1890ff',
 };
@@ -915,7 +916,7 @@ function TrendLineChart({ data }: { data: DailyTicketTrend[] }) {
 function TypePieChart({ data }: { data: TypeDist[] }) {
   const total = data.reduce((s, d) => s + d.count, 0);
   if (total === 0) return null;
-  const colors = ['#FF6B35', '#1890ff', '#f5222d', '#52c41a', '#fa8c16', '#722ed1'];
+  const colors = [txColors.primary, '#1890ff', '#f5222d', '#52c41a', '#fa8c16', '#722ed1'];
   const CX = 100;
   const CY = 100;
   const R = 80;
@@ -1024,7 +1025,7 @@ function StatsTab() {
               value={92.5}
               suffix="%"
               precision={1}
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>

@@ -18,6 +18,7 @@ import { txFetch } from '../api/index';
 import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
 import { KeyboardShortcutHelp, KeyboardHelpTrigger } from '../components/KeyboardShortcutHelp';
 import { ShortcutOverlay } from '../components/ShortcutOverlay';
+import { txColors } from '@tx/tokens';
 
 /* ─── Design tokens (deep dark theme for POS tablet) ─── */
 const T = {
@@ -25,15 +26,15 @@ const T = {
   bg1: '#1A2232',
   bg2: '#1F2A3F',
   border: '#2A3A52',
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
-  success: '#0F6E56',
+  success: txColors.success,
   successBg: 'rgba(15,110,86,0.15)',
-  warning: '#BA7517',
+  warning: txColors.warning,
   warningBg: 'rgba(186,117,23,0.15)',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   dangerBg: 'rgba(163,45,45,0.15)',
-  info: '#185FA5',
+  info: txColors.info,
   infoBg: 'rgba(24,95,165,0.15)',
   text1: '#E8EDF5',
   text2: '#A0AEC0',
@@ -670,7 +671,7 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
               unit="单"
               trend={fmt.delta(kpi.order_trend) + ' 单'}
               trendPositive={kpi.order_trend >= 0}
-              accentColor="#185FA5"
+              accentColor={txColors.info}
             />
             <KpiCard
               label="客单价"
@@ -678,7 +679,7 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
               unit="元"
               trend={fmt.pct(kpi.avg_ticket_trend_pct)}
               trendPositive={kpi.avg_ticket_trend_pct >= 0}
-              accentColor="#BA7517"
+              accentColor={txColors.warning}
             />
             <KpiCard
               label="翻台率"
@@ -961,7 +962,7 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
         <ShortcutButton
           label="交班"
           emoji="🔄"
-          color="#BA7517"
+          color={txColors.warning}
           onClick={() => navigate('/shift')}
         />
         <ShortcutButton
@@ -973,7 +974,7 @@ function StoreDashboard({ store }: { store: typeof STORES[0] }) {
         <ShortcutButton
           label="异常"
           emoji="⚠️"
-          color="#A32D2D"
+          color={txColors.danger}
           onClick={() => navigate('/exceptions')}
         />
       </div>

@@ -4,6 +4,7 @@
  */
 import { useNavigate } from 'react-router-dom';
 import type { CSSProperties } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface PlaceholderPageProps {
   /** 功能模块名称 */
@@ -48,7 +49,7 @@ const C = {
   } as CSSProperties,
   btn: {
     height: 44, padding: '0 28px', borderRadius: 8, border: 'none',
-    background: '#FF6B35', color: '#fff', fontSize: 15, fontWeight: 600,
+    background: txColors.primary, color: '#fff', fontSize: 15, fontWeight: 600,
     cursor: 'pointer',
   } as CSSProperties,
 };

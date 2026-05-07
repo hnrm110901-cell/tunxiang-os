@@ -9,6 +9,7 @@ import {
 import { BulbOutlined } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface WastageRow {
@@ -59,7 +60,7 @@ const wastageColumns: ProColumns<WastageRow>[] = [
 
 const compositionItems = [
   { label: '制作损耗', percent: 48, color: '#FA8C16' },
-  { label: '过期',     percent: 12, color: '#A32D2D' },
+  { label: '过期',     percent: 12, color: txColors.danger },
   { label: '退货损耗', percent: 23, color: '#722ED1' },
   { label: '其他',     percent: 17, color: '#8C8C8C' },
 ];
@@ -73,7 +74,7 @@ const aiSuggestions = [
 // ---- 页面组件 ----
 export const WastageAnalysisPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部信息 */}
         <Alert
@@ -94,7 +95,7 @@ export const WastageAnalysisPage: React.FC = () => {
                 title="损耗率"
                 value={4.2}
                 suffix="%"
-                valueStyle={{ color: '#0F6E56' }}
+                valueStyle={{ color: txColors.success }}
               />
             </Card>
           </Col>
@@ -104,7 +105,7 @@ export const WastageAnalysisPage: React.FC = () => {
                 title="节省金额"
                 value={320}
                 prefix="¥"
-                valueStyle={{ color: '#0F6E56' }}
+                valueStyle={{ color: txColors.success }}
               />
             </Card>
           </Col>
@@ -152,7 +153,7 @@ export const WastageAnalysisPage: React.FC = () => {
                 renderItem={(item) => (
                   <List.Item
                     actions={[
-                      <Button key="adopt" size="small" type="link" style={{ color: '#FF6B35' }}>
+                      <Button key="adopt" size="small" type="link" style={{ color: txColors.primary }}>
                         采纳
                       </Button>,
                     ]}

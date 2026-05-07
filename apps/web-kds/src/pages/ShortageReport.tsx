@@ -7,6 +7,7 @@
  * 深色背景，触控优化（最小48x48按钮，最小16px字体）
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -100,15 +101,15 @@ export function ShortageReport() {
   };
 
   const getStockColor = (ing: Ingredient): string => {
-    if (ing.currentStock === 0) return '#A32D2D';
-    if (ing.currentStock < ing.safetyStock * 0.3) return '#BA7517';
-    return '#0F6E56';
+    if (ing.currentStock === 0) return txColors.danger;
+    if (ing.currentStock < ing.safetyStock * 0.3) return txColors.warning;
+    return txColors.success;
   };
 
   const statusLabel: Record<string, { text: string; color: string }> = {
-    reported: { text: '已上报', color: '#BA7517' },
-    confirmed: { text: '已确认沽清', color: '#A32D2D' },
-    resolved: { text: '已补货', color: '#0F6E56' },
+    reported: { text: '已上报', color: txColors.warning },
+    confirmed: { text: '已确认沽清', color: txColors.danger },
+    resolved: { text: '已补货', color: txColors.success },
   };
 
   return (
@@ -119,12 +120,12 @@ export function ShortageReport() {
     }}>
       {/* 顶栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 28, color: '#FF6B35' }}>缺料上报</h1>
+        <h1 style={{ margin: 0, fontSize: 28, color: txColors.primary }}>缺料上报</h1>
         {tab === 'report' && selectedIds.size > 0 && (
           <button
             onClick={() => setShowConfirm(true)}
             style={{
-              padding: '12px 32px', background: '#A32D2D', color: '#fff',
+              padding: '12px 32px', background: txColors.danger, color: '#fff',
               border: 'none', borderRadius: 8, cursor: 'pointer',
               fontSize: 20, fontWeight: 'bold', minHeight: 56,
               transition: 'transform 200ms ease',
@@ -144,7 +145,7 @@ export function ShortageReport() {
           style={{
             padding: '12px 28px', minHeight: 48,
             fontSize: 18, fontWeight: 'bold',
-            background: tab === 'report' ? '#FF6B35' : '#1a1a1a',
+            background: tab === 'report' ? txColors.primary : '#1a1a1a',
             color: tab === 'report' ? '#fff' : '#888',
             border: 'none', borderRadius: 8, cursor: 'pointer',
           }}
@@ -209,7 +210,7 @@ export function ShortageReport() {
                   style={{
                     background: isSelected ? '#1a0a00' : '#111',
                     borderRadius: 12, padding: 16,
-                    border: isSelected ? '3px solid #FF6B35' : `2px solid ${isOutOfStock ? '#A32D2D' : '#222'}`,
+                    border: isSelected ? `3px solid ${txColors.primary}` : `2px solid ${isOutOfStock ? txColors.danger : '#222'}`,
                     cursor: 'pointer', textAlign: 'left',
                     color: '#E0E0E0', minHeight: 100,
                     transition: 'transform 200ms ease',
@@ -221,7 +222,7 @@ export function ShortageReport() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                     <span style={{ fontSize: 20, fontWeight: 'bold', color: '#fff' }}>{ing.name}</span>
                     {isSelected && (
-                      <span style={{ fontSize: 20, color: '#FF6B35', fontWeight: 'bold' }}>已选</span>
+                      <span style={{ fontSize: 20, color: txColors.primary, fontWeight: 'bold' }}>已选</span>
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
@@ -236,7 +237,7 @@ export function ShortageReport() {
                   {isOutOfStock && (
                     <div style={{
                       marginTop: 6, fontSize: 16, fontWeight: 'bold',
-                      color: '#A32D2D', textAlign: 'center',
+                      color: txColors.danger, textAlign: 'center',
                     }}>
                       已缺货
                     </div>
@@ -276,7 +277,7 @@ export function ShortageReport() {
                   上报人: {r.reporter} | {new Date(r.reportedAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
                 </div>
                 {r.affectedDishes.length > 0 && (
-                  <div style={{ fontSize: 16, color: '#BA7517', marginTop: 4 }}>
+                  <div style={{ fontSize: 16, color: txColors.warning, marginTop: 4 }}>
                     影响菜品: {r.affectedDishes.join('、')}
                   </div>
                 )}
@@ -306,10 +307,10 @@ export function ShortageReport() {
                     padding: '10px 14px', background: '#1a0505', borderRadius: 8,
                     marginBottom: 6, fontSize: 20, fontWeight: 'bold',
                     display: 'flex', justifyContent: 'space-between',
-                    border: '1px solid #A32D2D',
+                    border: `1px solid ${txColors.danger}`,
                   }}>
                     <span>{ing.name}</span>
-                    <span style={{ color: '#A32D2D' }}>库存 {ing.currentStock}{ing.unit}</span>
+                    <span style={{ color: txColors.danger }}>库存 {ing.currentStock}{ing.unit}</span>
                   </div>
                 ) : null;
               })}
@@ -319,7 +320,7 @@ export function ShortageReport() {
                 onClick={handleSubmit}
                 disabled={submitting}
                 style={{
-                  flex: 1, padding: '14px 0', background: '#A32D2D', color: '#fff',
+                  flex: 1, padding: '14px 0', background: txColors.danger, color: '#fff',
                   border: 'none', borderRadius: 8, cursor: submitting ? 'wait' : 'pointer',
                   fontSize: 20, fontWeight: 'bold', minHeight: 56,
                   opacity: submitting ? 0.6 : 1,

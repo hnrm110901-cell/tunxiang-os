@@ -9,6 +9,7 @@
  *   GET  /api/v1/finance/configs/{store_id} — 查询门店财务配置
  */
 import { txFetchData } from './client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -175,11 +176,11 @@ export const COST_TYPE_LABEL: Record<CostType, string> = {
 };
 
 export const COST_TYPE_COLOR: Record<CostType, string> = {
-  purchase: '#FF6B35',
-  wastage: '#BA7517',
-  live_seafood_death: '#A32D2D',
-  labor: '#185FA5',
-  rent: '#0F6E56',
+  purchase: txColors.primary,
+  wastage: txColors.warning,
+  live_seafood_death: txColors.danger,
+  labor: txColors.info,
+  rent: txColors.success,
   utilities: '#9B8000',
   other: '#5F5E5A',
 };

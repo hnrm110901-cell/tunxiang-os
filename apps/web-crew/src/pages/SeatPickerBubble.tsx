@@ -2,11 +2,12 @@
  * SeatPickerBubble — 点单时为菜品选择归属座位的浮层组件
  */
 import { useEffect, useRef } from 'react';
+import { txColors } from '@tx/tokens';
 
 const C = {
   bg: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   accentDim: 'rgba(255,107,53,0.18)',
   muted: '#64748b',
   text: '#e2e8f0',

@@ -4,14 +4,14 @@
 
 /* ── 屯象OS Design Tokens（CSS 变量） ─────────────────────────────── */
 :root {
-  --tx-primary:        #FF6B35;
-  --tx-primary-active: #E55A28;
-  --tx-primary-light:  #FFF3ED;
-  --tx-navy:           #1E2A3A;
-  --tx-success:        #0F6E56;
-  --tx-warning:        #BA7517;
-  --tx-danger:         #A32D2D;
-  --tx-info:           #185FA5;
+  --tx-primary:        var(--tx-primary);
+  --tx-primary-active: var(--tx-primary-active);
+  --tx-primary-light:  var(--tx-primary-light);
+  --tx-navy:           var(--tx-navy);
+  --tx-success:        var(--tx-success);
+  --tx-warning:        var(--tx-warning);
+  --tx-danger:         var(--tx-danger);
+  --tx-info:           var(--tx-info);
   --tx-text-1:         #2C2C2A;
   --tx-text-2:         #5F5E5A;
   --tx-text-3:         #B4B2A9;

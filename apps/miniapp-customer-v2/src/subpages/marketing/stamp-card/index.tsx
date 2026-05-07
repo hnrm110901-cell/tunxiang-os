@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * stamp-card/index.tsx — 集章卡
  *
@@ -21,7 +22,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

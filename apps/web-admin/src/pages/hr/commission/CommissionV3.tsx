@@ -46,10 +46,11 @@ import { ProColumns, ProTable } from '@ant-design/pro-components';
 import type { ActionType } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

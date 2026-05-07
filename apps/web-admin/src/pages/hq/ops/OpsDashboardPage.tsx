@@ -8,6 +8,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Alert, Button } from 'antd';
 import { TxLineChart } from '../../../components/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型定义 ----------
 interface OverviewKPI {
@@ -51,8 +52,8 @@ const RANK_LABELS: Record<RankDimension, string> = {
 };
 
 // ---------- 工具 ----------
-const scoreColor = (s: number) => s >= 80 ? '#0F6E56' : s >= 60 ? '#BA7517' : '#A32D2D';
-const priorityColor: Record<string, string> = { critical: '#A32D2D', warning: '#BA7517', info: '#185FA5' };
+const scoreColor = (s: number) => s >= 80 ? txColors.success : s >= 60 ? txColors.warning : txColors.danger;
+const priorityColor: Record<string, string> = { critical: txColors.danger, warning: txColors.warning, info: txColors.info };
 const priorityLabel: Record<string, string> = { critical: '紧急', warning: '建议', info: '洞察' };
 
 const POLL_INTERVAL = 30_000;
@@ -122,7 +123,7 @@ export function OpsDashboardPage() {
         showIcon
         banner
         message="🤖 tx-ops 运营指挥官：福田中心店午市翻台率低于目标 23%，建议立即查看并调整排班"
-        action={<Button size="small" type="primary" style={{ background: '#FF6B35', border: 'none' }}>查看建议</Button>}
+        action={<Button size="small" type="primary" style={{ background: txColors.primary, border: 'none' }}>查看建议</Button>}
         style={{ marginBottom: 16 }}
         closable
       />
@@ -139,7 +140,7 @@ export function OpsDashboardPage() {
             <button key={d} onClick={() => setDateRange(d)} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: dateRange === d ? '#FF6B35' : '#1a2a33',
+              background: dateRange === d ? txColors.primary : '#1a2a33',
               color: dateRange === d ? '#fff' : '#999',
             }}>
               {dateLabels[d]}
@@ -153,13 +154,13 @@ export function OpsDashboardPage() {
         {kpis.map((kpi) => (
           <div key={kpi.label} style={{
             background: '#112228', borderRadius: 8, padding: 20,
-            borderLeft: '3px solid #FF6B35',
+            borderLeft: `3px solid ${txColors.primary}`,
           }}>
             <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
             <div style={{ fontSize: 28, fontWeight: 'bold', color: '#fff' }}>{kpi.formatted}</div>
             <div style={{
               fontSize: 12, marginTop: 4, display: 'flex', alignItems: 'center', gap: 4,
-              color: kpi.trend_up ? '#0F6E56' : '#A32D2D',
+              color: kpi.trend_up ? txColors.success : txColors.danger,
             }}>
               <span style={{ fontSize: 14 }}>{kpi.trend_up ? '\u2191' : '\u2193'}</span>
               {Math.abs(kpi.trend_percent).toFixed(1)}% 较昨日同期
@@ -175,8 +176,8 @@ export function OpsDashboardPage() {
           data={{
             labels: hourLabels,
             datasets: [
-              { name: '今日', values: todaySlice, color: '#FF6B35' },
-              { name: '昨日', values: yesterdaySlice, color: '#185FA5' },
+              { name: '今日', values: todaySlice, color: txColors.primary },
+              { name: '昨日', values: yesterdaySlice, color: txColors.info },
             ],
           }}
           height={280}
@@ -196,7 +197,7 @@ export function OpsDashboardPage() {
                 <button key={dim} onClick={() => setRankDimension(dim)} style={{
                   padding: '3px 10px', borderRadius: 4, border: 'none', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: rankDimension === dim ? '#FF6B35' : '#0B1A20',
+                  background: rankDimension === dim ? txColors.primary : '#0B1A20',
                   color: rankDimension === dim ? '#fff' : '#999',
                 }}>
                   {RANK_LABELS[dim]}
@@ -225,7 +226,7 @@ export function OpsDashboardPage() {
                     : s.turnover_rate.toFixed(1);
                 return (
                   <tr key={s.store_id} style={{ borderTop: '1px solid #1a2a33' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: s.rank <= 3 ? '#FF6B35' : '#666' }}>{s.rank}</td>
+                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: s.rank <= 3 ? txColors.primary : '#666' }}>{s.rank}</td>
                     <td style={{ padding: '10px 4px' }}>{s.store_name}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', fontWeight: 600 }}>{dimValue}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', color: '#999' }}>{s.order_count}</td>
@@ -247,12 +248,12 @@ export function OpsDashboardPage() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
             <h3 style={{ margin: 0, fontSize: 16 }}>
               AI 决策推荐
-              <span style={{ fontSize: 11, color: '#185FA5', marginLeft: 8 }}>TOP 3</span>
+              <span style={{ fontSize: 11, color: txColors.info, marginLeft: 8 }}>TOP 3</span>
             </h3>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {decisions.map((d, idx) => {
-              const pColor = priorityColor[d.priority] || '#185FA5';
+              const pColor = priorityColor[d.priority] || txColors.info;
               return (
                 <div key={d.decision_id} style={{
                   padding: 16, borderRadius: 8, background: '#0B1A20',

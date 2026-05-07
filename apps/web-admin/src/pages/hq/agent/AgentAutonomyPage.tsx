@@ -7,6 +7,7 @@
  * 纯 Mock 数据 + Ant Design 5.x
  */
 import { useCallback, useMemo, useState } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Badge,
   Button,
@@ -35,12 +36,12 @@ const { Title, Text, Paragraph } = Typography;
 
 // ─── Design Tokens ───
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
-  navy: '#1E2A3A',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
+  navy: txColors.navy,
   bgPrimary: '#FFFFFF',
   bgSecondary: '#F8F7F5',
   bgTertiary: '#F0EDE6',

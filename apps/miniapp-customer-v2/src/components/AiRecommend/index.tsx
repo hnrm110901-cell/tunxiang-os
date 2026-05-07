@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 import { View, Text, Image, ScrollView } from '@tarojs/components'
 import React from 'react'
 
@@ -177,7 +178,7 @@ const RecommendCard: React.FC<RecommendCardProps> = ({ item, onAdd }) => (
       >
         <Text
           style={{
-            color: '#FF6B35',
+            color: txColors.primary,
             fontSize: '30rpx',
             fontWeight: '700',
           }}
@@ -186,7 +187,7 @@ const RecommendCard: React.FC<RecommendCardProps> = ({ item, onAdd }) => (
         </Text>
         <View
           style={{
-            background: '#FF6B35',
+            background: txColors.primary,
             borderRadius: '28rpx',
             width: '64rpx',
             height: '64rpx',
@@ -249,7 +250,7 @@ const AiRecommend: React.FC<AiRecommendProps> = ({ recommendations, onAdd, loadi
             padding: '4rpx 12rpx',
           }}
         >
-          <Text style={{ color: '#FF6B35', fontSize: '20rpx', fontWeight: '600' }}>
+          <Text style={{ color: txColors.primary, fontSize: '20rpx', fontWeight: '600' }}>
             {loading ? '分析中...' : `${recommendations.length}道好菜`}
           </Text>
         </View>

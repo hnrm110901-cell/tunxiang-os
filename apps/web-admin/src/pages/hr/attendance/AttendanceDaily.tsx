@@ -28,9 +28,10 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { FileTextOutlined } from '@ant-design/icons';
 import dayjs, { Dayjs } from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

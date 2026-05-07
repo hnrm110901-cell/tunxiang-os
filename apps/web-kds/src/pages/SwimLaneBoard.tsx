@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -123,7 +124,7 @@ function TaskCard({
         <span
           style={{
             fontSize: 16,
-            color: '#FF6B35',
+            color: txColors.primary,
             fontWeight: 700,
             background: '#2A1A0E',
             borderRadius: 6,
@@ -197,7 +198,7 @@ export function SwimLaneBoard() {
       setData({
         steps: [
           { step_id: 's1', step_name: '切配', step_order: 1, color: '#FF9F0A' },
-          { step_id: 's2', step_name: '烹饪', step_order: 2, color: '#FF6B35' },
+          { step_id: 's2', step_name: '烹饪', step_order: 2, color: txColors.primary },
           { step_id: 's3', step_name: '装盘', step_order: 3, color: '#30D158' },
           { step_id: 's4', step_name: '传菜', step_order: 4, color: '#64D2FF' },
         ],

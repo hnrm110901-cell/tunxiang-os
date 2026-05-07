@@ -42,6 +42,7 @@ import {
 } from '@ant-design/icons';
 import type { ProColumns } from '@ant-design/pro-components';
 import { ProTable } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 const { TabPane } = Tabs;
@@ -139,9 +140,9 @@ const DeliveryCard = ({
     <Card
       size="small"
       style={{ marginBottom: 8, borderLeft: `3px solid`, borderLeftColor:
-        order.status === 'failed' ? '#A32D2D' :
-        order.status === 'delivered' ? '#0F6E56' :
-        order.status === 'delivering' || order.status === 'picked_up' ? '#BA7517' : '#185FA5'
+        order.status === 'failed' ? txColors.danger :
+        order.status === 'delivered' ? txColors.success :
+        order.status === 'delivering' || order.status === 'picked_up' ? txColors.warning : txColors.info
       }}
     >
       <Space direction="vertical" style={{ width: '100%' }} size={4}>
@@ -151,7 +152,7 @@ const DeliveryCard = ({
         </Space>
 
         <Space>
-          <EnvironmentOutlined style={{ color: '#BA7517' }} />
+          <EnvironmentOutlined style={{ color: txColors.warning }} />
           <Text style={{ fontSize: 12 }} ellipsis={{ tooltip: order.delivery_address }}>
             {order.delivery_address}
           </Text>
@@ -165,7 +166,7 @@ const DeliveryCard = ({
               实际 {order.actual_minutes} 分钟
             </Text>
           )}
-          <Text style={{ color: '#FF6B35' }}>¥{feeYuan}</Text>
+          <Text style={{ color: txColors.primary }}>¥{feeYuan}</Text>
         </Space>
 
         {order.rider_name && (
@@ -184,7 +185,7 @@ const DeliveryCard = ({
         <Space>
           {order.status === 'pending' && (
             <Button type="primary" size="small" onClick={() => onAssign(order)}
-              style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}>
+              style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}>
               派单
             </Button>
           )}
@@ -319,7 +320,7 @@ const DispatchBoard = () => {
                 title={
                   <Space>
                     <span>{col.title}</span>
-                    <Badge count={colOrders.length} style={{ backgroundColor: colOrders.length > 0 ? '#FF6B35' : '#d9d9d9' }} />
+                    <Badge count={colOrders.length} style={{ backgroundColor: colOrders.length > 0 ? txColors.primary : '#d9d9d9' }} />
                   </Space>
                 }
                 size="small"
@@ -352,7 +353,7 @@ const DispatchBoard = () => {
         onCancel={() => { setAssignModal({ visible: false }); form.resetFields(); }}
         onOk={() => form.submit()}
         okText="确认派单"
-        okButtonProps={{ style: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { backgroundColor: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form form={form} layout="vertical" onFinish={handleAssign}>
           <Form.Item name="rider_id" label="选择配送员" rules={[{ required: true, message: '请选择配送员' }]}>
@@ -441,8 +442,8 @@ const RiderManagement = () => {
       {riders.map(rider => {
         const cfg = RIDER_STATUS_CONFIG[rider.status] || RIDER_STATUS_CONFIG.offline;
         const workloadPct = Math.min(100, (rider.current_orders / MAX_ORDERS) * 100);
-        const workloadColor = rider.current_orders >= MAX_ORDERS ? '#A32D2D'
-          : rider.current_orders >= 3 ? '#BA7517' : '#0F6E56';
+        const workloadColor = rider.current_orders >= MAX_ORDERS ? txColors.danger
+          : rider.current_orders >= 3 ? txColors.warning : txColors.success;
 
         return (
           <Col key={rider.id} xs={24} sm={12} md={8} lg={6} xl={6}>
@@ -457,7 +458,7 @@ const RiderManagement = () => {
                 <Space>
                   <Avatar
                     icon={<UserOutlined />}
-                    style={{ backgroundColor: rider.status === 'offline' ? '#d9d9d9' : '#FF6B35' }}
+                    style={{ backgroundColor: rider.status === 'offline' ? '#d9d9d9' : txColors.primary }}
                   />
                   <div>
                     <Text strong>{rider.name}</Text>
@@ -489,7 +490,7 @@ const RiderManagement = () => {
 
                 <Space split={<Divider type="vertical" />} style={{ fontSize: 12 }}>
                   <Text type="secondary">今日完成</Text>
-                  <Text strong style={{ color: '#0F6E56' }}>{rider.today_completed} 单</Text>
+                  <Text strong style={{ color: txColors.success }}>{rider.today_completed} 单</Text>
                 </Space>
               </Space>
             </Card>
@@ -530,7 +531,7 @@ const DeliveryStats = () => {
     return (
       <div style={{ textAlign: 'center', padding: 48 }}>
         <Button loading={loading} onClick={loadStats} type="primary"
-          style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}>
+          style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}>
           加载今日统计
         </Button>
       </div>
@@ -552,43 +553,43 @@ const DeliveryStats = () => {
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="今日派单" value={stats.dispatched_count} suffix="单"
-              valueStyle={{ color: '#185FA5' }} />
+              valueStyle={{ color: txColors.info }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="已完成" value={stats.completed_count} suffix="单"
-              valueStyle={{ color: '#0F6E56' }} />
+              valueStyle={{ color: txColors.success }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="配送失败" value={stats.failed_count} suffix="单"
-              valueStyle={{ color: stats.failed_count > 0 ? '#A32D2D' : '#2C2C2A' }} />
+              valueStyle={{ color: stats.failed_count > 0 ? txColors.danger : '#2C2C2A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="进行中" value={stats.pending_count} suffix="单"
-              valueStyle={{ color: '#BA7517' }} />
+              valueStyle={{ color: txColors.warning }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="平均配送时长" value={stats.avg_delivery_minutes} suffix="分钟"
-              valueStyle={{ color: stats.avg_delivery_minutes > 40 ? '#A32D2D' : '#2C2C2A' }} />
+              valueStyle={{ color: stats.avg_delivery_minutes > 40 ? txColors.danger : '#2C2C2A' }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="准时率" value={stats.on_time_rate_percent} suffix="%"
-              valueStyle={{ color: stats.on_time_rate_percent >= 90 ? '#0F6E56' : '#BA7517' }} />
+              valueStyle={{ color: stats.on_time_rate_percent >= 90 ? txColors.success : txColors.warning }} />
           </Card>
         </Col>
         <Col xs={12} sm={8} md={6}>
           <Card size="small">
             <Statistic title="在线配送员" value={stats.rider_count_online} suffix="人"
-              valueStyle={{ color: '#0F6E56' }} />
+              valueStyle={{ color: txColors.success }} />
           </Card>
         </Col>
       </Row>
@@ -601,7 +602,7 @@ const DeliveryStats = () => {
               <Progress
                 type="circle"
                 percent={completionRate}
-                strokeColor={completionRate >= 90 ? '#0F6E56' : completionRate >= 70 ? '#BA7517' : '#A32D2D'}
+                strokeColor={completionRate >= 90 ? txColors.success : completionRate >= 70 ? txColors.warning : txColors.danger}
                 format={pct => <span style={{ fontSize: 20, fontWeight: 'bold' }}>{pct}%</span>}
               />
               <div style={{ marginTop: 8 }}>
@@ -617,8 +618,8 @@ const DeliveryStats = () => {
                 type="circle"
                 percent={stats.on_time_rate_percent}
                 strokeColor={
-                  stats.on_time_rate_percent >= 90 ? '#0F6E56'
-                  : stats.on_time_rate_percent >= 70 ? '#BA7517' : '#A32D2D'
+                  stats.on_time_rate_percent >= 90 ? txColors.success
+                  : stats.on_time_rate_percent >= 70 ? txColors.warning : txColors.danger
                 }
                 format={pct => <span style={{ fontSize: 20, fontWeight: 'bold' }}>{pct}%</span>}
               />
@@ -639,7 +640,7 @@ const DeliveryStats = () => {
               />
               <div style={{ marginTop: 8 }}>
                 <Space>
-                  <Badge color="#0F6E56" text={`在线 ${stats.rider_count_online} 人`} />
+                  <Badge color={txColors.success} text={`在线 ${stats.rider_count_online} 人`} />
                 </Space>
               </div>
             </div>
@@ -658,7 +659,7 @@ export default function DeliveryDispatchPage() {
   return (
     <div style={{ padding: 24, minWidth: 1280 }}>
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <CarOutlined style={{ fontSize: 20, color: '#FF6B35' }} />
+        <CarOutlined style={{ fontSize: 20, color: txColors.primary }} />
         <Title level={4} style={{ margin: 0 }}>自营配送调度台</Title>
         <Tag color="orange" icon={<CarOutlined />}>Y-M4</Tag>
       </div>

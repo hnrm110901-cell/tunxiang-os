@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * share/index.tsx — 分享中心
  *
@@ -19,7 +20,7 @@ import { truncate } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -428,7 +429,7 @@ const QUICK_SHARE_OPTIONS: QuickShareOption[] = [
     icon: '🎫',
     label: '分享优惠',
     desc: '好友领券立享折扣',
-    color: '#FF6B35',
+    color: txColors.primary,
     buildShare: () => ({
       title: '屯象OS优惠券，限时领取！',
       path: '/pages/coupon/claim/index',

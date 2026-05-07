@@ -1,6 +1,6 @@
 import React from 'react';
 
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 
 const sdks = [
   {
@@ -61,6 +61,7 @@ console.log(\`订单号: \${order.id}\`);`,
 </dependency>`,
     example: `import com.tunxiang.TunxiangClient;
 import com.tunxiang.model.Member;
+import { txColors } from '@tx/tokens';
 
 TunxiangClient client = TunxiangClient.builder()
     .apiKey("your-api-key")

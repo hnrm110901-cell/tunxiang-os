@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/community-detail/index.tsx — 帖子详情页
  *
@@ -52,7 +53,7 @@ interface Comment {
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   primaryDim: 'rgba(255,107,53,0.15)',
   bg:         '#0B1A20',
   card:       '#132029',

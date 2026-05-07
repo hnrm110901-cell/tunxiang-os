@@ -3,6 +3,7 @@ import { useLang } from '@/i18n/LangContext';
 import type { DishItem } from '@/api/menuApi';
 import AllergenBadge from './AllergenBadge';
 import styles from './DishCard.module.css';
+import { txColors } from '@tx/tokens';
 
 interface DishCardProps {
   dish: DishItem;
@@ -12,7 +13,7 @@ interface DishCardProps {
 }
 
 const TAG_COLORS: Record<string, string> = {
-  signature: '#FF6B35',
+  signature: txColors.primary,
   new: '#22C55E',
   spicy1: '#F59E0B',
   spicy2: '#EF4444',

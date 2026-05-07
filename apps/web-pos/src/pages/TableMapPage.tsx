@@ -12,17 +12,18 @@ import type { StatusBarItem, TableCardData } from '@tx-ds/biz';
 import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
 import { KeyboardShortcutHelp, KeyboardHelpTrigger } from '../components/KeyboardShortcutHelp';
 import { ShortcutOverlay } from '../components/ShortcutOverlay';
+import { txColors } from '@tx/tokens';
 
 /* ─── 样式常量 ─── */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
-  green: '#0F6E56',
-  blue: '#185FA5',
-  red: '#A32D2D',
-  yellow: '#BA7517',
+  accent: txColors.primary,
+  green: txColors.success,
+  blue: txColors.info,
+  red: txColors.danger,
+  yellow: txColors.warning,
   purple: '#722ed1',
   muted: '#64748b',
   text: '#E0E0E0',

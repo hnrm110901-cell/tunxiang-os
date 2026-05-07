@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 const C = {
   bg: '#0B0B0B', card: '#111', border: '#1A1A1A',
-  text: '#E0E0E0', muted: '#555', primary: '#FF6B35',
+  text: '#E0E0E0', muted: '#555', primary: txColors.primary,
   danger: '#FF3B30', warning: '#FF9F0A', success: '#30D158',
 };
 

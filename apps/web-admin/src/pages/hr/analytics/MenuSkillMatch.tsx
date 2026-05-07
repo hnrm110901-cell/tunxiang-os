@@ -37,6 +37,7 @@ import {
   WarningOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -237,7 +238,7 @@ export default function MenuSkillMatch() {
             <Col span={6}>
               <Card size="small">
                 <Text type="secondary">技能缺口</Text>
-                <Title level={4} style={{ margin: '4px 0', color: data.gap_store_count > 0 ? '#A32D2D' : '#0F6E56' }}>
+                <Title level={4} style={{ margin: '4px 0', color: data.gap_store_count > 0 ? txColors.danger : txColors.success }}>
                   {data.gap_store_count}
                   <Text type="secondary" style={{ fontSize: 14 }}> 家有缺口</Text>
                 </Title>
@@ -263,7 +264,7 @@ export default function MenuSkillMatch() {
                 yField="skill_label"
                 colorField="count"
                 height={Math.max(200, data.required_skill_labels.length * 60)}
-                color={['#A32D2D', '#BA7517', '#F5C842', '#7EC384', '#0F6E56']}
+                color={[txColors.danger, txColors.warning, '#F5C842', '#7EC384', txColors.success]}
                 meta={{ count: { alias: '掌握人数' } }}
                 label={{
                   style: { fill: '#fff', fontSize: 12 },
@@ -283,7 +284,7 @@ export default function MenuSkillMatch() {
             <Card
               title={
                 <Space>
-                  <WarningOutlined style={{ color: '#A32D2D' }} />
+                  <WarningOutlined style={{ color: txColors.danger }} />
                   <span>门店技能缺口</span>
                 </Space>
               }

@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -157,7 +158,7 @@ function DishCard({ dish }: { dish: DishItem }) {
               right: -24,
               width: 90,
               textAlign: 'center',
-              background: '#A32D2D',
+              background: txColors.danger,
               color: '#fff',
               fontSize: 13,
               fontWeight: 700,
@@ -179,7 +180,7 @@ function DishCard({ dish }: { dish: DishItem }) {
               position: 'absolute',
               top: 8,
               left: 8,
-              background: '#FF6B35',
+              background: txColors.primary,
               color: '#fff',
               fontSize: 12,
               fontWeight: 700,
@@ -199,7 +200,7 @@ function DishCard({ dish }: { dish: DishItem }) {
               position: 'absolute',
               top: dish.is_new ? 34 : 8,
               left: 8,
-              background: '#0F6E56',
+              background: txColors.success,
               color: '#fff',
               fontSize: 12,
               fontWeight: 700,
@@ -234,7 +235,7 @@ function DishCard({ dish }: { dish: DishItem }) {
             style={{
               fontSize: 22,
               fontWeight: 800,
-              color: soldOut ? '#555' : '#FF6B35',
+              color: soldOut ? '#555' : txColors.primary,
               fontFamily: 'monospace',
             }}
           >
@@ -418,7 +419,7 @@ export function DigitalMenuBoardPage() {
           flexShrink: 0,
           height: 72,
           background: '#1A1A1A',
-          borderBottom: '2px solid #FF6B35',
+          borderBottom: `2px solid ${txColors.primary}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -439,7 +440,7 @@ export function DigitalMenuBoardPage() {
                 width: 44,
                 height: 44,
                 borderRadius: 8,
-                background: '#FF6B35',
+                background: txColors.primary,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -464,7 +465,7 @@ export function DigitalMenuBoardPage() {
               style={{
                 fontSize: 32,
                 fontWeight: 700,
-                color: '#FF6B35',
+                color: txColors.primary,
                 fontFamily: 'monospace',
                 lineHeight: 1.1,
               }}
@@ -533,7 +534,7 @@ export function DigitalMenuBoardPage() {
         style={{
           flexShrink: 0,
           height: 48,
-          background: '#FF6B35',
+          background: txColors.primary,
           display: 'flex',
           alignItems: 'center',
           overflow: 'hidden',
@@ -544,7 +545,7 @@ export function DigitalMenuBoardPage() {
           style={{
             flexShrink: 0,
             padding: '0 16px',
-            background: '#E55A28',
+            background: txColors.primaryActive,
             height: '100%',
             display: 'flex',
             alignItems: 'center',

@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 类型 ---------- */
 interface TodoItem {
@@ -111,7 +112,7 @@ export function DashboardPage() {
         </div>
         <div style={{
           background: 'rgba(255,107,53,0.15)', borderRadius: 8, padding: '8px 14px',
-          fontSize: 16, color: '#FF6B35', fontWeight: 600,
+          fontSize: 16, color: txColors.primary, fontWeight: 600,
         }}>
           已工作 3h 42m
         </div>
@@ -136,7 +137,7 @@ export function DashboardPage() {
               width: 40, height: 40, borderRadius: 10,
               background: 'rgba(255,107,53,0.15)', display: 'flex',
               alignItems: 'center', justifyContent: 'center',
-              fontSize: 18, fontWeight: 700, color: '#FF6B35',
+              fontSize: 18, fontWeight: 700, color: txColors.primary,
             }}>
               {s.icon}
             </span>
@@ -168,7 +169,7 @@ export function DashboardPage() {
             { label: '顾客评分', value: String(stats.rating) },
           ] as const).map(item => (
             <div key={item.label} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#FF6B35' }}>{item.value}</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: txColors.primary }}>{item.value}</div>
               <div style={{ fontSize: 14, color: '#64748b', marginTop: 2 }}>{item.label}</div>
             </div>
           ))}
@@ -216,7 +217,7 @@ export function DashboardPage() {
               <button
                 onClick={() => handleDone(item.id)}
                 style={{
-                  background: '#FF6B35', border: 'none', borderRadius: 8,
+                  background: txColors.primary, border: 'none', borderRadius: 8,
                   color: '#fff', fontSize: 16, fontWeight: 600,
                   padding: '10px 16px', cursor: 'pointer',
                   minWidth: 48, minHeight: 48,

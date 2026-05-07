@@ -10,6 +10,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -52,7 +53,7 @@ const MOCK_UPCOMING_ORDERS: UpcomingOrder[] = [
 
 // ─── Constants ───
 
-const BRAND_COLOR = '#FF6B35';
+const BRAND_COLOR = txColors.primary;
 const BG_MAIN = '#1a1a1a';
 const BG_CARD = '#2d2d2d';
 const BG_DARK = '#141414';

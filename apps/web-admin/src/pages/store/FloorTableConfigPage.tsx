@@ -7,6 +7,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { apiGet, apiPost, apiPatch } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -51,9 +52,9 @@ const TABLE_TYPE_LABELS: Record<TableType, string> = {
 };
 
 const TABLE_TYPE_COLORS: Record<TableType, { color: string; bg: string }> = {
-  small:        { color: '#0F6E56', bg: '#0F6E5618' },
-  medium:       { color: '#185FA5', bg: '#185FA518' },
-  large:        { color: '#FF6B35', bg: '#FF6B3518' },
+  small:        { color: txColors.success, bg: `${txColors.success}18` },
+  medium:       { color: txColors.info, bg: `${txColors.info}18` },
+  large:        { color: txColors.primary, bg: `${txColors.primary}18` },
   private_room: { color: '#8B5CF6', bg: '#8B5CF618' },
   vip:          { color: '#D97706', bg: '#D9770618' },
 };
@@ -206,7 +207,7 @@ export function FloorTableConfigPage() {
   };
 
   // ─── 样式常量 ──────────────────────────────────────────────────────────────
-  const brand = '#FF6B35';
+  const brand = txColors.primary;
   const bg0 = '#0B1A20';
   const bg1 = '#112228';
   const bg2 = '#1a2a33';
@@ -311,9 +312,9 @@ export function FloorTableConfigPage() {
                 <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
                   {t.is_private_room && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: '#8B5CF618', color: '#8B5CF6' }}>包间</span>}
                   {t.is_vip_room && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: '#D9770618', color: '#D97706' }}>VIP</span>}
-                  {t.supports_reservation && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: '#185FA518', color: '#185FA5' }}>可预定</span>}
-                  {t.supports_merge && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: '#0F6E5618', color: '#0F6E56' }}>可并台</span>}
-                  {!t.enabled && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: '#A32D2D18', color: '#A32D2D' }}>已停用</span>}
+                  {t.supports_reservation && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: `${txColors.info}18`, color: txColors.info }}>可预定</span>}
+                  {t.supports_merge && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: `${txColors.success}18`, color: txColors.success }}>可并台</span>}
+                  {!t.enabled && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 3, background: `${txColors.danger}18`, color: txColors.danger }}>已停用</span>}
                 </div>
                 {t.low_consumption_amount != null && t.low_consumption_amount > 0 && (
                   <div style={{ marginTop: 6, fontSize: 11, color: text3 }}>最低消费 ¥{(t.low_consumption_amount / 100).toLocaleString()}</div>
@@ -343,9 +344,9 @@ export function FloorTableConfigPage() {
                 <span style={{ display: 'flex', gap: 4 }}>
                   {t.is_private_room && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: '#8B5CF618', color: '#8B5CF6' }}>包</span>}
                   {t.is_vip_room && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: '#D9770618', color: '#D97706' }}>V</span>}
-                  {t.supports_reservation && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: '#185FA518', color: '#185FA5' }}>预</span>}
+                  {t.supports_reservation && <span style={{ fontSize: 9, padding: '1px 4px', borderRadius: 2, background: `${txColors.info}18`, color: txColors.info }}>预</span>}
                 </span>
-                <span style={{ color: t.enabled ? '#0F6E56' : '#A32D2D', fontSize: 12 }}>{t.enabled ? '启用' : '停用'}</span>
+                <span style={{ color: t.enabled ? txColors.success : txColors.danger, fontSize: 12 }}>{t.enabled ? '启用' : '停用'}</span>
               </div>
             );
           })}

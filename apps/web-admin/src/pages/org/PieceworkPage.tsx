@@ -55,17 +55,18 @@ import {
   TrophyOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
 // ─── 品牌主题 ──────────────────────────────────────────────────────────────
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
@@ -211,12 +212,12 @@ function DashboardTab() {
         {/* 集团今日汇总 */}
         <Row gutter={16}>
           <Col span={8}>
-            <Card bordered={false} style={{ background: '#FFF3ED' }}>
+            <Card bordered={false} style={{ background: txColors.primaryLight }}>
               <Statistic
                 title="今日计件总金额"
                 value={report ? (report.total_fee_fen / 100).toFixed(2) : '--'}
                 prefix="¥"
-                valueStyle={{ color: '#FF6B35', fontWeight: 700, fontSize: 28 }}
+                valueStyle={{ color: txColors.primary, fontWeight: 700, fontSize: 28 }}
               />
             </Card>
           </Col>
@@ -226,7 +227,7 @@ function DashboardTab() {
                 title="今日计件总件数"
                 value={report?.total_quantity ?? '--'}
                 suffix="件"
-                valueStyle={{ color: '#0F6E56', fontWeight: 700, fontSize: 28 }}
+                valueStyle={{ color: txColors.success, fontWeight: 700, fontSize: 28 }}
               />
             </Card>
           </Col>
@@ -237,7 +238,7 @@ function DashboardTab() {
                 value={report?.participant_count ?? '--'}
                 suffix="人"
                 prefix={<TeamOutlined />}
-                valueStyle={{ color: '#185FA5', fontWeight: 700, fontSize: 28 }}
+                valueStyle={{ color: txColors.info, fontWeight: 700, fontSize: 28 }}
               />
             </Card>
           </Col>
@@ -249,7 +250,7 @@ function DashboardTab() {
             <Card
               title={
                 <Space>
-                  <TrophyOutlined style={{ color: '#FF6B35' }} />
+                  <TrophyOutlined style={{ color: txColors.primary }} />
                   <span>今日 TOP5 员工</span>
                 </Space>
               }
@@ -268,7 +269,7 @@ function DashboardTab() {
                 >
                   <Space>
                     <Tag
-                      color={emp.rank === 1 ? '#FF6B35' : emp.rank <= 3 ? '#BA7517' : '#d9d9d9'}
+                      color={emp.rank === 1 ? txColors.primary : emp.rank <= 3 ? txColors.warning : '#d9d9d9'}
                       style={{ fontWeight: 700 }}
                     >
                       {emp.rank}
@@ -276,7 +277,7 @@ function DashboardTab() {
                     <Text>{emp.employee_name ?? emp.employee_id ?? `员工${emp.rank}`}</Text>
                   </Space>
                   <Space direction="vertical" align="end" size={0}>
-                    <Text strong style={{ color: '#FF6B35' }}>
+                    <Text strong style={{ color: txColors.primary }}>
                       {fenToYuan(emp.total_fee_fen)}
                     </Text>
                     <Text type="secondary" style={{ fontSize: 12 }}>
@@ -411,7 +412,7 @@ function ZonesTab() {
         </a>,
         <a
           key="del"
-          style={{ color: '#A32D2D', marginLeft: 8 }}
+          style={{ color: txColors.danger, marginLeft: 8 }}
           onClick={() => handleDelete(record.id)}
         >
           <DeleteOutlined /> 停用
@@ -948,7 +949,7 @@ function SystemSettingsTab() {
             type="primary"
             onClick={handleSave}
             loading={saving}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             保存设置
           </Button>

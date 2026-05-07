@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * ReorderBanner — 智能复购提醒
  *
@@ -18,7 +19,7 @@ import { useCartStore } from '../../store/useCartStore'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryBg: 'rgba(255,107,44,0.08)',
   bgCard: '#132029',
   border: '#1E3340',

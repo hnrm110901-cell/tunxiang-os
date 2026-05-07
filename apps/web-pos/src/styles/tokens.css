@@ -5,8 +5,8 @@
 
 :root {
   /* ─── 品牌色（已迁移至 @tx/tokens/tokens.css，此处保留向后兼容变量）─── */
-  --brand: #FF6B35;
-  --brand-light: #FF8555;
+  --brand: var(--tx-primary);
+  --brand-light: var(--tx-primary-hover);
   --brand-bg: rgba(255, 107, 53, 0.08);
 
   /* ─── 语义色 ─── */

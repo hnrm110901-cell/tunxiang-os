@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { TxLineChart, TxBarChart } from '../../../components/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型 ----------
 interface RevenueChannel {
@@ -65,7 +66,7 @@ interface FinanceSummary {
 
 // ---------- 工具 ----------
 const formatMoney = (v: number) => '\u00A5' + (v / 100).toLocaleString(undefined, { minimumFractionDigits: 0 });
-const marginColor = (m: number) => m >= 45 ? '#0F6E56' : m >= 38 ? '#BA7517' : '#A32D2D';
+const marginColor = (m: number) => m >= 45 ? txColors.success : m >= 38 ? txColors.warning : txColors.danger;
 
 const PERIOD_MAP: Record<string, string> = {
   '今日': 'today',
@@ -135,22 +136,22 @@ export function FinanceAnalysisPage() {
   // 趋势图数据准备
   const trendLabels = revenueTrend.map(r => r.month);
   const revTrendDatasets = trendLabels.length > 0 ? [
-    { name: '堂食', values: revenueTrend.map(r => r.dine_in), color: '#FF6B35' },
-    { name: '外卖', values: revenueTrend.map(r => r.delivery), color: '#185FA5' },
-    { name: '宴席', values: revenueTrend.map(r => r.banquet), color: '#0F6E56' },
+    { name: '堂食', values: revenueTrend.map(r => r.dine_in), color: txColors.primary },
+    { name: '外卖', values: revenueTrend.map(r => r.delivery), color: txColors.info },
+    { name: '宴席', values: revenueTrend.map(r => r.banquet), color: txColors.success },
   ] : [];
 
   const payLabels = paymentTrend.map(r => r.month);
   const payTrendDatasets = payLabels.length > 0 ? [
-    { name: '微信支付', values: paymentTrend.map(r => r.wechat), color: '#0F6E56' },
-    { name: '支付宝', values: paymentTrend.map(r => r.alipay), color: '#185FA5' },
-    { name: '其他', values: paymentTrend.map(r => r.other), color: '#BA7517' },
+    { name: '微信支付', values: paymentTrend.map(r => r.wechat), color: txColors.success },
+    { name: '支付宝', values: paymentTrend.map(r => r.alipay), color: txColors.info },
+    { name: '其他', values: paymentTrend.map(r => r.other), color: txColors.warning },
   ] : [];
 
   const discLabels = discountTrend.map(r => r.month);
   const discTrendDatasets = discLabels.length > 0 ? [
-    { name: '折扣总额', values: discountTrend.map(r => r.total), color: '#BA7517' },
-    { name: '异常折扣', values: discountTrend.map(r => r.abnormal), color: '#A32D2D' },
+    { name: '折扣总额', values: discountTrend.map(r => r.total), color: txColors.warning },
+    { name: '异常折扣', values: discountTrend.map(r => r.abnormal), color: txColors.danger },
   ] : [];
 
   return (
@@ -163,7 +164,7 @@ export function FinanceAnalysisPage() {
             <button key={d} style={{
               padding: '4px 14px', borderRadius: 6, border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 600,
-              background: period === d ? '#FF6B35' : '#1a2a33',
+              background: period === d ? txColors.primary : '#1a2a33',
               color: period === d ? '#fff' : '#999',
             }} onClick={() => setPeriod(d)}>
               {d}
@@ -180,10 +181,10 @@ export function FinanceAnalysisPage() {
       {/* 汇总卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 24 }}>
         {[
-          { label: '总营收', value: formatMoney(totalRevenue), color: '#FF6B35' },
-          { label: '总利润', value: formatMoney(totalProfit), color: '#0F6E56' },
-          { label: '平均毛利率', value: `${avgMargin.toFixed(1)}%`, color: '#185FA5' },
-          { label: '折扣总额', value: formatMoney(totalDiscount), color: '#BA7517' },
+          { label: '总营收', value: formatMoney(totalRevenue), color: txColors.primary },
+          { label: '总利润', value: formatMoney(totalProfit), color: txColors.success },
+          { label: '平均毛利率', value: `${avgMargin.toFixed(1)}%`, color: txColors.info },
+          { label: '折扣总额', value: formatMoney(totalDiscount), color: txColors.warning },
         ].map((kpi) => (
           <div key={kpi.label} style={{
             background: '#112228', borderRadius: 8, padding: 16,
@@ -270,7 +271,7 @@ export function FinanceAnalysisPage() {
                     <div style={{ height: 10, borderRadius: 5, background: '#0B1A20', overflow: 'hidden' }}>
                       <div style={{
                         width: `${pm.percent}%`, height: '100%', borderRadius: 5,
-                        background: '#FF6B35', opacity: 0.6 + (pm.percent / 100) * 0.4,
+                        background: txColors.primary, opacity: 0.6 + (pm.percent / 100) * 0.4,
                         transition: 'width 0.6s ease',
                       }} />
                     </div>
@@ -300,7 +301,7 @@ export function FinanceAnalysisPage() {
             {totalDiscount > 0 && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#BA751720', color: '#BA7517', fontWeight: 600,
+                background: `${txColors.warning}20`, color: txColors.warning, fontWeight: 600,
               }}>
                 总折扣 {formatMoney(totalDiscount)}
               </span>
@@ -332,8 +333,8 @@ export function FinanceAnalysisPage() {
                       <td style={{ padding: '10px 4px', textAlign: 'right' }}>
                         <span style={{
                           padding: '2px 6px', borderRadius: 4, fontSize: 11, fontWeight: 600,
-                          background: d.avgDiscount > 35 ? '#A32D2D20' : '#0F6E5620',
-                          color: d.avgDiscount > 35 ? '#A32D2D' : '#0F6E56',
+                          background: d.avgDiscount > 35 ? `${txColors.danger}20` : `${txColors.success}20`,
+                          color: d.avgDiscount > 35 ? txColors.danger : txColors.success,
                         }}>
                           {d.avgDiscount}%
                         </span>
@@ -375,7 +376,7 @@ export function FinanceAnalysisPage() {
               <tbody>
                 {storeProfits.map((s) => (
                   <tr key={s.rank} style={{ borderTop: '1px solid #1a2a33' }}>
-                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: '#FF6B35' }}>{s.rank}</td>
+                    <td style={{ padding: '10px 4px', fontWeight: 'bold', color: txColors.primary }}>{s.rank}</td>
                     <td style={{ padding: '10px 4px', color: '#ccc' }}>{s.name}</td>
                     <td style={{ padding: '10px 4px', textAlign: 'right', color: '#fff' }}>
                       {formatMoney(s.revenue)}
@@ -393,7 +394,7 @@ export function FinanceAnalysisPage() {
                     </td>
                     <td style={{
                       padding: '10px 4px', textAlign: 'right', fontSize: 11,
-                      color: s.trend.startsWith('+') ? '#0F6E56' : '#A32D2D',
+                      color: s.trend.startsWith('+') ? txColors.success : txColors.danger,
                     }}>
                       {s.trend.startsWith('+') ? '\u2191' : '\u2193'}{s.trend}
                     </td>

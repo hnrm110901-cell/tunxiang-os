@@ -28,6 +28,7 @@ import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
 import { formatPrice } from '@tx-ds/utils';
 import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
+import { txColors } from '@tx/tokens';
 
 // ── 账单规则类型 ──────────────────────────────────────────────────────────────
 
@@ -331,7 +332,7 @@ export function SettlePage() {
           </div>
         )}
 
-        <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: '#FF6B35', textAlign: 'right' }}>
+        <div style={{ marginTop: 16, fontSize: 24, fontWeight: 'bold', color: txColors.primary, textAlign: 'right' }}>
           应付: {fen2yuan(billingRules ? finalFen + billingRules.service_fee_fen : finalFen)}
           {billingRules && billingRules.service_fee_fen > 0 && (
             <span style={{ fontSize: 14, color: '#8A94A4', marginLeft: 8, fontWeight: 400 }}>
@@ -353,8 +354,8 @@ export function SettlePage() {
             alignItems: 'center',
             fontSize: 17,
           }}>
-            <span style={{ color: '#FF6B35', fontWeight: 600 }}>已优惠</span>
-            <span style={{ color: '#FF6B35', fontWeight: 700 }}>-{fen2yuan(discountFen)}</span>
+            <span style={{ color: txColors.primary, fontWeight: 600 }}>已优惠</span>
+            <span style={{ color: txColors.primary, fontWeight: 700 }}>-{fen2yuan(discountFen)}</span>
           </div>
         )}
 
@@ -374,10 +375,10 @@ export function SettlePage() {
                 style={{
                   padding: '10px 16px',
                   minHeight: 48,
-                  border: '1.5px solid #FF6B35',
+                  border: `1.5px solid ${txColors.primary}`,
                   borderRadius: 8,
                   background: 'rgba(255,107,53,0.12)',
-                  color: items.length === 0 ? '#666' : '#FF6B35',
+                  color: items.length === 0 ? '#666' : txColors.primary,
                   fontSize: 17,
                   fontWeight: 600,
                   cursor: items.length === 0 ? 'not-allowed' : 'pointer',
@@ -441,12 +442,12 @@ export function SettlePage() {
           background: 'rgba(249,115,22,.06)', border: '1px solid rgba(249,115,22,.15)',
           borderRadius: 10, padding: '10px 14px', margin: '12px 0',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#FF6B35', marginBottom: 8 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: txColors.primary, marginBottom: 8 }}>
             💡 收益优化师 · 结账建议
           </div>
           {['存酒余800ml，建议推荐续存享9折', '企业客户，发票已自动准备', '五一包间有档期，可推荐预约'].map((tip, i) => (
             <div key={i} style={{ fontSize: 12, color: '#5F5E5A', marginBottom: 4, display: 'flex', gap: 6 }}>
-              <span style={{ color: '#FF6B35' }}>◆</span>{tip}
+              <span style={{ color: txColors.primary }}>◆</span>{tip}
             </div>
           ))}
         </div>

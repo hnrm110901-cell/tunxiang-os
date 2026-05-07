@@ -35,6 +35,7 @@ import {
 } from '@ant-design/icons';
 import { ProTable, ProColumns, ActionType, ModalForm, ProFormText, ProFormSelect, ProFormTextArea, ProFormDigit } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -130,9 +131,9 @@ function getCertColor(days?: number): string {
 
 function getCertIcon(days?: number) {
   if (days === undefined || days === null) return null;
-  if (days < 7) return <WarningOutlined style={{ color: '#A32D2D' }} />;
-  if (days <= 30) return <ClockCircleOutlined style={{ color: '#BA7517' }} />;
-  return <CheckCircleOutlined style={{ color: '#0F6E56' }} />;
+  if (days < 7) return <WarningOutlined style={{ color: txColors.danger }} />;
+  if (days <= 30) return <ClockCircleOutlined style={{ color: txColors.warning }} />;
+  return <CheckCircleOutlined style={{ color: txColors.success }} />;
 }
 
 // ── Tab 1: 培训记录 ──────────────────────────────────────────
@@ -189,7 +190,7 @@ function TrainingRecordsTab() {
       search: false,
       render: (_, r) => {
         if (r.score === undefined || r.score === null) return '-';
-        const color = r.score >= 90 ? '#0F6E56' : r.score >= 60 ? '#BA7517' : '#A32D2D';
+        const color = r.score >= 90 ? txColors.success : r.score >= 60 ? txColors.warning : txColors.danger;
         return <Text strong style={{ color }}>{r.score}</Text>;
       },
     },
@@ -224,7 +225,7 @@ function TrainingRecordsTab() {
           <Tooltip title={days !== undefined ? `剩余 ${days} 天` : ''}>
             <Space size={4}>
               {getCertIcon(days)}
-              <Text style={{ color: getCertColor(days) === 'red' ? '#A32D2D' : getCertColor(days) === 'orange' ? '#BA7517' : '#0F6E56' }}>
+              <Text style={{ color: getCertColor(days) === 'red' ? txColors.danger : getCertColor(days) === 'orange' ? txColors.warning : txColors.success }}>
                 {r.certificate_expires_at}
               </Text>
             </Space>
@@ -515,7 +516,7 @@ function CertificateAlertTab() {
       {items.length === 0 && !loading ? (
         <Card>
           <div style={{ textAlign: 'center', padding: 48 }}>
-            <SafetyCertificateOutlined style={{ fontSize: 48, color: '#0F6E56' }} />
+            <SafetyCertificateOutlined style={{ fontSize: 48, color: txColors.success }} />
             <div style={{ marginTop: 16 }}>
               <Text type="secondary">{queryDays} 天内无即将到期证书</Text>
             </div>
@@ -528,7 +529,7 @@ function CertificateAlertTab() {
               <Card
                 size="small"
                 style={{
-                  borderLeft: `4px solid ${item.risk_level === 'high' ? '#A32D2D' : item.risk_level === 'medium' ? '#BA7517' : '#185FA5'}`,
+                  borderLeft: `4px solid ${item.risk_level === 'high' ? txColors.danger : item.risk_level === 'medium' ? txColors.warning : txColors.info}`,
                 }}
                 actions={[
                   <Button
@@ -536,7 +537,7 @@ function CertificateAlertTab() {
                     type="primary"
                     size="small"
                     danger={item.risk_level === 'high'}
-                    style={item.risk_level !== 'high' ? { backgroundColor: '#BA7517', borderColor: '#BA7517' } : {}}
+                    style={item.risk_level !== 'high' ? { backgroundColor: txColors.warning, borderColor: txColors.warning } : {}}
                   >
                     {item.action}
                   </Button>,
@@ -604,8 +605,8 @@ function TrainingStatsTab() {
             <Statistic
               title="本月培训人次"
               value={stats?.monthly_count ?? '-'}
-              prefix={<CheckCircleOutlined style={{ color: '#0F6E56' }} />}
-              valueStyle={{ color: '#0F6E56' }}
+              prefix={<CheckCircleOutlined style={{ color: txColors.success }} />}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>
@@ -615,7 +616,7 @@ function TrainingStatsTab() {
               title="通过率"
               value={stats?.pass_rate ?? '-'}
               suffix="%"
-              valueStyle={{ color: (stats?.pass_rate ?? 0) >= 80 ? '#0F6E56' : '#BA7517' }}
+              valueStyle={{ color: (stats?.pass_rate ?? 0) >= 80 ? txColors.success : txColors.warning }}
             />
           </Card>
         </Col>
@@ -624,8 +625,8 @@ function TrainingStatsTab() {
             <Statistic
               title="证书持有人数"
               value={stats?.cert_holders ?? '-'}
-              prefix={<SafetyCertificateOutlined style={{ color: '#185FA5' }} />}
-              valueStyle={{ color: '#185FA5' }}
+              prefix={<SafetyCertificateOutlined style={{ color: txColors.info }} />}
+              valueStyle={{ color: txColors.info }}
             />
           </Card>
         </Col>
@@ -634,11 +635,11 @@ function TrainingStatsTab() {
             <Statistic
               title="30天内到期证书"
               value={stats?.expiring_30_days ?? '-'}
-              valueStyle={{ color: (stats?.expiring_30_days ?? 0) > 0 ? '#A32D2D' : '#0F6E56' }}
+              valueStyle={{ color: (stats?.expiring_30_days ?? 0) > 0 ? txColors.danger : txColors.success }}
               prefix={
                 (stats?.expiring_30_days ?? 0) > 0
-                  ? <WarningOutlined style={{ color: '#A32D2D' }} />
-                  : <CheckCircleOutlined style={{ color: '#0F6E56' }} />
+                  ? <WarningOutlined style={{ color: txColors.danger }} />
+                  : <CheckCircleOutlined style={{ color: txColors.success }} />
               }
             />
           </Card>
@@ -661,7 +662,7 @@ function TrainingStatsTab() {
                 </Col>
                 <Col>
                   <Text strong style={{
-                    color: item.pass_rate >= 80 ? '#0F6E56' : item.pass_rate >= 60 ? '#BA7517' : '#A32D2D'
+                    color: item.pass_rate >= 80 ? txColors.success : item.pass_rate >= 60 ? txColors.warning : txColors.danger
                   }}>
                     {item.pass_rate}%
                   </Text>
@@ -671,9 +672,9 @@ function TrainingStatsTab() {
                 percent={item.pass_rate}
                 showInfo={false}
                 strokeColor={
-                  item.pass_rate >= 80 ? '#0F6E56'
-                  : item.pass_rate >= 60 ? '#BA7517'
-                  : '#A32D2D'
+                  item.pass_rate >= 80 ? txColors.success
+                  : item.pass_rate >= 60 ? txColors.warning
+                  : txColors.danger
                 }
                 trailColor="#F0EDE6"
                 size="small"

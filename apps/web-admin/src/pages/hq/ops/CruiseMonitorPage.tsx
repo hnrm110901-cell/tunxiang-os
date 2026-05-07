@@ -7,6 +7,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChartPlaceholder } from '../../../components/ChartPlaceholder';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型 ----------
 type TableAlertType = 'overtime-bill' | 'uncleared' | 'normal';
@@ -68,21 +69,21 @@ interface CruiseDashboard {
 
 // ---------- 配色 ----------
 const TABLE_ALERT_CONFIG: Record<TableAlertType, { label: string; color: string; bg: string }> = {
-  'overtime-bill': { label: '超时未结', color: '#A32D2D', bg: '#A32D2D30' },
-  'uncleared':     { label: '空桌未清', color: '#BA7517', bg: '#BA751730' },
-  'normal':        { label: '正常', color: '#0F6E56', bg: '#0F6E5630' },
+  'overtime-bill': { label: '超时未结', color: txColors.danger, bg: `${txColors.danger}30` },
+  'uncleared':     { label: '空桌未清', color: txColors.warning, bg: `${txColors.warning}30` },
+  'normal':        { label: '正常', color: txColors.success, bg: `${txColors.success}30` },
 };
 
 const DISH_ALERT_CONFIG: Record<DishAlertType, { label: string; color: string }> = {
-  'overtime':  { label: '超时', color: '#A32D2D' },
-  'pile-up':   { label: '堆积', color: '#BA7517' },
-  'normal':    { label: '正常', color: '#0F6E56' },
+  'overtime':  { label: '超时', color: txColors.danger },
+  'pile-up':   { label: '堆积', color: txColors.warning },
+  'normal':    { label: '正常', color: txColors.success },
 };
 
 const SOLD_OUT_CONFIG: Record<SoldOutLevel, { label: string; color: string; bg: string }> = {
-  'sold-out': { label: '已沽清', color: '#A32D2D', bg: '#A32D2D20' },
-  'soon':     { label: '即将沽清', color: '#BA7517', bg: '#BA751720' },
-  'ok':       { label: '充足', color: '#0F6E56', bg: '#0F6E5620' },
+  'sold-out': { label: '已沽清', color: txColors.danger, bg: `${txColors.danger}20` },
+  'soon':     { label: '即将沽清', color: txColors.warning, bg: `${txColors.warning}20` },
+  'ok':       { label: '充足', color: txColors.success, bg: `${txColors.success}20` },
 };
 
 const POLL_INTERVAL = 30_000;
@@ -141,7 +142,7 @@ export function CruiseMonitorPage() {
           </span>
           <span style={{
             width: 8, height: 8, borderRadius: '50%',
-            background: loading ? '#BA7517' : '#0F6E56',
+            background: loading ? txColors.warning : txColors.success,
             display: 'inline-block', animation: 'cruise-pulse 2s infinite',
           }} />
           <span style={{ fontSize: 12, color: '#999' }}>30s自动刷新</span>
@@ -162,7 +163,7 @@ export function CruiseMonitorPage() {
           : kpiList.map((kpi) => (
               <div key={kpi.label} style={{
                 background: '#112228', borderRadius: 8, padding: 16,
-                borderLeft: '3px solid #FF6B35',
+                borderLeft: `3px solid ${txColors.primary}`,
               }}>
                 <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>{kpi.label}</div>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
@@ -170,7 +171,7 @@ export function CruiseMonitorPage() {
                   <span style={{ fontSize: 12, color: '#999' }}>{kpi.sub}</span>
                 </div>
                 {kpi.trend && (
-                  <div style={{ fontSize: 11, marginTop: 4, color: kpi.up ? '#0F6E56' : '#A32D2D' }}>
+                  <div style={{ fontSize: 11, marginTop: 4, color: kpi.up ? txColors.success : txColors.danger }}>
                     {kpi.up ? '\u2191' : '\u2193'} {kpi.trend} 较昨日同期
                   </div>
                 )}
@@ -187,7 +188,7 @@ export function CruiseMonitorPage() {
             {alertTableCount > 0 && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#A32D2D20', color: '#A32D2D', fontWeight: 600,
+                background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 600,
               }}>
                 {alertTableCount} 桌异常
               </span>
@@ -206,7 +207,7 @@ export function CruiseMonitorPage() {
                 style={{
                   padding: '4px 10px', borderRadius: 6, border: 'none', cursor: 'pointer',
                   fontSize: 11, fontWeight: 600,
-                  background: tableFilter === key ? '#FF6B35' : '#0B1A20',
+                  background: tableFilter === key ? txColors.primary : '#0B1A20',
                   color: tableFilter === key ? '#fff' : '#999',
                 }}
               >
@@ -267,7 +268,7 @@ export function CruiseMonitorPage() {
             {dishQueue.filter((d) => d.alert !== 'normal').length > 0 && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#A32D2D20', color: '#A32D2D', fontWeight: 600,
+                background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 600,
               }}>
                 {dishQueue.filter((d) => d.alert !== 'normal').length} 项异常
               </span>
@@ -323,7 +324,7 @@ export function CruiseMonitorPage() {
             {soldOut.filter((s) => s.level === 'sold-out').length > 0 && (
               <span style={{
                 fontSize: 11, marginLeft: 8, padding: '2px 8px', borderRadius: 10,
-                background: '#A32D2D20', color: '#A32D2D', fontWeight: 600,
+                background: `${txColors.danger}20`, color: txColors.danger, fontWeight: 600,
               }}>
                 {soldOut.filter((s) => s.level === 'sold-out').length} 项已沽清
               </span>
@@ -366,7 +367,7 @@ export function CruiseMonitorPage() {
                     </div>
                     <span style={{
                       fontSize: 22, fontWeight: 'bold',
-                      color: item.level === 'sold-out' ? '#A32D2D' : cfg.color,
+                      color: item.level === 'sold-out' ? txColors.danger : cfg.color,
                     }}>
                       {item.remaining}
                     </span>
@@ -406,8 +407,8 @@ export function CruiseMonitorPage() {
                     <td style={{ padding: '10px 4px' }}>
                       <span style={{
                         fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 600,
-                        background: r.result === 'issue' ? '#A32D2D20' : '#0F6E5620',
-                        color: r.result === 'issue' ? '#A32D2D' : '#0F6E56',
+                        background: r.result === 'issue' ? `${txColors.danger}20` : `${txColors.success}20`,
+                        color: r.result === 'issue' ? txColors.danger : txColors.success,
                       }}>
                         {r.result === 'issue' ? '异常' : '正常'}
                       </span>

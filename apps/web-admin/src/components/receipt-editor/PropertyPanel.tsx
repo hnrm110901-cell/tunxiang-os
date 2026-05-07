@@ -4,6 +4,7 @@
  */
 import type { CSSProperties, ReactNode, ChangeEvent } from 'react';
 import type { TemplateElement } from '../../api/receiptTemplateApi';
+import { txColors } from '@tx/tokens';
 
 interface PropertyPanelProps {
   element: TemplateElement | null;
@@ -226,7 +227,7 @@ export function PropertyPanel({ element, onChange }: PropertyPanelProps) {
                 {'{{store_name}} {{order_no}} {{cashier}} {{datetime}} {{table_no}}'.split(' ').map((v) => (
                   <div
                     key={v}
-                    style={{ cursor: 'pointer', color: 'var(--brand, #FF6B35)' }}
+                    style={{ cursor: 'pointer', color: `var(--brand, ${txColors.primary})` }}
                     onClick={() => update({ content: (element.content || '') + v })}
                   >
                     {v}
@@ -303,7 +304,7 @@ export function PropertyPanel({ element, onChange }: PropertyPanelProps) {
                 {'{{store_name}} {{order_no}} {{datetime}}'.split(' ').map((v) => (
                   <div
                     key={v}
-                    style={{ cursor: 'pointer', color: 'var(--brand, #FF6B35)' }}
+                    style={{ cursor: 'pointer', color: `var(--brand, ${txColors.primary})` }}
                     onClick={() => update({ content: (element.content || '') + v })}
                   >
                     {v}
@@ -436,7 +437,7 @@ export function PropertyPanel({ element, onChange }: PropertyPanelProps) {
                 {'{{store_name}} {{order_no}} {{cashier}} {{datetime}} {{table_no}}'.split(' ').map((v) => (
                   <div
                     key={v}
-                    style={{ cursor: 'pointer', color: 'var(--brand, #FF6B35)' }}
+                    style={{ cursor: 'pointer', color: `var(--brand, ${txColors.primary})` }}
                     onClick={() => update({ content: (element.content || '') + v })}
                   >
                     {v}
@@ -536,9 +537,9 @@ function AlignSelector({
             padding: '6px 0',
             borderRadius: 5,
             border: '1px solid',
-            borderColor: value === opt.value ? 'var(--brand, #FF6B35)' : 'var(--bg-2, #1a2a33)',
+            borderColor: value === opt.value ? `var(--brand, ${txColors.primary})` : 'var(--bg-2, #1a2a33)',
             background: value === opt.value ? 'rgba(255,107,53,0.15)' : 'var(--bg-2, #1a2a33)',
-            color: value === opt.value ? 'var(--brand, #FF6B35)' : 'var(--text-3, #999)',
+            color: value === opt.value ? `var(--brand, ${txColors.primary})` : 'var(--text-3, #999)',
             fontSize: 12,
             cursor: 'pointer',
             transition: 'all 0.15s',
@@ -572,9 +573,9 @@ function RadioGroup({
             padding: '6px 10px',
             borderRadius: 5,
             border: '1px solid',
-            borderColor: value === opt.value ? 'var(--brand, #FF6B35)' : 'var(--bg-2, #1a2a33)',
+            borderColor: value === opt.value ? `var(--brand, ${txColors.primary})` : 'var(--bg-2, #1a2a33)',
             background: value === opt.value ? 'rgba(255,107,53,0.15)' : 'var(--bg-2, #1a2a33)',
-            color: value === opt.value ? 'var(--brand, #FF6B35)' : 'var(--text-2, #ccc)',
+            color: value === opt.value ? `var(--brand, ${txColors.primary})` : 'var(--text-2, #ccc)',
             fontSize: 12,
             cursor: 'pointer',
             textAlign: 'left',
@@ -615,8 +616,8 @@ function Checkbox({
         width: 14,
         height: 14,
         borderRadius: 3,
-        border: `1.5px solid ${checked ? '#FF6B35' : 'var(--text-4, #666)'}`,
-        background: checked ? '#FF6B35' : 'transparent',
+        border: `1.5px solid ${checked ? txColors.primary : 'var(--text-4, #666)'}`,
+        background: checked ? txColors.primary : 'transparent',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -656,7 +657,7 @@ function Toggle({
         width: 32,
         height: 18,
         borderRadius: 9,
-        background: value ? '#FF6B35' : 'var(--bg-2, #1a2a33)',
+        background: value ? txColors.primary : 'var(--bg-2, #1a2a33)',
         position: 'relative',
         transition: 'background 0.2s',
         flexShrink: 0,
@@ -840,9 +841,9 @@ function SeparatorStylePicker({
             padding: '5px 8px',
             borderRadius: 5,
             border: '1px solid',
-            borderColor: value === s.key ? 'var(--brand, #FF6B35)' : 'var(--bg-2, #1a2a33)',
+            borderColor: value === s.key ? `var(--brand, ${txColors.primary})` : 'var(--bg-2, #1a2a33)',
             background: value === s.key ? 'rgba(255,107,53,0.15)' : 'var(--bg-2, #1a2a33)',
-            color: value === s.key ? 'var(--brand, #FF6B35)' : 'var(--text-3, #999)',
+            color: value === s.key ? `var(--brand, ${txColors.primary})` : 'var(--text-3, #999)',
             fontSize: 10,
             cursor: 'pointer',
             textAlign: 'left',

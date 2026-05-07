@@ -10,6 +10,7 @@ import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCategories, fetchDishes } from '@/api/menuApi';
 import type { Category, DishItem } from '@/api/menuApi';
 import CartBar from '@/components/CartBar';
+import { txColors } from '@tx/tokens';
 
 // ─── 茶饮专用类型 ─────────────────────────────────────────────────────────────
 
@@ -235,7 +236,7 @@ export default function TeaTemplate() {
               onClick={() => setActiveCat(cat.id)}
               style={{
                 padding: '16px 8px', textAlign: 'center', fontSize: 13,
-                color: activeCat === cat.id ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-text-secondary)',
+                color: activeCat === cat.id ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-text-secondary)',
                 fontWeight: activeCat === cat.id ? 700 : 400,
                 background: activeCat === cat.id ? 'var(--tx-bg-primary)' : 'transparent',
                 borderLeft: activeCat === cat.id ? '3px solid var(--tx-brand)' : '3px solid transparent',
@@ -278,7 +279,7 @@ export default function TeaTemplate() {
                   {qty > 0 && (
                     <span
                       className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ background: 'var(--tx-brand, #FF6B35)', fontSize: 11 }}
+                      style={{ background: `var(--tx-brand, ${txColors.primary})`, fontSize: 11 }}
                     >
                       {qty}
                     </span>
@@ -295,7 +296,7 @@ export default function TeaTemplate() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-base font-bold" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                      <span className="text-base font-bold" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                         ¥{dish.price}
                       </span>
                       <span className="text-xs" style={{ color: 'var(--tx-text-tertiary)' }}>起</span>
@@ -303,8 +304,8 @@ export default function TeaTemplate() {
                     <span
                       className="text-xs px-3 py-1 rounded-full"
                       style={{
-                        background: dish.soldOut ? 'var(--tx-bg-tertiary)' : 'var(--tx-brand-light, #FFF3ED)',
-                        color: dish.soldOut ? 'var(--tx-text-tertiary)' : 'var(--tx-brand, #FF6B35)',
+                        background: dish.soldOut ? 'var(--tx-bg-tertiary)' : `var(--tx-brand-light, ${txColors.primaryLight})`,
+                        color: dish.soldOut ? 'var(--tx-text-tertiary)' : `var(--tx-brand, ${txColors.primary})`,
                         fontWeight: 600, minHeight: 48, display: 'flex', alignItems: 'center',
                       }}
                     >
@@ -368,7 +369,7 @@ export default function TeaTemplate() {
                 <div className="text-lg font-bold" style={{ color: 'var(--tx-text-primary)' }}>
                   {customizing.dish.name}
                 </div>
-                <div className="text-xl font-bold mt-1" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                <div className="text-xl font-bold mt-1" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                   ¥{customPrice.toFixed(1)}
                 </div>
               </div>
@@ -395,7 +396,7 @@ export default function TeaTemplate() {
                     {group.required && (
                       <span
                         className="text-xs px-1.5 py-0.5 rounded"
-                        style={{ background: 'var(--tx-brand-light, #FFF3ED)', color: 'var(--tx-brand, #FF6B35)' }}
+                        style={{ background: `var(--tx-brand-light, ${txColors.primaryLight})`, color: `var(--tx-brand, ${txColors.primary})` }}
                       >
                         必选
                       </span>
@@ -413,7 +414,7 @@ export default function TeaTemplate() {
                             padding: '10px 16px', borderRadius: 999,
                             fontSize: 14,
                             fontWeight: selected ? 700 : 400,
-                            background: selected ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-bg-secondary, #F8F7F5)',
+                            background: selected ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-bg-secondary, #F8F7F5)',
                             color: selected ? '#fff' : 'var(--tx-text-primary)',
                             border: 'none',
                             minHeight: 48,
@@ -450,7 +451,7 @@ export default function TeaTemplate() {
                           padding: '10px 16px', borderRadius: 999,
                           fontSize: 14,
                           fontWeight: selected ? 700 : 400,
-                          background: selected ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-bg-secondary, #F8F7F5)',
+                          background: selected ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-bg-secondary, #F8F7F5)',
                           color: selected ? '#fff' : 'var(--tx-text-primary)',
                           border: 'none',
                           minHeight: 48,
@@ -493,7 +494,7 @@ export default function TeaTemplate() {
                   onClick={() => setCustomizing((p) => p ? { ...p, quantity: p.quantity + 1 } : p)}
                   style={{
                     width: 36, height: 36,
-                    background: 'var(--tx-brand, #FF6B35)', color: '#fff',
+                    background: `var(--tx-brand, ${txColors.primary})`, color: '#fff',
                     minWidth: 48, minHeight: 48, padding: 0,
                   }}
                 >
@@ -507,7 +508,7 @@ export default function TeaTemplate() {
                 onClick={handleConfirmCustom}
                 style={{
                   height: 52, borderRadius: 12,
-                  background: 'var(--tx-brand, #FF6B35)', color: '#fff',
+                  background: `var(--tx-brand, ${txColors.primary})`, color: '#fff',
                   fontSize: 16, fontWeight: 700,
                 }}
               >

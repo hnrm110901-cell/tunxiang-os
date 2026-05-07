@@ -11,6 +11,7 @@
  *   <PadLayout><OrderPage /></PadLayout>
  */
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 设备检测 ──────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ export function PadLayout({ children, forcePad }: PadLayoutProps) {
           <div style={{
             position: 'fixed', bottom: 8, right: 8,
             padding: '4px 10px', borderRadius: 6,
-            background: 'rgba(24,95,165,0.15)', color: '#185FA5',
+            background: 'rgba(24,95,165,0.15)', color: txColors.info,
             fontSize: 12, pointerEvents: 'none', zIndex: 10,
           }}>
             PAD · 外设桥接 → POS

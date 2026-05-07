@@ -5,6 +5,7 @@
  * 快捷键 ⌘/ 打开/关闭，SSE 流式接收响应。
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ── 颜色常量 ──
 const SURFACE = '#0E1E24';
@@ -15,7 +16,7 @@ const BORDER2 = '#23485a';
 const TEXT = '#E6EDF1';
 const TEXT2 = '#94A8B3';
 const TEXT3 = '#647985';
-const ORANGE = '#FF6B35';
+const ORANGE = txColors.primary;
 
 // ── 类型定义 ──
 

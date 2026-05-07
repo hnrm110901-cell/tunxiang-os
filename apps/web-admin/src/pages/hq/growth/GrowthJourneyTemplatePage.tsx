@@ -15,6 +15,7 @@ import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers';
 import { txFetchData } from '../../../api';
 import type { JourneyTemplate, JourneyStep, ExperimentSummary, ExperimentSelectResult, ExperimentAutoPauseResult } from '../../../api/growthHubApi';
+import { txColors } from '@tx/tokens';
 
 echarts.use([BarChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -24,7 +25,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 
 const JOURNEY_TYPE_COLORS: Record<string, string> = {
@@ -156,7 +157,7 @@ export function GrowthJourneyTemplatePage() {
       itemStyle: {
         color: (params: { dataIndex: number }) => {
           const v = expSummary!.variants[params.dataIndex];
-          if (expSelectResult?.selected === v.variant) return '#FF6B35';
+          if (expSelectResult?.selected === v.variant) return txColors.primary;
           if (expAutoPause?.pause_variants?.includes(v.variant)) return '#ff4d4f';
           return '#1890ff';
         },

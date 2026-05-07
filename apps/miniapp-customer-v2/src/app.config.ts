@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 export default defineAppConfig({
   pages: [
     'pages/index/index',
@@ -138,7 +139,7 @@ export default defineAppConfig({
   ],
   tabBar: {
     color: '#9EB5C0',
-    selectedColor: '#FF6B35',
+    selectedColor: txColors.primary,
     backgroundColor: '#0B1A20',
     borderStyle: 'black',
     list: [

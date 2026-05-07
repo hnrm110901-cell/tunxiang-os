@@ -12,6 +12,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens (inline CSS) ──────────────────────────────────────────────
 
@@ -19,16 +20,16 @@ const C = {
   bg:       '#0B1A20',
   card:     '#112228',
   border:   '#1a2a33',
-  accent:   '#FF6B35',
-  green:    '#0F6E56',
-  red:      '#A32D2D',
+  accent:   txColors.primary,
+  green:    txColors.success,
+  red:      txColors.danger,
   greenBg:  '#e6f4f1',
   redBg:    '#fde8e8',
   muted:    '#5F5E5A',
   text:     '#e2e8f0',
   subtext:  '#94a3b8',
   white:    '#ffffff',
-  warning:  '#BA7517',
+  warning:  txColors.warning,
   warningBg:'#fff8e1',
 };
 

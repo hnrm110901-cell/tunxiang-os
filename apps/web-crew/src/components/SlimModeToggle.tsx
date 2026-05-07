@@ -5,6 +5,7 @@
  * 状态持久化到 Zustand store（localStorage）。
  */
 import { useCrewStore } from '../store/crewStore';
+import { txColors } from '@tx/tokens';
 
 interface SlimModeToggleProps {
   /** 是否以图标+文字紧凑模式展示（用于顶部栏） */
@@ -25,8 +26,8 @@ export function SlimModeToggle({ compact = false }: SlimModeToggleProps) {
           gap: 4,
           minHeight: 48,
           padding: '0 12px',
-          background: isSlimMode ? 'var(--tx-primary, #FF6B35)' : 'transparent',
-          border: `1.5px solid ${isSlimMode ? 'var(--tx-primary, #FF6B35)' : '#3a4a55'}`,
+          background: isSlimMode ? `var(--tx-primary, ${txColors.primary})` : 'transparent',
+          border: `1.5px solid ${isSlimMode ? `var(--tx-primary, ${txColors.primary})` : '#3a4a55'}`,
           borderRadius: 8,
           color: isSlimMode ? '#fff' : '#aaa',
           fontSize: 14,
@@ -73,7 +74,7 @@ export function SlimModeToggle({ compact = false }: SlimModeToggleProps) {
           width: 52,
           height: 28,
           borderRadius: 14,
-          background: isSlimMode ? 'var(--tx-primary, #FF6B35)' : '#3a4a55',
+          background: isSlimMode ? `var(--tx-primary, ${txColors.primary})` : '#3a4a55',
           border: 'none',
           cursor: 'pointer',
           flexShrink: 0,

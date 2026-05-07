@@ -53,6 +53,7 @@ import {
 } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -165,8 +166,8 @@ export function AgreementUnitPage() {
               cursor: 'pointer',
               fontSize: 15,
               fontWeight: activeTab === tab.key ? 700 : 400,
-              color: activeTab === tab.key ? '#FF6B35' : '#5F5E5A',
-              borderBottom: activeTab === tab.key ? '2px solid #FF6B35' : '2px solid transparent',
+              color: activeTab === tab.key ? txColors.primary : '#5F5E5A',
+              borderBottom: activeTab === tab.key ? `2px solid ${txColors.primary}` : '2px solid transparent',
               transition: 'all 150ms',
             }}
           >
@@ -223,8 +224,8 @@ function UnitsTab() {
               ? Math.round(r.credit_used_fen / r.credit_limit_fen * 100)
               : 0)}
             size="small"
-            strokeColor={r.credit_used_fen / (r.credit_limit_fen || 1) >= 0.9 ? '#A32D2D'
-              : r.credit_used_fen / (r.credit_limit_fen || 1) >= 0.7 ? '#BA7517' : '#0F6E56'}
+            strokeColor={r.credit_used_fen / (r.credit_limit_fen || 1) >= 0.9 ? txColors.danger
+              : r.credit_used_fen / (r.credit_limit_fen || 1) >= 0.7 ? txColors.warning : txColors.success}
             showInfo={false}
             style={{ width: 80 }}
           />
@@ -248,7 +249,7 @@ function UnitsTab() {
       title: '账户余额',
       dataIndex: 'balance_fen',
       render: (_, r) => (
-        <span style={{ color: r.balance_fen >= 0 ? '#0F6E56' : '#A32D2D', fontWeight: 600 }}>
+        <span style={{ color: r.balance_fen >= 0 ? txColors.success : txColors.danger, fontWeight: 600 }}>
           {fen2yuan(r.balance_fen)}
         </span>
       ),
@@ -581,7 +582,7 @@ function ChargeRepayTab() {
                   value={fenToInputYuan(selectedUnit.balance_fen)}
                   prefix="¥"
                   precision={2}
-                  valueStyle={{ color: selectedUnit.balance_fen >= 0 ? '#0F6E56' : '#A32D2D' }}
+                  valueStyle={{ color: selectedUnit.balance_fen >= 0 ? txColors.success : txColors.danger }}
                 />
               </Card>
               <Card size="small" style={{ background: '#F8F7F5' }}>
@@ -591,15 +592,15 @@ function ChargeRepayTab() {
                   suffix={`/ ¥${fenToInputYuan(selectedUnit.credit_limit_fen).toFixed(2)}`}
                   prefix="¥"
                   precision={2}
-                  valueStyle={{ color: '#FF6B35' }}
+                  valueStyle={{ color: txColors.primary }}
                 />
                 <Progress
                   percent={Math.min(100, selectedUnit.credit_limit_fen > 0
                     ? Math.round(selectedUnit.credit_used_fen / selectedUnit.credit_limit_fen * 100)
                     : 0)}
                   strokeColor={
-                    selectedUnit.credit_used_fen / (selectedUnit.credit_limit_fen || 1) >= 0.9 ? '#A32D2D'
-                    : '#FF6B35'
+                    selectedUnit.credit_used_fen / (selectedUnit.credit_limit_fen || 1) >= 0.9 ? txColors.danger
+                    : txColors.primary
                   }
                   style={{ marginTop: 8 }}
                 />
@@ -621,7 +622,7 @@ function ChargeRepayTab() {
                     type="default"
                     icon={<DollarOutlined />}
                     block
-                    style={{ borderColor: '#0F6E56', color: '#0F6E56' }}
+                    style={{ borderColor: txColors.success, color: txColors.success }}
                     onClick={() => setRepayModal(true)}
                   >
                     还款
@@ -681,7 +682,7 @@ function ChargeRepayTab() {
                   render: (v) => {
                     const val = Number(v);
                     return (
-                      <span style={{ color: val > 0 ? '#A32D2D' : '#0F6E56', fontWeight: 600 }}>
+                      <span style={{ color: val > 0 ? txColors.danger : txColors.success, fontWeight: 600 }}>
                         {val > 0 ? '+' : ''}{fen2yuan(val)}
                       </span>
                     );
@@ -896,7 +897,7 @@ function RepayModal({ open, unit, onClose, onSuccess }: {
     >
       <Descriptions column={1} size="small" style={{ marginBottom: 16 }}>
         <Descriptions.Item label="当前欠款">
-          <span style={{ color: '#A32D2D', fontWeight: 600 }}>
+          <span style={{ color: txColors.danger, fontWeight: 600 }}>
             {fen2yuan(unit.credit_used_fen)}
           </span>
         </Descriptions.Item>
@@ -986,7 +987,7 @@ function RepayRecordsTab() {
       dataIndex: 'amount_fen',
       search: false,
       render: (_, r) => (
-        <span style={{ color: '#0F6E56', fontWeight: 600 }}>
+        <span style={{ color: txColors.success, fontWeight: 600 }}>
           {fen2yuan(Math.abs(r.amount_fen))}
         </span>
       ),
@@ -1125,7 +1126,7 @@ function PrepaidTab() {
       render: (_, r) => (
         <span style={{
           fontWeight: 600,
-          color: r.balance_fen > 0 ? '#0F6E56' : r.balance_fen < 0 ? '#A32D2D' : '#5F5E5A',
+          color: r.balance_fen > 0 ? txColors.success : r.balance_fen < 0 ? txColors.danger : '#5F5E5A',
         }}>
           {fen2yuan(r.balance_fen)}
         </span>
@@ -1274,9 +1275,9 @@ function AgingTab() {
   const agingColor = (fen: number, severity: 'low' | 'medium' | 'high' | 'critical') => {
     if (fen <= 0) return '#B4B2A9';
     const colors = {
-      low: '#BA7517',
+      low: txColors.warning,
       medium: '#C84B2F',
-      high: '#A32D2D',
+      high: txColors.danger,
       critical: '#6B1A1A',
     };
     return colors[severity];
@@ -1289,7 +1290,7 @@ function AgingTab() {
       title: '总欠款',
       dataIndex: 'total_owed_fen',
       render: (_, r) => (
-        <span style={{ fontWeight: 700, color: r.total_owed_fen > 0 ? '#A32D2D' : '#5F5E5A' }}>
+        <span style={{ fontWeight: 700, color: r.total_owed_fen > 0 ? txColors.danger : '#5F5E5A' }}>
           {fen2yuan(r.total_owed_fen)}
         </span>
       ),
@@ -1350,7 +1351,7 @@ function AgingTab() {
         r.total_owed_fen > 0 && (
           <Badge key="overdue" dot color="red">
             <CheckCircleOutlined
-              style={{ color: '#0F6E56', cursor: 'pointer', fontSize: 16 }}
+              style={{ color: txColors.success, cursor: 'pointer', fontSize: 16 }}
               title="去还款"
             />
           </Badge>
@@ -1394,7 +1395,7 @@ function AgingTab() {
                   <Text strong>合计（{data.length} 家单位）</Text>
                 </ProTable.Summary.Cell>
                 <ProTable.Summary.Cell index={2}>
-                  <Text strong style={{ color: '#A32D2D' }}>{fen2yuan(totalOwed)}</Text>
+                  <Text strong style={{ color: txColors.danger }}>{fen2yuan(totalOwed)}</Text>
                 </ProTable.Summary.Cell>
                 <ProTable.Summary.Cell index={3} />
                 <ProTable.Summary.Cell index={4} />
@@ -1494,7 +1495,7 @@ function MonthlyReconciliationTab() {
       dataIndex: 'paid_fen',
       search: false,
       render: (_, r) => (
-        <Text style={{ color: '#0F6E56' }}>{fen2yuan(r.paid_fen)}</Text>
+        <Text style={{ color: txColors.success }}>{fen2yuan(r.paid_fen)}</Text>
       ),
     },
     {
@@ -1502,7 +1503,7 @@ function MonthlyReconciliationTab() {
       dataIndex: 'unpaid_fen',
       search: false,
       render: (_, r) => (
-        <Text strong style={{ color: r.unpaid_fen > 0 ? '#A32D2D' : '#B4B2A9' }}>
+        <Text strong style={{ color: r.unpaid_fen > 0 ? txColors.danger : '#B4B2A9' }}>
           {fen2yuan(r.unpaid_fen)}
         </Text>
       ),
@@ -1558,7 +1559,7 @@ function MonthlyReconciliationTab() {
             key="settle"
             size="small"
             type="primary"
-            style={{ background: '#0F6E56', borderColor: '#0F6E56' }}
+            style={{ background: txColors.success, borderColor: txColors.success }}
             onClick={() => {
               Modal.confirm({
                 title: `确认标记「${r.unit_name}」${selectedMonth} 已结清？`,
@@ -1645,7 +1646,7 @@ function MonthlyReconciliationTab() {
               title={<span style={{ color: '#5F5E5A', fontSize: 13 }}>已结清</span>}
               value={fen2yuan(summaryTotals.paid_fen)}
               prefix="¥"
-              valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+              valueStyle={{ color: txColors.success, fontWeight: 700 }}
             />
           </Card>
         </Col>
@@ -1656,7 +1657,7 @@ function MonthlyReconciliationTab() {
               value={fen2yuan(summaryTotals.unpaid_fen)}
               prefix="¥"
               valueStyle={{
-                color: summaryTotals.unpaid_fen > 0 ? '#A32D2D' : '#B4B2A9',
+                color: summaryTotals.unpaid_fen > 0 ? txColors.danger : '#B4B2A9',
                 fontWeight: 700,
               }}
             />
@@ -1746,10 +1747,10 @@ function MonthlyReconciliationTab() {
                   <Text strong>{fen2yuan(totalConsumed)}</Text>
                 </ProTable.Summary.Cell>
                 <ProTable.Summary.Cell index={2}>
-                  <Text strong style={{ color: '#0F6E56' }}>{fen2yuan(totalPaid)}</Text>
+                  <Text strong style={{ color: txColors.success }}>{fen2yuan(totalPaid)}</Text>
                 </ProTable.Summary.Cell>
                 <ProTable.Summary.Cell index={3}>
-                  <Text strong style={{ color: totalUnpaid > 0 ? '#A32D2D' : '#B4B2A9' }}>
+                  <Text strong style={{ color: totalUnpaid > 0 ? txColors.danger : '#B4B2A9' }}>
                     {fen2yuan(totalUnpaid)}
                   </Text>
                 </ProTable.Summary.Cell>

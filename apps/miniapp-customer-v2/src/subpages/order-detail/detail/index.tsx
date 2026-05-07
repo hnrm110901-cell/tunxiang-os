@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * order-detail/detail/index.tsx — 订单详情页
  *
@@ -22,7 +23,7 @@ import { fenToYuanDisplay } from '../../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary:     '#FF6B35',
+  primary:     txColors.primary,
   primaryDim:  'rgba(255,107,53,0.15)',
   bgDeep:      '#0B1A20',
   bgCard:      '#132029',
@@ -681,7 +682,7 @@ interface ActionBtnProps {
 }
 
 const C_BTN: Record<string, { bg: string; text: string; border?: string }> = {
-  primary: { bg: '#FF6B35',                        text: '#fff' },
+  primary: { bg: txColors.primary,                        text: '#fff' },
   ghost:   { bg: 'transparent',                    text: '#E8F4F8', border: '#1E3040' },
   danger:  { bg: 'rgba(229,57,53,0.15)',            text: '#E53935' },
 }

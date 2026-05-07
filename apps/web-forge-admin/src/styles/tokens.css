@@ -11,7 +11,7 @@
   --green-200: #5DCAA5; --green-400: #1D9E75; --green-900: #04342C;
   --amber-100: #FAC775; --amber-200: #EF9F27; --amber-900: #412402;
   --blue-200: #85B7EB; --blue-400: #378ADD; --blue-900: #042C53;
-  --crimson-400: #E24B4A; --crimson-600: #A32D2D;
+  --crimson-400: #E24B4A; --crimson-600: var(--tx-danger);
 
   --bg-primary: var(--ink-900);
   --bg-secondary: var(--ink-800);

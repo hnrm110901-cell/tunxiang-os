@@ -48,14 +48,15 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData, apiPost, apiGet } from '../../api/client';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token ─────────────────────────────────────────────────────────────
 const C = {
-  primary:  '#FF6B35',
-  success:  '#0F6E56',
-  warning:  '#BA7517',
-  danger:   '#A32D2D',
-  info:     '#185FA5',
+  primary:  txColors.primary,
+  success:  txColors.success,
+  warning:  txColors.warning,
+  danger:   txColors.danger,
+  info:     txColors.info,
   cardBg:   '#1a2535',
   border:   '#2a3a4a',
   text:     '#e8eaf0',

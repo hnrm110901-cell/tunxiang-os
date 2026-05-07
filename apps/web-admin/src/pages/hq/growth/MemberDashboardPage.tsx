@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, Row, Col, Spin, Tooltip, Empty } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
+import { txColors } from '@tx/tokens';
 import {
   fetchMemberDashboard,
   type MemberDashboardData,
@@ -21,11 +22,11 @@ const fmtChange = (v: number) => {
 };
 
 const COLOR = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  error: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  error: txColors.danger,
+  info: txColors.info,
 };
 
 // ---------- KPI 卡片定义 ----------

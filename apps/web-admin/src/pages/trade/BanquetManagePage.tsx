@@ -48,6 +48,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -56,19 +57,19 @@ const { TabPane } = Tabs;
 
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
     fontSize: 14,
   },
   components: {
-    Layout: { headerBg: '#1E2A3A', siderBg: '#1E2A3A' },
-    Menu: { darkItemBg: '#1E2A3A', darkItemSelectedBg: '#FF6B35' },
+    Layout: { headerBg: txColors.navy, siderBg: txColors.navy },
+    Menu: { darkItemBg: txColors.navy, darkItemSelectedBg: txColors.primary },
     Table: { headerBg: '#F8F7F5' },
   },
 };
@@ -356,7 +357,7 @@ export default function BanquetManagePage() {
       width: 120,
       hideInSearch: true,
       render: (_, r) => (
-        <span style={{ color: '#BA7517' }}>{fenToYuan(r.deposit_fen)}</span>
+        <span style={{ color: txColors.warning }}>{fenToYuan(r.deposit_fen)}</span>
       ),
     },
     {
@@ -400,7 +401,7 @@ export default function BanquetManagePage() {
           actions.push(
             <a
               key="deposit"
-              style={{ color: '#FF6B35' }}
+              style={{ color: txColors.primary }}
               onClick={() => {
                 setSelectedOrder(record);
                 payDepositForm.setFieldsValue({
@@ -422,7 +423,7 @@ export default function BanquetManagePage() {
           actions.push(
             <a
               key="balance"
-              style={{ color: '#0F6E56' }}
+              style={{ color: txColors.success }}
               onClick={() => {
                 setSelectedOrder(record);
                 payBalanceForm.setFieldsValue({
@@ -646,7 +647,7 @@ export default function BanquetManagePage() {
     if (statsLoading) {
       return (
         <div style={{ textAlign: 'center', padding: 80 }}>
-          <LoadingOutlined style={{ fontSize: 32, color: '#FF6B35' }} />
+          <LoadingOutlined style={{ fontSize: 32, color: txColors.primary }} />
           <div style={{ marginTop: 16 }}>加载中…</div>
         </div>
       );
@@ -661,9 +662,9 @@ export default function BanquetManagePage() {
 
     const distributionItems = [
       { label: '未支付', count: stats.unpaid_count, color: '#B4B2A9' },
-      { label: '已付定金', count: stats.deposit_paid_count - stats.fully_paid_count, color: '#FF6B35' },
-      { label: '已全额付清', count: stats.fully_paid_count, color: '#0F6E56' },
-      { label: '已取消', count: stats.cancelled_count, color: '#A32D2D' },
+      { label: '已付定金', count: stats.deposit_paid_count - stats.fully_paid_count, color: txColors.primary },
+      { label: '已全额付清', count: stats.fully_paid_count, color: txColors.success },
+      { label: '已取消', count: stats.cancelled_count, color: txColors.danger },
     ];
     const total = distributionItems.reduce((s, i) => s + Math.max(0, i.count), 0) || 1;
 
@@ -687,8 +688,8 @@ export default function BanquetManagePage() {
                 title="本月预订数"
                 value={stats.total_count}
                 suffix="单"
-                prefix={<FileTextOutlined style={{ color: '#185FA5' }} />}
-                valueStyle={{ color: '#185FA5' }}
+                prefix={<FileTextOutlined style={{ color: txColors.info }} />}
+                valueStyle={{ color: txColors.info }}
               />
             </div>
           </Col>
@@ -703,8 +704,8 @@ export default function BanquetManagePage() {
               <Statistic
                 title="定金收入"
                 value={(stats.deposit_income_fen / 100).toFixed(2)}
-                prefix={<DollarOutlined style={{ color: '#FF6B35' }} />}
-                valueStyle={{ color: '#FF6B35' }}
+                prefix={<DollarOutlined style={{ color: txColors.primary }} />}
+                valueStyle={{ color: txColors.primary }}
               />
             </div>
           </Col>
@@ -719,8 +720,8 @@ export default function BanquetManagePage() {
               <Statistic
                 title="尾款收入"
                 value={(stats.balance_income_fen / 100).toFixed(2)}
-                prefix={<CheckCircleOutlined style={{ color: '#0F6E56' }} />}
-                valueStyle={{ color: '#0F6E56' }}
+                prefix={<CheckCircleOutlined style={{ color: txColors.success }} />}
+                valueStyle={{ color: txColors.success }}
               />
             </div>
           </Col>
@@ -736,8 +737,8 @@ export default function BanquetManagePage() {
                 title="取消数"
                 value={stats.cancelled_count}
                 suffix={`单（${(stats.cancel_rate * 100).toFixed(1)}%）`}
-                prefix={<CloseCircleOutlined style={{ color: '#A32D2D' }} />}
-                valueStyle={{ color: '#A32D2D' }}
+                prefix={<CloseCircleOutlined style={{ color: txColors.danger }} />}
+                valueStyle={{ color: txColors.danger }}
               />
             </div>
           </Col>
@@ -792,19 +793,19 @@ export default function BanquetManagePage() {
             <Row gutter={16}>
               <Col span={8}>
                 <Text type="secondary">本月总收入：</Text>
-                <Text strong style={{ fontSize: 16, color: '#0F6E56' }}>
+                <Text strong style={{ fontSize: 16, color: txColors.success }}>
                   {fenToYuan(stats.total_income_fen)}
                 </Text>
               </Col>
               <Col span={8}>
                 <Text type="secondary">其中定金：</Text>
-                <Text strong style={{ color: '#FF6B35' }}>
+                <Text strong style={{ color: txColors.primary }}>
                   {fenToYuan(stats.deposit_income_fen)}
                 </Text>
               </Col>
               <Col span={8}>
                 <Text type="secondary">其中尾款：</Text>
-                <Text strong style={{ color: '#0F6E56' }}>
+                <Text strong style={{ color: txColors.success }}>
                   {fenToYuan(stats.balance_income_fen)}
                 </Text>
               </Col>
@@ -891,7 +892,7 @@ export default function BanquetManagePage() {
                     </Tag>
                   </Col>
                   <Col span={6}>
-                    <Text strong style={{ color: '#FF6B35' }}>{fenToYuan(p.amount_fen)}</Text>
+                    <Text strong style={{ color: txColors.primary }}>{fenToYuan(p.amount_fen)}</Text>
                   </Col>
                   <Col span={6}>
                     <Text type="secondary">{payMethodLabel[p.payment_method] ?? p.payment_method}</Text>
@@ -916,7 +917,7 @@ export default function BanquetManagePage() {
           {selectedOrder.deposit_status === 'unpaid' && selectedOrder.status !== 'cancelled' && (
             <Button
               type="primary"
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
               onClick={() => {
                 setDetailVisible(false);
                 payDepositForm.setFieldsValue({
@@ -934,7 +935,7 @@ export default function BanquetManagePage() {
             selectedOrder.status !== 'cancelled' && (
               <Button
                 type="primary"
-                style={{ background: '#0F6E56', borderColor: '#0F6E56' }}
+                style={{ background: txColors.success, borderColor: txColors.success }}
                 onClick={() => {
                   setDetailVisible(false);
                   payBalanceForm.setFieldsValue({
@@ -964,12 +965,12 @@ export default function BanquetManagePage() {
         payDepositForm.resetFields();
       }}
       okText="确认收款"
-      okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+      okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
     >
       {selectedOrder && (
-        <div style={{ marginBottom: 12, padding: 12, background: '#FFF3ED', borderRadius: 6 }}>
+        <div style={{ marginBottom: 12, padding: 12, background: txColors.primaryLight, borderRadius: 6 }}>
           <Text>
-            应付定金：<Text strong style={{ color: '#FF6B35' }}>
+            应付定金：<Text strong style={{ color: txColors.primary }}>
               {fenToYuan(selectedOrder.deposit_fen)}
             </Text>
             （总额 {fenToYuan(selectedOrder.total_fen)} × {(parseFloat(selectedOrder.deposit_rate) * 100).toFixed(0)}%）
@@ -1039,12 +1040,12 @@ export default function BanquetManagePage() {
         payBalanceForm.resetFields();
       }}
       okText="确认收款"
-      okButtonProps={{ style: { background: '#0F6E56', borderColor: '#0F6E56' } }}
+      okButtonProps={{ style: { background: txColors.success, borderColor: txColors.success } }}
     >
       {selectedOrder && (
         <div style={{ marginBottom: 12, padding: 12, background: '#F0FDF4', borderRadius: 6 }}>
           <Text>
-            应付尾款：<Text strong style={{ color: '#0F6E56' }}>
+            应付尾款：<Text strong style={{ color: txColors.success }}>
               {fenToYuan(selectedOrder.balance_fen)}
             </Text>
             （总额 {fenToYuan(selectedOrder.total_fen)} − 已付定金 {fenToYuan(selectedOrder.deposit_fen)}）
@@ -1103,7 +1104,7 @@ export default function BanquetManagePage() {
   return (
     <ConfigProvider theme={txAdminTheme}>
       <div style={{ padding: 24, minWidth: 1280 }}>
-        <Title level={3} style={{ marginBottom: 16, color: '#1E2A3A' }}>
+        <Title level={3} style={{ marginBottom: 16, color: txColors.navy }}>
           宴席管理
         </Title>
 

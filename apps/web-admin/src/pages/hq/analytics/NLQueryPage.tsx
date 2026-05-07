@@ -10,6 +10,7 @@ import type { TabsProps } from 'antd';
 import { SendOutlined, AudioOutlined } from '@ant-design/icons';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -73,13 +74,13 @@ ORDER BY today_revenue DESC;`;
 const TABLE_COLUMNS: ProColumns<StoreRevRow>[] = [
   { title: '门店名', dataIndex: 'store', width: 140 },
   { title: '今日营业额', dataIndex: 'today', width: 120,
-    render: (v) => <span style={{ color: '#FF6B35', fontWeight: 600 }}>¥{Number(v).toLocaleString()}</span> },
+    render: (v) => <span style={{ color: txColors.primary, fontWeight: 600 }}>¥{Number(v).toLocaleString()}</span> },
   { title: '昨日营业额', dataIndex: 'yesterday', width: 120,
     render: (v) => <span>¥{Number(v).toLocaleString()}</span> },
   { title: '环比', dataIndex: 'ratio', width: 90,
     render: (v) => {
       const s = String(v);
-      return <span style={{ color: s.startsWith('+') ? '#0F6E56' : '#A32D2D', fontWeight: 600 }}>{s}</span>;
+      return <span style={{ color: s.startsWith('+') ? txColors.success : txColors.danger, fontWeight: 600 }}>{s}</span>;
     } },
 ];
 
@@ -88,7 +89,7 @@ const MSG_TABLE_COLS = [
   { title: '今日(¥)', dataIndex: 'today', key: 'today', render: (v: number) => v.toLocaleString() },
   { title: '昨日(¥)', dataIndex: 'yesterday', key: 'yesterday', render: (v: number) => v.toLocaleString() },
   { title: '环比', dataIndex: 'ratio', key: 'ratio',
-    render: (v: string) => <span style={{ color: v.startsWith('+') ? '#0F6E56' : '#A32D2D' }}>{v}</span> },
+    render: (v: string) => <span style={{ color: v.startsWith('+') ? txColors.success : txColors.danger }}>{v}</span> },
 ];
 
 // ---- 右侧 Result 面板 ----
@@ -126,7 +127,7 @@ const resultTabs: TabsProps['items'] = [
     label: 'SQL',
     children: (
       <pre style={{
-        background: '#1e2a3a', color: '#a8d8a8', padding: 16, borderRadius: 8,
+        background: txColors.navy, color: '#a8d8a8', padding: 16, borderRadius: 8,
         fontSize: 12, overflowX: 'auto', margin: 0, lineHeight: 1.6,
       }}>
         {MOCK_SQL}
@@ -185,7 +186,7 @@ export const NLQueryPage = () => {
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
         {/* 顶部 PageHeader */}
         <div style={{ padding: '16px 24px', borderBottom: '1px solid #f0f0f0', background: '#fff', flexShrink: 0 }}>
@@ -220,7 +221,7 @@ export const NLQueryPage = () => {
                 <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
                   <div style={{
                     maxWidth: '85%',
-                    background: msg.role === 'user' ? '#FF6B35' : '#f8f7f5',
+                    background: msg.role === 'user' ? txColors.primary : '#f8f7f5',
                     color: msg.role === 'user' ? '#fff' : '#2C2C2A',
                     padding: '10px 14px',
                     borderRadius: msg.role === 'user' ? '14px 14px 4px 14px' : '14px 14px 14px 4px',
@@ -258,7 +259,7 @@ export const NLQueryPage = () => {
                 type="primary"
                 icon={<SendOutlined />}
                 onClick={handleSend}
-                style={{ background: '#FF6B35', borderColor: '#FF6B35', height: 40 }}
+                style={{ background: txColors.primary, borderColor: txColors.primary, height: 40 }}
               >
                 发送
               </Button>

@@ -16,6 +16,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -64,7 +65,7 @@ function DeptLoadCard({ dept }: { dept: DeptLoad }) {
     <div
       style={{
         background: '#1A1A1A',
-        border: `1px solid ${isHeavy ? '#FF6B35' : '#2A2A2A'}`,
+        border: `1px solid ${isHeavy ? txColors.primary : '#2A2A2A'}`,
         borderRadius: 10,
         padding: '12px 16px',
         marginBottom: 8,
@@ -96,7 +97,7 @@ function DeptLoadCard({ dept }: { dept: DeptLoad }) {
           style={{
             fontSize: 28,
             fontWeight: 700,
-            color: '#FF6B35',
+            color: txColors.primary,
             fontFamily: 'monospace',
           }}
         >
@@ -196,7 +197,7 @@ function TableCard({
                 ? '#FF3B30'
                 : progress >= 1
                 ? '#30D158'
-                : '#FF6B35',
+                : txColors.primary,
             transition: 'width 0.3s',
           }}
         />
@@ -222,7 +223,7 @@ function TableCard({
             style={{
               flex: 1,
               minHeight: 48,
-              background: '#FF6B35',
+              background: txColors.primary,
               color: '#fff',
               border: 'none',
               borderRadius: 8,

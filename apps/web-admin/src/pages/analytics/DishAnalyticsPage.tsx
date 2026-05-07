@@ -42,11 +42,11 @@ const { Title, Text } = Typography;
 // ── Design Token ─────────────────────────────────────────────────
 const txAdminTheme = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     borderRadius: 6,
     fontSize: 14,
@@ -93,8 +93,8 @@ const formatRevenue = (fen: number) =>
   `¥${(fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0 })}`;
 
 const TrendIcon = ({ trend }: { trend: TopDish['trend'] }) => {
-  if (trend === 'up') return <RiseOutlined style={{ color: '#0F6E56' }} />;
-  if (trend === 'down') return <FallOutlined style={{ color: '#A32D2D' }} />;
+  if (trend === 'up') return <RiseOutlined style={{ color: txColors.success }} />;
+  if (trend === 'down') return <FallOutlined style={{ color: txColors.danger }} />;
   return <MinusOutlined style={{ color: '#B4B2A9' }} />;
 };
 
@@ -105,6 +105,7 @@ const MarginTag = ({ pct }: { pct: number }) => {
 
 // ── API 调用 ─────────────────────────────────────────────────────
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 const BASE = '/api/v1/analytics';
 
 // 新增类型：BCG 分析结果
@@ -215,7 +216,7 @@ function TopSellingTab({ storeId, date }: { storeId: string; date: string }) {
           <Progress
             percent={Math.round((count / maxCount) * 100)}
             showInfo={false}
-            strokeColor="#FF6B35"
+            strokeColor={txColors.primary}
             size="small"
           />
         </Space>
@@ -352,7 +353,7 @@ function TimeHeatmapTab({ storeId }: { storeId: string }) {
                         backgroundColor: cellBg(count),
                         cursor: 'pointer',
                         border: selected?.day_of_week === day && selected?.hour === hour
-                          ? '2px solid #FF6B35'
+                          ? `2px solid ${txColors.primary}`
                           : '1px solid #E8E6E1',
                         transition: 'opacity 0.15s',
                       }}
@@ -450,7 +451,7 @@ function PairingTab({ storeId }: { storeId: string }) {
               <Text style={{ width: 120, flexShrink: 0 }}>{item.dish_name}</Text>
               <Progress
                 percent={Math.round(item.co_occurrence_rate * 100)}
-                strokeColor="#FF6B35"
+                strokeColor={txColors.primary}
                 style={{ flex: 1, marginBottom: 0 }}
                 format={(pct) => `${pct}%`}
               />
@@ -536,7 +537,7 @@ function UnderperformingTab({ storeId }: { storeId: string }) {
                     <div style={{ marginTop: 4 }}>
                       <Text
                         style={{
-                          color: isDog ? '#A32D2D' : '#BA7517',
+                          color: isDog ? txColors.danger : txColors.warning,
                           fontSize: 13,
                         }}
                       >
@@ -566,7 +567,7 @@ function UnderperformingTab({ storeId }: { storeId: string }) {
                           okText="确认"
                           cancelText="取消"
                         >
-                          <Button size="small" style={{ color: '#BA7517', borderColor: '#BA7517' }}>
+                          <Button size="small" style={{ color: txColors.warning, borderColor: txColors.warning }}>
                             创建推广
                           </Button>
                         </Popconfirm>

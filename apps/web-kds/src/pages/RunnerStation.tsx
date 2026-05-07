@@ -17,6 +17,7 @@
  *   - 不使用 Ant Design / hover-only 反馈
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 配置（从 localStorage 读取） ───
 
@@ -76,9 +77,9 @@ function formatWaitTime(readyAt: string): string {
 }
 
 const WAIT_COLORS: Record<WaitLevel, { text: string; border: string; bg: string }> = {
-  normal:  { text: '#0F6E56', border: '#0F6E56', bg: '#001a0d' },
-  warning: { text: '#BA7517', border: '#BA7517', bg: '#1a1000' },
-  danger:  { text: '#ff4d4f', border: '#A32D2D', bg: '#1a0505' },
+  normal:  { text: txColors.success, border: txColors.success, bg: '#001a0d' },
+  warning: { text: txColors.warning, border: txColors.warning, bg: '#1a1000' },
+  danger:  { text: '#ff4d4f', border: txColors.danger, bg: '#1a0505' },
 };
 
 // ─── API 调用 ───
@@ -368,17 +369,17 @@ export function RunnerStation() {
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <span style={{ fontSize: 26, fontWeight: 'bold', color: '#FF6B35' }}>
+          <span style={{ fontSize: 26, fontWeight: 'bold', color: txColors.primary }}>
             传菜站
           </span>
           {config.host && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 16, color: connected ? '#0F6E56' : '#A32D2D',
+              fontSize: 16, color: connected ? txColors.success : txColors.danger,
             }}>
               <span style={{
                 width: 10, height: 10, borderRadius: '50%',
-                background: connected ? '#0F6E56' : '#A32D2D',
+                background: connected ? txColors.success : txColors.danger,
                 display: 'inline-block',
                 animation: connected ? undefined : 'runner-pulse 1.5s infinite',
               }} />
@@ -386,7 +387,7 @@ export function RunnerStation() {
             </span>
           )}
           {noConfig && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>
+            <span style={{ fontSize: 16, color: txColors.warning }}>
               未配置（请设置 Mac mini 地址/门店/租户）
             </span>
           )}
@@ -394,7 +395,7 @@ export function RunnerStation() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 20, fontSize: 18 }}>
           <span>
             待取菜{' '}
-            <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>
+            <b style={{ color: txColors.warning, fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>
               {readyDishes.length}
             </b>
           </span>
@@ -417,8 +418,8 @@ export function RunnerStation() {
               minHeight: 48,
               padding: '0 18px',
               background: 'rgba(255,107,53,0.15)',
-              color: '#FF6B35',
-              border: '1px solid #FF6B35',
+              color: txColors.primary,
+              border: `1px solid ${txColors.primary}`,
               borderRadius: 10,
               fontSize: 16,
               fontWeight: 'bold',
@@ -449,8 +450,8 @@ export function RunnerStation() {
             padding: '10px 0',
             fontSize: 20,
             fontWeight: 'bold',
-            color: '#BA7517',
-            borderBottom: '3px solid #BA7517',
+            color: txColors.warning,
+            borderBottom: `3px solid ${txColors.warning}`,
             background: '#1a1000',
             flexShrink: 0,
           }}>
@@ -702,7 +703,7 @@ function DeliveringCard({ dish, tick: _tick, loading, onServed }: {
         style={{
           width: '100%',
           minHeight: 72,
-          background: loading ? '#333' : '#0F6E56',
+          background: loading ? '#333' : txColors.success,
           color: '#fff',
           border: 'none',
           borderRadius: 10,

@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -45,9 +46,9 @@ const MOCK_DATA: MobileDashboardData = {
 const fen2yuan = (fen: number) => (fen / 100).toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 function marginColor(pct: number): string {
-  if (pct >= 0.5) return '#0F6E56';
-  if (pct >= 0.3) return '#BA7517';
-  return '#A32D2D';
+  if (pct >= 0.5) return txColors.success;
+  if (pct >= 0.3) return txColors.warning;
+  return txColors.danger;
 }
 
 function marginBg(pct: number): string {
@@ -76,7 +77,7 @@ function MiniTrendChart({ data }: { data: number[] }) {
               <div style={{
                 width: '100%',
                 height,
-                background: isToday ? '#FF6B35' : '#E8E6E1',
+                background: isToday ? txColors.primary : '#E8E6E1',
                 borderRadius: '3px 3px 0 0',
                 transition: 'height 0.3s ease',
               }} />
@@ -149,9 +150,9 @@ export function MobileDashboard() {
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
             {[
-              { label: '营业额', value: `¥${fen2yuan(d.revenue_fen)}`, sub: '元', color: '#FF6B35' },
-              { label: '客流量', value: String(d.customer_count), sub: '人次', color: '#185FA5' },
-              { label: '新增会员', value: String(d.new_members), sub: '人', color: '#0F6E56' },
+              { label: '营业额', value: `¥${fen2yuan(d.revenue_fen)}`, sub: '元', color: txColors.primary },
+              { label: '客流量', value: String(d.customer_count), sub: '人次', color: txColors.info },
+              { label: '新增会员', value: String(d.new_members), sub: '人', color: txColors.success },
             ].map(kpi => (
               <div key={kpi.label} style={{
                 background: '#fff',
@@ -174,7 +175,7 @@ export function MobileDashboard() {
           background: marginBg(grossMarginPct),
           borderRadius: 12,
           padding: 16,
-          border: `1.5px solid ${isMarginLow ? '#A32D2D' : isMarginGood ? '#0F6E56' : '#BA7517'}`,
+          border: `1.5px solid ${isMarginLow ? txColors.danger : isMarginGood ? txColors.success : txColors.warning}`,
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
@@ -199,7 +200,7 @@ export function MobileDashboard() {
             <div style={{
               marginTop: 10,
               padding: '6px 10px',
-              background: '#A32D2D',
+              background: txColors.danger,
               color: '#fff',
               borderRadius: 6,
               fontSize: 13,
@@ -212,7 +213,7 @@ export function MobileDashboard() {
             <div style={{
               marginTop: 10,
               fontSize: 12,
-              color: '#0F6E56',
+              color: txColors.success,
               fontWeight: 500,
             }}>
               ✓ 毛利健康，继续保持
@@ -255,11 +256,11 @@ export function MobileDashboard() {
                   width: 10,
                   height: 10,
                   borderRadius: '50%',
-                  background: store.online ? '#0F6E56' : '#B4B2A9',
+                  background: store.online ? txColors.success : '#B4B2A9',
                   flexShrink: 0,
                 }} />
                 <span style={{ flex: 1, fontSize: 14, color: '#2C2C2A' }}>{store.store_name}</span>
-                <span style={{ fontSize: 12, color: store.online ? '#0F6E56' : '#B4B2A9' }}>
+                <span style={{ fontSize: 12, color: store.online ? txColors.success : '#B4B2A9' }}>
                   {store.online ? '在线' : '离线'}
                 </span>
                 <span style={{ fontSize: 12, color: '#B4B2A9' }}>›</span>
@@ -276,7 +277,7 @@ export function MobileDashboard() {
             borderRadius: 12,
             padding: 16,
             boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
-            border: (d.anomaly_discount + d.anomaly_inventory) > 0 ? '1.5px solid #BA7517' : '1px solid transparent',
+            border: (d.anomaly_discount + d.anomaly_inventory) > 0 ? `1.5px solid ${txColors.warning}` : '1px solid transparent',
             cursor: 'pointer',
             textAlign: 'left',
             width: '100%',
@@ -289,7 +290,7 @@ export function MobileDashboard() {
           <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{
-                background: d.anomaly_discount > 0 ? '#A32D2D' : '#B4B2A9',
+                background: d.anomaly_discount > 0 ? txColors.danger : '#B4B2A9',
                 color: '#fff',
                 fontSize: 11,
                 fontWeight: 700,
@@ -302,7 +303,7 @@ export function MobileDashboard() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{
-                background: d.anomaly_inventory > 0 ? '#BA7517' : '#B4B2A9',
+                background: d.anomaly_inventory > 0 ? txColors.warning : '#B4B2A9',
                 color: '#fff',
                 fontSize: 11,
                 fontWeight: 700,

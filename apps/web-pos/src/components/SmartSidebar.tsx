@@ -7,6 +7,7 @@
  */
 import { useAgentInsights } from '../hooks/useAgentInsights';
 import { InsightCard } from './InsightCard';
+import { txColors } from '@tx/tokens';
 
 // ─── 样式 ──────────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ const C = {
   tab: (active: boolean): React.CSSProperties => ({
     flex: 1, height: 36, borderRadius: 8, border: 'none',
     background: active ? 'rgba(255,107,53,0.12)' : 'transparent',
-    color: active ? '#FF6B35' : 'rgba(255,255,255,0.45)',
+    color: active ? txColors.primary : 'rgba(255,255,255,0.45)',
     fontSize: 12, fontWeight: active ? 700 : 400,
     cursor: 'pointer', display: 'flex', alignItems: 'center',
     justifyContent: 'center', gap: 4,
@@ -65,7 +66,7 @@ const C = {
 
   badge: {
     padding: '1px 6px', borderRadius: 8,
-    background: '#FF6B35', color: '#fff',
+    background: txColors.primary, color: '#fff',
     fontSize: 10, fontWeight: 700, minWidth: 16, textAlign: 'center',
   } as React.CSSProperties,
 
@@ -124,7 +125,7 @@ export function SmartSidebar({ open, onToggle, storeId, tenantId }: SmartSidebar
           <span style={{
             position: 'absolute', top: -2, right: -2,
             width: 14, height: 14, borderRadius: '50%',
-            background: '#FF6B35', fontSize: 9,
+            background: txColors.primary, fontSize: 9,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {unreadCount > 9 ? '9+' : unreadCount}

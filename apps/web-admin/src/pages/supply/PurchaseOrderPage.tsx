@@ -51,6 +51,7 @@ import {
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -181,12 +182,12 @@ const StarScore = ({ score }: { score: number }) => {
 const PriceChange = ({ pct }: { pct: number }) => {
   if (pct === 0) return <Text type="secondary">0%</Text>;
   if (pct > 0) return (
-    <Text style={{ color: '#A32D2D' }}>
+    <Text style={{ color: txColors.danger }}>
       <ArrowUpOutlined /> +{pct.toFixed(1)}%
     </Text>
   );
   return (
-    <Text style={{ color: '#0F6E56' }}>
+    <Text style={{ color: txColors.success }}>
       <ArrowDownOutlined /> {pct.toFixed(1)}%
     </Text>
   );
@@ -223,12 +224,12 @@ function Sparkline({ data, width = 320, height = 60 }: SparklineProps) {
       <polyline
         points={points}
         fill="none"
-        stroke="#FF6B35"
+        stroke={txColors.primary}
         strokeWidth={1.5}
         strokeLinejoin="round"
       />
-      <circle cx={lastX} cy={lastY} r={3} fill="#FF6B35" />
-      <text x={lastX + 4} y={lastY + 4} fontSize={9} fill="#FF6B35">
+      <circle cx={lastX} cy={lastY} r={3} fill={txColors.primary} />
+      <text x={lastX + 4} y={lastY + 4} fontSize={9} fill={txColors.primary}>
         ¥{(data[data.length - 1] / 100).toFixed(2)}
       </text>
     </svg>
@@ -332,8 +333,8 @@ function StatsCards({ stats }: StatsCardsProps) {
             title="本月采购单数"
             value={stats.month_order_count}
             suffix="单"
-            prefix={<ShoppingCartOutlined style={{ color: '#FF6B35', marginRight: 4 }} />}
-            valueStyle={{ color: '#FF6B35' }}
+            prefix={<ShoppingCartOutlined style={{ color: txColors.primary, marginRight: 4 }} />}
+            valueStyle={{ color: txColors.primary }}
           />
         </Card>
       </Col>
@@ -343,8 +344,8 @@ function StatsCards({ stats }: StatsCardsProps) {
             title="本月采购金额"
             value={fenToWan(stats.month_amount_fen)}
             suffix="万元"
-            prefix={<DollarOutlined style={{ color: '#185FA5', marginRight: 4 }} />}
-            valueStyle={{ color: '#185FA5' }}
+            prefix={<DollarOutlined style={{ color: txColors.info, marginRight: 4 }} />}
+            valueStyle={{ color: txColors.info }}
           />
         </Card>
       </Col>
@@ -354,8 +355,8 @@ function StatsCards({ stats }: StatsCardsProps) {
             title="待收货"
             value={stats.pending_receive_count}
             suffix="单"
-            prefix={<InboxOutlined style={{ color: '#BA7517', marginRight: 4 }} />}
-            valueStyle={{ color: '#BA7517' }}
+            prefix={<InboxOutlined style={{ color: txColors.warning, marginRight: 4 }} />}
+            valueStyle={{ color: txColors.warning }}
           />
         </Card>
       </Col>
@@ -372,8 +373,8 @@ function StatsCards({ stats }: StatsCardsProps) {
             title="异常单数"
             value={stats.exception_count}
             suffix="单"
-            prefix={<WarningOutlined style={{ color: '#A32D2D', marginRight: 4 }} />}
-            valueStyle={{ color: '#A32D2D', fontWeight: 700 }}
+            prefix={<WarningOutlined style={{ color: txColors.danger, marginRight: 4 }} />}
+            valueStyle={{ color: txColors.danger, fontWeight: 700 }}
           />
         </Card>
       </Col>
@@ -421,7 +422,7 @@ function DetailDrawer({ po, open, onClose }: DetailDrawerProps) {
         <Descriptions.Item label="门店">{d.store_name ?? d.store_id ?? '—'}</Descriptions.Item>
         <Descriptions.Item label="供应商">{d.supplier_name ?? '自采'}</Descriptions.Item>
         <Descriptions.Item label="总金额">
-          <Text strong style={{ color: '#FF6B35' }}>¥{fenToYuan(d.total_amount_fen)}</Text>
+          <Text strong style={{ color: txColors.primary }}>¥{fenToYuan(d.total_amount_fen)}</Text>
         </Descriptions.Item>
         <Descriptions.Item label="商品数">{d.item_count ?? (d.items?.length ?? '—')}</Descriptions.Item>
         <Descriptions.Item label="下单时间">
@@ -456,7 +457,7 @@ function DetailDrawer({ po, open, onClose }: DetailDrawerProps) {
           {
             title: '实收数量',
             render: (_, r) => r.received_quantity != null
-              ? <Text style={{ color: '#0F6E56' }}>{r.received_quantity} {r.unit}</Text>
+              ? <Text style={{ color: txColors.success }}>{r.received_quantity} {r.unit}</Text>
               : <Text type="secondary">—</Text>,
           },
         ]}
@@ -530,7 +531,7 @@ function CreatePOModal({ open, onClose, onSuccess, suppliers }: CreatePOModalPro
       footer={
         <Space>
           <Text type="secondary">合计：</Text>
-          <Text strong style={{ fontSize: 16, color: '#FF6B35' }}>¥{total.toFixed(2)}</Text>
+          <Text strong style={{ fontSize: 16, color: txColors.primary }}>¥{total.toFixed(2)}</Text>
           <Button onClick={onClose}>取消</Button>
           <Button type="primary" loading={loading} onClick={handleSubmit}>
             创建采购单
@@ -642,7 +643,7 @@ function CreatePOModal({ open, onClose, onSuccess, suppliers }: CreatePOModalPro
                     width: 32,
                     render: (_, field) => fields.length > 1 ? (
                       <MinusCircleOutlined
-                        style={{ color: '#A32D2D', cursor: 'pointer', fontSize: 16 }}
+                        style={{ color: txColors.danger, cursor: 'pointer', fontSize: 16 }}
                         onClick={() => remove(field.name)}
                       />
                     ) : null,
@@ -702,7 +703,7 @@ function PurchaseOrderTab({ suppliers }: PurchaseOrderTabProps) {
       hideInSearch: true,
       render: (_, r) => (
         <a
-          style={{ color: '#185FA5', fontFamily: 'monospace', fontSize: 12 }}
+          style={{ color: txColors.info, fontFamily: 'monospace', fontSize: 12 }}
           onClick={() => setDetailPO(r)}
         >
           {r.po_number}
@@ -736,7 +737,7 @@ function PurchaseOrderTab({ suppliers }: PurchaseOrderTabProps) {
         const isLate = dayjs(r.expected_delivery_date).isBefore(dayjs(), 'day')
           && r.status !== 'received' && r.status !== 'cancelled';
         return (
-          <Text style={isLate ? { color: '#A32D2D', fontWeight: 600 } : undefined}>
+          <Text style={isLate ? { color: txColors.danger, fontWeight: 600 } : undefined}>
             {r.expected_delivery_date}
           </Text>
         );
@@ -778,7 +779,7 @@ function PurchaseOrderTab({ suppliers }: PurchaseOrderTabProps) {
               okText="确认收货"
               cancelText="取消"
             >
-              <a style={{ color: '#0F6E56' }}>确认收货</a>
+              <a style={{ color: txColors.success }}>确认收货</a>
             </Popconfirm>,
           );
         }
@@ -791,7 +792,7 @@ function PurchaseOrderTab({ suppliers }: PurchaseOrderTabProps) {
               okText="确认审批"
               cancelText="取消"
             >
-              <a style={{ color: '#0F6E56' }}>审批</a>
+              <a style={{ color: txColors.success }}>审批</a>
             </Popconfirm>,
             <Popconfirm
               key="reject"
@@ -801,7 +802,7 @@ function PurchaseOrderTab({ suppliers }: PurchaseOrderTabProps) {
               cancelText="取消"
               okButtonProps={{ danger: true }}
             >
-              <a style={{ color: '#A32D2D' }}>拒绝</a>
+              <a style={{ color: txColors.danger }}>拒绝</a>
             </Popconfirm>,
           );
         }
@@ -996,7 +997,7 @@ function SupplierTab() {
       width: 200,
       render: (_, r) => (
         <Space size="middle">
-          <a style={{ color: '#185FA5' }} onClick={() => openEdit(r)}>查看/编辑</a>
+          <a style={{ color: txColors.info }} onClick={() => openEdit(r)}>查看/编辑</a>
           {r.status === 'active' && (
             <Popconfirm
               title="确认停用该供应商？"
@@ -1008,12 +1009,12 @@ function SupplierTab() {
               okText="停用"
               okButtonProps={{ danger: true }}
             >
-              <a style={{ color: '#A32D2D' }}>停用</a>
+              <a style={{ color: txColors.danger }}>停用</a>
             </Popconfirm>
           )}
           {r.status === 'inactive' && (
             <a
-              style={{ color: '#0F6E56' }}
+              style={{ color: txColors.success }}
               onClick={async () => {
                 await createOrUpdateSupplier({ ...r, status: 'active' }, r.id);
                 message.success('已恢复合作');
@@ -1159,7 +1160,7 @@ function PriceRecordTab() {
       render: (_, r) => (
         <Tooltip title="点击展开/收起价格走势图">
           <a
-            style={{ color: '#185FA5' }}
+            style={{ color: txColors.info }}
             onClick={() => setExpandedRowId(expandedRowId === r.id ? null : r.id)}
           >
             {expandedRowId === r.id ? '收起' : '展开'}

@@ -5,6 +5,7 @@
 import { useState, useRef } from 'react';
 import { Input, Button, Tag, Spin } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
+import { txColors } from '@tx/tokens';
 
 const { TextArea } = Input;
 
@@ -88,7 +89,7 @@ const NLQChatPanel = ({ placeholder = '输入问题，如：今天各门店营�
           <div key={idx} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
             <div style={{
               maxWidth: '90%',
-              background: msg.role === 'user' ? '#FF6B35' : '#f8f7f5',
+              background: msg.role === 'user' ? txColors.primary : '#f8f7f5',
               color: msg.role === 'user' ? '#fff' : '#2C2C2A',
               padding: '8px 12px',
               borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
@@ -122,7 +123,7 @@ const NLQChatPanel = ({ placeholder = '输入问题，如：今天各门店营�
           icon={<SendOutlined />}
           onClick={() => void handleSend()}
           loading={loading}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35', height: 36 }}
+          style={{ background: txColors.primary, borderColor: txColors.primary, height: 36 }}
         />
       </div>
     </div>

@@ -41,6 +41,7 @@ import {
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
 import { useLang } from '../../i18n/LangContext';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
@@ -601,7 +602,7 @@ function TaxLedgerTab({ isMY }: { isMY?: boolean }) {
                   title: isMY ? 'Total Invoiced' : '开票总额',
                   value: fenToYuan(ledger.total_invoice_amount_fen),
                   prefix: currency,
-                  valueStyle: { color: '#0F6E56' },
+                  valueStyle: { color: txColors.success },
                 }}
               />
             </Col>
@@ -611,7 +612,7 @@ function TaxLedgerTab({ isMY }: { isMY?: boolean }) {
                   title: isMY ? 'Sales Tax' : '销项税额',
                   value: fenToYuan(ledger.sales_tax_amount_fen),
                   prefix: currency,
-                  valueStyle: { color: '#BA7517' },
+                  valueStyle: { color: txColors.warning },
                 }}
               />
             </Col>
@@ -622,7 +623,7 @@ function TaxLedgerTab({ isMY }: { isMY?: boolean }) {
                   value: ledger.uninvoiced_order_count,
                   suffix: isMY ? '' : '笔',
                   valueStyle: {
-                    color: ledger.uninvoiced_order_count > 0 ? '#A32D2D' : '#0F6E56',
+                    color: ledger.uninvoiced_order_count > 0 ? txColors.danger : txColors.success,
                   },
                 }}
               />

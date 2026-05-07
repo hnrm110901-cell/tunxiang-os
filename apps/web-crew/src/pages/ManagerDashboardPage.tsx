@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 /* ---------- Design Token ---------- */
 const C = {
@@ -16,27 +17,27 @@ const C = {
   text: '#E0E0E0',
   textSub: '#8FA3AA',
   muted: '#64748b',
-  primary: '#FF6B35',
-  primaryActive: '#E55A28',
+  primary: txColors.primary,
+  primaryActive: txColors.primaryActive,
   primaryLight: 'rgba(255,107,53,0.15)',
-  success: '#0F6E56',
+  success: txColors.success,
   successBg: 'rgba(15,110,86,0.14)',
   successText: '#2de8aa',
-  warning: '#BA7517',
+  warning: txColors.warning,
   warningBg: 'rgba(186,117,23,0.14)',
   warningText: '#FFB938',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   dangerBg: 'rgba(163,45,45,0.14)',
   dangerText: '#FF6060',
-  info: '#185FA5',
+  info: txColors.info,
   infoBg: 'rgba(24,95,165,0.14)',
   infoText: '#60AAFF',
   divider: '#1a2a33',
   // table status colors
   tableEmpty: '#2a3a44',
-  tableDining: '#FF6B35',
-  tableDirty: '#BA7517',
-  tableReserved: '#185FA5',
+  tableDining: txColors.primary,
+  tableDirty: txColors.warning,
+  tableReserved: txColors.info,
 };
 
 /* ---------- 类型定义 ---------- */

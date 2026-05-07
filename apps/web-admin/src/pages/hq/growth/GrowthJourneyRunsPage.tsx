@@ -8,6 +8,7 @@ import { Card, Table, Tag, Tabs, Spin, Space, Button } from 'antd';
 import { ReloadOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
 import type { JourneyEnrollment } from '../../../api/growthHubApi';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量 ----
 const PAGE_BG = '#0d1e28';
@@ -15,7 +16,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 
 const STATE_COLORS: Record<string, string> = {
   eligible: 'blue',

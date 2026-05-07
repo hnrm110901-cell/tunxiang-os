@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useState } from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +36,7 @@ const CSS = {
     color: '#2C2C2A',
   } as React.CSSProperties,
   header: {
-    background: '#1E2A3A',
+    background: txColors.navy,
     padding: '16px 20px',
     display: 'flex',
     alignItems: 'center',
@@ -57,10 +58,10 @@ const CSS = {
     minHeight: 56,
     fontSize: 18,
     fontWeight: active ? 700 : 400,
-    color: active ? '#FF6B35' : '#5F5E5A',
+    color: active ? txColors.primary : '#5F5E5A',
     background: 'transparent',
     border: 'none',
-    borderBottom: active ? '3px solid #FF6B35' : '3px solid transparent',
+    borderBottom: active ? `3px solid ${txColors.primary}` : '3px solid transparent',
     cursor: 'pointer',
     transition: 'all 200ms ease',
   }),
@@ -94,7 +95,7 @@ const CSS = {
     fontSize: 18,
     fontWeight: 700,
     color: '#FFFFFF',
-    background: '#FF6B35',
+    background: txColors.primary,
     border: 'none',
     borderRadius: 12,
     cursor: 'pointer',
@@ -105,9 +106,9 @@ const CSS = {
     width: '100%',
     fontSize: 18,
     fontWeight: 600,
-    color: '#FF6B35',
+    color: txColors.primary,
     background: '#FFFFFF',
-    border: '2px solid #FF6B35',
+    border: `2px solid ${txColors.primary}`,
     borderRadius: 12,
     cursor: 'pointer',
   } as React.CSSProperties,
@@ -117,7 +118,7 @@ const CSS = {
     fontSize: 18,
     fontWeight: 700,
     color: '#FFFFFF',
-    background: '#A32D2D',
+    background: txColors.danger,
     border: 'none',
     borderRadius: 12,
     cursor: 'pointer',
@@ -131,12 +132,12 @@ const CSS = {
     border: '2px solid transparent',
   } as React.CSSProperties,
   cardSelected: {
-    background: '#FFF3ED',
+    background: txColors.primaryLight,
     borderRadius: 12,
     padding: '16px 20px',
     marginBottom: 12,
     boxShadow: '0 4px 12px rgba(255,107,53,0.15)',
-    border: '2px solid #FF6B35',
+    border: `2px solid ${txColors.primary}`,
   } as React.CSSProperties,
   statusBadge: (status: string): React.CSSProperties => ({
     display: 'inline-block',
@@ -149,8 +150,8 @@ const CSS = {
       : status === 'partially_retrieved' ? '#FFF7E6'
       : '#F5F5F5',
     color:
-      status === 'stored' ? '#0F6E56'
-      : status === 'partially_retrieved' ? '#BA7517'
+      status === 'stored' ? txColors.success
+      : status === 'partially_retrieved' ? txColors.warning
       : '#5F5E5A',
   }),
   field: {
@@ -161,7 +162,7 @@ const CSS = {
     top: 80,
     left: '50%',
     transform: 'translateX(-50%)',
-    background: type === 'success' ? '#0F6E56' : '#A32D2D',
+    background: type === 'success' ? txColors.success : txColors.danger,
     color: '#FFFFFF',
     padding: '14px 28px',
     borderRadius: 12,
@@ -393,7 +394,7 @@ export function WineStoragePosPage() {
                         )}
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: 28, fontWeight: 700, color: '#0F6E56' }}>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: txColors.success }}>
                           {item.quantity}
                         </div>
                         <div style={{ fontSize: 14, color: '#5F5E5A' }}>{item.unit} 剩余</div>
@@ -416,7 +417,7 @@ export function WineStoragePosPage() {
                 borderRadius: 12,
                 padding: '20px',
                 marginTop: 16,
-                border: '2px solid #FF6B35',
+                border: `2px solid ${txColors.primary}`,
               }}>
                 <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
                   取出：{selectedWine.wine_name}
@@ -492,8 +493,8 @@ export function WineStoragePosPage() {
                       fontSize: 16,
                       fontWeight: storeCategory === cat ? 700 : 400,
                       color: storeCategory === cat ? '#FFFFFF' : '#2C2C2A',
-                      background: storeCategory === cat ? '#FF6B35' : '#FFFFFF',
-                      border: `2px solid ${storeCategory === cat ? '#FF6B35' : '#E8E6E1'}`,
+                      background: storeCategory === cat ? txColors.primary : '#FFFFFF',
+                      border: `2px solid ${storeCategory === cat ? txColors.primary : '#E8E6E1'}`,
                       borderRadius: 8,
                       cursor: 'pointer',
                     }}
@@ -530,8 +531,8 @@ export function WineStoragePosPage() {
                       fontSize: 16,
                       fontWeight: storeExpiresDays === String(d) ? 700 : 400,
                       color: storeExpiresDays === String(d) ? '#FFFFFF' : '#2C2C2A',
-                      background: storeExpiresDays === String(d) ? '#FF6B35' : '#FFFFFF',
-                      border: `2px solid ${storeExpiresDays === String(d) ? '#FF6B35' : '#E8E6E1'}`,
+                      background: storeExpiresDays === String(d) ? txColors.primary : '#FFFFFF',
+                      border: `2px solid ${storeExpiresDays === String(d) ? txColors.primary : '#E8E6E1'}`,
                       borderRadius: 8,
                       cursor: 'pointer',
                     }}

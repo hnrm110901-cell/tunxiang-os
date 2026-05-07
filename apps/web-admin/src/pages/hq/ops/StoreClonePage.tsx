@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -51,10 +52,10 @@ const CLONE_ITEMS: { value: string; label: string; desc: string }[] = [
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
   pending:   { label: '等待中', color: '#888',    bg: '#88888822' },
-  running:   { label: '进行中', color: '#FF6B35', bg: '#FF6B3522' },
-  completed: { label: '完成',   color: '#0F6E56', bg: '#0F6E5622' },
+  running:   { label: '进行中', color: txColors.primary, bg: `${txColors.primary}22` },
+  completed: { label: '完成',   color: txColors.success, bg: `${txColors.success}22` },
   failed:    { label: '失败',   color: '#FF4D4D', bg: '#FF4D4D22' },
-  partial:   { label: '部分成功', color: '#BA7517', bg: '#BA751722' },
+  partial:   { label: '部分成功', color: txColors.warning, bg: `${txColors.warning}22` },
 };
 
 const POLL_INTERVAL = 1500; // ms
@@ -137,7 +138,7 @@ function ProgressPanel({ progress }: { progress: CloneProgressData }) {
         <div style={{
           width: `${progress.progress_pct}%`, height: '100%', borderRadius: 4,
           background: progress.status === 'failed' ? '#FF4D4D'
-            : progress.status === 'partial' ? '#BA7517' : '#FF6B35',
+            : progress.status === 'partial' ? txColors.warning : txColors.primary,
           transition: 'width 0.4s ease',
         }} />
       </div>
@@ -150,8 +151,8 @@ function ProgressPanel({ progress }: { progress: CloneProgressData }) {
       {progress.status === 'completed' && (
         <div style={{
           marginTop: 16, padding: '10px 14px', borderRadius: 6,
-          background: '#0F6E5622', border: '1px solid #0F6E5644',
-          color: '#0F6E56', fontSize: 14, fontWeight: 600,
+          background: `${txColors.success}22`, border: `1px solid ${txColors.success}44`,
+          color: txColors.success, fontSize: 14, fontWeight: 600,
         }}>
           克隆完成！所有配置已成功复制到目标门店。
         </div>
@@ -204,7 +205,7 @@ function HistoryCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ color: '#fff', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
             {storeMap[item.source_store_id] || item.source_store_id.slice(0, 8)}
-            <span style={{ color: '#FF6B35', margin: '0 6px' }}>→</span>
+            <span style={{ color: txColors.primary, margin: '0 6px' }}>→</span>
             {storeMap[item.target_store_id] || item.target_store_id.slice(0, 8)}
           </div>
           <div style={{ color: '#888', fontSize: 11, marginBottom: 6 }}>
@@ -214,7 +215,7 @@ function HistoryCard({
             {items.map((v) => (
               <span key={v} style={{
                 padding: '1px 7px', borderRadius: 10, fontSize: 10,
-                background: '#FF6B3522', color: '#FF6B35',
+                background: `${txColors.primary}22`, color: txColors.primary,
               }}>
                 {CLONE_ITEMS.find((c) => c.value === v)?.label || v}
               </span>
@@ -388,7 +389,7 @@ export function StoreClonePage() {
             />
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#FF6B35', fontSize: 20, margin: '4px 0 8px',
+              color: txColors.primary, fontSize: 20, margin: '4px 0 8px',
             }}>
               ↓
             </div>
@@ -431,15 +432,15 @@ export function StoreClonePage() {
                     display: 'flex', alignItems: 'center', gap: 12,
                     padding: '10px 12px', borderRadius: 6, marginBottom: 6,
                     cursor: 'pointer',
-                    background: checked ? '#FF6B3511' : 'transparent',
-                    border: `1px solid ${checked ? '#FF6B3533' : '#2a3a44'}`,
+                    background: checked ? `${txColors.primary}11` : 'transparent',
+                    border: `1px solid ${checked ? `${txColors.primary}33` : '#2a3a44'}`,
                     transition: 'all 0.15s',
                   }}
                 >
                   <div style={{
                     width: 18, height: 18, borderRadius: 4, flexShrink: 0,
-                    border: `2px solid ${checked ? '#FF6B35' : '#2a3a44'}`,
-                    background: checked ? '#FF6B35' : 'transparent',
+                    border: `2px solid ${checked ? txColors.primary : '#2a3a44'}`,
+                    background: checked ? txColors.primary : 'transparent',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}>
                     {checked && <span style={{ color: '#fff', fontSize: 11, fontWeight: 700 }}>✓</span>}
@@ -469,7 +470,7 @@ export function StoreClonePage() {
             disabled={launching || isRunning}
             style={{
               width: '100%', padding: '14px 0', borderRadius: 8, border: 'none',
-              background: (launching || isRunning) ? '#333' : '#FF6B35',
+              background: (launching || isRunning) ? '#333' : txColors.primary,
               color: (launching || isRunning) ? '#888' : '#fff',
               fontSize: 16, fontWeight: 700, cursor: (launching || isRunning) ? 'not-allowed' : 'pointer',
               transition: 'background 0.15s',

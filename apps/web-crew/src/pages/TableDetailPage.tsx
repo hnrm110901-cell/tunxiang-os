@@ -37,6 +37,7 @@ import {
 import { ConstraintStatusBar } from './ConstraintStatusBar';
 import { ServiceSuggestionCard } from './ServiceSuggestionCard';
 import type { ServiceSuggestion } from './ServiceSuggestionCard';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -106,14 +107,14 @@ async function txFetch<T = unknown>(
 const T = {
   bg: '#F5F5F5',           // 页面背景
   white: '#FFFFFF',         // 卡片背景
-  primary: '#FF6B35',       // 主色
+  primary: txColors.primary,       // 主色
   text1: '#1A1A1A',         // 主文字
   text2: '#666666',         // 次要文字
   text3: '#AAAAAA',         // 辅助文字
   border: '#E8E8E8',        // 分割线
-  success: '#0F6E56',       // 已上桌绿
-  warning: '#BA7517',       // 部分上桌黄
-  danger: '#A32D2D',        // 未上桌/退单红
+  success: txColors.success,       // 已上桌绿
+  warning: txColors.warning,       // 部分上桌黄
+  danger: txColors.danger,        // 未上桌/退单红
   gift: '#6B3FA0',          // 赠单紫
   tabActive: '#1A9BE8',     // Tab选中色（天财商龙蓝）
 };

@@ -5,11 +5,12 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const BG_1 = '#0d1e28';
 const BG_2 = '#1a2a33';
 const BG_3 = '#223040';
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 const XHS_RED = '#FF2442';
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';

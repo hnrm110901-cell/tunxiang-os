@@ -5,13 +5,14 @@
  * 3个预置Journey模板：新客户Onboarding / 续约流程 / 流失挽回
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ── 颜色常量 ──
 const C = {
   bg: '#0A1418', surface: '#0E1E24', surface2: '#132932', surface3: '#1A3540',
   border: '#1A3540', border2: '#23485a',
   text: '#E6EDF1', text2: '#94A8B3', text3: '#647985',
-  orange: '#FF6B35', green: '#22C55E', yellow: '#F59E0B', red: '#EF4444', blue: '#3B82F6', purple: '#A855F7',
+  orange: txColors.primary, green: '#22C55E', yellow: '#F59E0B', red: '#EF4444', blue: '#3B82F6', purple: '#A855F7',
 };
 
 // ── 类型定义 ──

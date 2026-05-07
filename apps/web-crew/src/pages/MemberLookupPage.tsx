@@ -6,6 +6,7 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── 等级颜色 ───
 const LEVEL_COLORS: Record<string, string> = {
@@ -115,7 +116,7 @@ function NumKeypad({ value, onChange }: { value: string; onChange: (v: string) =
             height: 56, borderRadius: 10,
             background: k === '' ? 'transparent' : k === '⌫' ? '#1a2a33' : '#1a2a33',
             border: k === '' ? 'none' : '1px solid #2a3a43',
-            color: k === '⌫' ? '#FF6B35' : '#e2e8f0',
+            color: k === '⌫' ? txColors.primary : '#e2e8f0',
             fontSize: 22, fontWeight: k === '⌫' ? 700 : 500,
             cursor: k === '' ? 'default' : 'pointer',
             transition: 'transform 200ms ease, background 200ms ease',
@@ -202,7 +203,7 @@ function GiftPointsModal({
           padding: '12px 16px', marginBottom: 16,
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>+</span>
+          <span style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>+</span>
           <span style={{ fontSize: 36, fontWeight: 700, color: '#e2e8f0', minWidth: 80 }}>
             {pointsStr || '0'}
           </span>
@@ -222,7 +223,7 @@ function GiftPointsModal({
                 height: 52, borderRadius: 10,
                 background: k === '' ? 'transparent' : '#1a2a33',
                 border: k === '' ? 'none' : '1px solid #2a3a43',
-                color: k === '⌫' ? '#FF6B35' : '#e2e8f0',
+                color: k === '⌫' ? txColors.primary : '#e2e8f0',
                 fontSize: 20, cursor: k === '' ? 'default' : 'pointer',
                 minHeight: 52,
               }}
@@ -263,7 +264,7 @@ function GiftPointsModal({
             disabled={loading}
             style={{
               flex: 2, height: 56, borderRadius: 12,
-              background: loading ? '#1a2a33' : '#FF6B35',
+              background: loading ? '#1a2a33' : txColors.primary,
               border: 'none', color: '#fff',
               fontSize: 18, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               opacity: loading ? 0.6 : 1, minHeight: 56,
@@ -378,12 +379,12 @@ export function MemberLookupPage() {
         </div>
 
         {errorMsg && (
-          <div style={{ color: '#BA7517', fontSize: 16, padding: '4px 4px 8px' }}>
+          <div style={{ color: txColors.warning, fontSize: 16, padding: '4px 4px 8px' }}>
             ⚠ {errorMsg}
           </div>
         )}
         {giftSuccess && (
-          <div style={{ color: '#0F6E56', fontSize: 16, padding: '4px 4px 8px' }}>
+          <div style={{ color: txColors.success, fontSize: 16, padding: '4px 4px 8px' }}>
             ✓ {giftSuccess}
           </div>
         )}
@@ -397,7 +398,7 @@ export function MemberLookupPage() {
           disabled={loading || phone.length < 7}
           style={{
             width: '100%', height: 60, borderRadius: 14,
-            background: loading || phone.length < 7 ? '#1a2a33' : '#FF6B35',
+            background: loading || phone.length < 7 ? '#1a2a33' : txColors.primary,
             border: 'none', color: '#fff',
             fontSize: 20, fontWeight: 700,
             cursor: loading || phone.length < 7 ? 'not-allowed' : 'pointer',
@@ -430,7 +431,7 @@ export function MemberLookupPage() {
             <button
               style={{
                 width: '100%', height: 56, borderRadius: 12,
-                background: '#0F6E56', border: 'none',
+                background: txColors.success, border: 'none',
                 color: '#fff', fontSize: 18, fontWeight: 700,
                 cursor: 'pointer', minHeight: 56,
               }}
@@ -469,7 +470,7 @@ export function MemberLookupPage() {
                 <div style={{ fontSize: 16, color: '#64748b', marginBottom: 4 }}>当前积分余额</div>
                 <div style={{
                   fontSize: 48, fontWeight: 800,
-                  color: '#FF6B35', lineHeight: 1.1,
+                  color: txColors.primary, lineHeight: 1.1,
                 }}>
                   {member.points_balance.toLocaleString()}
                 </div>
@@ -576,7 +577,7 @@ function ActionRow({
       <div style={{ flex: 1 }}>
         <div style={{
           fontSize: 18, fontWeight: 600,
-          color: highlight ? '#FF6B35' : '#e2e8f0',
+          color: highlight ? txColors.primary : '#e2e8f0',
         }}>{label}</div>
         <div style={{ fontSize: 16, color: '#64748b', marginTop: 2 }}>{desc}</div>
       </div>

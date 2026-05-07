@@ -58,7 +58,7 @@
   left: 4px;
   padding: 1px 6px;
   border-radius: 4px;
-  background: #A32D2D;
+  background: var(--tx-danger);
   color: #fff;
   font-size: 10px;
   font-weight: 600;

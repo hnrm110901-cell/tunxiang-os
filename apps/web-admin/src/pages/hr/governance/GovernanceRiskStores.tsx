@@ -10,6 +10,7 @@ import { Card, Col, Row, Space, Tag, message } from 'antd';
 import { ProColumns, ProTable } from '@ant-design/pro-components';
 import { Pie } from '@ant-design/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -75,7 +76,7 @@ export default function GovernanceRiskStores() {
       dataIndex: 'compliance_alerts',
       width: 100,
       render: (_, r) => (
-        <span style={{ color: r.compliance_alerts > 5 ? '#A32D2D' : undefined }}>
+        <span style={{ color: r.compliance_alerts > 5 ? txColors.danger : undefined }}>
           {r.compliance_alerts}
         </span>
       ),
@@ -102,7 +103,7 @@ export default function GovernanceRiskStores() {
         <Space size="small">
           <a onClick={() => message.info(`查看 ${r.store_name} 详情`)}>查看详情</a>
           {r.risk_score < 60 && (
-            <a style={{ color: '#A32D2D' }} onClick={() => message.info(`发起对 ${r.store_name} 的干预`)}>
+            <a style={{ color: txColors.danger }} onClick={() => message.info(`发起对 ${r.store_name} 的干预`)}>
               发起干预
             </a>
           )}
@@ -130,7 +131,7 @@ export default function GovernanceRiskStores() {
               radius={0.8}
               innerRadius={0.5}
               height={260}
-              color={['#A32D2D', '#BA7517', '#0F6E56']}
+              color={[txColors.danger, txColors.warning, txColors.success]}
               label={{ type: 'spider', content: '{name}: {value}' }}
               statistic={{
                 title: { content: '门店总数' },
@@ -144,7 +145,7 @@ export default function GovernanceRiskStores() {
             <Row gutter={16}>
               <Col span={8}>
                 <div style={{ textAlign: 'center', padding: 16 }}>
-                  <div style={{ fontSize: 32, fontWeight: 600, color: '#A32D2D' }}>
+                  <div style={{ fontSize: 32, fontWeight: 600, color: txColors.danger }}>
                     {data.filter((d) => d.risk_score < 60).length}
                   </div>
                   <div style={{ color: '#666' }}>高风险门店</div>
@@ -152,7 +153,7 @@ export default function GovernanceRiskStores() {
               </Col>
               <Col span={8}>
                 <div style={{ textAlign: 'center', padding: 16 }}>
-                  <div style={{ fontSize: 32, fontWeight: 600, color: '#BA7517' }}>
+                  <div style={{ fontSize: 32, fontWeight: 600, color: txColors.warning }}>
                     {data.filter((d) => d.risk_score >= 60 && d.risk_score < 80).length}
                   </div>
                   <div style={{ color: '#666' }}>中风险门店</div>
@@ -160,7 +161,7 @@ export default function GovernanceRiskStores() {
               </Col>
               <Col span={8}>
                 <div style={{ textAlign: 'center', padding: 16 }}>
-                  <div style={{ fontSize: 32, fontWeight: 600, color: '#0F6E56' }}>
+                  <div style={{ fontSize: 32, fontWeight: 600, color: txColors.success }}>
                     {data.filter((d) => d.risk_score >= 80).length}
                   </div>
                   <div style={{ color: '#666' }}>低风险门店</div>

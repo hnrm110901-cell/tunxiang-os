@@ -5,6 +5,7 @@
  * 由 KitchenBoard 和 ZoneKitchenBoard 共享使用。
  */
 import type { RemakeAlert } from '../hooks/useKdsWebSocket';
+import { txColors } from '@tx/tokens';
 
 interface RemakeOverlayProps {
   alerts: RemakeAlert[];
@@ -22,7 +23,7 @@ export function RemakeOverlay({ alerts, onDismiss, slideAnimation = 'kds-slide-i
     }}>
       <div style={{
         background: '#1a1a1a', borderRadius: 16, padding: 28,
-        border: '3px solid #A32D2D', maxWidth: 480, width: '90%',
+        border: `3px solid ${txColors.danger}`, maxWidth: 480, width: '90%',
         animation: `${slideAnimation} 0.3s ease-out`,
       }}>
         <div style={{
@@ -34,7 +35,7 @@ export function RemakeOverlay({ alerts, onDismiss, slideAnimation = 'kds-slide-i
         {alerts.map(a => (
           <div key={a.taskId} style={{
             background: '#222', borderRadius: 12, padding: 16,
-            marginBottom: 12, borderLeft: '6px solid #A32D2D',
+            marginBottom: 12, borderLeft: `6px solid ${txColors.danger}`,
           }}>
             <div style={{ fontSize: 22, fontWeight: 'bold', color: '#fff', marginBottom: 8 }}>
               {a.tableNumber && `${a.tableNumber} - `}{a.dishName}
@@ -44,13 +45,13 @@ export function RemakeOverlay({ alerts, onDismiss, slideAnimation = 'kds-slide-i
                 </span>
               )}
             </div>
-            <div style={{ fontSize: 18, color: '#BA7517', marginBottom: 12 }}>
+            <div style={{ fontSize: 18, color: txColors.warning, marginBottom: 12 }}>
               原因: {a.reason}
             </div>
             <button
               onClick={() => onDismiss(a.taskId)}
               style={{
-                width: '100%', padding: '14px 0', background: '#A32D2D',
+                width: '100%', padding: '14px 0', background: txColors.danger,
                 color: '#fff', border: 'none', borderRadius: 8,
                 fontSize: 20, fontWeight: 'bold', cursor: 'pointer',
                 minHeight: 56,

@@ -7,6 +7,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { apiGet } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -46,13 +47,13 @@ const fen2yuan = (fen: number) => `¥${(fen / 100).toLocaleString('zh-CN', { min
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 function healthColor(score: number): string {
-  if (score >= 90) return '#0F6E56';
-  if (score >= 75) return '#BA7517';
-  return '#A32D2D';
+  if (score >= 90) return txColors.success;
+  if (score >= 75) return txColors.warning;
+  return txColors.danger;
 }
 
 function marginColor(margin: number): string {
-  return margin < 0.4 ? '#A32D2D' : margin < 0.55 ? '#BA7517' : '#0F6E56';
+  return margin < 0.4 ? txColors.danger : margin < 0.55 ? txColors.warning : txColors.success;
 }
 
 // ─── 主组件 ──────────────────────────────────────────────────────────────────
@@ -98,14 +99,14 @@ export function StoreInsightsPage() {
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <div style={{ fontSize: 20, fontWeight: 600, color: '#1E2A3A' }}>门店经营洞察</div>
+          <div style={{ fontSize: 20, fontWeight: 600, color: txColors.navy }}>门店经营洞察</div>
           <div style={{ fontSize: 13, color: '#6B7280', marginTop: 4 }}>多门店对比分析、健康度评分、排名</div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           {(['today', 'week', 'month'] as Period[]).map(p => (
             <button key={p} onClick={() => setPeriod(p)} style={{
               padding: '6px 14px', borderRadius: 6, fontSize: 13, cursor: 'pointer',
-              background: period === p ? '#FF6B35' : '#fff', color: period === p ? '#fff' : '#374151',
+              background: period === p ? txColors.primary : '#fff', color: period === p ? '#fff' : '#374151',
               border: period === p ? 'none' : '1px solid #D1D5DB',
             }}>
               {p === 'today' ? '今日' : p === 'week' ? '本周' : '本月'}
@@ -117,7 +118,7 @@ export function StoreInsightsPage() {
       {/* 汇总卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
         <SummaryCard label="门店数" value={`${sorted.length} 家`} />
-        <SummaryCard label="总营收" value={fen2yuan(totalRevenue)} color="#FF6B35" />
+        <SummaryCard label="总营收" value={fen2yuan(totalRevenue)} color={txColors.primary} />
         <SummaryCard label="总订单" value={`${totalOrders} 单`} />
         <SummaryCard label="平均健康度" value={`${avgHealth}分`} color={healthColor(avgHealth)} />
       </div>
@@ -154,7 +155,7 @@ export function StoreInsightsPage() {
               <tr><td colSpan={11} style={{ padding: 40, textAlign: 'center', color: '#9CA3AF' }}>加载中...</td></tr>
             ) : sorted.map((s, i) => (
               <tr key={s.storeId} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                <td style={tdStyle}><span style={{ display: 'inline-block', width: 24, height: 24, borderRadius: '50%', background: i < 3 ? '#FF6B35' : '#E5E7EB', color: i < 3 ? '#fff' : '#6B7280', textAlign: 'center', lineHeight: '24px', fontSize: 12, fontWeight: 600 }}>{i + 1}</span></td>
+                <td style={tdStyle}><span style={{ display: 'inline-block', width: 24, height: 24, borderRadius: '50%', background: i < 3 ? txColors.primary : '#E5E7EB', color: i < 3 ? '#fff' : '#6B7280', textAlign: 'center', lineHeight: '24px', fontSize: 12, fontWeight: 600 }}>{i + 1}</span></td>
                 <td style={{ ...tdStyle, fontWeight: 500 }}>{s.storeName}</td>
                 <td style={tdStyle}>{s.region}</td>
                 <td style={{ ...tdStyle, fontWeight: 600 }}>{fen2yuan(s.revenueFen)}</td>
@@ -163,8 +164,8 @@ export function StoreInsightsPage() {
                 <td style={tdStyle}>{s.tableTurnRate.toFixed(1)}</td>
                 <td style={tdStyle}><span style={{ color: marginColor(s.grossMargin), fontWeight: 500 }}>{pct(s.grossMargin)}</span></td>
                 <td style={tdStyle}><span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 600, color: healthColor(s.healthScore), background: `${healthColor(s.healthScore)}15` }}>{s.healthScore}</span></td>
-                <td style={tdStyle}><span style={{ color: s.revenueGrowth >= 0 ? '#0F6E56' : '#A32D2D' }}>{s.revenueGrowth >= 0 ? '+' : ''}{pct(s.revenueGrowth)}</span></td>
-                <td style={tdStyle}>{s.complaintCount > 0 ? <span style={{ color: '#A32D2D', fontWeight: 500 }}>{s.complaintCount}</span> : '—'}</td>
+                <td style={tdStyle}><span style={{ color: s.revenueGrowth >= 0 ? txColors.success : txColors.danger }}>{s.revenueGrowth >= 0 ? '+' : ''}{pct(s.revenueGrowth)}</span></td>
+                <td style={tdStyle}>{s.complaintCount > 0 ? <span style={{ color: txColors.danger, fontWeight: 500 }}>{s.complaintCount}</span> : '—'}</td>
               </tr>
             ))}
           </tbody>
@@ -180,7 +181,7 @@ function SummaryCard({ label, value, color }: { label: string; value: string; co
   return (
     <div style={{ background: '#fff', borderRadius: 8, border: '1px solid #E5E7EB', padding: '14px 16px' }}>
       <div style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 600, color: color || '#1E2A3A' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 600, color: color || txColors.navy }}>{value}</div>
     </div>
   );
 }

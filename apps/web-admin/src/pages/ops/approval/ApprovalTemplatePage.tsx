@@ -13,6 +13,7 @@ import {
 import { PlusOutlined, EditOutlined, DeleteOutlined, SettingOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -392,7 +393,7 @@ export function ApprovalTemplatePage() {
       {/* 页面标题栏 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <div>
-          <Title level={4} style={{ margin: 0, color: '#1E2A3A' }}>审批模板管理</Title>
+          <Title level={4} style={{ margin: 0, color: txColors.navy }}>审批模板管理</Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
             配置各业务场景的审批流程模板，支持多步骤、条件路由
           </Text>
@@ -401,7 +402,7 @@ export function ApprovalTemplatePage() {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => openDrawer()}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
         >
           新建模板
         </Button>
@@ -441,7 +442,7 @@ export function ApprovalTemplatePage() {
               type="primary"
               loading={saving}
               onClick={handleSave}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               {editTarget ? '保存修改' : '创建模板'}
             </Button>

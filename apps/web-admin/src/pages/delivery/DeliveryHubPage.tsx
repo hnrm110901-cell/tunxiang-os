@@ -4,12 +4,13 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Constants ───
 
 const BASE = 'http://localhost:8001';
 const REFRESH_MS = 30_000;
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 
 // ─── Types ───
 
@@ -66,7 +67,7 @@ const PLATFORM_META: Record<PlatformKey, { label: string; dot: string; color: st
   meituan: { label: '美团', dot: '\uD83D\uDFE1', color: '#FAAD14' },
   eleme:   { label: '饿了么', dot: '\uD83D\uDD35', color: '#1677FF' },
   douyin:  { label: '抖音', dot: '\u26AB', color: '#222' },
-  self:    { label: '自营', dot: '\uD83D\uDFE0', color: '#FF6B35' },
+  self:    { label: '自营', dot: '\uD83D\uDFE0', color: txColors.primary },
 };
 
 const STATUS_META: Record<OrderStatus, { label: string; color: string; bg: string }> = {

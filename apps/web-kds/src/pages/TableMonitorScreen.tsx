@@ -11,6 +11,7 @@
  * 终端规范：≥48px 点击目标，≥16px 字体
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -58,14 +59,14 @@ const COLOR = {
   border: '#2A2A2A',
   text: '#FFFFFF',
   textMuted: '#888888',
-  primary: '#FF6B35',   // 催单状态主色
+  primary: txColors.primary,   // 催单状态主色
   overtime: '#FF3B30',  // 超时
   cooking: '#34C759',   // 用餐中/出菜中
   ready: '#30D158',     // 菜已出齐
   idle: '#636366',      // 空闲
   ordering: '#0A84FF',  // 下单中
-  rush: '#FF6B35',      // 催单
-  tabActive: '#FF6B35',
+  rush: txColors.primary,      // 催单
+  tabActive: txColors.primary,
   tabInactive: '#3A3A3C',
 };
 

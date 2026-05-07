@@ -20,6 +20,7 @@ import TableCardView from './TableCardView';
 import TableListView from './TableListView';
 import TableMapView from './TableMapView';
 import styles from './TableManagement.module.css';
+import { txColors } from '@tx/tokens';
 
 /**
  * 页面Props
@@ -139,7 +140,7 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
                   minHeight: 40,
                   border: 'none',
                   borderRadius: 6,
-                  background: viewMode === mode ? '#FF6B35' : 'transparent',
+                  background: viewMode === mode ? txColors.primary : 'transparent',
                   color: viewMode === mode ? '#fff' : 'rgba(255,255,255,0.65)',
                   fontSize: 16,
                   fontWeight: viewMode === mode ? 600 : 400,

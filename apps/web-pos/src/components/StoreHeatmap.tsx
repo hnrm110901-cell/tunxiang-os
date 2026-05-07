@@ -8,6 +8,7 @@
  *   - 区域标注 + 图例
  */
 import { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -37,10 +38,10 @@ interface StoreHeatmapProps {
 // ─── Design Tokens ──────────────────────────────────────────────────────────────
 
 const COLORS = {
-  free: '#0F6E56',
-  occupied: '#185FA5',
-  overtime: '#A32D2D',
-  reserved: '#BA7517',
+  free: txColors.success,
+  occupied: txColors.info,
+  overtime: txColors.danger,
+  reserved: txColors.warning,
   vip: '#722ed1',
   bg: '#0B1A20',
   zoneFill: 'rgba(255,255,255,0.02)',
@@ -48,7 +49,7 @@ const COLORS = {
   text: '#E0E0E0',
   text2: 'rgba(255,255,255,0.55)',
   text3: 'rgba(255,255,255,0.3)',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   heatLow: '#10B981',
   heatMid: '#F59E0B',
   heatHigh: '#EF4444',

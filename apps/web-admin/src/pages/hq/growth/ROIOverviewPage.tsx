@@ -34,6 +34,7 @@ import {
 } from '@ant-design/icons';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -71,11 +72,11 @@ interface MemberGrowthPoint {
 // ─── 渠道 ROI 配置（静态元数据，名称/颜色，数据来自 API） ───────────────────
 
 const CHANNEL_META: Record<string, { color: string; defaultCAC: number; defaultLTV: number }> = {
-  '美团/点评':  { color: '#FF6B35', defaultCAC: 35,  defaultLTV: 680 },
+  '美团/点评':  { color: txColors.primary, defaultCAC: 35,  defaultLTV: 680 },
   '抖音本地':   { color: '#1890ff', defaultCAC: 28,  defaultLTV: 520 },
-  '微信私域':   { color: '#0F6E56', defaultCAC: 12,  defaultLTV: 890 },
+  '微信私域':   { color: txColors.success, defaultCAC: 12,  defaultLTV: 890 },
   '小红书':     { color: '#722ed1', defaultCAC: 45,  defaultLTV: 450 },
-  '线下地推':   { color: '#BA7517', defaultCAC: 18,  defaultLTV: 720 },
+  '线下地推':   { color: txColors.warning, defaultCAC: 18,  defaultLTV: 720 },
 };
 
 // ─── 工具函数 ────────────────────────────────────────────────────────────────
@@ -86,9 +87,9 @@ const fen2yuan = (fen: number) => (fen / 100).toFixed(0);
 
 /** ROI 数字颜色规则：≥3=绿色 / 1-3=蓝色 / <1=红色 */
 function roiColor(roi: number): string {
-  if (roi >= 3) return '#0F6E56';
-  if (roi >= 1) return '#185FA5';
-  return '#A32D2D';
+  if (roi >= 3) return txColors.success;
+  if (roi >= 1) return txColors.info;
+  return txColors.danger;
 }
 
 function roiTag(roi: number) {
@@ -124,8 +125,8 @@ function SVGLineChart({ data }: SVGLineChartProps) {
   type LineKey = 'investment' | 'revenue' | 'profit';
   const lines: Array<{ key: LineKey; color: string; label: string }> = [
     { key: 'revenue',    color: '#1890ff', label: '产出' },
-    { key: 'profit',     color: '#0F6E56', label: '利润' },
-    { key: 'investment', color: '#A32D2D', label: '投入' },
+    { key: 'profit',     color: txColors.success, label: '利润' },
+    { key: 'investment', color: txColors.danger, label: '投入' },
   ];
 
   const polyline = (key: LineKey) =>
@@ -445,7 +446,7 @@ export function ROIOverviewPage() {
                 <Statistic
                   title="总拉新收益"
                   value={fen2wan(kpi.totalRevenue)}
-                  valueStyle={{ color: '#185FA5' }}
+                  valueStyle={{ color: txColors.info }}
                 />
                 <Text style={{ fontSize: 12 }}>
                   新增会员 {kpi.totalNewMembers.toLocaleString()} 人
@@ -471,14 +472,14 @@ export function ROIOverviewPage() {
                 <Statistic
                   title="利润贡献"
                   value={fen2wan(kpi.totalProfit)}
-                  valueStyle={{ color: '#0F6E56' }}
+                  valueStyle={{ color: txColors.success }}
                 />
                 {kpi.momProfit !== null ? (
                   <Space size={4} style={{ fontSize: 12 }}>
                     {kpi.momProfit >= 0
-                      ? <RiseOutlined style={{ color: '#0F6E56' }} />
-                      : <FallOutlined style={{ color: '#A32D2D' }} />}
-                    <Text style={{ fontSize: 12, color: kpi.momProfit >= 0 ? '#0F6E56' : '#A32D2D' }}>
+                      ? <RiseOutlined style={{ color: txColors.success }} />
+                      : <FallOutlined style={{ color: txColors.danger }} />}
+                    <Text style={{ fontSize: 12, color: kpi.momProfit >= 0 ? txColors.success : txColors.danger }}>
                       月环比 {Math.abs(kpi.momProfit).toFixed(1)}%
                     </Text>
                   </Space>
@@ -505,7 +506,7 @@ export function ROIOverviewPage() {
             <Space>
               渠道 ROI 对比
               <Badge
-                color={degradedChannels ? '#BA7517' : '#0F6E56'}
+                color={degradedChannels ? txColors.warning : txColors.success}
                 text={
                   <Text style={{ fontSize: 12 }} type={degradedChannels ? 'warning' : 'success'}>
                     {degradedChannels ? '数据估算中' : '实时数据'}
@@ -518,7 +519,7 @@ export function ROIOverviewPage() {
           extra={
             degradedChannels && (
               <Tooltip title="渠道收入数据来自 revenue-composition 接口，获客成本/LTV 为行业参考值，接入广告平台 API 后可精确计算">
-                <InfoCircleOutlined style={{ color: '#BA7517', cursor: 'pointer' }} />
+                <InfoCircleOutlined style={{ color: txColors.warning, cursor: 'pointer' }} />
               </Tooltip>
             )
           }
@@ -663,13 +664,13 @@ export function ROIOverviewPage() {
                     title: '投入',
                     dataIndex: 'investment',
                     align: 'right' as const,
-                    render: (v: number) => <Text style={{ color: '#A32D2D' }}>{fen2wan(v)}</Text>,
+                    render: (v: number) => <Text style={{ color: txColors.danger }}>{fen2wan(v)}</Text>,
                   },
                   {
                     title: '利润',
                     dataIndex: 'profit',
                     align: 'right' as const,
-                    render: (v: number) => <Text style={{ color: '#0F6E56', fontWeight: 700 }}>{fen2wan(v)}</Text>,
+                    render: (v: number) => <Text style={{ color: txColors.success, fontWeight: 700 }}>{fen2wan(v)}</Text>,
                   },
                   {
                     title: 'ROI',

@@ -34,6 +34,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -184,7 +185,7 @@ export function PayrollConfigPage() {
           okText="确认"
           cancelText="取消"
         >
-          <a style={{ color: '#A32D2D' }}>删除</a>
+          <a style={{ color: txColors.danger }}>删除</a>
         </Popconfirm>,
       ],
     },

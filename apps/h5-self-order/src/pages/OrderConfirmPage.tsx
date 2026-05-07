@@ -5,6 +5,7 @@ import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCoupons } from '@/api/paymentApi';
 import { createOrder } from '@/api/orderApi';
 import type { Coupon } from '@/api/paymentApi';
+import { txColors } from '@tx/tokens';
 
 /** 订单确认页 — 桌台 + 已选菜品 + 优惠 + 金额汇总 */
 export default function OrderConfirmPage() {
@@ -221,7 +222,7 @@ export default function OrderConfirmPage() {
                 )}
                 <div style={{ flex: 1 }} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 700, color: '#FF6B35' }}>
+                  <span style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 700, color: txColors.primary }}>
                     {t('yuan')}{item.subtotal.toFixed(2)}
                   </span>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -251,7 +252,7 @@ export default function OrderConfirmPage() {
                       onClick={() => updateQuantity(item.cartKey, item.quantity + 1)}
                       style={{
                         width: 28, height: 28, borderRadius: 14,
-                        background: '#FF6B35',
+                        background: txColors.primary,
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                         color: '#fff', fontSize: 16,
                       }}
@@ -302,7 +303,7 @@ export default function OrderConfirmPage() {
           <span style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 600, color: 'var(--tx-text-primary)' }}>
             {t('coupon')}
           </span>
-          <span style={{ fontSize: 'var(--tx-font-sm)', color: coupon ? '#FF6B35' : 'var(--tx-text-tertiary)' }}>
+          <span style={{ fontSize: 'var(--tx-font-sm)', color: coupon ? txColors.primary : 'var(--tx-text-tertiary)' }}>
             {coupon ? `-${t('yuan')}${coupon.discountAmount}` : t('selectCoupon')}
             <span style={{ marginLeft: 4 }}>&gt;</span>
           </span>
@@ -323,11 +324,11 @@ export default function OrderConfirmPage() {
                     width: '100%', padding: 12, marginBottom: 8,
                     borderRadius: 'var(--tx-radius-sm)',
                     background: selectedCoupon === c.id ? 'rgba(255,107,53,0.1)' : 'var(--tx-bg-tertiary)',
-                    border: selectedCoupon === c.id ? '1px solid #FF6B35' : '1px solid transparent',
+                    border: selectedCoupon === c.id ? `1px solid ${txColors.primary}` : '1px solid transparent',
                     textAlign: 'left',
                   }}
                 >
-                  <div style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 600, color: '#FF6B35' }}>
+                  <div style={{ fontSize: 'var(--tx-font-sm)', fontWeight: 600, color: txColors.primary }}>
                     -{t('yuan')}{c.discountAmount}
                   </div>
                   <div style={{ fontSize: 'var(--tx-font-xs)', color: 'var(--tx-text-tertiary)', marginTop: 2 }}>
@@ -348,7 +349,7 @@ export default function OrderConfirmPage() {
               {t('orderConfirmPoints')}
             </span>
             {usePoints && (
-              <span style={{ fontSize: 'var(--tx-font-xs)', color: '#FF6B35', marginLeft: 8 }}>
+              <span style={{ fontSize: 'var(--tx-font-xs)', color: txColors.primary, marginLeft: 8 }}>
                 -{t('yuan')}{pointsDiscount.toFixed(2)}
               </span>
             )}
@@ -358,7 +359,7 @@ export default function OrderConfirmPage() {
             onClick={() => setUsePoints(!usePoints)}
             style={{
               width: 44, height: 26, borderRadius: 13,
-              background: usePoints ? '#FF6B35' : 'var(--tx-bg-tertiary)',
+              background: usePoints ? txColors.primary : 'var(--tx-bg-tertiary)',
               position: 'relative', transition: 'background 0.2s',
             }}
           >
@@ -391,7 +392,7 @@ export default function OrderConfirmPage() {
           <span style={{ fontSize: 'var(--tx-font-md)', fontWeight: 600, color: 'var(--tx-text-primary)' }}>
             {t('orderConfirmPayable')}
           </span>
-          <span style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>
+          <span style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>
             {t('yuan')}{payableAmount.toFixed(2)}
           </span>
         </div>
@@ -412,7 +413,7 @@ export default function OrderConfirmPage() {
           style={{
             width: '100%', height: 56,
             borderRadius: 'var(--tx-radius-full)',
-            background: (submitting || cart.length === 0) ? 'var(--tx-bg-tertiary)' : '#FF6B35',
+            background: (submitting || cart.length === 0) ? 'var(--tx-bg-tertiary)' : txColors.primary,
             color: (submitting || cart.length === 0) ? 'var(--tx-text-tertiary)' : '#fff',
             fontSize: 'var(--tx-font-lg)', fontWeight: 700,
             transition: 'background 0.2s',

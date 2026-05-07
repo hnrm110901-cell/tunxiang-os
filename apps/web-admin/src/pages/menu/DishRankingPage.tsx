@@ -39,6 +39,7 @@ import { formatPrice } from '@tx-ds/utils';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { MarginTag } from '../../components/MarginTag';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -90,35 +91,35 @@ interface HealthItem {
 const fmtPrice = (fen: number) => `¥${(fen / 100).toFixed(0)}`;
 
 const TAG_COLORS: Record<string, string> = {
-  明星菜品: '#FF6B35',
-  现金牛: '#0F6E56',
-  问题菜品: '#BA7517',
-  瘦狗: '#A32D2D',
-  潜力菜品: '#185FA5',
+  明星菜品: txColors.primary,
+  现金牛: txColors.success,
+  问题菜品: txColors.warning,
+  瘦狗: txColors.danger,
+  潜力菜品: txColors.info,
 };
 
 const QUADRANT_BG: Record<string, string> = {
-  star: '#FFF3ED',
+  star: txColors.primaryLight,
   cash_cow: '#F0FDF4',
   question: '#FFFBEB',
   dog: '#FEF2F2',
 };
 
 const QUADRANT_BORDER: Record<string, string> = {
-  star: '#FF6B35',
-  cash_cow: '#0F6E56',
-  question: '#BA7517',
-  dog: '#A32D2D',
+  star: txColors.primary,
+  cash_cow: txColors.success,
+  question: txColors.warning,
+  dog: txColors.danger,
 };
 
 // ─── 子组件：5因子Mini进度条 ─────────────────────────────────────────────────
 
 function ScoreBars({ scores }: { scores: DishScores }) {
   const factors = [
-    { key: 'volume', label: '销量', color: '#FF6B35' },
-    { key: 'margin', label: '毛利', color: '#0F6E56' },
-    { key: 'reorder', label: '复购', color: '#185FA5' },
-    { key: 'satisfaction', label: '满意', color: '#BA7517' },
+    { key: 'volume', label: '销量', color: txColors.primary },
+    { key: 'margin', label: '毛利', color: txColors.success },
+    { key: 'reorder', label: '复购', color: txColors.info },
+    { key: 'satisfaction', label: '满意', color: txColors.warning },
     { key: 'trend', label: '趋势', color: '#7C3AED' },
   ] as const;
 
@@ -149,16 +150,16 @@ function RankChange({ change }: { change: number }) {
   if (change > 0) {
     return (
       <Space>
-        <ArrowUpOutlined style={{ color: '#0F6E56' }} />
-        <Text style={{ color: '#0F6E56', fontWeight: 600 }}>+{change}</Text>
+        <ArrowUpOutlined style={{ color: txColors.success }} />
+        <Text style={{ color: txColors.success, fontWeight: 600 }}>+{change}</Text>
       </Space>
     );
   }
   if (change < 0) {
     return (
       <Space>
-        <ArrowDownOutlined style={{ color: '#A32D2D' }} />
-        <Text style={{ color: '#A32D2D', fontWeight: 600 }}>{change}</Text>
+        <ArrowDownOutlined style={{ color: txColors.danger }} />
+        <Text style={{ color: txColors.danger, fontWeight: 600 }}>{change}</Text>
       </Space>
     );
   }
@@ -217,7 +218,7 @@ function RankingTab({ storeId }: { storeId: string }) {
   };
 
   const weightTotalOk = Math.abs(weightsTotal - 100) <= 0;
-  const totalColor = weightTotalOk ? '#0F6E56' : '#A32D2D';
+  const totalColor = weightTotalOk ? txColors.success : txColors.danger;
 
   const columns: ProColumns<DishRankItem>[] = [
     {
@@ -230,7 +231,7 @@ function RankingTab({ storeId }: { storeId: string }) {
         <div
           style={{
             width: 28, height: 28, borderRadius: '50%',
-            background: row.rank <= 3 ? '#FF6B35' : '#F8F7F5',
+            background: row.rank <= 3 ? txColors.primary : '#F8F7F5',
             color: row.rank <= 3 ? '#fff' : '#2C2C2A',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontWeight: 600, fontSize: 13,
@@ -278,7 +279,7 @@ function RankingTab({ storeId }: { storeId: string }) {
             strong
             style={{
               fontSize: 20,
-              color: row.composite_score >= 0.8 ? '#FF6B35' : row.composite_score >= 0.6 ? '#0F6E56' : row.composite_score >= 0.4 ? '#BA7517' : '#A32D2D',
+              color: row.composite_score >= 0.8 ? txColors.primary : row.composite_score >= 0.6 ? txColors.success : row.composite_score >= 0.4 ? txColors.warning : txColors.danger,
             }}
           >
             {(row.composite_score * 100).toFixed(0)}
@@ -327,7 +328,7 @@ function RankingTab({ storeId }: { storeId: string }) {
       <Card
         title={
           <Space>
-            <ThunderboltOutlined style={{ color: '#FF6B35' }} />
+            <ThunderboltOutlined style={{ color: txColors.primary }} />
             <span>5因子权重配置</span>
           </Space>
         }
@@ -343,7 +344,7 @@ function RankingTab({ storeId }: { storeId: string }) {
               loading={saving}
               disabled={!weightTotalOk}
               onClick={handleSaveWeights}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               保存权重
             </Button>
@@ -369,7 +370,7 @@ function RankingTab({ storeId }: { storeId: string }) {
                     onChange={(v) => handleWeightChange(f.key, v)}
                     style={{ flex: 1 }}
                     tooltip={{ formatter: (v) => `${v}%` }}
-                    styles={{ track: { background: '#FF6B35' } }}
+                    styles={{ track: { background: txColors.primary } }}
                   />
                   <Text style={{ width: 38, textAlign: 'right', fontWeight: 600, color: totalColor }}>
                     {weights[f.key]}%
@@ -388,7 +389,7 @@ function RankingTab({ storeId }: { storeId: string }) {
         rowKey="dish_id"
         headerTitle={
           <Space>
-            <FireOutlined style={{ color: '#FF6B35' }} />
+            <FireOutlined style={{ color: txColors.primary }} />
             <span>菜品排行榜</span>
           </Space>
         }
@@ -561,7 +562,7 @@ function HealthTab({ storeId }: { storeId: string }) {
             <Statistic
               title="健康品项"
               value={report.summary.healthy_count}
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
               suffix={<CheckCircleOutlined />}
             />
           </Card>
@@ -571,7 +572,7 @@ function HealthTab({ storeId }: { storeId: string }) {
             <Statistic
               title="需关注"
               value={report.summary.warning_count}
-              valueStyle={{ color: '#BA7517' }}
+              valueStyle={{ color: txColors.warning }}
               suffix={<WarningOutlined />}
             />
           </Card>
@@ -581,7 +582,7 @@ function HealthTab({ storeId }: { storeId: string }) {
             <Statistic
               title="需立即处理"
               value={report.summary.critical_count}
-              valueStyle={{ color: '#A32D2D' }}
+              valueStyle={{ color: txColors.danger }}
               suffix={<FireOutlined />}
             />
           </Card>
@@ -609,7 +610,7 @@ function HealthTab({ storeId }: { storeId: string }) {
                 <Row align="middle" gutter={16}>
                   <Col span={5}><Text strong>{item.dish_name}</Text></Col>
                   <Col span={3}>
-                    <Text strong style={{ color: '#A32D2D', fontSize: 18 }}>
+                    <Text strong style={{ color: txColors.danger, fontSize: 18 }}>
                       {item.composite_score !== undefined ? (item.composite_score * 100).toFixed(0) : '--'}
                     </Text>
                     <Text type="secondary"> /100</Text>
@@ -648,7 +649,7 @@ function HealthTab({ storeId }: { storeId: string }) {
                 <Row align="middle" gutter={16}>
                   <Col span={5}><Text strong>{item.dish_name}</Text></Col>
                   <Col span={3}>
-                    <Text strong style={{ color: '#185FA5', fontSize: 18 }}>
+                    <Text strong style={{ color: txColors.info, fontSize: 18 }}>
                       {item.composite_score !== undefined ? (item.composite_score * 100).toFixed(0) : '--'}
                     </Text>
                     <Text type="secondary"> /100</Text>

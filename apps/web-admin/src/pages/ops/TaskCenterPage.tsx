@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react';
 import { apiGet, apiPost } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -41,22 +42,22 @@ interface TaskItem {
 // ─── 常量 ──────────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<TaskStatus, { label: string; color: string; bg: string }> = {
-  new:            { label: '新建',   color: '#185FA5', bg: '#185FA518' },
+  new:            { label: '新建',   color: txColors.info, bg: `${txColors.info}18` },
   assigned:       { label: '待受理', color: '#D97706', bg: '#D9770618' },
-  accepted:       { label: '已接受', color: '#0F6E56', bg: '#0F6E5618' },
-  processing:     { label: '处理中', color: '#FF6B35', bg: '#FF6B3518' },
+  accepted:       { label: '已接受', color: txColors.success, bg: `${txColors.success}18` },
+  processing:     { label: '处理中', color: txColors.primary, bg: `${txColors.primary}18` },
   pending_review: { label: '待复核', color: '#8B5CF6', bg: '#8B5CF618' },
-  escalated:      { label: '已升级', color: '#A32D2D', bg: '#A32D2D18' },
+  escalated:      { label: '已升级', color: txColors.danger, bg: `${txColors.danger}18` },
   ignored:        { label: '已忽略', color: '#666',    bg: '#66666618' },
   cancelled:      { label: '已取消', color: '#666',    bg: '#66666618' },
-  closed:         { label: '已关闭', color: '#0F6E56', bg: '#0F6E5618' },
+  closed:         { label: '已关闭', color: txColors.success, bg: `${txColors.success}18` },
 };
 
 const PRIORITY_CONFIG: Record<TaskPriority, { label: string; color: string; bg: string }> = {
-  low:    { label: '低', color: '#0F6E56', bg: '#0F6E5618' },
-  normal: { label: '中', color: '#185FA5', bg: '#185FA518' },
+  low:    { label: '低', color: txColors.success, bg: `${txColors.success}18` },
+  normal: { label: '中', color: txColors.info, bg: `${txColors.info}18` },
   high:   { label: '高', color: '#D97706', bg: '#D9770618' },
-  urgent: { label: '紧急', color: '#A32D2D', bg: '#A32D2D18' },
+  urgent: { label: '紧急', color: txColors.danger, bg: `${txColors.danger}18` },
 };
 
 const TYPE_CONFIG: Record<TaskType, { label: string; icon: string }> = {
@@ -135,7 +136,7 @@ export function TaskCenterPage() {
     return `${Math.floor(diff / 60)}小时前`;
   };
 
-  const brand = '#FF6B35';
+  const brand = txColors.primary;
   const bg1 = '#112228';
   const bg2 = '#1a2a33';
   const text1 = '#E8E6E1';
@@ -151,9 +152,9 @@ export function TaskCenterPage() {
 
       {/* 统计卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
-        <div style={{ background: urgentCount > 0 ? '#A32D2D18' : bg1, borderRadius: 12, padding: '16px 20px', border: `1px solid ${urgentCount > 0 ? '#A32D2D44' : bg2}` }}>
+        <div style={{ background: urgentCount > 0 ? `${txColors.danger}18` : bg1, borderRadius: 12, padding: '16px 20px', border: `1px solid ${urgentCount > 0 ? `${txColors.danger}44` : bg2}` }}>
           <div style={{ fontSize: 11, color: text2 }}>🚨 紧急任务</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: urgentCount > 0 ? '#A32D2D' : text1 }}>{urgentCount}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: urgentCount > 0 ? txColors.danger : text1 }}>{urgentCount}</div>
         </div>
         <div style={{ background: bg1, borderRadius: 12, padding: '16px 20px', border: `1px solid ${bg2}` }}>
           <div style={{ fontSize: 11, color: text2 }}>📋 进行中</div>
@@ -161,7 +162,7 @@ export function TaskCenterPage() {
         </div>
         <div style={{ background: bg1, borderRadius: 12, padding: '16px 20px', border: `1px solid ${bg2}` }}>
           <div style={{ fontSize: 11, color: text2 }}>✅ 今日已关闭</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#0F6E56' }}>{closedToday}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: txColors.success }}>{closedToday}</div>
         </div>
       </div>
 
@@ -196,9 +197,9 @@ export function TaskCenterPage() {
               <div
                 key={t.id}
                 onClick={() => setSelectedTask(t)}
-                style={{ background: bg1, borderRadius: 12, padding: 16, border: `1px solid ${isOverdue ? '#A32D2D44' : bg2}`, cursor: 'pointer', transition: 'border-color .15s', display: 'flex', gap: 14, alignItems: 'flex-start' }}
+                style={{ background: bg1, borderRadius: 12, padding: 16, border: `1px solid ${isOverdue ? `${txColors.danger}44` : bg2}`, cursor: 'pointer', transition: 'border-color .15s', display: 'flex', gap: 14, alignItems: 'flex-start' }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = brand)}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = isOverdue ? '#A32D2D44' : bg2)}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = isOverdue ? `${txColors.danger}44` : bg2)}
               >
                 <span style={{ fontSize: 24 }}>{tc.icon}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
@@ -206,16 +207,16 @@ export function TaskCenterPage() {
                     <span style={{ fontSize: 14, fontWeight: 600 }}>{t.title}</span>
                     <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: pc.bg, color: pc.color }}>{pc.label}</span>
                     <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: sc.bg, color: sc.color }}>{sc.label}</span>
-                    {isOverdue && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: '#A32D2D18', color: '#A32D2D', fontWeight: 600 }}>超时</span>}
+                    {isOverdue && <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: `${txColors.danger}18`, color: txColors.danger, fontWeight: 600 }}>超时</span>}
                   </div>
                   {t.description && <div style={{ fontSize: 12, color: text2, marginBottom: 4 }}>{t.description}</div>}
-                  {t.suggestion_text && <div style={{ fontSize: 12, color: '#185FA5', marginBottom: 4 }}>💡 {t.suggestion_text}</div>}
+                  {t.suggestion_text && <div style={{ fontSize: 12, color: txColors.info, marginBottom: 4 }}>💡 {t.suggestion_text}</div>}
                   <div style={{ display: 'flex', gap: 12, fontSize: 11, color: text2 }}>
                     <span>{tc.label}</span>
                     {t.assignee_name && <span>👤 {t.assignee_name}</span>}
                     {t.store_name && <span>🏪 {t.store_name}</span>}
                     <span>🕐 {timeAgo(t.created_at)}</span>
-                    {t.sla_due_at && <span style={{ color: isOverdue ? '#A32D2D' : text2 }}>截止 {formatTime(t.sla_due_at)}</span>}
+                    {t.sla_due_at && <span style={{ color: isOverdue ? txColors.danger : text2 }}>截止 {formatTime(t.sla_due_at)}</span>}
                   </div>
                 </div>
               </div>
@@ -243,7 +244,7 @@ export function TaskCenterPage() {
               <button onClick={() => setSelectedTask(null)} style={{ border: 'none', background: 'transparent', color: text2, fontSize: 20, cursor: 'pointer' }}>✕</button>
             </div>
             {selectedTask.description && <div style={{ fontSize: 13, color: text2, marginBottom: 12, padding: 12, background: bg2, borderRadius: 8 }}>{selectedTask.description}</div>}
-            {selectedTask.suggestion_text && <div style={{ fontSize: 13, color: '#185FA5', marginBottom: 12, padding: 12, background: '#185FA510', borderRadius: 8 }}>💡 AI建议：{selectedTask.suggestion_text}</div>}
+            {selectedTask.suggestion_text && <div style={{ fontSize: 13, color: txColors.info, marginBottom: 12, padding: 12, background: `${txColors.info}10`, borderRadius: 8 }}>💡 AI建议：{selectedTask.suggestion_text}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, fontSize: 12, color: text2, marginBottom: 16 }}>
               <div>任务类型：{(TYPE_CONFIG[selectedTask.task_type] || { label: selectedTask.task_type }).label}</div>
               <div>关联对象：{selectedTask.related_object_type} / {selectedTask.related_object_id}</div>
@@ -255,7 +256,7 @@ export function TaskCenterPage() {
             </div>
             {selectedTask.status !== 'closed' && selectedTask.status !== 'cancelled' && (
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-                <button onClick={() => handleClose(selectedTask.id)} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#0F6E56', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>关闭任务</button>
+                <button onClick={() => handleClose(selectedTask.id)} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: txColors.success, color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>关闭任务</button>
               </div>
             )}
           </div>

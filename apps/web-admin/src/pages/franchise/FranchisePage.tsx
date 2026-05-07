@@ -46,6 +46,7 @@ import {
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -305,7 +306,7 @@ function OverviewTab() {
               value={fenToWan(overview.royalty_ytd_fen)}
               prefix={<BankOutlined />}
               suffix="万元"
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>
@@ -809,11 +810,11 @@ export function FranchisePage() {
   ];
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         <div style={{ marginBottom: 20 }}>
           <Title level={4} style={{ margin: 0 }}>
-            <ShopOutlined style={{ marginRight: 8, color: '#FF6B35' }} />
+            <ShopOutlined style={{ marginRight: 8, color: txColors.primary }} />
             加盟管理
           </Title>
           <Text type="secondary">管理加盟商档案、合同及费用收缴</Text>

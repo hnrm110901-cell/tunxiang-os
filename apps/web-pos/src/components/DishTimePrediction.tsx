@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * DishTimePrediction — AI 出品时间预测组件
  *
@@ -14,12 +15,12 @@ interface DishTimePredictionProps {
 
 function getTimingConfig(minutes: number): { color: string; text: string; icon: string } {
   if (minutes <= 10) {
-    return { color: '#0F6E56', text: `约${minutes}分钟`, icon: '🟢' };
+    return { color: txColors.success, text: `约${minutes}分钟`, icon: '🟢' };
   }
   if (minutes <= 20) {
-    return { color: '#BA7517', text: `约${minutes}分钟，稍候`, icon: '🟡' };
+    return { color: txColors.warning, text: `约${minutes}分钟，稍候`, icon: '🟡' };
   }
-  return { color: '#A32D2D', text: `预计${minutes}分钟，较慢`, icon: '🔴' };
+  return { color: txColors.danger, text: `预计${minutes}分钟，较慢`, icon: '🔴' };
 }
 
 export default function DishTimePrediction({
@@ -52,7 +53,7 @@ export default function DishTimePrediction({
         {isOverdue && (
           <span
             style={{
-              color: '#A32D2D',
+              color: txColors.danger,
               animation: 'tx-pulse 1s infinite',
               marginLeft: 4,
             }}
@@ -67,7 +68,7 @@ export default function DishTimePrediction({
   return (
     <div
       style={{
-        background: `rgba(${color === '#0F6E56' ? '15,110,86' : color === '#BA7517' ? '186,117,23' : '163,45,45'}, .06)`,
+        background: `rgba(${color === txColors.success ? '15,110,86' : color === txColors.warning ? '186,117,23' : '163,45,45'}, .06)`,
         border: `1px solid ${color}33`,
         borderRadius: 8,
         padding: '8px 12px',
@@ -128,7 +129,7 @@ export default function DishTimePrediction({
               marginTop: 6,
               fontSize: 13,
               fontWeight: 700,
-              color: '#A32D2D',
+              color: txColors.danger,
               animation: 'tx-pulse 1s infinite',
               display: 'flex',
               alignItems: 'center',

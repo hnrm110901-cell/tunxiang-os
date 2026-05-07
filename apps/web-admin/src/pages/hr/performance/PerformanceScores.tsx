@@ -25,6 +25,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
 
@@ -115,7 +116,7 @@ export default function PerformanceScores() {
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
-                style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+                style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
               >
                 新建评分
               </Button>

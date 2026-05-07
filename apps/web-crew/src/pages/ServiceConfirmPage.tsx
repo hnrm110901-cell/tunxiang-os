@@ -3,19 +3,20 @@
  * 移动端竖屏, 最小字体16px, 热区>=48px
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  warning: '#BA7517',
-  info: '#185FA5',
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
 /* ---------- 类型 ---------- */

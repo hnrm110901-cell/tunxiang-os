@@ -10,6 +10,7 @@
  */
 import { useState, useCallback } from 'react';
 import { playNewOrder, playRush, playTimeout, warmUpAudio } from '../utils/audio';
+import { txColors } from '@tx/tokens';
 
 /* ---------- Types ---------- */
 interface Stall {
@@ -174,7 +175,7 @@ export function KDSConfigPage() {
         <a
           href="/board"
           style={{
-            padding: '10px 24px', background: '#FF6B35', color: '#fff',
+            padding: '10px 24px', background: txColors.primary, color: '#fff',
             borderRadius: 8, fontSize: 18, fontWeight: 'bold',
             textDecoration: 'none', minHeight: 48, display: 'inline-flex', alignItems: 'center',
           }}
@@ -186,9 +187,9 @@ export function KDSConfigPage() {
       {/* ─── WebSocket 连接配置 ─── */}
       <div style={{
         background: '#112B36', borderRadius: 12, padding: 24,
-        marginBottom: 24, borderLeft: '5px solid #FF6B35',
+        marginBottom: 24, borderLeft: `5px solid ${txColors.primary}`,
       }}>
-        <h2 style={{ margin: '0 0 20px', fontSize: 24, color: '#FF6B35' }}>
+        <h2 style={{ margin: '0 0 20px', fontSize: 24, color: txColors.primary }}>
           实时推送配置
         </h2>
 
@@ -209,8 +210,8 @@ export function KDSConfigPage() {
               disabled={!macHost.trim() || wsTestStatus === 'testing'}
               style={{
                 padding: '12px 20px', minWidth: 100, minHeight: 48,
-                background: wsTestStatus === 'ok' ? '#0F6E56'
-                  : wsTestStatus === 'fail' ? '#A32D2D'
+                background: wsTestStatus === 'ok' ? txColors.success
+                  : wsTestStatus === 'fail' ? txColors.danger
                   : '#1A3A48',
                 color: '#fff', border: '1px solid #2A4A58',
                 borderRadius: 6, cursor: 'pointer', fontSize: 18,
@@ -243,8 +244,8 @@ export function KDSConfigPage() {
                   fontSize: 18,
                   fontWeight: stationId === s.id ? 'bold' : 'normal',
                   color: stationId === s.id ? '#fff' : '#888',
-                  background: stationId === s.id ? '#FF6B35' : '#1A3A48',
-                  border: stationId === s.id ? '2px solid #FF6B35' : '1px solid #2A4A58',
+                  background: stationId === s.id ? txColors.primary : '#1A3A48',
+                  border: stationId === s.id ? `2px solid ${txColors.primary}` : '1px solid #2A4A58',
                   borderRadius: 8, cursor: 'pointer',
                 }}
               >
@@ -272,7 +273,7 @@ export function KDSConfigPage() {
                 padding: '12px 28px', minHeight: 56, minWidth: 120,
                 fontSize: 20, fontWeight: 'bold',
                 color: '#fff',
-                background: soundEnabled ? '#0F6E56' : '#A32D2D',
+                background: soundEnabled ? txColors.success : txColors.danger,
                 border: 'none', borderRadius: 8, cursor: 'pointer',
                 transition: 'transform 200ms ease',
               }}
@@ -289,8 +290,8 @@ export function KDSConfigPage() {
                   onClick={() => testSound('new')}
                   style={{
                     padding: '10px 16px', minHeight: 48,
-                    background: '#1A3A48', color: '#0F6E56',
-                    border: '1px solid #0F6E56', borderRadius: 6,
+                    background: '#1A3A48', color: txColors.success,
+                    border: `1px solid ${txColors.success}`, borderRadius: 6,
                     cursor: 'pointer', fontSize: 16,
                   }}
                 >
@@ -300,8 +301,8 @@ export function KDSConfigPage() {
                   onClick={() => testSound('rush')}
                   style={{
                     padding: '10px 16px', minHeight: 48,
-                    background: '#1A3A48', color: '#BA7517',
-                    border: '1px solid #BA7517', borderRadius: 6,
+                    background: '#1A3A48', color: txColors.warning,
+                    border: `1px solid ${txColors.warning}`, borderRadius: 6,
                     cursor: 'pointer', fontSize: 16,
                   }}
                 >
@@ -311,8 +312,8 @@ export function KDSConfigPage() {
                   onClick={() => testSound('timeout')}
                   style={{
                     padding: '10px 16px', minHeight: 48,
-                    background: '#1A3A48', color: '#A32D2D',
-                    border: '1px solid #A32D2D', borderRadius: 6,
+                    background: '#1A3A48', color: txColors.danger,
+                    border: `1px solid ${txColors.danger}`, borderRadius: 6,
                     cursor: 'pointer', fontSize: 16,
                   }}
                 >
@@ -367,7 +368,7 @@ export function KDSConfigPage() {
           onClick={saveWsConfig}
           style={{
             width: '100%', padding: '16px 0', minHeight: 56,
-            background: configSaved ? '#0F6E56' : '#FF6B35',
+            background: configSaved ? txColors.success : txColors.primary,
             color: '#fff', border: 'none', borderRadius: 8,
             fontSize: 22, fontWeight: 'bold', cursor: 'pointer',
             transition: 'background 300ms ease, transform 200ms ease',

@@ -9,6 +9,7 @@
  */
 import { useState, useCallback, useMemo } from 'react';
 import { printReceipt } from '../bridge/TXBridge';
+import { txColors } from '@tx/tokens';
 
 /* ═══════════════════════════════════════════
    类型定义
@@ -153,7 +154,7 @@ const C = {
   card: '#112228',
   cardAlt: '#112B36',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   accentHover: '#FF8255',
   text: '#E0E0E0',
   textDim: '#8899A6',

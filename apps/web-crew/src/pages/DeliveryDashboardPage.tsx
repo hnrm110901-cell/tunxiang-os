@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ──────────────────────────────────────────────────────────────────
 
@@ -197,7 +198,7 @@ function OrderCard({ order, tab, onAccept, onReject, onStatusNext, loading }: Ca
             <span style={{
               fontSize: 13,
               background: 'rgba(255,107,44,0.15)',
-              color: '#FF6B35',
+              color: txColors.primary,
               padding: '2px 8px',
               borderRadius: 12,
             }}>
@@ -259,7 +260,7 @@ function OrderCard({ order, tab, onAccept, onReject, onStatusNext, loading }: Ca
             style={{
               flex: 2,
               minHeight: 56,
-              background: isLoading ? '#444' : '#FF6B35',
+              background: isLoading ? '#444' : txColors.primary,
               color: '#fff',
               border: 'none',
               borderRadius: 10,
@@ -351,7 +352,7 @@ function StatsCard({ stats }: { stats: DailyStats | null }) {
       }}>
         <div>
           <div style={{ fontSize: 13, color: '#64748b' }}>今日单量</div>
-          <div style={{ fontSize: 28, fontWeight: 800, color: '#FF6B35' }}>{stats.total_orders}</div>
+          <div style={{ fontSize: 28, fontWeight: 800, color: txColors.primary }}>{stats.total_orders}</div>
         </div>
         <div>
           <div style={{ fontSize: 13, color: '#64748b' }}>总收入（扣佣后）</div>
@@ -645,7 +646,7 @@ export function DeliveryDashboardPage() {
                 flex: 1,
                 background: 'transparent',
                 border: 'none',
-                color: isActive ? '#FF6B35' : '#64748b',
+                color: isActive ? txColors.primary : '#64748b',
                 fontSize: 16,
                 fontWeight: isActive ? 700 : 400,
                 padding: '10px 4px 12px',
@@ -685,7 +686,7 @@ export function DeliveryDashboardPage() {
                   left: '20%',
                   right: '20%',
                   height: 2,
-                  background: '#FF6B35',
+                  background: txColors.primary,
                   borderRadius: 1,
                 }} />
               )}

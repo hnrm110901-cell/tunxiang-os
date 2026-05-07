@@ -17,6 +17,7 @@ import { RemakeOverlay } from '../components/RemakeOverlay';
 import { DeliveryOrderBadge } from '../components/DeliveryOrderBadge';
 import { useKDSRules } from '../hooks/useKDSRules';
 import { getTimeLevelFromRules, getChannelColor, type KDSRuleConfig } from '../api/kdsRulesApi';
+import { txColors } from '@tx/tokens';
 
 // ─── KDS 配置（从 localStorage 读取） ───
 
@@ -258,7 +259,7 @@ export function KitchenBoard() {
       {/* 超时告警条 */}
       {timeoutAlerts.length > 0 && (
         <div style={{
-          background: '#A32D2D', padding: '10px 20px',
+          background: txColors.danger, padding: '10px 20px',
           display: 'flex', alignItems: 'center', gap: 12,
           animation: 'kds-pulse 1.5s infinite',
         }}>
@@ -290,17 +291,17 @@ export function KitchenBoard() {
         minHeight: 56,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
-          <span style={{ fontWeight: 'bold', fontSize: 24, color: '#FF6B35' }}>后厨看板</span>
+          <span style={{ fontWeight: 'bold', fontSize: 24, color: txColors.primary }}>后厨看板</span>
           <DeptTabs selected={selectedDept} onChange={setSelectedDept} />
           {/* WebSocket 连接状态 */}
           {wsEnabled && (
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 16, color: connected ? '#0F6E56' : '#A32D2D',
+              fontSize: 16, color: connected ? txColors.success : txColors.danger,
             }}>
               <span style={{
                 width: 10, height: 10, borderRadius: '50%',
-                background: connected ? '#0F6E56' : '#A32D2D',
+                background: connected ? txColors.success : txColors.danger,
                 display: 'inline-block',
                 animation: connected ? undefined : 'kds-pulse 1.5s infinite',
               }} />
@@ -317,9 +318,9 @@ export function KitchenBoard() {
             style={{
               padding: '6px 14px',
               minHeight: 48,
-              background: grabMode ? '#FF6B35' : '#1A1A1A',
+              background: grabMode ? txColors.primary : '#1A1A1A',
               color: grabMode ? '#fff' : '#666',
-              border: `1px solid ${grabMode ? '#FF6B35' : '#333'}`,
+              border: `1px solid ${grabMode ? txColors.primary : '#333'}`,
               borderRadius: 8,
               fontSize: 15,
               fontWeight: grabMode ? 700 : 400,
@@ -358,7 +359,7 @@ export function KitchenBoard() {
                   minHeight: 36,
                   fontSize: 14,
                   fontWeight: deliveryFilter === opt ? 700 : 400,
-                  background: deliveryFilter === opt ? '#FF6B35' : 'transparent',
+                  background: deliveryFilter === opt ? txColors.primary : 'transparent',
                   color: deliveryFilter === opt ? '#fff' : '#888',
                   cursor: 'pointer',
                   fontFamily: 'inherit',
@@ -370,23 +371,23 @@ export function KitchenBoard() {
           </div>
 
           {!wsEnabled && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>
+            <span style={{ fontSize: 16, color: txColors.warning }}>
               离线模式（未配置 Mac mini 地址）
             </span>
           )}
         </div>
         <StatusBar items={[
-          { label: '待制作', value: pending.length, color: '#BA7517' },
+          { label: '待制作', value: pending.length, color: txColors.warning },
           { label: '制作中', value: cooking.length, color: '#1890ff' },
-          { label: '已完成', value: done.length, color: '#0F6E56' },
+          { label: '已完成', value: done.length, color: txColors.success },
         ]} />
         {/* 统计栏：待出单数 + 平均出餐时间 */}
         <div style={{ display: 'flex', gap: 32, fontSize: 18, alignItems: 'center' }}>
           <span>
-            待出 <b style={{ color: '#BA7517', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length + cooking.length}</b> 单
+            待出 <b style={{ color: txColors.warning, fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{pending.length + cooking.length}</b> 单
           </span>
           <span>
-            平均出餐 <b style={{ color: '#0F6E56', fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{avgCookMin}</b> 分钟
+            平均出餐 <b style={{ color: txColors.success, fontSize: 28, fontFamily: 'JetBrains Mono, monospace' }}>{avgCookMin}</b> 分钟
           </span>
           <span>
             已完成 <b style={{ color: '#555', fontSize: 24, fontFamily: 'JetBrains Mono, monospace' }}>{done.length}</b>
@@ -446,8 +447,8 @@ export function KitchenBoard() {
                   padding: '4px 0', borderRadius: 6,
                   background: isPending ? '#1a1a00' : '#001a1a',
                   fontSize: 16, fontWeight: 'bold',
-                  color: isPending ? '#BA7517' : '#4A9EFF',
-                  border: `1px solid ${isPending ? '#BA7517' : '#4A9EFF'}`,
+                  color: isPending ? txColors.warning : '#4A9EFF',
+                  border: `1px solid ${isPending ? txColors.warning : '#4A9EFF'}`,
                 }}>
                   {isPending ? '待制作' : '制作中'}
                 </div>
@@ -470,7 +471,7 @@ export function KitchenBoard() {
                       onClick={() => handleGrab(t.id)}
                       style={{
                         flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-                        background: '#FF6B35', color: '#fff',
+                        background: txColors.primary, color: '#fff',
                         fontSize: 20, fontWeight: 'bold', cursor: 'pointer', minHeight: 56,
                       }}
                       onTouchStart={e => (e.currentTarget.style.transform = 'scale(0.97)')}
@@ -484,7 +485,7 @@ export function KitchenBoard() {
                       disabled={isPaused}
                       style={{
                         flex: 1, padding: '14px 0', border: 'none', borderRadius: 8,
-                        background: isPaused ? '#2A2A2A' : isPending ? '#4A9EFF' : '#0F6E56',
+                        background: isPaused ? '#2A2A2A' : isPending ? '#4A9EFF' : txColors.success,
                         color: '#fff', fontSize: 20, fontWeight: 'bold',
                         cursor: isPaused ? 'not-allowed' : 'pointer',
                         opacity: isPaused ? 0.5 : 1, minHeight: 56,
@@ -577,7 +578,7 @@ function DeptTabs({ selected, onChange }: { selected: string; onChange: (id: str
             fontSize: 16,
             fontWeight: selected === d.id ? 'bold' : 'normal',
             color: selected === d.id ? '#fff' : '#888',
-            background: selected === d.id ? '#FF6B35' : '#222',
+            background: selected === d.id ? txColors.primary : '#222',
             border: 'none', borderRadius: 8, cursor: 'pointer',
             transition: 'transform 200ms ease',
           }}
@@ -601,14 +602,14 @@ function DoneCard({ ticket: t }: { ticket: KDSTicket }) {
   return (
     <div style={{
       background: '#111', borderRadius: 12, padding: 12,
-      borderLeft: '6px solid #0F6E56', opacity: 0.75,
+      borderLeft: `6px solid ${txColors.success}`, opacity: 0.75,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 22, fontWeight: 'bold', color: '#aaa' }}>{t.tableNo}</span>
           <span style={{ fontSize: 16, color: '#555' }}>#{t.orderNo}</span>
         </div>
-        <span style={{ fontSize: 20, color: '#0F6E56', fontFamily: 'JetBrains Mono, monospace', fontWeight: 'bold' }}>
+        <span style={{ fontSize: 20, color: txColors.success, fontFamily: 'JetBrains Mono, monospace', fontWeight: 'bold' }}>
           {totalMin}'
         </span>
       </div>

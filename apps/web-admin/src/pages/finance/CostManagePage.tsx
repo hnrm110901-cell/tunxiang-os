@@ -51,6 +51,7 @@ import {
 } from '../../api/costApi';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -135,7 +136,7 @@ function CostStructureCard({ summary, loading }: { summary: CostSummary | null; 
             justifyContent: 'space-between',
           }}>
             <Text strong>总成本</Text>
-            <Text strong style={{ color: '#FF6B35', fontSize: 16 }}>
+            <Text strong style={{ color: txColors.primary, fontSize: 16 }}>
               ¥{fenToYuan(summary.total_cost_fen)}
             </Text>
           </div>
@@ -178,7 +179,7 @@ function CostSummaryCards({
               value={foodCost / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>
@@ -189,7 +190,7 @@ function CostSummaryCards({
               value={laborCost / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#185FA5' }}
+              valueStyle={{ color: txColors.info }}
             />
           </Card>
         </Col>
@@ -200,7 +201,7 @@ function CostSummaryCards({
               value={(rentCost + utilitiesCost) / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>
@@ -216,13 +217,13 @@ function CostSummaryCards({
           </Card>
         </Col>
         <Col span={8}>
-          <Card size="small" style={{ background: '#F8F7F5', borderColor: '#FF6B35' }}>
+          <Card size="small" style={{ background: '#F8F7F5', borderColor: txColors.primary }}>
             <Statistic
               title="总成本"
               value={totalCost / 100}
               precision={2}
               prefix="¥"
-              valueStyle={{ color: '#FF6B35', fontWeight: 700 }}
+              valueStyle={{ color: txColors.primary, fontWeight: 700 }}
             />
           </Card>
         </Col>
@@ -296,7 +297,7 @@ function CostOverviewTab({
             icon={<ReloadOutlined />}
             onClick={handleQuery}
             loading={loading}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             查询
           </Button>
@@ -463,7 +464,7 @@ function CostDetailTab({
             onClick={() => void loadItems(1)}
             loading={loading}
             disabled={!storeId}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             查询
           </Button>
@@ -653,7 +654,7 @@ function FinanceConfigTab({
             onClick={loadConfigs}
             loading={loading}
             disabled={!storeId}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             查询配置
           </Button>

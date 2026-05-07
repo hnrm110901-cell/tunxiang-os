@@ -7,15 +7,16 @@ import { useState, useEffect, useCallback, useRef, type CSSProperties } from 're
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ─── 颜色常量 ─── */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#10B981',
-  orange: '#FF6B35',
+  orange: txColors.primary,
   red: '#EF4444',
   blue: '#3B82F6',
   gray: '#6B7280',
@@ -670,7 +671,7 @@ export function FloorMapPage() {
             <div style={{ display: 'flex', gap: 6 }}>
               <button style={{
                 flex: 1, minHeight: 36, border: 'none', borderRadius: 6, cursor: 'pointer',
-                background: '#FF6B35', color: '#fff', fontWeight: 600, fontSize: 12,
+                background: txColors.primary, color: '#fff', fontWeight: 600, fontSize: 12,
               }}>
                 {item.action}
               </button>

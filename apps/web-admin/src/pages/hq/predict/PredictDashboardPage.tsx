@@ -15,6 +15,7 @@ import { TxBarChart } from '../../../components/charts';
 import { TxHeatmap } from '../../../components/charts';
 import { TxLineChart } from '../../../components/charts';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -162,8 +163,8 @@ export function PredictDashboardPage() {
   const barChartData = {
     labels: weeklyTraffic.map(d => d.date),
     datasets: [
-      { name: '预测客流', values: weeklyTraffic.map(d => d.predicted), color: '#FF6B35' },
-      { name: '实际客流', values: weeklyTraffic.map(d => d.actual), color: '#185FA5' },
+      { name: '预测客流', values: weeklyTraffic.map(d => d.predicted), color: txColors.primary },
+      { name: '实际客流', values: weeklyTraffic.map(d => d.actual), color: txColors.info },
     ],
   };
 
@@ -176,17 +177,17 @@ export function PredictDashboardPage() {
   const accuracyLineData = {
     labels: accuracy.map(a => a.date),
     datasets: [
-      { name: '预测准确率', values: accuracy.map(a => +a.accuracy.toFixed(1)), color: '#FF6B35' },
-      { name: '目标线(85%)', values: accuracy.map(() => 85), color: '#0F6E56' },
+      { name: '预测准确率', values: accuracy.map(a => +a.accuracy.toFixed(1)), color: txColors.primary },
+      { name: '目标线(85%)', values: accuracy.map(() => 85), color: txColors.success },
     ],
   };
 
   // ─── 渲染 ───
 
   const deviationColor = traffic
-    ? Math.abs(traffic.deviation_rate) <= 5 ? '#0F6E56'
-    : Math.abs(traffic.deviation_rate) <= 15 ? '#BA7517'
-    : '#A32D2D'
+    ? Math.abs(traffic.deviation_rate) <= 5 ? txColors.success
+    : Math.abs(traffic.deviation_rate) <= 15 ? txColors.warning
+    : txColors.danger
     : '#5F5E5A';
 
   return (
@@ -226,7 +227,7 @@ export function PredictDashboardPage() {
           }}>
             <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 8 }}>今日客流预测</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-              <span style={{ fontSize: 36, fontWeight: 700, color: '#FF6B35' }}>
+              <span style={{ fontSize: 36, fontWeight: 700, color: txColors.primary }}>
                 {traffic?.predicted ?? '--'}
               </span>
               <span style={{ fontSize: 14, color: '#5F5E5A' }}>人</span>
@@ -269,7 +270,7 @@ export function PredictDashboardPage() {
           }}>
             <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 8 }}>本周营收预测</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 16 }}>
-              <span style={{ fontSize: 36, fontWeight: 700, color: '#1E2A3A' }}>
+              <span style={{ fontSize: 36, fontWeight: 700, color: txColors.navy }}>
                 {revenue ? fmtMoney(revenue.predicted_fen) : '--'}
               </span>
             </div>
@@ -280,7 +281,7 @@ export function PredictDashboardPage() {
               <span>实际: <b style={{ color: '#2C2C2A' }}>{revenue ? fmtMoney(revenue.actual_fen) : '--'}</b></span>
               <span>
                 环比:{' '}
-                <b style={{ color: (revenue?.trend_percent ?? 0) >= 0 ? '#0F6E56' : '#A32D2D' }}>
+                <b style={{ color: (revenue?.trend_percent ?? 0) >= 0 ? txColors.success : txColors.danger }}>
                   {revenue ? fmtPercent(revenue.trend_percent) : '--'}
                 </b>
               </span>
@@ -300,7 +301,7 @@ export function PredictDashboardPage() {
                     position: 'absolute', left: 0, top: 0, height: '100%',
                     borderRadius: 3,
                     width: `${Math.min(100, (revenue.actual_fen / revenue.predicted_fen) * 100)}%`,
-                    background: '#FF6B35',
+                    background: txColors.primary,
                     transition: 'width 0.6s ease',
                   }} />
                 </div>
@@ -319,11 +320,11 @@ export function PredictDashboardPage() {
           </div>
           <div style={{ display: 'flex', gap: 16, marginBottom: 12, fontSize: 13, color: '#5F5E5A' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 2, background: '#FF6B35', display: 'inline-block' }} />
+              <span style={{ width: 12, height: 12, borderRadius: 2, background: txColors.primary, display: 'inline-block' }} />
               预测客流
             </span>
             <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 2, background: '#185FA5', display: 'inline-block' }} />
+              <span style={{ width: 12, height: 12, borderRadius: 2, background: txColors.info, display: 'inline-block' }} />
               实际客流
             </span>
           </div>
@@ -344,7 +345,7 @@ export function PredictDashboardPage() {
           <TxHeatmap
             data={heatmapData}
             unit="份"
-            colorRange={['#FFF3ED', '#FF6B35']}
+            colorRange={[txColors.primaryLight, txColors.primary]}
           />
         </div>
 

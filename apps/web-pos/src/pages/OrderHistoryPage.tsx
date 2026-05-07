@@ -4,6 +4,7 @@
  * 规范：纯内联CSS，禁止Ant Design，触控优化（最小48×48px）
  */
 import { useState, useCallback, useEffect } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ─────────── 类型定义 ─────────── */
 type OrderStatus = 'paid' | 'refunded' | 'voided' | 'pending';
@@ -263,9 +264,9 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: '待支付',
 };
 const STATUS_BG: Record<OrderStatus, string> = {
-  paid: '#0F6E56',
-  refunded: '#BA7517',
-  voided: '#A32D2D',
+  paid: txColors.success,
+  refunded: txColors.warning,
+  voided: txColors.danger,
   pending: '#5F5E5A',
 };
 
@@ -282,7 +283,7 @@ function Toast({ state }: { state: ToastState }) {
     <div style={{
       position: 'fixed', top: 80, left: '50%', transform: 'translateX(-50%)',
       zIndex: 9999, padding: '14px 28px', borderRadius: 12, fontSize: 18, fontWeight: 600,
-      background: state.type === 'success' ? '#0F6E56' : '#A32D2D',
+      background: state.type === 'success' ? txColors.success : txColors.danger,
       color: '#fff', boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
       animation: 'fadeInDown 0.25s ease',
       whiteSpace: 'nowrap',
@@ -379,7 +380,7 @@ function RefundModal({ order, onClose, onSuccess, showToast }: RefundModalProps)
         }}>
           <span>订单号：{order.orderNo}</span><br />
           <span>桌台：{order.tableNo} &nbsp;|&nbsp; 实付：</span>
-          <span style={{ color: '#FF6B35', fontWeight: 700, fontSize: 20 }}>
+          <span style={{ color: txColors.primary, fontWeight: 700, fontSize: 20 }}>
             ¥{order.actualAmount.toFixed(2)}
           </span>
         </div>
@@ -441,7 +442,7 @@ function RefundModal({ order, onClose, onSuccess, showToast }: RefundModalProps)
           disabled={loading}
           style={{
             width: '100%', height: 60, borderRadius: 12, border: 'none',
-            background: loading ? '#B4B2A9' : '#A32D2D',
+            background: loading ? '#B4B2A9' : txColors.danger,
             color: '#fff', fontSize: 20, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'transform 0.2s ease',
           }}
@@ -475,9 +476,9 @@ function RefundModal({ order, onClose, onSuccess, showToast }: RefundModalProps)
                 onClick={() => { setReason(opt.value); setShowReasonPicker(false); }}
                 style={{
                   width: '100%', height: 60, marginBottom: 12, borderRadius: 12,
-                  border: `2px solid ${reason === opt.value ? '#FF6B35' : '#E8E6E1'}`,
-                  background: reason === opt.value ? '#FFF3ED' : '#F8F7F5',
-                  color: reason === opt.value ? '#FF6B35' : '#2C2C2A',
+                  border: `2px solid ${reason === opt.value ? txColors.primary : '#E8E6E1'}`,
+                  background: reason === opt.value ? txColors.primaryLight : '#F8F7F5',
+                  color: reason === opt.value ? txColors.primary : '#2C2C2A',
                   fontSize: 18, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                   transition: 'transform 0.2s ease',
                 }}
@@ -633,7 +634,7 @@ function OrderDrawer({ order, onClose, onPrint, onRefund }: OrderDrawerProps) {
                   fontSize: 16,
                 }}>
                   <span style={{ color: '#5F5E5A' }}>{d.label}</span>
-                  <span style={{ color: '#BA7517', fontWeight: 600 }}>
+                  <span style={{ color: txColors.warning, fontWeight: 600 }}>
                     -¥{Math.abs(d.amount).toFixed(2)}
                   </span>
                 </div>
@@ -654,7 +655,7 @@ function OrderDrawer({ order, onClose, onPrint, onRefund }: OrderDrawerProps) {
             {order.discountTotal > 0 && (
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: 16, color: '#BA7517', marginBottom: 8,
+                fontSize: 16, color: txColors.warning, marginBottom: 8,
               }}>
                 <span>优惠</span><span>-¥{order.discountTotal.toFixed(2)}</span>
               </div>
@@ -666,14 +667,14 @@ function OrderDrawer({ order, onClose, onPrint, onRefund }: OrderDrawerProps) {
               <span style={{ fontSize: 18, color: '#2C2C2A', fontWeight: 600 }}>
                 {order.paymentMethod} 实付
               </span>
-              <span style={{ fontSize: 32, fontWeight: 800, color: '#FF6B35' }}>
+              <span style={{ fontSize: 32, fontWeight: 800, color: txColors.primary }}>
                 ¥{order.actualAmount.toFixed(2)}
               </span>
             </div>
             {order.refundAmount !== undefined && (
               <div style={{
                 display: 'flex', justifyContent: 'space-between',
-                fontSize: 16, color: '#A32D2D', marginTop: 8,
+                fontSize: 16, color: txColors.danger, marginTop: 8,
               }}>
                 <span>已退款</span><span>-¥{order.refundAmount.toFixed(2)}</span>
               </div>
@@ -690,8 +691,8 @@ function OrderDrawer({ order, onClose, onPrint, onRefund }: OrderDrawerProps) {
             <button
               onClick={() => onPrint(order)}
               style={{
-                flex: 1, height: 60, borderRadius: 12, border: '2px solid #FF6B35',
-                background: '#FFF3ED', color: '#FF6B35', fontSize: 18, fontWeight: 700,
+                flex: 1, height: 60, borderRadius: 12, border: `2px solid ${txColors.primary}`,
+                background: txColors.primaryLight, color: txColors.primary, fontSize: 18, fontWeight: 700,
                 cursor: 'pointer', transition: 'transform 0.2s ease', fontFamily: 'inherit',
               }}
               onPointerDown={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)'; }}
@@ -704,7 +705,7 @@ function OrderDrawer({ order, onClose, onPrint, onRefund }: OrderDrawerProps) {
               onClick={() => onRefund(order)}
               style={{
                 flex: 1, height: 60, borderRadius: 12, border: 'none',
-                background: '#A32D2D', color: '#fff', fontSize: 18, fontWeight: 700,
+                background: txColors.danger, color: '#fff', fontSize: 18, fontWeight: 700,
                 cursor: 'pointer', transition: 'transform 0.2s ease', fontFamily: 'inherit',
               }}
               onPointerDown={e => { (e.currentTarget as HTMLButtonElement).style.transform = 'scale(0.97)'; }}
@@ -855,10 +856,10 @@ export function OrderHistoryPage() {
   };
 
   /* ────── 样式常量 ────── */
-  const searchBg = '#1E2A3A';
+  const searchBg = txColors.navy;
   const dateButtonStyle = (active: boolean): React.CSSProperties => ({
     height: 44, padding: '0 20px', borderRadius: 8, border: 'none',
-    background: active ? '#FF6B35' : '#2C3E50',
+    background: active ? txColors.primary : txColors.navyLight,
     color: active ? '#fff' : '#B4B2A9',
     fontSize: 16, fontWeight: active ? 700 : 400,
     cursor: 'pointer', transition: 'transform 0.2s ease',
@@ -868,7 +869,7 @@ export function OrderHistoryPage() {
 
   const statusTabStyle = (active: boolean): React.CSSProperties => ({
     height: 44, padding: '0 16px', borderRadius: 8, border: 'none',
-    background: active ? '#FF6B35' : 'transparent',
+    background: active ? txColors.primary : 'transparent',
     color: active ? '#fff' : '#B4B2A9',
     fontSize: 16, fontWeight: active ? 700 : 400,
     cursor: 'pointer', transition: 'transform 0.2s ease',
@@ -934,7 +935,7 @@ export function OrderHistoryPage() {
                 onChange={e => setCustomFrom(e.target.value)}
                 style={{
                   height: 44, padding: '0 12px', borderRadius: 8,
-                  border: 'none', background: '#2C3E50', color: '#E0E0E0',
+                  border: 'none', background: txColors.navyLight, color: '#E0E0E0',
                   fontSize: 16, fontFamily: 'inherit',
                 }}
               />
@@ -945,7 +946,7 @@ export function OrderHistoryPage() {
                 onChange={e => setCustomTo(e.target.value)}
                 style={{
                   height: 44, padding: '0 12px', borderRadius: 8,
-                  border: 'none', background: '#2C3E50', color: '#E0E0E0',
+                  border: 'none', background: txColors.navyLight, color: '#E0E0E0',
                   fontSize: 16, fontFamily: 'inherit',
                 }}
               />
@@ -953,7 +954,7 @@ export function OrderHistoryPage() {
                 onClick={() => loadOrders(true)}
                 style={{
                   height: 44, padding: '0 20px', borderRadius: 8, border: 'none',
-                  background: '#FF6B35', color: '#fff', fontSize: 16, fontWeight: 700,
+                  background: txColors.primary, color: '#fff', fontSize: 16, fontWeight: 700,
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
@@ -966,7 +967,7 @@ export function OrderHistoryPage() {
         {/* 状态筛选 + 搜索框 */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{
-            display: 'flex', background: '#2C3E50', borderRadius: 8, padding: 4,
+            display: 'flex', background: txColors.navyLight, borderRadius: 8, padding: 4,
           }}>
             {(['all', 'paid', 'refunded', 'voided'] as const).map(s => (
               <button
@@ -996,7 +997,7 @@ export function OrderHistoryPage() {
               style={{
                 width: '100%', height: 44, boxSizing: 'border-box',
                 paddingLeft: 44, paddingRight: 16, borderRadius: 8,
-                border: 'none', background: '#2C3E50',
+                border: 'none', background: txColors.navyLight,
                 color: '#E0E0E0', fontSize: 16, fontFamily: 'inherit',
                 outline: 'none',
               }}
@@ -1007,7 +1008,7 @@ export function OrderHistoryPage() {
             onClick={() => loadOrders(true)}
             style={{
               height: 44, padding: '0 24px', borderRadius: 8, border: 'none',
-              background: '#FF6B35', color: '#fff', fontSize: 16, fontWeight: 700,
+              background: txColors.primary, color: '#fff', fontSize: 16, fontWeight: 700,
               cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
               transition: 'transform 0.2s ease',
             }}
@@ -1081,7 +1082,7 @@ export function OrderHistoryPage() {
 
             {/* 金额 */}
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 24, fontWeight: 800, color: '#FF6B35' }}>
+              <div style={{ fontSize: 24, fontWeight: 800, color: txColors.primary }}>
                 ¥{order.actualAmount.toFixed(2)}
               </div>
               <div style={{ fontSize: 14, color: '#B4B2A9', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1111,8 +1112,8 @@ export function OrderHistoryPage() {
                     onClick={() => handlePrint(order)}
                     style={{
                       minWidth: 80, height: 48, padding: '0 12px', borderRadius: 8,
-                      border: '2px solid #FF6B35', background: '#FFF3ED',
-                      color: '#FF6B35', fontSize: 15, fontWeight: 600,
+                      border: `2px solid ${txColors.primary}`, background: txColors.primaryLight,
+                      color: txColors.primary, fontSize: 15, fontWeight: 600,
                       cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
                       transition: 'transform 0.2s ease',
                     }}
@@ -1126,7 +1127,7 @@ export function OrderHistoryPage() {
                     onClick={() => setRefundOrder(order)}
                     style={{
                       minWidth: 80, height: 48, padding: '0 12px', borderRadius: 8,
-                      border: 'none', background: '#A32D2D',
+                      border: 'none', background: txColors.danger,
                       color: '#fff', fontSize: 15, fontWeight: 600,
                       cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
                       transition: 'transform 0.2s ease',

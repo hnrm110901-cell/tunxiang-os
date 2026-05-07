@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * member/insights — 个人消费报告（类支付宝年度账单）
  *
@@ -14,13 +15,13 @@ import { txRequest } from '../../../utils/request'
 import { useUserStore } from '../../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   gold: '#C5A347',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   border: '#1E3340',
   success: '#34C759',
-  info: '#185FA5',
+  info: txColors.info,
   text1: '#E8F4F8',
   text2: '#9EB5C0',
   text3: '#5A7A88',

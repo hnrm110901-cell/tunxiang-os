@@ -41,6 +41,7 @@ import {
 } from 'antd';
 import { PlusOutlined, CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  类型
@@ -345,7 +346,7 @@ export default function OnboardingPathPage() {
               </Popconfirm>
             )}
             {canTerminate && (
-              <a key="terminate" style={{ color: '#A32D2D' }} onClick={() => setTerminateId(record.id)}>
+              <a key="terminate" style={{ color: txColors.danger }} onClick={() => setTerminateId(record.id)}>
                 终止
               </a>
             )}
@@ -365,7 +366,7 @@ export default function OnboardingPathPage() {
             statistic={{
               title: '训练中',
               value: dashboard?.in_progress ?? 0,
-              valueStyle: { color: '#185FA5' },
+              valueStyle: { color: txColors.info },
             }}
           />
         </Col>
@@ -374,7 +375,7 @@ export default function OnboardingPathPage() {
             statistic={{
               title: '已完成',
               value: dashboard?.completed ?? 0,
-              valueStyle: { color: '#0F6E56' },
+              valueStyle: { color: txColors.success },
             }}
           />
         </Col>
@@ -383,7 +384,7 @@ export default function OnboardingPathPage() {
             statistic={{
               title: '已逾期',
               value: dashboard?.overdue ?? 0,
-              valueStyle: { color: '#A32D2D' },
+              valueStyle: { color: txColors.danger },
             }}
           />
         </Col>

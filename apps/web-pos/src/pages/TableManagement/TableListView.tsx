@@ -15,6 +15,7 @@ import {
 import { useTableStore } from '../../stores/tableStore';
 import { getStatusText, getStatusColor, getAlertBgColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
+import { txColors } from '@tx/tokens';
 
 /**
  * 列表视图Props
@@ -74,7 +75,7 @@ const AreaPanel: React.FC<{
           padding: '2px 10px',
           borderRadius: 12,
           background: 'rgba(255,107,53,0.18)',
-          color: '#FF6B35',
+          color: txColors.primary,
           fontSize: 14,
           fontWeight: 600,
         }}>

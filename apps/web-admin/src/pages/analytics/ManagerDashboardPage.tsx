@@ -48,6 +48,7 @@ import {
 } from '../../api/managerDashboardApi';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -100,7 +101,7 @@ function KpiCard({ title, value, sub, trend }: KpiCardProps) {
           {trend != null && (
             <span
               style={{
-                color: trend >= 0 ? '#0F6E56' : '#A32D2D',
+                color: trend >= 0 ? txColors.success : txColors.danger,
                 fontWeight: 600,
               }}
             >
@@ -131,9 +132,9 @@ interface AlertListProps {
 }
 
 const SEVERITY_COLOR: Record<ManagerAlert['severity'], string> = {
-  critical: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  critical: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 const SEVERITY_TAG: Record<ManagerAlert['severity'], string> = {
   critical: 'red',
@@ -155,7 +156,7 @@ function AlertList({ alerts, loading, onMarkRead }: AlertListProps) {
       {display.length === 0 ? (
         <Empty
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={<Text style={{ color: '#0F6E56' }}>暂无异常告警</Text>}
+          description={<Text style={{ color: txColors.success }}>暂无异常告警</Text>}
         />
       ) : (
         <Space direction="vertical" style={{ width: '100%' }} size={8}>
@@ -175,7 +176,7 @@ function AlertList({ alerts, loading, onMarkRead }: AlertListProps) {
                 alignItems: 'flex-start',
                 gap: 10,
                 padding: '10px 12px',
-                background: alert.is_read ? '#F8F7F5' : '#FFF3ED',
+                background: alert.is_read ? '#F8F7F5' : txColors.primaryLight,
                 borderRadius: 8,
                 borderLeft: `3px solid ${SEVERITY_COLOR[alert.severity]}`,
               }}
@@ -248,7 +249,7 @@ function TrendTable({ data, loading }: { data: DailyTrendItem[]; loading: boolea
       render: (v: number | null) => {
         if (v == null) return <Text style={{ color: '#B4B2A9' }}>—</Text>;
         return (
-          <span style={{ color: v >= 0 ? '#0F6E56' : '#A32D2D', fontWeight: 600 }}>
+          <span style={{ color: v >= 0 ? txColors.success : txColors.danger, fontWeight: 600 }}>
             {v >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{' '}
             {Math.abs(v).toFixed(1)}%
           </span>
@@ -446,7 +447,7 @@ export function ManagerDashboardPage() {
       key: 'completion_pct',
       align: 'right',
       render: (v: number) => (
-        <span style={{ color: v >= 100 ? '#0F6E56' : v >= 80 ? '#BA7517' : '#A32D2D', fontWeight: 600 }}>
+        <span style={{ color: v >= 100 ? txColors.success : v >= 80 ? txColors.warning : txColors.danger, fontWeight: 600 }}>
           {v.toFixed(1)}%
         </span>
       ),
@@ -471,7 +472,7 @@ export function ManagerDashboardPage() {
           </Title>
           <Space size={8}>
             <Badge count={unreadCount} size="small">
-              <BellOutlined style={{ fontSize: 18, color: unreadCount > 0 ? '#FF6B35' : '#B4B2A9' }} />
+              <BellOutlined style={{ fontSize: 18, color: unreadCount > 0 ? txColors.primary : '#B4B2A9' }} />
             </Badge>
             <Button
               size="small"
@@ -567,10 +568,10 @@ export function ManagerDashboardPage() {
                 size={120}
                 strokeColor={
                   goal.completion_pct >= 100
-                    ? '#0F6E56'
+                    ? txColors.success
                     : goal.completion_pct >= 80
-                    ? '#FF6B35'
-                    : '#A32D2D'
+                    ? txColors.primary
+                    : txColors.danger
                 }
                 format={(pct) => (
                   <span style={{ fontSize: 20, fontWeight: 700 }}>{pct}%</span>
@@ -583,7 +584,7 @@ export function ManagerDashboardPage() {
                     {fenToWan(goal.target_fen)} 万
                   </Text>
                   ，已完成{' '}
-                  <Text strong style={{ color: '#FF6B35' }}>
+                  <Text strong style={{ color: txColors.primary }}>
                     {fenToWan(goal.achieved_fen)} 万
                   </Text>
                 </Text>
@@ -610,14 +611,14 @@ export function ManagerDashboardPage() {
         <Spin spinning={statsLoading}>
           <Row gutter={16}>
             <Col span={12} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>
                 {/* 数据来自 manager_app_routes.py 的 on_table_count */}
                 {stats ? (stats as unknown as Record<string, number>)['on_table_count'] ?? '—' : '—'}
               </div>
               <Text style={{ fontSize: 12, color: '#5F5E5A' }}>桌在营业</Text>
             </Col>
             <Col span={12} style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 28, fontWeight: 700, color: '#0F6E56' }}>
+              <div style={{ fontSize: 28, fontWeight: 700, color: txColors.success }}>
                 {stats ? (stats as unknown as Record<string, number>)['free_table_count'] ?? '—' : '—'}
               </div>
               <Text style={{ fontSize: 12, color: '#5F5E5A' }}>桌空闲</Text>
@@ -702,7 +703,7 @@ export function ManagerDashboardPage() {
             <Button
               block
               type="primary"
-              style={{ background: '#FF6B35', borderColor: '#FF6B35', borderRadius: 8 }}
+              style={{ background: txColors.primary, borderColor: txColors.primary, borderRadius: 8 }}
               onClick={() => handleReport('daily')}
               disabled={!storeId}
             >
@@ -731,7 +732,7 @@ export function ManagerDashboardPage() {
           <Button
             key="copy"
             type="primary"
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             onClick={() => {
               navigator.clipboard?.writeText(reportModal.content).then(() => {
                 message.success('已复制到剪贴板');

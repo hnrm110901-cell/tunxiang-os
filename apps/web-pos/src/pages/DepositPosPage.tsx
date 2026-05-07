@@ -10,6 +10,7 @@ import { useCallback, useState } from 'react';
 import React from 'react';
 import { txFetch } from '../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ const CSS = {
     color: '#2C2C2A',
   } as React.CSSProperties,
   header: {
-    background: '#1E2A3A',
+    background: txColors.navy,
     padding: '16px 20px',
   } as React.CSSProperties,
   headerTitle: {
@@ -64,10 +65,10 @@ const CSS = {
     minHeight: 56,
     fontSize: 17,
     fontWeight: active ? 700 : 400,
-    color: active ? '#FF6B35' : '#5F5E5A',
+    color: active ? txColors.primary : '#5F5E5A',
     background: 'transparent',
     border: 'none',
-    borderBottom: active ? '3px solid #FF6B35' : '3px solid transparent',
+    borderBottom: active ? `3px solid ${txColors.primary}` : '3px solid transparent',
     cursor: 'pointer',
     transition: 'all 200ms ease',
   }),
@@ -115,7 +116,7 @@ const CSS = {
     fontSize: 18,
     fontWeight: 700,
     color: '#FFFFFF',
-    background: '#FF6B35',
+    background: txColors.primary,
     border: 'none',
     borderRadius: 12,
     cursor: 'pointer',
@@ -125,9 +126,9 @@ const CSS = {
     width: '100%',
     fontSize: 18,
     fontWeight: 600,
-    color: '#FF6B35',
+    color: txColors.primary,
     background: '#FFFFFF',
-    border: '2px solid #FF6B35',
+    border: `2px solid ${txColors.primary}`,
     borderRadius: 12,
     cursor: 'pointer',
   } as React.CSSProperties,
@@ -137,7 +138,7 @@ const CSS = {
     fontSize: 18,
     fontWeight: 700,
     color: '#FFFFFF',
-    background: '#A32D2D',
+    background: txColors.danger,
     border: 'none',
     borderRadius: 12,
     cursor: 'pointer',
@@ -170,7 +171,7 @@ const CSS = {
     top: 80,
     left: '50%',
     transform: 'translateX(-50%)',
-    background: type === 'success' ? '#0F6E56' : '#A32D2D',
+    background: type === 'success' ? txColors.success : txColors.danger,
     color: '#FFFFFF',
     padding: '14px 28px',
     borderRadius: 12,
@@ -209,7 +210,7 @@ function Numpad({ value, onChange }: { value: string; onChange: (v: string) => v
           style={{
             ...CSS.numpadBtn,
             background: key === 'del' ? '#F8F7F5' : '#FFFFFF',
-            color: key === 'del' ? '#A32D2D' : '#2C2C2A',
+            color: key === 'del' ? txColors.danger : '#2C2C2A',
             fontSize: key === 'del' ? 20 : 28,
           }}
           onPointerDown={(e) => {
@@ -438,8 +439,8 @@ export function DepositPosPage() {
               <label style={{ ...CSS.label, textAlign: 'center' as const }}>押金金额（元）</label>
               <div style={{
                 ...CSS.inputLarge,
-                borderColor: collectAmount ? '#FF6B35' : '#E8E6E1',
-                color: collectAmount ? '#FF6B35' : '#B4B2A9',
+                borderColor: collectAmount ? txColors.primary : '#E8E6E1',
+                color: collectAmount ? txColors.primary : '#B4B2A9',
               }}>
                 ¥ {collectAmount || '0.00'}
               </div>
@@ -463,8 +464,8 @@ export function DepositPosPage() {
                       fontSize: 16,
                       fontWeight: collectPayMethod === m.value ? 700 : 400,
                       color: collectPayMethod === m.value ? '#FFFFFF' : '#2C2C2A',
-                      background: collectPayMethod === m.value ? '#FF6B35' : '#FFFFFF',
-                      border: `2px solid ${collectPayMethod === m.value ? '#FF6B35' : '#E8E6E1'}`,
+                      background: collectPayMethod === m.value ? txColors.primary : '#FFFFFF',
+                      border: `2px solid ${collectPayMethod === m.value ? txColors.primary : '#E8E6E1'}`,
                       borderRadius: 8,
                       cursor: 'pointer',
                     }}
@@ -536,8 +537,8 @@ export function DepositPosPage() {
                     key={dep.id}
                     style={{
                       ...CSS.card,
-                      border: refundSelected?.id === dep.id ? '2px solid #FF6B35' : '2px solid transparent',
-                      background: refundSelected?.id === dep.id ? '#FFF3ED' : '#FFFFFF',
+                      border: refundSelected?.id === dep.id ? `2px solid ${txColors.primary}` : '2px solid transparent',
+                      background: refundSelected?.id === dep.id ? txColors.primaryLight : '#FFFFFF',
                     }}
                     onClick={() => {
                       setRefundSelected(dep);
@@ -555,7 +556,7 @@ export function DepositPosPage() {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' as const }}>
-                        <div style={{ fontSize: 24, fontWeight: 700, color: '#BA7517' }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: txColors.warning }}>
                           ¥{fenToYuan(dep.remaining_fen)}
                         </div>
                         <div style={{ fontSize: 12, color: '#B4B2A9' }}>可退余额</div>
@@ -573,7 +574,7 @@ export function DepositPosPage() {
                 borderRadius: 12,
                 padding: 20,
                 marginTop: 16,
-                border: '2px solid #FF6B35',
+                border: `2px solid ${txColors.primary}`,
               }}>
                 <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>
                   退还金额（元）
@@ -583,8 +584,8 @@ export function DepositPosPage() {
                 </div>
                 <div style={{
                   ...CSS.inputLarge,
-                  borderColor: '#FF6B35',
-                  color: '#FF6B35',
+                  borderColor: txColors.primary,
+                  color: txColors.primary,
                   marginBottom: 16,
                 }}>
                   ¥ {refundAmt || '0.00'}
@@ -610,13 +611,13 @@ export function DepositPosPage() {
         {activeTab === 'convert' && (
           <div>
             <div style={{
-              background: '#FFF3ED',
-              border: '1px solid #FF6B35',
+              background: txColors.primaryLight,
+              border: `1px solid ${txColors.primary}`,
               borderRadius: 12,
               padding: '12px 16px',
               marginBottom: 20,
               fontSize: 16,
-              color: '#E55A28',
+              color: txColors.primaryActive,
             }}>
               此操作将把押金余额转为门店收入，不可撤销。
             </div>
@@ -642,7 +643,7 @@ export function DepositPosPage() {
                     key={dep.id}
                     style={{
                       ...CSS.card,
-                      border: convertSelected?.id === dep.id ? '2px solid #A32D2D' : '2px solid transparent',
+                      border: convertSelected?.id === dep.id ? `2px solid ${txColors.danger}` : '2px solid transparent',
                       background: convertSelected?.id === dep.id ? '#FFF5F5' : '#FFFFFF',
                     }}
                     onClick={() => setConvertSelected(dep)}
@@ -658,7 +659,7 @@ export function DepositPosPage() {
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' as const }}>
-                        <div style={{ fontSize: 24, fontWeight: 700, color: '#A32D2D' }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: txColors.danger }}>
                           ¥{fenToYuan(dep.remaining_fen)}
                         </div>
                         <div style={{ fontSize: 12, color: '#B4B2A9' }}>余额</div>
@@ -676,12 +677,12 @@ export function DepositPosPage() {
                 borderRadius: 12,
                 padding: 20,
                 marginTop: 16,
-                border: '2px solid #A32D2D',
+                border: `2px solid ${txColors.danger}`,
               }}>
                 <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>
                   确认将以下押金转为收入？
                 </div>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#A32D2D', marginBottom: 16 }}>
+                <div style={{ fontSize: 28, fontWeight: 700, color: txColors.danger, marginBottom: 16 }}>
                   ¥{fenToYuan(convertSelected.remaining_fen)}
                 </div>
                 <div style={{ display: 'flex', gap: 12 }}>

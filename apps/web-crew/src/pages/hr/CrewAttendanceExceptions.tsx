@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const T = {
   bg:       '#0B1A20',
@@ -12,8 +13,8 @@ const T = {
   text:     '#E0E0E0',
   muted:    '#64748b',
   dim:      '#334155',
-  primary:  '#FF6B35',
-  primaryAct: '#E55A28',
+  primary:  txColors.primary,
+  primaryAct: txColors.primaryActive,
   success:  '#30D158',
   warning:  '#FF9F0A',
   danger:   '#FF453A',

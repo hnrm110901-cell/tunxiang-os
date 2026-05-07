@@ -11,6 +11,7 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -55,9 +56,9 @@ function UnitCard({ unit, selected, orderAmountFen, onPress }: UnitCardProps) {
     ? unit.credit_used_fen / unit.credit_limit_fen
     : 0;
 
-  let creditColor = '#0F6E56';   // 充足 — 绿
-  if (usageRate >= 0.9) creditColor = '#A32D2D';     // 危险 — 红
-  else if (usageRate >= 0.7) creditColor = '#BA7517'; // 警告 — 黄
+  let creditColor: string = txColors.success;   // 充足 — 绿
+  if (usageRate >= 0.9) creditColor = txColors.danger;     // 危险 — 红
+  else if (usageRate >= 0.7) creditColor = txColors.warning; // 警告 — 黄
 
   return (
     <div
@@ -71,8 +72,8 @@ function UnitCard({ unit, selected, orderAmountFen, onPress }: UnitCardProps) {
         gap: 6,
         padding: '16px 20px',
         borderRadius: 12,
-        background: selected ? '#FFF3ED' : '#FFFFFF',
-        border: selected ? '2px solid #FF6B35' : '1px solid #E8E6E1',
+        background: selected ? txColors.primaryLight : '#FFFFFF',
+        border: selected ? `2px solid ${txColors.primary}` : '1px solid #E8E6E1',
         cursor: unit.status !== 'active' ? 'not-allowed' : 'pointer',
         opacity: unit.status !== 'active' ? 0.5 : 1,
         transition: 'border-color 150ms, background 150ms',
@@ -87,13 +88,13 @@ function UnitCard({ unit, selected, orderAmountFen, onPress }: UnitCardProps) {
         </span>
         {unit.status === 'suspended' && (
           <span style={{
-            fontSize: 12, background: '#A32D2D', color: '#fff',
+            fontSize: 12, background: txColors.danger, color: '#fff',
             padding: '2px 8px', borderRadius: 4,
           }}>已暂停</span>
         )}
         {selected && (
           <span style={{
-            fontSize: 14, color: '#FF6B35', fontWeight: 600,
+            fontSize: 14, color: txColors.primary, fontWeight: 600,
           }}>已选 ✓</span>
         )}
       </div>
@@ -119,7 +120,7 @@ function UnitCard({ unit, selected, orderAmountFen, onPress }: UnitCardProps) {
             <span style={{ fontSize: 12, color: '#B4B2A9' }}>账户余额</span>
             <span style={{
               fontSize: 16, fontWeight: 600,
-              color: unit.balance_fen >= 0 ? '#0F6E56' : '#A32D2D',
+              color: unit.balance_fen >= 0 ? txColors.success : txColors.danger,
             }}>
               {fen2yuan(unit.balance_fen)}
             </span>
@@ -131,11 +132,11 @@ function UnitCard({ unit, selected, orderAmountFen, onPress }: UnitCardProps) {
       {isOverLimit && (
         <div style={{
           background: '#FFF3F3',
-          border: '1px solid #A32D2D',
+          border: `1px solid ${txColors.danger}`,
           borderRadius: 8,
           padding: '8px 12px',
           fontSize: 14,
-          color: '#A32D2D',
+          color: txColors.danger,
           marginTop: 4,
         }}>
           ⚠ 本次挂账 {fen2yuan(orderAmountFen)} 超出可用授信额度 {fen2yuan(unit.available_credit_fen)}
@@ -223,7 +224,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
             </div>
             <div style={confirmRowStyle}>
               <span style={confirmLabelStyle}>本次挂账金额</span>
-              <span style={{ ...confirmValueStyle, fontSize: 24, color: '#FF6B35' }}>
+              <span style={{ ...confirmValueStyle, fontSize: 24, color: txColors.primary }}>
                 {fen2yuan(orderAmountFen)}
               </span>
             </div>
@@ -231,7 +232,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
               <span style={confirmLabelStyle}>挂账后剩余可用额度</span>
               <span style={{
                 ...confirmValueStyle,
-                color: isOverLimit ? '#A32D2D' : '#0F6E56',
+                color: isOverLimit ? txColors.danger : txColors.success,
               }}>
                 {fen2yuan(selectedUnit.available_credit_fen - orderAmountFen)}
               </span>
@@ -240,10 +241,10 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
             {isOverLimit && (
               <div style={{
                 background: '#FFF3F3',
-                border: '2px solid #A32D2D',
+                border: `2px solid ${txColors.danger}`,
                 borderRadius: 12,
                 padding: 16,
-                color: '#A32D2D',
+                color: txColors.danger,
                 fontSize: 16,
                 lineHeight: 1.6,
               }}>
@@ -278,7 +279,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
                 height: 56,
                 borderRadius: 12,
                 border: 'none',
-                background: isOverLimit ? '#A32D2D' : '#FF6B35',
+                background: isOverLimit ? txColors.danger : txColors.primary,
                 fontSize: 18,
                 fontWeight: 700,
                 color: '#fff',
@@ -308,7 +309,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
 
         {/* 本次金额提示 */}
         <div style={{
-          background: '#FFF3ED',
+          background: txColors.primaryLight,
           padding: '12px 20px',
           display: 'flex',
           justifyContent: 'space-between',
@@ -316,7 +317,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
           borderBottom: '1px solid #E8E6E1',
         }}>
           <span style={{ fontSize: 16, color: '#5F5E5A' }}>本次挂账金额</span>
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35' }}>
+          <span style={{ fontSize: 20, fontWeight: 700, color: txColors.primary }}>
             {fen2yuan(orderAmountFen)}
           </span>
         </div>
@@ -387,7 +388,7 @@ export const AgreementUnitSelector: React.FC<AgreementUnitSelectorProps> = ({
               height: 72,
               borderRadius: 16,
               border: 'none',
-              background: isConfirmDisabled ? '#E8E6E1' : '#FF6B35',
+              background: isConfirmDisabled ? '#E8E6E1' : txColors.primary,
               color: isConfirmDisabled ? '#B4B2A9' : '#fff',
               fontSize: 20,
               fontWeight: 700,
@@ -426,7 +427,7 @@ const sheetStyle: React.CSSProperties = {
 };
 
 const headerStyle: React.CSSProperties = {
-  background: '#1E2A3A',
+  background: txColors.navy,
   padding: '16px 20px',
   display: 'flex',
   justifyContent: 'space-between',

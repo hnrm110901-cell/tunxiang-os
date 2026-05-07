@@ -38,6 +38,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -106,7 +107,7 @@ export default function AgentSalaryAdvisor() {
       width: 110,
       render: (_, r) => {
         const val = r.suggested_raise_fen;
-        const color = val > 0 ? '#0F6E56' : val < 0 ? '#A32D2D' : undefined;
+        const color = val > 0 ? txColors.success : val < 0 ? txColors.danger : undefined;
         return (
           <Text style={{ color }}>
             {val > 0 ? '+' : ''}{fmtYuan(val)}元
@@ -222,7 +223,7 @@ export default function AgentSalaryAdvisor() {
   return (
     <div style={{ padding: 24 }}>
       <Title level={4}>
-        <DollarOutlined style={{ marginRight: 8, color: '#0F6E56' }} />
+        <DollarOutlined style={{ marginRight: 8, color: txColors.success }} />
         AI薪酬顾问
       </Title>
 
@@ -291,7 +292,7 @@ export default function AgentSalaryAdvisor() {
                         maxWidth: '85%',
                         padding: '8px 12px',
                         borderRadius: 8,
-                        background: msg.role === 'user' ? '#FF6B35' : '#f5f5f5',
+                        background: msg.role === 'user' ? txColors.primary : '#f5f5f5',
                         color: msg.role === 'user' ? '#fff' : '#2C2C2A',
                       }}
                     >

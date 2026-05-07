@@ -19,6 +19,7 @@
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Alert,
   Badge,
@@ -56,24 +57,24 @@ import {
 const { Title, Text, Paragraph } = Typography;
 
 // ─── Design Token ──────────────────────────────────────────────────────────
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_DANGER = '#A32D2D';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_DANGER = txColors.danger;
 const TX_BG_SECONDARY = '#F8F7F5';
 const TX_TEXT_SECONDARY = '#5F5E5A';
-const TX_NAVY = '#1E2A3A';
+const TX_NAVY = txColors.navy;
 
 // ─── 预设颜色选项（替代 ColorPicker，兼容所有 antd 5.x 版本） ─────────────
 
 const PRESET_COLORS = [
-  { value: '#FF6B35', label: '橙色（主色）' },
-  { value: '#A32D2D', label: '危险红' },
-  { value: '#BA7517', label: '警告橙' },
-  { value: '#0F6E56', label: '成功绿' },
-  { value: '#185FA5', label: '信息蓝' },
+  { value: txColors.primary, label: '橙色（主色）' },
+  { value: txColors.danger, label: '危险红' },
+  { value: txColors.warning, label: '警告橙' },
+  { value: txColors.success, label: '成功绿' },
+  { value: txColors.info, label: '信息蓝' },
   { value: '#9B59B6', label: '紫色' },
-  { value: '#1E2A3A', label: '深蓝（档口）' },
+  { value: txColors.navy, label: '深蓝（档口）' },
   { value: '#E8B800', label: '金黄' },
   { value: '#2C2C2A', label: '深灰' },
   { value: '#B4B2A9', label: '浅灰' },

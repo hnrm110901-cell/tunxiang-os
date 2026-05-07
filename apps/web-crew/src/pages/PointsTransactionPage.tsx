@@ -7,13 +7,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { getMemberPoints, type PointsTransaction } from '../api/memberPointsApi';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1E3A45',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   red: '#ef4444',
   muted: '#64748b',

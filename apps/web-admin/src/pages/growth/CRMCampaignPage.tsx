@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { txFetchData } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -258,13 +259,13 @@ export function CRMCampaignPage() {
                 <div style={{ display: 'flex', gap: 8 }}>
                   <button
                     onClick={() => handleLoadHistory(item)}
-                    style={{ ...smallBtnStyle, color: '#185FA5' }}
+                    style={{ ...smallBtnStyle, color: txColors.info }}
                   >
                     载入
                   </button>
                   <button
                     onClick={() => handleDeleteHistory(item.id)}
-                    style={{ ...smallBtnStyle, color: '#A32D2D' }}
+                    style={{ ...smallBtnStyle, color: txColors.danger }}
                   >
                     删除
                   </button>
@@ -356,7 +357,7 @@ export function CRMCampaignPage() {
                   onClick={() => toggleDish(dish)}
                   style={{
                     padding: '4px 10px', borderRadius: 4, fontSize: 12, border: 'none',
-                    background: form.key_dishes.includes(dish) ? '#FF6B35' : '#2a3a44',
+                    background: form.key_dishes.includes(dish) ? txColors.primary : '#2a3a44',
                     color: form.key_dishes.includes(dish) ? '#fff' : '#aaa',
                     cursor: 'pointer', transition: 'background 0.15s',
                   }}
@@ -376,7 +377,7 @@ export function CRMCampaignPage() {
               step={5}
               value={form.max_discount_pct}
               onChange={(e) => updateForm('max_discount_pct', Number(e.target.value))}
-              style={{ width: '100%', accentColor: '#FF6B35' }}
+              style={{ width: '100%', accentColor: txColors.primary }}
             />
             <div style={{ display: 'flex', justifyContent: 'space-between', color: '#666', fontSize: 11 }}>
               <span>0%</span><span>50%</span>
@@ -399,7 +400,7 @@ export function CRMCampaignPage() {
             disabled={loading}
             style={{
               width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
-              background: loading ? '#2a3a44' : '#FF6B35',
+              background: loading ? '#2a3a44' : txColors.primary,
               color: loading ? '#888' : '#fff',
               fontSize: 15, fontWeight: 700, cursor: loading ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
@@ -420,7 +421,7 @@ export function CRMCampaignPage() {
           {/* 错误 */}
           {error && (
             <div style={{
-              background: '#A32D2D22', border: '1px solid #A32D2D55', borderRadius: 8,
+              background: `${txColors.danger}22`, border: `1px solid ${txColors.danger}55`, borderRadius: 8,
               padding: '12px 16px', marginBottom: 16, color: '#FF6B6B', fontSize: 13,
             }}>
               ⚠️ {error}
@@ -553,8 +554,8 @@ export function CRMCampaignPage() {
                           key={i}
                           style={{
                             padding: '4px 14px', borderRadius: 20, fontSize: 13,
-                            background: '#185FA522', color: '#185FA5',
-                            border: '1px solid #185FA533',
+                            background: `${txColors.info}22`, color: txColors.info,
+                            border: `1px solid ${txColors.info}33`,
                           }}
                         >
                           {t}
@@ -635,7 +636,7 @@ function CouponField({ label, value, accent, wide }: { label: string; value: str
       <div style={{ color: '#666', fontSize: 11, marginBottom: 3 }}>{label}</div>
       <div style={{
         fontSize: accent ? 22 : 14, fontWeight: accent ? 800 : 600,
-        color: accent ? '#FF6B35' : '#ccc',
+        color: accent ? txColors.primary : '#ccc',
       }}>
         {value}
       </div>
@@ -670,7 +671,7 @@ const spinnerStyle: React.CSSProperties = {
 
 const toastStyle: React.CSSProperties = {
   position: 'fixed', bottom: 32, right: 32, zIndex: 9999,
-  background: '#0F6E56', color: '#fff', borderRadius: 8,
+  background: txColors.success, color: '#fff', borderRadius: 8,
   padding: '10px 20px', fontSize: 14, fontWeight: 600,
   boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
 };
@@ -678,9 +679,9 @@ const toastStyle: React.CSSProperties = {
 function copyBtnStyle(copied: boolean): React.CSSProperties {
   return {
     padding: '5px 12px', borderRadius: 5,
-    border: `1px solid ${copied ? '#0F6E5655' : '#2a3a44'}`,
-    background: copied ? '#0F6E5622' : '#152028',
-    color: copied ? '#0F6E56' : '#888',
+    border: `1px solid ${copied ? `${txColors.success}55` : '#2a3a44'}`,
+    background: copied ? `${txColors.success}22` : '#152028',
+    color: copied ? txColors.success : '#888',
     fontSize: 12, cursor: 'pointer', transition: 'all 0.2s', whiteSpace: 'nowrap',
   };
 }

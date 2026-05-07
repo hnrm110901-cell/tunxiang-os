@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import { MobileLayout } from '../../components/MobileLayout';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -91,9 +92,9 @@ const MOCK_ANOMALIES: AnomalyGroup[] = [
 // ─── 工具函数 ───
 
 const SEVERITY_CONFIG: Record<Severity, { label: string; color: string; bg: string }> = {
-  high:   { label: '高',  color: '#A32D2D', bg: '#FEF2F2' },
-  medium: { label: '中',  color: '#BA7517', bg: '#FFFBEB' },
-  low:    { label: '低',  color: '#185FA5', bg: '#EFF6FF' },
+  high:   { label: '高',  color: txColors.danger, bg: '#FEF2F2' },
+  medium: { label: '中',  color: txColors.warning, bg: '#FFFBEB' },
+  low:    { label: '低',  color: txColors.info, bg: '#EFF6FF' },
 };
 
 // ─── 异常条目 ───
@@ -140,7 +141,7 @@ function AnomalyItemCard({
           onClick={() => onHandle(item.id)}
           style={{
             padding: '7px 16px',
-            background: '#FF6B35',
+            background: txColors.primary,
             color: '#fff',
             border: 'none',
             borderRadius: 6,
@@ -153,7 +154,7 @@ function AnomalyItemCard({
           标记已处理
         </button>
       ) : (
-        <span style={{ fontSize: 12, color: '#0F6E56', fontWeight: 500 }}>✓ 已处理</span>
+        <span style={{ fontSize: 12, color: txColors.success, fontWeight: 500 }}>✓ 已处理</span>
       )}
     </div>
   );
@@ -198,10 +199,10 @@ export function MobileAnomalyPage() {
           borderRadius: 12,
           padding: '14px 16px',
           marginBottom: 16,
-          border: `1.5px solid ${totalUnhandled > 0 ? '#A32D2D' : '#0F6E56'}`,
+          border: `1.5px solid ${totalUnhandled > 0 ? txColors.danger : txColors.success}`,
         }}>
           <div style={{ fontSize: 13, color: '#5F5E5A' }}>今日待处理异常</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: totalUnhandled > 0 ? '#A32D2D' : '#0F6E56' }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: totalUnhandled > 0 ? txColors.danger : txColors.success }}>
             {totalUnhandled} 条
           </div>
         </div>
@@ -234,7 +235,7 @@ export function MobileAnomalyPage() {
                   <span style={{ fontSize: 15, fontWeight: 600, color: '#2C2C2A' }}>{group.label}</span>
                   {unhandled > 0 && (
                     <span style={{
-                      background: '#A32D2D',
+                      background: txColors.danger,
                       color: '#fff',
                       fontSize: 11,
                       fontWeight: 700,

@@ -24,6 +24,7 @@ import {
 } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 import {
   AlertOutlined,
   FolderOpenOutlined,
@@ -41,7 +42,7 @@ import {
 } from '../../../api/contractApi';
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 const TYPE_COLOR: Record<string, string> = {
   labor: 'blue',

@@ -12,22 +12,23 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ─────────────────────────────────────────
    设计 Token
 ───────────────────────────────────────── */
 const T = {
-  primary:   '#FF6B35',
-  primaryAct:'#E55A28',
-  navy:      '#1E2A3A',
-  navyLight: '#2C3E50',
-  success:   '#0F6E56',
-  danger:    '#A32D2D',
-  warning:   '#BA7517',
-  info:      '#185FA5',
+  primary:   txColors.primary,
+  primaryAct:txColors.primaryActive,
+  navy:      txColors.navy,
+  navyLight: txColors.navyLight,
+  success:   txColors.success,
+  danger:    txColors.danger,
+  warning:   txColors.warning,
+  info:      txColors.info,
   textPri:   '#E2E8F0',
   textSec:   '#94A3B8',
-  border:    '#2C3E50',
+  border:    txColors.navyLight,
   bgBase:    '#0B1820',
   bgCard:    '#112230',
   bgCard2:   '#162A38',
@@ -129,7 +130,7 @@ const MOCK: DailyData = {
     { method: 'alipay',   label: '支付宝',   amount_fen: 2180000, count: 78,  color: '#1677FF' },
     { method: 'unionpay', label: '银行卡',   amount_fen: 960000,  count: 26,  color: '#E6002D' },
     { method: 'stored',   label: '储值卡',   amount_fen: 620000,  count: 18,  color: '#9B59B6' },
-    { method: 'credit',   label: '挂账',     amount_fen: 180000,  count: 3,   color: '#185FA5' },
+    { method: 'credit',   label: '挂账',     amount_fen: 180000,  count: 3,   color: txColors.info },
   ],
   refunds: [
     { order_id: 'ORD-0402-0087', time: '12:35', amount_fen: 15800, reason: '菜品问题退款' },

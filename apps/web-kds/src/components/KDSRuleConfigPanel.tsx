@@ -14,6 +14,7 @@ import {
   type KDSRuleConfig,
 } from '../api/kdsRulesApi';
 import { useKDSRules } from '../hooks/useKDSRules';
+import { txColors } from '@tx/tokens';
 
 // ─── 简单颜色选择器（色块 + 文本输入） ───
 
@@ -182,7 +183,7 @@ export function KDSRuleConfigPanel({ storeId, onSaved }: KDSRuleConfigPanelProps
           '-apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif',
       }}
     >
-      <div style={{ fontSize: 20, fontWeight: 700, color: '#FF6B35', marginBottom: 20 }}>
+      <div style={{ fontSize: 20, fontWeight: 700, color: txColors.primary, marginBottom: 20 }}>
         KDS 标识规则配置
       </div>
 
@@ -308,7 +309,7 @@ export function KDSRuleConfigPanel({ storeId, onSaved }: KDSRuleConfigPanelProps
       {/* 错误提示 */}
       {error && (
         <div style={{
-          background: '#2D1515', border: '1px solid #A32D2D',
+          background: '#2D1515', border: `1px solid ${txColors.danger}`,
           borderRadius: 8, padding: '10px 14px',
           fontSize: 14, color: '#ff6b6b', marginBottom: 16,
         }}>
@@ -335,7 +336,7 @@ export function KDSRuleConfigPanel({ storeId, onSaved }: KDSRuleConfigPanelProps
           disabled={saving}
           style={{
             flex: 2, height: 48, borderRadius: 10,
-            background: saved ? '#0F6E56' : saving ? '#555' : '#FF6B35',
+            background: saved ? txColors.success : saving ? '#555' : txColors.primary,
             border: 'none',
             color: '#fff',
             fontSize: 16, fontWeight: 700,

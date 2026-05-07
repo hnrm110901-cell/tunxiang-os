@@ -3,12 +3,13 @@
  */
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   red: '#ef4444',
   muted: '#64748b',
@@ -429,8 +430,8 @@ export function ReceivingPage() {
       {loadError && (
         <div style={{
           margin: '12px 16px 0', padding: '10px 14px',
-          background: 'rgba(186,117,23,0.12)', border: '1px solid #BA7517',
-          borderRadius: 10, fontSize: 14, color: '#BA7517',
+          background: 'rgba(186,117,23,0.12)', border: `1px solid ${txColors.warning}`,
+          borderRadius: 10, fontSize: 14, color: txColors.warning,
         }}>
           {loadError}
         </div>

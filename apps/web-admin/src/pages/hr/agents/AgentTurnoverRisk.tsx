@@ -39,6 +39,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -70,8 +71,8 @@ interface RiskResp {
 // ─── 辅助 ────────────────────────────────────────────────────────────────────
 
 const riskColor = (score: number): string => {
-  if (score >= 80) return '#A32D2D';
-  if (score >= 60) return '#BA7517';
+  if (score >= 80) return txColors.danger;
+  if (score >= 60) return txColors.warning;
   return '#999';
 };
 
@@ -235,7 +236,7 @@ export default function AgentTurnoverRisk() {
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Title level={4} style={{ margin: 0 }}>
-          <WarningOutlined style={{ marginRight: 8, color: '#A32D2D' }} />
+          <WarningOutlined style={{ marginRight: 8, color: txColors.danger }} />
           离职风险 Agent
         </Title>
         <Button icon={<ReloadOutlined />} onClick={load} loading={loading}>
@@ -251,7 +252,7 @@ export default function AgentTurnoverRisk() {
               title="极高风险"
               value={distCritical}
               suffix="人"
-              valueStyle={{ color: '#A32D2D' }}
+              valueStyle={{ color: txColors.danger }}
             />
           </Card>
         </Col>
@@ -261,7 +262,7 @@ export default function AgentTurnoverRisk() {
               title="高风险"
               value={distHigh}
               suffix="人"
-              valueStyle={{ color: '#BA7517' }}
+              valueStyle={{ color: txColors.warning }}
             />
           </Card>
         </Col>
@@ -276,7 +277,7 @@ export default function AgentTurnoverRisk() {
               title="总扫描"
               value={data?.total_scanned || 0}
               suffix="人"
-              valueStyle={{ color: '#0F6E56' }}
+              valueStyle={{ color: txColors.success }}
             />
           </Card>
         </Col>
@@ -290,7 +291,7 @@ export default function AgentTurnoverRisk() {
             <div
               style={{
                 flex: distCritical,
-                background: '#A32D2D',
+                background: txColors.danger,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -303,7 +304,7 @@ export default function AgentTurnoverRisk() {
             <div
               style={{
                 flex: distHigh,
-                background: '#BA7517',
+                background: txColors.warning,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -340,8 +341,8 @@ export default function AgentTurnoverRisk() {
           )}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 4 }}>
-          <Text style={{ fontSize: 11, color: '#A32D2D' }}>极高 (80+)</Text>
-          <Text style={{ fontSize: 11, color: '#BA7517' }}>高 (60-79)</Text>
+          <Text style={{ fontSize: 11, color: txColors.danger }}>极高 (80+)</Text>
+          <Text style={{ fontSize: 11, color: txColors.warning }}>高 (60-79)</Text>
           <Text style={{ fontSize: 11, color: '#999' }}>中 (40-59)</Text>
           <Text style={{ fontSize: 11, color: '#999' }}>低 (&lt;40)</Text>
         </div>

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * points/index.tsx — 积分中心页
  *
@@ -19,7 +20,7 @@ import { PointsBalance } from '../../../components/PointsBalance'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',

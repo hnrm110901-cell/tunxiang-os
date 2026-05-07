@@ -2,6 +2,7 @@
  * 门店报表页 — 日报/菜品Top10/支付方式/时段客流
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 /* ---------- Mock Data ---------- */
 const mockDaily = {
@@ -109,7 +110,7 @@ export function POSReportsPage() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 26, height: 26, borderRadius: '50%', fontSize: 13, fontWeight: 'bold',
-                background: d.rank <= 3 ? '#FF6B35' : '#1A3A48',
+                background: d.rank <= 3 ? txColors.primary : '#1A3A48',
                 color: d.rank <= 3 ? '#fff' : '#8899A6',
               }}>{d.rank}</span>
               <span style={{ fontSize: 14, color: '#fff' }}>{d.name}</span>

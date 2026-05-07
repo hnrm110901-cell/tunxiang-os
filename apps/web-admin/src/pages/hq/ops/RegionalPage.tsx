@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react';
 import { ChartPlaceholder } from '../../../components/ChartPlaceholder';
 import { apiGet } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ---------- 类型 ----------
 type ScoreLevel = 'green' | 'yellow' | 'red';
@@ -57,22 +58,22 @@ interface InspectionRecord {
 
 // ---------- 评分配色 ----------
 const LEVEL_CONFIG: Record<ScoreLevel, { label: string; color: string; bg: string }> = {
-  green:  { label: '达标',   color: '#0F6E56', bg: '#0F6E5625' },
-  yellow: { label: '预警',   color: '#BA7517', bg: '#BA751725' },
-  red:    { label: '不达标', color: '#A32D2D', bg: '#A32D2D25' },
+  green:  { label: '达标',   color: txColors.success, bg: `${txColors.success}25` },
+  yellow: { label: '预警',   color: txColors.warning, bg: `${txColors.warning}25` },
+  red:    { label: '不达标', color: txColors.danger, bg: `${txColors.danger}25` },
 };
 
 const STATUS_CONFIG: Record<string, { color: string; bg: string }> = {
-  '待处理': { color: '#BA7517', bg: '#BA751720' },
-  '进行中': { color: '#185FA5', bg: '#185FA520' },
-  '已完成': { color: '#0F6E56', bg: '#0F6E5620' },
-  '已超期': { color: '#A32D2D', bg: '#A32D2D20' },
+  '待处理': { color: txColors.warning, bg: `${txColors.warning}20` },
+  '进行中': { color: txColors.info, bg: `${txColors.info}20` },
+  '已完成': { color: txColors.success, bg: `${txColors.success}20` },
+  '已超期': { color: txColors.danger, bg: `${txColors.danger}20` },
 };
 
 const PRIORITY_LABEL: Record<string, { text: string; color: string }> = {
-  high:   { text: '高', color: '#A32D2D' },
-  medium: { text: '中', color: '#BA7517' },
-  low:    { text: '低', color: '#185FA5' },
+  high:   { text: '高', color: txColors.danger },
+  medium: { text: '中', color: txColors.warning },
+  low:    { text: '低', color: txColors.info },
 };
 
 // ---------- 组件 ----------
@@ -232,7 +233,7 @@ export function RegionalPage() {
                 style={{
                   padding: '4px 12px', borderRadius: 6, border: 'none', cursor: 'pointer',
                   fontSize: 12, fontWeight: 600,
-                  background: statusFilter === s ? '#FF6B35' : '#0B1A20',
+                  background: statusFilter === s ? txColors.primary : '#0B1A20',
                   color: statusFilter === s ? '#fff' : '#999',
                 }}
               >
@@ -257,7 +258,7 @@ export function RegionalPage() {
                     style={{
                       padding: 12, borderRadius: 8, cursor: 'pointer',
                       background: isSelected ? '#1a2a33' : '#0B1A20',
-                      border: isSelected ? '1px solid #FF6B3540' : '1px solid transparent',
+                      border: isSelected ? `1px solid ${txColors.primary}40` : '1px solid transparent',
                       transition: 'all 0.15s ease',
                     }}
                   >
@@ -305,8 +306,8 @@ export function RegionalPage() {
                   <div style={{
                     position: 'absolute', left: -17, top: 6,
                     width: 10, height: 10, borderRadius: '50%',
-                    background: i === 0 ? '#FF6B35' : '#1a2a33',
-                    border: `2px solid ${i === 0 ? '#FF6B35' : '#555'}`,
+                    background: i === 0 ? txColors.primary : '#1a2a33',
+                    border: `2px solid ${i === 0 ? txColors.primary : '#555'}`,
                   }} />
                   <div style={{ fontSize: 11, color: '#999', marginBottom: 4 }}>
                     {item.time} | {item.operator}
@@ -341,7 +342,7 @@ export function RegionalPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {rankStores.map((s) => {
-                const barColor = s.score >= 80 ? '#0F6E56' : s.score >= 60 ? '#BA7517' : '#A32D2D';
+                const barColor = s.score >= 80 ? txColors.success : s.score >= 60 ? txColors.warning : txColors.danger;
                 return (
                   <div key={s.rank} style={{
                     display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0',
@@ -349,7 +350,7 @@ export function RegionalPage() {
                   }}>
                     <span style={{
                       width: 24, textAlign: 'center', fontSize: 14, fontWeight: 'bold',
-                      color: s.rank <= 3 ? '#FF6B35' : '#666',
+                      color: s.rank <= 3 ? txColors.primary : '#666',
                     }}>
                       {s.rank}
                     </span>

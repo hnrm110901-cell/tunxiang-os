@@ -5,15 +5,16 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchActiveOrders, rushOrder, type ActiveOrder } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  green: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
+  accent: txColors.primary,
+  green: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
   muted: '#5F5E5A',
   text: '#E2EAE8',
   white: '#FFFFFF',

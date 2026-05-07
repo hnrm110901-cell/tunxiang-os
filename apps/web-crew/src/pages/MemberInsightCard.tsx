@@ -13,6 +13,7 @@
  */
 import { useEffect, useState } from 'react';
 import { generateMemberInsight, type MemberInsight, type InsightAlert, type InsightSuggestion } from '../api/memberInsightApi';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ──────────────────────────────────────────────────
 
@@ -124,7 +125,7 @@ function SuggestionRow({ suggestion }: { suggestion: InsightSuggestion }) {
   return (
     <div
       style={{
-        borderLeft: '4px solid #FF6B35',
+        borderLeft: `4px solid ${txColors.primary}`,
         background: 'rgba(255,107,53,0.08)',
         borderRadius: '0 8px 8px 0',
         padding: '10px 14px',
@@ -136,7 +137,7 @@ function SuggestionRow({ suggestion }: { suggestion: InsightSuggestion }) {
     >
       <span style={{ fontSize: 20, flexShrink: 0, marginTop: 1 }}>{suggestion.icon}</span>
       <div>
-        <div style={{ fontSize: 16, fontWeight: 600, color: '#FF6B35', marginBottom: 2 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, color: txColors.primary, marginBottom: 2 }}>
           {suggestion.title}
         </div>
         <div style={{ fontSize: 15, color: '#94a3b8', lineHeight: 1.5 }}>{suggestion.body}</div>
@@ -160,7 +161,7 @@ export function MemberInsightCard({
 
   // 等级显示
   const levelLabel = LEVEL_LABEL[memberLevel] || memberLevel;
-  const levelColor = LEVEL_COLOR[memberLevel] || '#FF6B35';
+  const levelColor = LEVEL_COLOR[memberLevel] || txColors.primary;
 
   useEffect(() => {
     let cancelled = false;
@@ -323,9 +324,9 @@ export function MemberInsightCard({
             <div style={{
               marginTop: 12, padding: '10px 12px',
               background: 'rgba(24,95,165,.08)', borderRadius: 8,
-              borderLeft: '3px solid #185FA5',
+              borderLeft: `3px solid ${txColors.info}`,
             }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#185FA5', marginBottom: 6 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: txColors.info, marginBottom: 6 }}>
                 🤖 客户大脑 · 服务建议
               </div>
               {[

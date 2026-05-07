@@ -43,6 +43,7 @@ import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { PlusOutlined, SwapOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
 import type { TransferOrder } from '../../../api/transferApi';
+import { txColors } from '@tx/tokens';
 import {
   approveTransfer,
   cancelTransfer,
@@ -52,7 +53,7 @@ import {
 } from '../../../api/transferApi';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── 枚举 ───────────────────────────────────────────────
 

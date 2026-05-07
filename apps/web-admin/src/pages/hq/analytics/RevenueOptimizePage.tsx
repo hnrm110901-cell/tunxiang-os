@@ -19,6 +19,7 @@ import {
 import type { TabsProps } from 'antd';
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface PricingRow {
@@ -77,18 +78,18 @@ const PRICING_COLS: ProColumns<PricingRow>[] = [
   { title: '建议价', dataIndex: 'suggestedPrice', width: 90,
     render: (_, r) => {
       const diff = r.suggestedPrice - r.currentPrice;
-      const color = diff > 0 ? '#0F6E56' : diff < 0 ? '#A32D2D' : '#888';
+      const color = diff > 0 ? txColors.success : diff < 0 ? txColors.danger : '#888';
       return <span style={{ color, fontWeight: 600 }}>¥{r.suggestedPrice}{diff !== 0 && ` (${diff > 0 ? '+' : ''}${diff})`}</span>;
     } },
   { title: '毛利率', dataIndex: 'margin', width: 80,
     render: (v) => {
       const pct = parseInt(String(v));
-      return <span style={{ color: pct < 40 ? '#A32D2D' : '#0F6E56', fontWeight: 600 }}>{v}</span>;
+      return <span style={{ color: pct < 40 ? txColors.danger : txColors.success, fontWeight: 600 }}>{v}</span>;
     } },
   { title: '建议理由', dataIndex: 'reason', ellipsis: true },
   { title: '操作', valueType: 'option', width: 80,
     render: () => [
-      <Button key="adopt" size="small" type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+      <Button key="adopt" size="small" type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}>
         采纳
       </Button>,
     ] },
@@ -102,7 +103,7 @@ const TURNOVER_COLS: ProColumns<TurnoverRow>[] = [
   { title: 'AI 建议', dataIndex: 'suggestion', ellipsis: true },
   { title: '操作', valueType: 'option', width: 80,
     render: () => [
-      <Button key="adopt" size="small" type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+      <Button key="adopt" size="small" type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}>
         采纳
       </Button>,
     ] },
@@ -113,7 +114,7 @@ const TIME_SLOT_COLS: ProColumns<TimeSlotRow>[] = [
   { title: '当前 GMV', dataIndex: 'gmv', width: 110, render: (v) => `¥${Number(v).toLocaleString()}` },
   { title: 'GMV 占比', dataIndex: 'share', width: 90 },
   { title: '可提升空间', dataIndex: 'potential', width: 120,
-    render: (v) => <span style={{ color: '#0F6E56', fontWeight: 600 }}>{v}</span> },
+    render: (v) => <span style={{ color: txColors.success, fontWeight: 600 }}>{v}</span> },
   { title: 'AI 建议', dataIndex: 'suggestion', ellipsis: true },
 ];
 
@@ -169,7 +170,7 @@ const tabItems: TabsProps['items'] = [
 // ---- 主组件 ----
 export const RevenueOptimizePage = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24 }}>
         {/* 顶部 Alert */}
         <Alert
@@ -186,7 +187,7 @@ export const RevenueOptimizePage = () => {
               <Statistic
                 title="潜在收益提升"
                 value="+¥12,400/月"
-                valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+                valueStyle={{ color: txColors.success, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -196,7 +197,7 @@ export const RevenueOptimizePage = () => {
                 title="毛利低于阈值菜品"
                 value={8}
                 suffix="个"
-                valueStyle={{ color: '#A32D2D', fontWeight: 700 }}
+                valueStyle={{ color: txColors.danger, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -206,7 +207,7 @@ export const RevenueOptimizePage = () => {
                 title="建议调价菜品"
                 value={5}
                 suffix="个"
-                valueStyle={{ color: '#BA7517', fontWeight: 700 }}
+                valueStyle={{ color: txColors.warning, fontWeight: 700 }}
               />
             </Card>
           </Col>
@@ -219,7 +220,7 @@ export const RevenueOptimizePage = () => {
 
         {/* 底部操作 */}
         <Space>
-          <Button type="primary" style={{ background: '#FF6B35', borderColor: '#FF6B35' }}>
+          <Button type="primary" style={{ background: txColors.primary, borderColor: txColors.primary }}>
             一键生成调价方案
           </Button>
           <Button>导出分析报告</Button>

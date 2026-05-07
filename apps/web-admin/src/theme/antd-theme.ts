@@ -3,22 +3,23 @@
  * 通过 ConfigProvider 注入，不硬编码颜色
  */
 import type { ThemeConfig } from 'antd';
+import { txColors } from '@tx/tokens';
 
 export const txAdminTheme: ThemeConfig = {
   token: {
-    colorPrimary: '#FF6B35',
-    colorSuccess: '#0F6E56',
-    colorWarning: '#BA7517',
-    colorError: '#A32D2D',
-    colorInfo: '#185FA5',
+    colorPrimary: txColors.primary,
+    colorSuccess: txColors.success,
+    colorWarning: txColors.warning,
+    colorError: txColors.danger,
+    colorInfo: txColors.info,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
     borderRadius: 6,
     fontSize: 14,
   },
   components: {
-    Layout: { headerBg: '#1E2A3A', siderBg: '#1E2A3A' },
-    Menu: { darkItemBg: '#1E2A3A', darkItemSelectedBg: '#FF6B35' },
+    Layout: { headerBg: txColors.navy, siderBg: txColors.navy },
+    Menu: { darkItemBg: txColors.navy, darkItemSelectedBg: txColors.primary },
     Table: { headerBg: '#F8F7F5' },
   },
 };

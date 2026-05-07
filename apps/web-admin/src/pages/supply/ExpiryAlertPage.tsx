@@ -44,6 +44,7 @@ import {
   ShoppingCartOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Text, Paragraph } = Typography;
 
@@ -99,10 +100,10 @@ async function apiPatch<T = unknown>(path: string, body?: unknown): Promise<T> {
 }
 
 function getDaysColor(days: number): string {
-  if (days <= 3) return '#A32D2D';
+  if (days <= 3) return txColors.danger;
   if (days <= 7) return '#D46B08';
-  if (days <= 15) return '#BA7517';
-  return '#0F6E56';
+  if (days <= 15) return txColors.warning;
+  return txColors.success;
 }
 
 function getDaysTag(days: number) {
@@ -399,20 +400,20 @@ export function ExpiryAlertPage() {
         <Space size="small">
           {r.status === 'pending' && (
             <a
-              style={{ color: '#0F6E56', fontSize: 12 }}
+              style={{ color: txColors.success, fontSize: 12 }}
               onClick={() => handleMarkDone(r)}
             >
               标记已处理
             </a>
           )}
           <a
-            style={{ color: '#185FA5', fontSize: 12 }}
+            style={{ color: txColors.info, fontSize: 12 }}
             onClick={() => handleTransfer(r)}
           >
             转移门店
           </a>
           <a
-            style={{ color: '#FF6B35', fontSize: 12 }}
+            style={{ color: txColors.primary, fontSize: 12 }}
             onClick={() => setQuickPOIngredient(r.ingredient_name)}
           >
             生成采购单
@@ -477,7 +478,7 @@ export function ExpiryAlertPage() {
             icon={<RobotOutlined />}
             loading={aiLoading}
             onClick={handleAIAnalyze}
-            style={{ background: '#185FA5', borderColor: '#185FA5' }}
+            style={{ background: txColors.info, borderColor: txColors.info }}
           >
             AI 分析
           </Button>
@@ -490,12 +491,12 @@ export function ExpiryAlertPage() {
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 16 }}>
         <Col span={6}>
-          <Card bordered={false} style={{ borderLeft: '4px solid #A32D2D' }}>
+          <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.danger}` }}>
             <Statistic
               title="今日临期（≤3天）"
               value={todayCount}
               suffix="种"
-              valueStyle={{ color: '#A32D2D', fontWeight: 700 }}
+              valueStyle={{ color: txColors.danger, fontWeight: 700 }}
               prefix={<ExclamationCircleOutlined />}
             />
           </Card>
@@ -512,22 +513,22 @@ export function ExpiryAlertPage() {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ borderLeft: '4px solid #BA7517' }}>
+          <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.warning}` }}>
             <Statistic
               title="待处理预警"
               value={pendingCount}
               suffix="条"
-              valueStyle={{ color: '#BA7517', fontWeight: 700 }}
+              valueStyle={{ color: txColors.warning, fontWeight: 700 }}
             />
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ borderLeft: '4px solid #0F6E56' }}>
+          <Card bordered={false} style={{ borderLeft: `4px solid ${txColors.success}` }}>
             <Statistic
               title="已处理预警"
               value={handledCount}
               suffix="条"
-              valueStyle={{ color: '#0F6E56', fontWeight: 700 }}
+              valueStyle={{ color: txColors.success, fontWeight: 700 }}
               prefix={<CheckCircleOutlined />}
             />
           </Card>
@@ -551,8 +552,8 @@ export function ExpiryAlertPage() {
           }}
           title={
             <Space>
-              <RobotOutlined style={{ color: '#185FA5' }} />
-              <Text strong style={{ color: '#185FA5' }}>AI 库存分析结果</Text>
+              <RobotOutlined style={{ color: txColors.info }} />
+              <Text strong style={{ color: txColors.info }}>AI 库存分析结果</Text>
               <Badge
                 {...getRiskBadge(aiResult.risk_level)}
                 text={getRiskBadge(aiResult.risk_level).text}
@@ -572,7 +573,7 @@ export function ExpiryAlertPage() {
                 actions={[
                   <a
                     key="po"
-                    style={{ color: '#FF6B35' }}
+                    style={{ color: txColors.primary }}
                     onClick={() => setQuickPOIngredient(item.ingredient_name)}
                   >
                     <ShoppingCartOutlined /> 生成采购单
@@ -636,7 +637,7 @@ export function ExpiryAlertPage() {
             icon={<RobotOutlined />}
             loading={aiLoading}
             onClick={handleAIAnalyze}
-            style={{ color: '#185FA5', borderColor: '#185FA5' }}
+            style={{ color: txColors.info, borderColor: txColors.info }}
           >
             AI 分析
           </Button>,

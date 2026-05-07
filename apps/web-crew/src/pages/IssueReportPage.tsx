@@ -5,6 +5,7 @@
  */
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 颜色常量（Design Token）---------- */
 const C = {
@@ -13,14 +14,14 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
-  primaryActive: '#E55A28',
+  primary: txColors.primary,
+  primaryActive: txColors.primaryActive,
   primaryLight: 'rgba(255,107,53,0.12)',
-  success: '#0F6E56',
+  success: txColors.success,
   successBg: 'rgba(15,110,86,0.12)',
-  warning: '#BA7517',
+  warning: txColors.warning,
   warningBg: 'rgba(186,117,23,0.12)',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   dangerBg: 'rgba(163,45,45,0.12)',
   inputBg: '#0d1e25',
 };
@@ -49,7 +50,7 @@ interface SeverityOption {
 const ISSUE_TYPES: IssueTypeOption[] = [
   { value: 'food_safety', label: '食品安全', icon: '🍽️', color: C.danger, bg: C.dangerBg },
   { value: 'equipment',   label: '设备故障', icon: '⚙️',  color: C.warning, bg: C.warningBg },
-  { value: 'hygiene',     label: '卫生问题', icon: '🧹', color: '#185FA5', bg: 'rgba(24,95,165,0.10)' },
+  { value: 'hygiene',     label: '卫生问题', icon: '🧹', color: txColors.info, bg: 'rgba(24,95,165,0.10)' },
   { value: 'complaint',   label: '客户投诉', icon: '💬', color: C.primary, bg: C.primaryLight },
   { value: 'other',       label: '其他问题', icon: '📋', color: C.muted,   bg: 'rgba(100,116,139,0.12)' },
 ];

@@ -31,6 +31,7 @@ import {
   Divider,
 } from 'antd';
 import type { TreeDataNode } from 'antd';
+import { txColors } from '@tx/tokens';
 import {
   PlusOutlined,
   ShopOutlined,
@@ -99,9 +100,9 @@ const BRAND_TYPE_COLORS: Record<string, string> = {
 
 function regionToTreeNode(region: Region): TreeDataNode {
   const levelIconMap: Record<number, React.ReactNode> = {
-    1: <GlobalOutlined style={{ color: '#FF6B35' }} />,
-    2: <ApartmentOutlined style={{ color: '#185FA5' }} />,
-    3: <EnvironmentOutlined style={{ color: '#0F6E56' }} />,
+    1: <GlobalOutlined style={{ color: txColors.primary }} />,
+    2: <ApartmentOutlined style={{ color: txColors.info }} />,
+    3: <EnvironmentOutlined style={{ color: txColors.success }} />,
   };
   return {
     key: region.region_id,
@@ -221,7 +222,7 @@ function BrandTab() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
           onClick={() => setCreateModalOpen(true)}
         >
           新建品牌
@@ -244,7 +245,7 @@ function BrandTab() {
                     width: 56,
                     height: 56,
                     borderRadius: 8,
-                    background: brand.primary_color || '#FF6B35',
+                    background: brand.primary_color || txColors.primary,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -349,7 +350,7 @@ function BrandTab() {
                       type="primary"
                       loading={savingStrategy}
                       onClick={handleSaveStrategy}
-                      style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                      style={{ background: txColors.primary, borderColor: txColors.primary }}
                     >
                       保存到DB
                     </Button>
@@ -394,7 +395,7 @@ function BrandTab() {
         onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); }}
         onOk={() => createForm.submit()}
         okText="创建"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form
           form={createForm}
@@ -417,7 +418,7 @@ function BrandTab() {
               <Select.Option value="banquet">宴席</Select.Option>
             </Select>
           </Form.Item>
-          <Form.Item name="primary_color" label="品牌主色" initialValue="#FF6B35">
+          <Form.Item name="primary_color" label="品牌主色" initialValue={txColors.primary}>
             <Input type="color" style={{ width: 80, padding: 2 }} />
           </Form.Item>
           <Form.Item name="description" label="品牌描述">
@@ -538,7 +539,7 @@ function RegionTab() {
         <Card
           title={
             <Space>
-              <BranchesOutlined style={{ color: '#FF6B35' }} />
+              <BranchesOutlined style={{ color: txColors.primary }} />
               <span>区域层级</span>
             </Space>
           }
@@ -577,7 +578,7 @@ function RegionTab() {
           title={
             selectedRegion
               ? <Space>
-                  <EnvironmentOutlined style={{ color: '#FF6B35' }} />
+                  <EnvironmentOutlined style={{ color: txColors.primary }} />
                   <span>{selectedRegion.name}</span>
                   <Tag color={['', 'orange', 'blue', 'green'][selectedRegion.level] ?? 'default'}>
                     {levelLabel(selectedRegion.level)}
@@ -655,7 +656,7 @@ function RegionTab() {
                 </Descriptions.Item>
               </Descriptions>
 
-              <div style={{ marginTop: 16, padding: '12px 16px', background: '#FFF3ED', borderRadius: 6 }}>
+              <div style={{ marginTop: 16, padding: '12px 16px', background: txColors.primaryLight, borderRadius: 6 }}>
                 <Text type="secondary" style={{ fontSize: 13 }}>
                   <b>税率说明：</b>修改此区域税率将影响该区域下所有门店的默认发票税率。
                   当前税率：{((selectedRegion.tax_rate ?? 0.06) * 100).toFixed(2)}%
@@ -678,7 +679,7 @@ function RegionTab() {
         onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); }}
         onOk={() => createForm.submit()}
         okText="创建"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form
           form={createForm}
@@ -708,7 +709,7 @@ function RegionTab() {
         onOk={handleSaveTaxRate}
         okText="确认修改"
         confirmLoading={savingTaxRate}
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <div style={{ padding: '16px 0' }}>
           <Space direction="vertical" style={{ width: '100%' }}>

@@ -42,15 +42,16 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
 
 // ─── Design Token（与 txAdminTheme 对齐） ────────────────────────────────────
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_ERROR = '#A32D2D';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_ERROR = txColors.danger;
 const TX_BG_HEADER = '#F8F7F5';
 
 // ─── 类型定义 ────────────────────────────────────────────────────────────────

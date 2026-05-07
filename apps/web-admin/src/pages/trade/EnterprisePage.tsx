@@ -50,6 +50,7 @@ import type {
 } from '../../api/enterpriseAdminApi';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { confirm } = Modal;
@@ -261,7 +262,7 @@ function EnterpriseListTab() {
       key: 'used_credit_fen',
       width: 130,
       render: (val: number) => (
-        <Text style={{ color: val > 0 ? '#BA7517' : undefined }}>
+        <Text style={{ color: val > 0 ? txColors.warning : undefined }}>
           ¥{fenToYuan(val)}
         </Text>
       ),
@@ -359,7 +360,7 @@ function EnterpriseListTab() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleCreate}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             新建企业
           </Button>
@@ -486,7 +487,7 @@ function EnterpriseListTab() {
                   title="已用额度"
                   value={fenToYuan(drawerEnterprise.used_credit_fen)}
                   prefix="¥"
-                  valueStyle={{ color: drawerEnterprise.used_credit_fen > 0 ? '#BA7517' : undefined }}
+                  valueStyle={{ color: drawerEnterprise.used_credit_fen > 0 ? txColors.warning : undefined }}
                 />
               </Col>
               <Col span={8}>
@@ -494,7 +495,7 @@ function EnterpriseListTab() {
                   title="剩余额度"
                   value={fenToYuan(drawerEnterprise.credit_limit_fen - drawerEnterprise.used_credit_fen)}
                   prefix="¥"
-                  valueStyle={{ color: '#0F6E56' }}
+                  valueStyle={{ color: txColors.success }}
                 />
               </Col>
             </Row>
@@ -646,7 +647,7 @@ function SignRecordsTab() {
                 title="未还款金额"
                 value={fenToYuan(totalUnpaidFen)}
                 prefix="¥"
-                valueStyle={{ color: totalUnpaidFen > 0 ? '#A32D2D' : '#0F6E56' }}
+                valueStyle={{ color: totalUnpaidFen > 0 ? txColors.danger : txColors.success }}
               />
             </Card>
           </Col>
@@ -784,7 +785,7 @@ function MonthlyBillingTab() {
             type="primary"
             onClick={handleLoadStatement}
             loading={loadingStatement}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             查询明细
           </Button>
@@ -821,7 +822,7 @@ function MonthlyBillingTab() {
                 title="本月签单总额"
                 value={fenToYuan(statement.total_fen)}
                 prefix="¥"
-                valueStyle={{ color: '#FF6B35' }}
+                valueStyle={{ color: txColors.primary }}
               />
             </Col>
             <Col span={6}>
@@ -838,7 +839,7 @@ function MonthlyBillingTab() {
                     title="已还款"
                     value={fenToYuan(statement.bill.paid_fen)}
                     prefix="¥"
-                    valueStyle={{ color: '#0F6E56' }}
+                    valueStyle={{ color: txColors.success }}
                   />
                 </Col>
                 <Col span={6}>
@@ -854,8 +855,8 @@ function MonthlyBillingTab() {
                     valueStyle={{
                       color:
                         statement.bill.status === 'settled'
-                          ? '#0F6E56'
-                          : '#BA7517',
+                          ? txColors.success
+                          : txColors.warning,
                       fontSize: 20,
                     }}
                   />
@@ -882,7 +883,7 @@ function MonthlyBillingTab() {
                     <Text strong>合计</Text>
                   </Table.Summary.Cell>
                   <Table.Summary.Cell index={2}>
-                    <Text strong style={{ color: '#FF6B35' }}>
+                    <Text strong style={{ color: txColors.primary }}>
                       ¥{fenToYuan(total)}
                     </Text>
                   </Table.Summary.Cell>

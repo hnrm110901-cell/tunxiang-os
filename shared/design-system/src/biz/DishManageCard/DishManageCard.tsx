@@ -9,6 +9,7 @@ import { useMemo } from 'react';
 import styles from './DishManageCard.module.css';
 import { cn } from '../../utils/cn';
 import { formatPrice } from '../../utils/formatPrice';
+import { txColors } from '@tx/tokens';
 
 export interface DishManageData {
   id: string;
@@ -36,16 +37,16 @@ export interface DishManageCardProps {
 }
 
 const QUADRANT_META: Record<string, { label: string; icon: string; color: string }> = {
-  star:     { label: '明星', icon: '⭐', color: '#FF6B35' },
-  cash_cow: { label: '金牛', icon: '🐂', color: '#185FA5' },
-  question: { label: '问题', icon: '❓', color: '#BA7517' },
+  star:     { label: '明星', icon: '⭐', color: txColors.primary },
+  cash_cow: { label: '金牛', icon: '🐂', color: txColors.info },
+  question: { label: '问题', icon: '❓', color: txColors.warning },
   dog:      { label: '瘦狗', icon: '🐕', color: '#8899A6' },
 };
 
 const STOCK_META: Record<string, { label: string; color: string }> = {
-  normal:       { label: '正常', color: '#0F6E56' },
-  low:          { label: '低库存', color: '#BA7517' },
-  out_of_stock: { label: '缺货', color: '#A32D2D' },
+  normal:       { label: '正常', color: txColors.success },
+  low:          { label: '低库存', color: txColors.warning },
+  out_of_stock: { label: '缺货', color: txColors.danger },
 };
 
 export default function DishManageCard({
@@ -66,9 +67,9 @@ export default function DishManageCard({
 
   const costRateColor = useMemo(() => {
     if (dish.costRate == null) return '#8899A6';
-    if (dish.costRate > 0.5) return '#A32D2D';
-    if (dish.costRate >= 0.3) return '#BA7517';
-    return '#0F6E56';
+    if (dish.costRate > 0.5) return txColors.danger;
+    if (dish.costRate >= 0.3) return txColors.warning;
+    return txColors.success;
   }, [dish.costRate]);
 
   return (

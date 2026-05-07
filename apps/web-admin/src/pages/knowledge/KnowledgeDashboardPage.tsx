@@ -12,15 +12,16 @@ import {
   DatabaseOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const { Text } = Typography;
 
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  info: txColors.info,
   bg: '#F8F7F5',
   border: '#E8E6E1',
   textSub: '#5F5E5A',

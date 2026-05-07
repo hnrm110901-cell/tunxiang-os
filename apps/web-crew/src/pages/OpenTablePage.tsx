@@ -7,19 +7,20 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { fetchTables, openTable } from '../api/tablesApi';
 import type { TableInfo } from '../api/tablesApi';
 import { updateReservationStatus } from '../api/reservationApi';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
   green: '#22c55e',
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  danger: '#A32D2D',
+  danger: txColors.danger,
 };
 
 type TableStatus = 'idle' | 'occupied' | 'reserved' | 'cleaning';
@@ -109,7 +110,7 @@ export function OpenTablePage() {
       {isPrefilled && !isFromReservation && (
         <div style={{
           background: 'rgba(255, 107, 53, 0.15)',
-          border: '1px solid #FF6B35',
+          border: `1px solid ${txColors.primary}`,
           borderRadius: 8,
           padding: '10px 14px',
           marginBottom: 12,
@@ -123,7 +124,7 @@ export function OpenTablePage() {
       {isFromReservation && (
         <div style={{
           background: 'rgba(255, 107, 53, 0.12)',
-          border: '1px solid #FF6B35',
+          border: `1px solid ${txColors.primary}`,
           borderRadius: 8,
           padding: '12px 14px',
           marginBottom: 12,

@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * coupon/index.tsx — 优惠券中心
  *
@@ -21,7 +22,7 @@ import { fenToYuanDisplay } from '../../utils/format'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   primaryDark: '#E55A1F',
   bgDeep: '#0B1A20',
   bgCard: '#132029',

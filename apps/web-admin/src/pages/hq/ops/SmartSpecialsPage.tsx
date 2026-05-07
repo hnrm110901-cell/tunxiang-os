@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -62,8 +63,8 @@ function getDiscountLabel(rate: number): string {
 
 function getReasonColor(reason: string): { color: string; bg: string } {
   if (reason === '临期食材') return { color: '#FF4D4D', bg: '#FF4D4D22' };
-  if (reason === '高库存清货') return { color: '#BA7517', bg: '#BA751722' };
-  return { color: '#185FA5', bg: '#185FA522' };
+  if (reason === '高库存清货') return { color: txColors.warning, bg: `${txColors.warning}22` };
+  return { color: txColors.info, bg: `${txColors.info}22` };
 }
 
 // ─── 子组件：特供菜卡片 ───
@@ -84,7 +85,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
     <div style={{
       background: selected ? '#1f3040' : '#1a2a33',
       borderRadius: 10,
-      border: `1px solid ${selected ? '#FF6B35' : '#2a3a44'}`,
+      border: `1px solid ${selected ? txColors.primary : '#2a3a44'}`,
       padding: 16,
       transition: 'border-color 0.2s, background 0.2s',
     }}>
@@ -94,7 +95,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
           type="checkbox"
           checked={selected}
           onChange={() => onToggle(dish.dish_id)}
-          style={{ width: 16, height: 16, marginTop: 3, accentColor: '#FF6B35', cursor: 'pointer', flexShrink: 0 }}
+          style={{ width: 16, height: 16, marginTop: 3, accentColor: txColors.primary, cursor: 'pointer', flexShrink: 0 }}
         />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -116,7 +117,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
             {dish.pushed && (
               <span style={{
                 padding: '2px 8px', borderRadius: 10, fontSize: 11,
-                background: '#0F6E5622', color: '#0F6E56',
+                background: `${txColors.success}22`, color: txColors.success,
               }}>
                 ✓ 已推送
               </span>
@@ -129,7 +130,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
 
         {/* 折扣徽章 */}
         <div style={{
-          background: '#FF6B35', color: '#fff', borderRadius: 8,
+          background: txColors.primary, color: '#fff', borderRadius: 8,
           padding: '4px 10px', fontSize: 13, fontWeight: 700, flexShrink: 0,
         }}>
           {getDiscountLabel(dish.discount_rate)}
@@ -141,7 +142,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
         <span style={{ color: '#888', fontSize: 13, textDecoration: 'line-through' }}>
           ¥{fenToYuan(dish.original_price_fen)}
         </span>
-        <span style={{ color: '#FF6B35', fontSize: 24, fontWeight: 800 }}>
+        <span style={{ color: txColors.primary, fontSize: 24, fontWeight: 800 }}>
           ¥{fenToYuan(dish.special_price_fen)}
         </span>
         <span style={{ color: '#888', fontSize: 12 }}>省¥{fenToYuan(dish.original_price_fen - dish.special_price_fen)}</span>
@@ -164,7 +165,7 @@ function SpecialCard({ dish, selected, onToggle, expanded, onExpandToggle }: Spe
             <div style={{
               marginTop: 6, padding: '8px 12px', background: '#0d1e28',
               borderRadius: 6, color: '#aaa', fontSize: 12, lineHeight: 1.6,
-              borderLeft: '3px solid #FF6B3544',
+              borderLeft: `3px solid ${txColors.primary}44`,
             }}>
               {dish.sales_script}
             </div>
@@ -297,7 +298,7 @@ export function SmartSpecialsPage() {
             disabled={generating}
             style={{
               padding: '7px 18px', borderRadius: 6, border: 'none',
-              background: generating ? '#2a3a44' : '#FF6B35',
+              background: generating ? '#2a3a44' : txColors.primary,
               color: generating ? '#888' : '#fff',
               fontSize: 14, fontWeight: 600, cursor: generating ? 'not-allowed' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
@@ -321,7 +322,7 @@ export function SmartSpecialsPage() {
       {/* 错误提示 */}
       {error && (
         <div style={{
-          background: '#A32D2D22', border: '1px solid #A32D2D44', borderRadius: 8,
+          background: `${txColors.danger}22`, border: `1px solid ${txColors.danger}44`, borderRadius: 8,
           padding: '10px 16px', marginBottom: 16, color: '#FF4D4D', fontSize: 13,
         }}>
           ⚠️ {error}
@@ -430,19 +431,19 @@ export function SmartSpecialsPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     {pushedDishes.map(dish => (
                       <div key={dish.dish_id} style={{
-                        background: '#0F6E5611', borderRadius: 8,
-                        border: '1px solid #0F6E5633', padding: '10px 14px',
+                        background: `${txColors.success}11`, borderRadius: 8,
+                        border: `1px solid ${txColors.success}33`, padding: '10px 14px',
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <span style={{ color: '#0F6E56', fontSize: 16 }}>✓</span>
+                          <span style={{ color: txColors.success, fontSize: 16 }}>✓</span>
                           <div>
                             <span style={{ color: '#ccc', fontSize: 14, fontWeight: 600 }}>{dish.dish_name}</span>
                             <span style={{ color: '#666', fontSize: 12, marginLeft: 8 }}>{dish.ingredient_name}</span>
                           </div>
                         </div>
                         <div style={{ textAlign: 'right' }}>
-                          <span style={{ color: '#FF6B35', fontWeight: 700 }}>¥{fenToYuan(dish.special_price_fen)}</span>
+                          <span style={{ color: txColors.primary, fontWeight: 700 }}>¥{fenToYuan(dish.special_price_fen)}</span>
                           <span style={{ color: '#666', fontSize: 12, marginLeft: 6, textDecoration: 'line-through' }}>
                             ¥{fenToYuan(dish.original_price_fen)}
                           </span>
@@ -469,7 +470,7 @@ export function SmartSpecialsPage() {
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
               <span style={{ color: '#888', fontSize: 14 }}>已选菜品</span>
-              <span style={{ color: selected.size > 0 ? '#FF6B35' : '#888', fontSize: 20, fontWeight: 700 }}>
+              <span style={{ color: selected.size > 0 ? txColors.primary : '#888', fontSize: 20, fontWeight: 700 }}>
                 {selected.size} 道
               </span>
             </div>
@@ -481,9 +482,9 @@ export function SmartSpecialsPage() {
               style={{
                 width: '100%', padding: '12px 0', borderRadius: 8, border: 'none',
                 background: pushSuccess
-                  ? '#0F6E56'
+                  ? txColors.success
                   : selected.size > 0 && !pushing
-                  ? '#FF6B35'
+                  ? txColors.primary
                   : '#2a3a44',
                 color: selected.size > 0 || pushSuccess ? '#fff' : '#666',
                 fontSize: 15, fontWeight: 700, cursor: selected.size > 0 && !pushing && !pushSuccess ? 'pointer' : 'not-allowed',
@@ -511,8 +512,8 @@ export function SmartSpecialsPage() {
             {pushSuccess && (
               <div style={{
                 marginTop: 12, padding: '10px 14px', borderRadius: 8,
-                background: '#0F6E5622', border: '1px solid #0F6E5644',
-                color: '#0F6E56', fontSize: 13, textAlign: 'center',
+                background: `${txColors.success}22`, border: `1px solid ${txColors.success}44`,
+                color: txColors.success, fontSize: 13, textAlign: 'center',
               }}>
                 特供方案已推送至 POS 屏幕和小程序推荐位
               </div>
@@ -529,7 +530,7 @@ export function SmartSpecialsPage() {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ color: '#888' }}>已推送</span>
-                    <span style={{ color: '#0F6E56', fontWeight: 600 }}>{specials.pushed_count ?? pushedDishes.length} 道</span>
+                    <span style={{ color: txColors.success, fontWeight: 600 }}>{specials.pushed_count ?? pushedDishes.length} 道</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
                     <span style={{ color: '#888' }}>生成时间</span>
@@ -545,8 +546,8 @@ export function SmartSpecialsPage() {
             {specials && specials.alternatives.length > 0 && (
               <div style={{
                 marginTop: 16, padding: '10px 14px', borderRadius: 8,
-                background: '#185FA522', border: '1px solid #185FA544',
-                color: '#185FA5', fontSize: 13,
+                background: `${txColors.info}22`, border: `1px solid ${txColors.info}44`,
+                color: txColors.info, fontSize: 13,
               }}>
                 💡 {specials.alternatives.length} 条缺货菜品替代建议，见下方列表
               </div>

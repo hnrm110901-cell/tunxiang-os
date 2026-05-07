@@ -8,12 +8,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量（深色主题） ----
 const BG_0 = '#0d1e28';
 const BG_1 = '#1a2a33';
 const BG_2 = '#243442';
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 const GREEN = '#52c41a';
 const RED = '#ff4d4f';
 const YELLOW = '#faad14';

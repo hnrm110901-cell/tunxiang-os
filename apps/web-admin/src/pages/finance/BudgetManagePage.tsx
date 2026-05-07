@@ -47,6 +47,7 @@ import {
 } from '../../api/budgetApi';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -221,7 +222,7 @@ function BudgetPlanTab({
       <Table.Summary.Row style={{ background: '#F8F7F5', fontWeight: 600 }}>
         <Table.Summary.Cell index={0}>年度合计</Table.Summary.Cell>
         <Table.Summary.Cell index={1} align="right">
-          <Text strong style={{ color: '#FF6B35' }}>¥{fenToYuan(totalRevenue)}</Text>
+          <Text strong style={{ color: txColors.primary }}>¥{fenToYuan(totalRevenue)}</Text>
         </Table.Summary.Cell>
         <Table.Summary.Cell index={2} align="right">
           <Text strong>¥{fenToYuan(totalCost)}</Text>
@@ -259,7 +260,7 @@ function BudgetPlanTab({
             onClick={loadBudgets}
             loading={loading}
             disabled={!storeId}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             查询
           </Button>
@@ -400,15 +401,15 @@ function BudgetExecutionTab({
 
   // 完成率颜色
   const rateColor = (rate: number) => {
-    if (rate >= 1.0) return '#0F6E56';   // ≥100% 绿
-    if (rate >= 0.8) return '#185FA5';   // 80-100% 蓝
-    return '#A32D2D';                    // <80% 红
+    if (rate >= 1.0) return txColors.success;   // ≥100% 绿
+    if (rate >= 0.8) return txColors.info;   // 80-100% 蓝
+    return txColors.danger;                    // <80% 红
   };
 
   const rateStrokeColor = (rate: number) => {
-    if (rate >= 1.0) return '#0F6E56';
-    if (rate >= 0.8) return '#185FA5';
-    return '#A32D2D';
+    if (rate >= 1.0) return txColors.success;
+    if (rate >= 0.8) return txColors.info;
+    return txColors.danger;
   };
 
   const columns: ColumnsType<ExecutionRow> = [
@@ -468,7 +469,7 @@ function BudgetExecutionTab({
         if (!record.execution) return '-';
         const over = record.execution.variance.cost_over_budget;
         return (
-          <Text style={{ color: over ? '#A32D2D' : '#0F6E56' }}>
+          <Text style={{ color: over ? txColors.danger : txColors.success }}>
             ¥{fenToYuan(record.execution.actual.food_cost_fen)}
             {over && <Tag color="red" style={{ marginLeft: 6, fontSize: 11 }}>超预算</Tag>}
           </Text>
@@ -497,7 +498,7 @@ function BudgetExecutionTab({
         const warnings = [];
         if (variance.cost_over_budget) warnings.push('食材超预算');
         if (variance.labor_over_budget) warnings.push('人力超预算');
-        if (warnings.length === 0) return <Text style={{ color: '#0F6E56' }}>正常</Text>;
+        if (warnings.length === 0) return <Text style={{ color: txColors.success }}>正常</Text>;
         return warnings.map((w) => <Tag key={w} color="orange">{w}</Tag>);
       },
     },
@@ -533,7 +534,7 @@ function BudgetExecutionTab({
             icon={<ReloadOutlined />}
             onClick={handleQuery}
             loading={querying}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             对比查询
           </Button>
@@ -753,7 +754,7 @@ function BudgetDispatchTab({
               icon={<SendOutlined />}
               disabled={!sourceStoreId || targetStoreIds.length === 0 || sourcebudgets.length === 0}
               onClick={() => setPreviewOpen(true)}
-              style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ background: txColors.primary, borderColor: txColors.primary }}
             >
               预览并下发
             </Button>
@@ -773,7 +774,7 @@ function BudgetDispatchTab({
         onOk={handleDispatch}
         confirmLoading={dispatching}
         okText="确认下发"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
         cancelText="取消"
         width={680}
       >

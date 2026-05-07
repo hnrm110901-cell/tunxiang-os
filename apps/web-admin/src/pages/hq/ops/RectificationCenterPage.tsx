@@ -27,6 +27,7 @@ import {
   Steps,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { txColors } from '@tx/tokens';
 import {
   fetchRectificationSummary,
   fetchRectificationTasks,
@@ -46,11 +47,11 @@ const fmtPct = (rate: number) => `${(rate * 100).toFixed(1)}%`;
 // ─── 颜色常量 ───
 
 const COLOR = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  error: '#A32D2D',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  error: txColors.danger,
+  info: txColors.info,
   text: '#2C2C2A',
   muted: '#8c8c8c',
   bg: '#F8F7F5',

@@ -16,6 +16,7 @@ import { Button, Modal, Space, Table, Tag, Typography, message } from 'antd';
 import { UserAddOutlined, CheckOutlined } from '@ant-design/icons';
 import { ActionType, ProColumns, ProTable } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
 
@@ -232,7 +233,7 @@ export default function ScheduleGaps() {
                   size="small"
                   disabled={!r.available}
                   onClick={() => handleFill(r.employee_id)}
-                  style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+                  style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
                 >
                   指派
                 </Button>

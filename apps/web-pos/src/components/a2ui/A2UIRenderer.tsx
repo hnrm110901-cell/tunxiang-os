@@ -11,6 +11,7 @@
  *   - 暗色主题适配
  */
 import { type ReactNode } from 'react';
+import { txColors } from '@tx/tokens';
 import type {
   A2UINode, A2UIDeclaration, A2UIActionCallback, A2UIRenderContext,
   A2UIButtonProps, A2UICardProps, A2UIListProps, A2UIListItem,
@@ -26,7 +27,7 @@ const T = {
   text: '#E0E0E0',
   text2: 'rgba(255,255,255,0.55)',
   text3: 'rgba(255,255,255,0.3)',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   success: '#10B981',
   warning: '#F59E0B',
   danger: '#EF4444',

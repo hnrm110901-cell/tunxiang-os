@@ -9,6 +9,7 @@
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -79,7 +80,7 @@ interface SyncIndicatorProps {
 function SyncIndicator({ status, syncedCount }: SyncIndicatorProps) {
   const map: Record<SyncStatus, { color: string; label: string; spin?: boolean }> = {
     idle:    { color: '#9CA3AF', label: '已同步' },
-    syncing: { color: '#FF6B35', label: '同步中...', spin: true },
+    syncing: { color: txColors.primary, label: '同步中...', spin: true },
     success: { color: '#22C55E', label: `已同步到 ${syncedCount} 个终端` },
     error:   { color: '#EF4444', label: '同步失败，请重试' },
   };
@@ -195,9 +196,9 @@ function DishEditPanel({ dish, onSave, onClose, saving }: DishEditPanelProps) {
             onClick={() => update({ is_available: true })}
             style={{
               ...toggleBase,
-              background: edit.is_available ? '#FF6B35' : '#111827',
+              background: edit.is_available ? txColors.primary : '#111827',
               color: edit.is_available ? '#fff' : '#9CA3AF',
-              borderColor: edit.is_available ? '#FF6B35' : '#374151',
+              borderColor: edit.is_available ? txColors.primary : '#374151',
             }}
           >
             ● 上架
@@ -248,7 +249,7 @@ function DishEditPanel({ dish, onSave, onClose, saving }: DishEditPanelProps) {
         style={{
           ...btnBase,
           width: '100%',
-          background: saving ? '#6B7280' : '#FF6B35',
+          background: saving ? '#6B7280' : txColors.primary,
           color: '#fff',
           opacity: saving ? 0.7 : 1,
           cursor: saving ? 'not-allowed' : 'pointer',
@@ -386,7 +387,7 @@ function DishRow({ dish, selected, onSelect, expanded, onEdit, onQuickToggle, on
             type="checkbox"
             checked={selected}
             onChange={e => onSelect(dish.id, e.target.checked)}
-            style={{ width: 18, height: 18, accentColor: '#FF6B35', cursor: 'pointer' }}
+            style={{ width: 18, height: 18, accentColor: txColors.primary, cursor: 'pointer' }}
           />
         </label>
 
@@ -396,7 +397,7 @@ function DishRow({ dish, selected, onSelect, expanded, onEdit, onQuickToggle, on
             <span style={{ color: '#F9FAFB', fontSize: 16, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
               {dish.name}
             </span>
-            <span style={{ color: '#FF6B35', fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>
+            <span style={{ color: txColors.primary, fontSize: 16, fontWeight: 700, whiteSpace: 'nowrap' }}>
               ¥{fenToYuan(dish.price)}
             </span>
           </div>
@@ -466,7 +467,7 @@ function DishRow({ dish, selected, onSelect, expanded, onEdit, onQuickToggle, on
             style={{
               height: 48,
               padding: '0 16px',
-              background: expanded ? '#FF6B35' : '#374151',
+              background: expanded ? txColors.primary : '#374151',
               color: '#F9FAFB',
               border: 'none',
               borderRadius: 8,
@@ -759,7 +760,7 @@ export function LiveMenuEditorPage() {
               cursor: 'pointer',
               fontSize: 14,
               fontWeight: activeCategory === cat ? 700 : 400,
-              background: activeCategory === cat ? '#FF6B35' : '#1F2937',
+              background: activeCategory === cat ? txColors.primary : '#1F2937',
               color: activeCategory === cat ? '#fff' : '#9CA3AF',
               whiteSpace: 'nowrap',
               flexShrink: 0,

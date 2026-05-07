@@ -10,6 +10,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── 常量 ─────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   red: '#ef4444',
   muted: '#64748b',

@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ---------- 数据结构 ----------
 
@@ -198,7 +199,7 @@ function highlightMatch(text: string, query: string): React.ReactNode {
   return (
     <>
       {text.slice(0, idx)}
-      <span style={{ color: 'var(--brand, #FF6B35)', fontWeight: 600 }}>{text.slice(idx, idx + query.length)}</span>
+      <span style={{ color: `var(--brand, ${txColors.primary})`, fontWeight: 600 }}>{text.slice(idx, idx + query.length)}</span>
       {text.slice(idx + query.length)}
     </>
   );

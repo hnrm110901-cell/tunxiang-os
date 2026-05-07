@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetch } from '../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -110,10 +111,10 @@ export function DailyBriefPage() {
 
       {/* 核心 KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10, marginBottom: 16 }}>
-        <KPICard label="今日营收" value={fen2yuan(brief.revenueFen)} sub={`环比 ${brief.revenueGrowth >= 0 ? '+' : ''}${pct(brief.revenueGrowth)}`} subColor={brief.revenueGrowth >= 0 ? '#0F6E56' : '#A32D2D'} highlight />
+        <KPICard label="今日营收" value={fen2yuan(brief.revenueFen)} sub={`环比 ${brief.revenueGrowth >= 0 ? '+' : ''}${pct(brief.revenueGrowth)}`} subColor={brief.revenueGrowth >= 0 ? txColors.success : txColors.danger} highlight />
         <KPICard label="订单/客流" value={`${brief.orderCount}单 / ${brief.guestCount}人`} sub={`客单价 ${fen2yuan(brief.avgCheckFen)}`} />
         <KPICard label="翻台率" value={brief.tableTurnRate.toFixed(1)} sub={`最佳: ${brief.bestPeriod}`} />
-        <KPICard label="毛利率" value={pct(brief.grossMargin)} sub={brief.grossMargin < 0.55 ? '低于阈值' : '正常'} subColor={brief.grossMargin < 0.55 ? '#A32D2D' : '#0F6E56'} />
+        <KPICard label="毛利率" value={pct(brief.grossMargin)} sub={brief.grossMargin < 0.55 ? '低于阈值' : '正常'} subColor={brief.grossMargin < 0.55 ? txColors.danger : txColors.success} />
       </div>
 
       {/* 异常预警 */}
@@ -123,9 +124,9 @@ export function DailyBriefPage() {
             <div key={i} style={{
               padding: '10px 12px', borderRadius: 8, marginBottom: 6,
               background: a.severity === 'high' ? 'rgba(163,45,45,0.08)' : 'rgba(186,117,23,0.08)',
-              borderLeft: `4px solid ${a.severity === 'high' ? '#A32D2D' : '#BA7517'}`,
+              borderLeft: `4px solid ${a.severity === 'high' ? txColors.danger : txColors.warning}`,
             }}>
-              <div style={{ fontSize: 14, color: a.severity === 'high' ? '#A32D2D' : '#BA7517' }}>{a.title}</div>
+              <div style={{ fontSize: 14, color: a.severity === 'high' ? txColors.danger : txColors.warning }}>{a.title}</div>
             </div>
           ))}
         </Section>
@@ -139,7 +140,7 @@ export function DailyBriefPage() {
             background: 'rgba(24,95,165,0.06)', fontSize: 14, color: '#ccc',
             display: 'flex', gap: 8,
           }}>
-            <span style={{ color: '#185FA5', fontWeight: 600, flexShrink: 0 }}>{i + 1}.</span>
+            <span style={{ color: txColors.info, fontWeight: 600, flexShrink: 0 }}>{i + 1}.</span>
             {s}
           </div>
         ))}
@@ -150,7 +151,7 @@ export function DailyBriefPage() {
         <Section title="热销 TOP3" icon="🔥" compact>
           {brief.topDishes.map((d, i) => (
             <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14, borderBottom: '1px solid #1a2a33' }}>
-              <span><span style={{ color: '#FF6B35', fontWeight: 600, marginRight: 6 }}>{i + 1}</span>{d.name}</span>
+              <span><span style={{ color: txColors.primary, fontWeight: 600, marginRight: 6 }}>{i + 1}</span>{d.name}</span>
               <span style={{ color: '#9CA3AF' }}>{d.count}份</span>
             </div>
           ))}
@@ -159,7 +160,7 @@ export function DailyBriefPage() {
           {brief.coldDishes.map(d => (
             <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', fontSize: 14, borderBottom: '1px solid #1a2a33' }}>
               <span>{d.name}</span>
-              <span style={{ color: '#A32D2D' }}>{d.count}份</span>
+              <span style={{ color: txColors.danger }}>{d.count}份</span>
             </div>
           ))}
         </Section>
@@ -171,12 +172,12 @@ export function DailyBriefPage() {
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>当班人员</div>
           <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4 }}>
             {brief.staffOnDuty}人
-            {brief.staffAbsent > 0 && <span style={{ fontSize: 13, color: '#A32D2D', marginLeft: 6 }}>缺勤{brief.staffAbsent}</span>}
+            {brief.staffAbsent > 0 && <span style={{ fontSize: 13, color: txColors.danger, marginLeft: 6 }}>缺勤{brief.staffAbsent}</span>}
           </div>
         </div>
         <div style={cardStyle}>
           <div style={{ fontSize: 12, color: '#9CA3AF' }}>客诉</div>
-          <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4, color: brief.complaintCount > 0 ? '#A32D2D' : '#0F6E56' }}>
+          <div style={{ fontSize: 18, fontWeight: 600, marginTop: 4, color: brief.complaintCount > 0 ? txColors.danger : txColors.success }}>
             {brief.complaintCount > 0 ? `${brief.complaintCount}件` : '0 件 ✓'}
           </div>
         </div>
@@ -189,7 +190,7 @@ export function DailyBriefPage() {
           实时看板
         </button>
         <button type="button" onClick={() => navigate('/manager/opening-checklist')}
-          style={{ flex: 1, padding: '14px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 52 }}>
+          style={{ flex: 1, padding: '14px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 500, cursor: 'pointer', minHeight: 52 }}>
           开始今日检查
         </button>
       </div>
@@ -203,7 +204,7 @@ function KPICard({ label, value, sub, subColor, highlight }: { label: string; va
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 12, color: '#9CA3AF' }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700, color: highlight ? '#FF6B35' : '#fff', marginTop: 4 }}>{value}</div>
+      <div style={{ fontSize: 20, fontWeight: 700, color: highlight ? txColors.primary : '#fff', marginTop: 4 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: subColor || '#6B7280', marginTop: 2 }}>{sub}</div>}
     </div>
   );

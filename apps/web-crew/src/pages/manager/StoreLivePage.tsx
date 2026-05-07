@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
 import { fetchStoreLive, rushDish } from '../../api/storeLiveApi';
 import type { StoreLiveData, SlowDish } from '../../api/storeLiveApi';
+import { txColors } from '@tx/tokens';
 
 // ─── 设计Token ───
 
@@ -19,10 +20,10 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
 };
 
 const pageStyle: React.CSSProperties = {

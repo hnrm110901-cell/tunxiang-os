@@ -7,6 +7,7 @@
  * 缺口3: 毛利守护预算面板
  */
 import { useState, useEffect, useMemo } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   Card, Row, Col, Tag, Select, Spin, Statistic, Space, Collapse, message,
 } from 'antd';
@@ -26,7 +27,7 @@ const CARD_BG = '#142833';
 const BORDER = '#1e3a4a';
 const TEXT_PRIMARY = '#e8e8e8';
 const TEXT_SECONDARY = '#8899a6';
-const BRAND_ORANGE = '#FF6B35';
+const BRAND_ORANGE = txColors.primary;
 const SUCCESS_GREEN = '#52c41a';
 const DANGER_RED = '#ff4d4f';
 

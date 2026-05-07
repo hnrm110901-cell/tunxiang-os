@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * member/cross-brand — 跨品牌积分通兑
  *
@@ -15,7 +16,7 @@ import { txRequest } from '../../../utils/request'
 import { useStoreInfo } from '../../../store/useStoreInfo'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   gold: '#C5A347',
   bgDeep: '#0B1A20',
   bgCard: '#132029',
@@ -46,9 +47,9 @@ const FALLBACK: CrossBrandSummary = {
   total_points: 12580,
   total_stored_value_fen: 358000,
   brands: [
-    { brand_id: 'b1', brand_name: '徐记海鲜', theme_color: '#FF6B35', points: 8200, stored_value_fen: 258000, member_level: 'gold' },
-    { brand_id: 'b2', brand_name: '湘厨小馆', theme_color: '#0F6E56', points: 3180, stored_value_fen: 80000, member_level: 'silver' },
-    { brand_id: 'b3', brand_name: '海味外卖', theme_color: '#185FA5', points: 1200, stored_value_fen: 20000, member_level: 'bronze' },
+    { brand_id: 'b1', brand_name: '徐记海鲜', theme_color: txColors.primary, points: 8200, stored_value_fen: 258000, member_level: 'gold' },
+    { brand_id: 'b2', brand_name: '湘厨小馆', theme_color: txColors.success, points: 3180, stored_value_fen: 80000, member_level: 'silver' },
+    { brand_id: 'b3', brand_name: '海味外卖', theme_color: txColors.info, points: 1200, stored_value_fen: 20000, member_level: 'bronze' },
   ],
 }
 

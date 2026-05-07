@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { txFetch } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ───
 
@@ -45,14 +46,14 @@ function PrepCard({ item, rank }: { item: PrepItem; rank: number }) {
   const isHigh = item.recommended_qty >= 15;
   const isMid = item.recommended_qty >= 8 && item.recommended_qty < 15;
 
-  const qtyColor = isHigh ? '#FF6B35' : isMid ? '#FF9F0A' : '#8E8E93';
+  const qtyColor = isHigh ? txColors.primary : isMid ? '#FF9F0A' : '#8E8E93';
   const boostPct = Math.round((item.boost_factor - 1) * 100);
 
   return (
     <div
       style={{
         background: '#1A1A1A',
-        border: `1px solid ${isHigh ? '#FF6B35' : '#2A2A2A'}`,
+        border: `1px solid ${isHigh ? txColors.primary : '#2A2A2A'}`,
         borderRadius: 12,
         padding: 16,
         display: 'flex',

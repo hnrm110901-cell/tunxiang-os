@@ -7,11 +7,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ---- 颜色常量 ----
 const BG_1 = '#112228';
 const BG_2 = '#1a2a33';
-const BRAND = '#FF6B35';
+const BRAND = txColors.primary;
 const GREEN = '#52c41a';
 const YELLOW = '#faad14';
 const BLUE = '#1890ff';

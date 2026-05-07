@@ -21,6 +21,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import dayjs, { Dayjs } from 'dayjs';
 import { apiGet } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 
@@ -28,7 +29,7 @@ const { RangePicker } = DatePicker;
 
 // BASE URL 通过 apiGet 注入，不再硬编码
 
-const STORE_COLORS = ['#FF6B35', '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'] as const;
+const STORE_COLORS = [txColors.primary, '#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'] as const;
 
 type MetricKey = 'revenue' | 'orders' | 'avg_spend' | 'turnover_rate' | 'gross_margin';
 
@@ -663,7 +664,7 @@ export function StoreComparisonPage() {
   };
 
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 页面标题 */}
         <h2 style={{ margin: '0 0 20px', fontSize: 22, fontWeight: 600 }}>
@@ -681,11 +682,11 @@ export function StoreComparisonPage() {
                   cursor: 'pointer',
                   borderColor:
                     dateRange[0].isSame(q.range[0], 'day') && dateRange[1].isSame(q.range[1], 'day')
-                      ? '#FF6B35'
+                      ? txColors.primary
                       : undefined,
                   color:
                     dateRange[0].isSame(q.range[0], 'day') && dateRange[1].isSame(q.range[1], 'day')
-                      ? '#FF6B35'
+                      ? txColors.primary
                       : undefined,
                 }}
                 onClick={() => setDateRange(q.range)}

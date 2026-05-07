@@ -51,6 +51,7 @@ import {
   type EnterpriseBill,
 } from '../../api/enterpriseAdminApi';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -173,7 +174,7 @@ function WineSummaryTab() {
         if (!v) return '—';
         const days = dayjs(v).diff(dayjs(), 'day');
         return (
-          <span style={{ color: days <= 7 ? '#A32D2D' : days <= 30 ? '#BA7517' : '#2C2C2A' }}>
+          <span style={{ color: days <= 7 ? txColors.danger : days <= 30 ? txColors.warning : '#2C2C2A' }}>
             {dayjs(v).format('YYYY-MM-DD')}
             {days >= 0 && ` (${days}天)`}
           </span>
@@ -219,7 +220,7 @@ function WineSummaryTab() {
           />
           <Button
             type="primary"
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             disabled={!storeId}
             onClick={() => storeId && void load(storeId)}
           >
@@ -234,7 +235,7 @@ function WineSummaryTab() {
           <Row gutter={12}>
             <Col span={8}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 24, fontWeight: 700, color: '#FF6B35' }}>
+                <div style={{ fontSize: 24, fontWeight: 700, color: txColors.primary }}>
                   {summary.total_count}
                 </div>
                 <Text style={{ fontSize: 12, color: '#5F5E5A' }}>存酒档案数</Text>
@@ -250,7 +251,7 @@ function WineSummaryTab() {
             </Col>
             <Col span={8}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: txColors.success }}>
                   {summary.total_estimated_value_fen ? fmtMoney(summary.total_estimated_value_fen) : '—'}
                 </div>
                 <Text style={{ fontSize: 12, color: '#5F5E5A' }}>估值合计</Text>
@@ -285,7 +286,7 @@ function WineSummaryTab() {
         title={
           <Space>
             <span>即将到期存酒</span>
-            {expiring.length > 0 && <Badge count={expiring.length} color="#BA7517" />}
+            {expiring.length > 0 && <Badge count={expiring.length} color={txColors.warning} />}
             <Text style={{ fontSize: 12, color: '#5F5E5A', fontWeight: 400 }}>30天内</Text>
           </Space>
         }
@@ -408,14 +409,14 @@ function DepositLedgerTab() {
       dataIndex: 'refunded_amount_fen',
       key: 'ref',
       align: 'right',
-      render: (v: number) => (v > 0 ? <Text style={{ color: '#0F6E56' }}>{fmtMoney(v)}</Text> : '—'),
+      render: (v: number) => (v > 0 ? <Text style={{ color: txColors.success }}>{fmtMoney(v)}</Text> : '—'),
     },
     {
       title: '余额',
       dataIndex: 'remaining_fen',
       key: 'rem',
       align: 'right',
-      render: (v: number) => <Text strong style={{ color: v > 0 ? '#FF6B35' : '#B4B2A9' }}>{fmtMoney(v)}</Text>,
+      render: (v: number) => <Text strong style={{ color: v > 0 ? txColors.primary : '#B4B2A9' }}>{fmtMoney(v)}</Text>,
     },
     {
       title: '状态',
@@ -469,7 +470,7 @@ function DepositLedgerTab() {
           />
           <Button
             type="primary"
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
             disabled={!storeId}
             onClick={() => storeId && void load(storeId, dateRange[0], dateRange[1])}
           >
@@ -484,7 +485,7 @@ function DepositLedgerTab() {
           <Row gutter={12}>
             <Col span={8}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#FF6B35' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: txColors.primary }}>
                   {fmtMoney(ledger.total_collected_fen)}
                 </div>
                 <Text style={{ fontSize: 12, color: '#5F5E5A' }}>收取总额</Text>
@@ -492,7 +493,7 @@ function DepositLedgerTab() {
             </Col>
             <Col span={8}>
               <Card size="small" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>
+                <div style={{ fontSize: 18, fontWeight: 700, color: txColors.success }}>
                   {fmtMoney(ledger.total_refunded_fen)}
                 </div>
                 <Text style={{ fontSize: 12, color: '#5F5E5A' }}>退还总额</Text>
@@ -627,7 +628,7 @@ function EnterpriseDebtTab() {
       render: (v: number, r) => {
         const pct = r.credit_limit_fen > 0 ? v / r.credit_limit_fen : 0;
         return (
-          <span style={{ color: pct >= 0.9 ? '#A32D2D' : pct >= 0.7 ? '#BA7517' : '#2C2C2A', fontWeight: 600 }}>
+          <span style={{ color: pct >= 0.9 ? txColors.danger : pct >= 0.7 ? txColors.warning : '#2C2C2A', fontWeight: 600 }}>
             {fmtMoney(v)}
           </span>
         );
@@ -639,7 +640,7 @@ function EnterpriseDebtTab() {
       align: 'right',
       render: (_, r) => {
         const debt = r.used_credit_fen;
-        return <Text strong style={{ color: debt > 0 ? '#A32D2D' : '#0F6E56' }}>{fmtMoney(debt)}</Text>;
+        return <Text strong style={{ color: debt > 0 ? txColors.danger : txColors.success }}>{fmtMoney(debt)}</Text>;
       },
     },
     {
@@ -686,7 +687,7 @@ function EnterpriseDebtTab() {
       key: 'amt',
       align: 'right',
       render: (v: number) => (
-        <Text strong style={{ color: v > 0 ? '#A32D2D' : '#B4B2A9' }}>{fmtMoney(v)}</Text>
+        <Text strong style={{ color: v > 0 ? txColors.danger : '#B4B2A9' }}>{fmtMoney(v)}</Text>
       ),
     },
   ];
@@ -717,7 +718,7 @@ function EnterpriseDebtTab() {
       dataIndex: 'paid_fen',
       key: 'paid',
       align: 'right',
-      render: (v: number) => <Text style={{ color: '#0F6E56' }}>{fmtMoney(v)}</Text>,
+      render: (v: number) => <Text style={{ color: txColors.success }}>{fmtMoney(v)}</Text>,
     },
     {
       title: '未还款',
@@ -726,7 +727,7 @@ function EnterpriseDebtTab() {
       render: (_: unknown, r) => {
         const unpaid = r.total_fen - r.paid_fen;
         return (
-          <Text strong style={{ color: unpaid > 0 ? '#A32D2D' : '#B4B2A9' }}>
+          <Text strong style={{ color: unpaid > 0 ? txColors.danger : '#B4B2A9' }}>
             {fmtMoney(unpaid)}
           </Text>
         );
@@ -769,7 +770,7 @@ function EnterpriseDebtTab() {
       <Card size="small" styles={{ body: { padding: '12px 16px' } }}>
         <Button
           type="primary"
-          style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+          style={{ background: txColors.primary, borderColor: txColors.primary }}
           onClick={load}
         >
           刷新数据
@@ -781,7 +782,7 @@ function EnterpriseDebtTab() {
         <Row gutter={12}>
           <Col span={8}>
             <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#A32D2D' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: txColors.danger }}>
                 {fmtMoney(totalDebt)}
               </div>
               <Text style={{ fontSize: 12, color: '#5F5E5A' }}>欠款总额</Text>
@@ -797,7 +798,7 @@ function EnterpriseDebtTab() {
           </Col>
           <Col span={8}>
             <Card size="small" style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: overLimitCount > 0 ? '#A32D2D' : '#0F6E56' }}>
+              <div style={{ fontSize: 20, fontWeight: 700, color: overLimitCount > 0 ? txColors.danger : txColors.success }}>
                 {overLimitCount}
               </div>
               <Text style={{ fontSize: 12, color: '#5F5E5A' }}>临近额度企业</Text>

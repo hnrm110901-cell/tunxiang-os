@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useVoiceAgent, type VoiceCommand } from '../hooks/useVoiceAgent';
+import { txColors } from '@tx/tokens';
 
 // ─── Props ──────────────────────────────────────────────────────────────────────
 
@@ -30,7 +31,7 @@ interface VoiceCommandBarProps {
 const C = {
   bg: '#112B36',
   border: '#1A3A48',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   success: '#10B981',
   danger: '#EF4444',
   text: '#E0E0E0',

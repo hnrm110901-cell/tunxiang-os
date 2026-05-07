@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * queue-game/index.tsx — 等位互动小游戏
  *
@@ -17,7 +18,7 @@ import { txRequest } from '../../utils/request'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   gold: '#C5A347',
   success: '#34C759',
   danger: '#FF3B30',
@@ -385,7 +386,7 @@ function LuckyWheel({ onResult, onBack }: { onResult: (r: typeof REWARDS[0]) => 
       <View style={{
         width: '500rpx', height: '500rpx', borderRadius: '50%',
         background: `conic-gradient(${REWARDS.map((r, i) => {
-          const colors = [C.primary, '#185FA5', C.gold, '#0F6E56', '#7C3AED', '#DC2626']
+          const colors = [C.primary, txColors.info, C.gold, txColors.success, '#7C3AED', '#DC2626']
           return `${colors[i % colors.length]} ${i * (100 / REWARDS.length)}% ${(i + 1) * (100 / REWARDS.length)}%`
         }).join(', ')})`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',

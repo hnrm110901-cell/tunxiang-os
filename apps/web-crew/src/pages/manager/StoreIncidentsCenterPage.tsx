@@ -11,6 +11,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 import {
   fetchIncidents,
   fetchIncidentSummary,
@@ -33,10 +34,10 @@ const C = {
   border: '#1a2a33',
   text: '#E0E0E0',
   muted: '#64748b',
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  warning: '#BA7517',
-  danger: '#A32D2D',
+  primary: txColors.primary,
+  success: txColors.success,
+  warning: txColors.warning,
+  danger: txColors.danger,
 };
 
 const pageStyle: React.CSSProperties = {
@@ -60,12 +61,12 @@ const cardStyle: React.CSSProperties = {
 // ─── 分类配置 ───
 
 const CATEGORY_CONFIG: Record<IncidentCategory, { label: string; icon: string; color: string }> = {
-  shortage: { label: '缺货', icon: '📦', color: '#BA7517' },
-  complaint: { label: '客诉', icon: '😤', color: '#A32D2D' },
-  slow_dish: { label: '出品超时', icon: '⏱️', color: '#FF6B35' },
-  return: { label: '退菜', icon: '🔄', color: '#A32D2D' },
-  equipment: { label: '设备异常', icon: '🔧', color: '#185FA5' },
-  staff: { label: '人员异常', icon: '👤', color: '#BA7517' },
+  shortage: { label: '缺货', icon: '📦', color: txColors.warning },
+  complaint: { label: '客诉', icon: '😤', color: txColors.danger },
+  slow_dish: { label: '出品超时', icon: '⏱️', color: txColors.primary },
+  return: { label: '退菜', icon: '🔄', color: txColors.danger },
+  equipment: { label: '设备异常', icon: '🔧', color: txColors.info },
+  staff: { label: '人员异常', icon: '👤', color: txColors.warning },
 };
 
 const ALL_CATEGORIES: (IncidentCategory | 'all')[] = [

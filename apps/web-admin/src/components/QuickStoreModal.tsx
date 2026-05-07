@@ -3,6 +3,7 @@
  * 3步向导：选门店 → 选配置 → 完成
  */
 import { useState } from 'react';
+import { txColors } from '@tx/tokens';
 
 interface Props {
   visible: boolean;
@@ -57,7 +58,7 @@ export function QuickStoreModal({ visible, onClose }: Props) {
             <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <span style={{
                 width: 28, height: 28, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                background: step >= s ? '#FF6B35' : '#333', color: '#fff', fontSize: 13, fontWeight: 'bold',
+                background: step >= s ? txColors.primary : '#333', color: '#fff', fontSize: 13, fontWeight: 'bold',
               }}>{s}</span>
               <span style={{ fontSize: 12, color: step >= s ? '#fff' : '#666' }}>
                 {s === 1 ? '选择门店' : s === 2 ? '选择配置' : '开店完成'}
@@ -96,10 +97,10 @@ export function QuickStoreModal({ visible, onClose }: Props) {
               <label key={item.key} onClick={() => toggleItem(item.key)} style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', marginBottom: 6,
                 background: selectedItems.includes(item.key) ? 'rgba(255,107,44,0.08)' : '#0B1A20',
-                border: `1px solid ${selectedItems.includes(item.key) ? '#FF6B35' : '#333'}`,
+                border: `1px solid ${selectedItems.includes(item.key) ? txColors.primary : '#333'}`,
                 borderRadius: 8, cursor: 'pointer',
               }}>
-                <input type="checkbox" checked={selectedItems.includes(item.key)} readOnly style={{ accentColor: '#FF6B35' }} />
+                <input type="checkbox" checked={selectedItems.includes(item.key)} readOnly style={{ accentColor: txColors.primary }} />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 600 }}>{item.label}</div>
                   <div style={{ fontSize: 11, color: '#666' }}>{item.desc}</div>
@@ -130,7 +131,7 @@ export function QuickStoreModal({ visible, onClose }: Props) {
           </button>
           {step === 1 && (
             <button onClick={() => sourceStore && targetStore && setStep(2)} disabled={!sourceStore || !targetStore}
-              style={{ padding: '8px 20px', background: sourceStore && targetStore ? '#FF6B35' : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+              style={{ padding: '8px 20px', background: sourceStore && targetStore ? txColors.primary : '#444', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
               下一步
             </button>
           )}
@@ -138,7 +139,7 @@ export function QuickStoreModal({ visible, onClose }: Props) {
             <>
               <button onClick={() => setStep(1)} style={{ padding: '8px 20px', background: '#333', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>上一步</button>
               <button onClick={handleClone} disabled={cloning || selectedItems.length === 0}
-                style={{ padding: '8px 20px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
+                style={{ padding: '8px 20px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer' }}>
                 {cloning ? '复制中...' : '开始复制'}
               </button>
             </>

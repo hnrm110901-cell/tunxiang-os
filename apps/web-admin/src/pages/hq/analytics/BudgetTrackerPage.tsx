@@ -6,6 +6,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -120,8 +121,8 @@ function currentYear(): string {
 /** 执行率转颜色 */
 function rateColor(rate: number): string {
   if (rate > 1.0) return '#FF4D4D';
-  if (rate >= 0.8) return '#BA7517';
-  return '#0F6E56';
+  if (rate >= 0.8) return txColors.warning;
+  return txColors.success;
 }
 
 function rateStatusLabel(status: 'normal' | 'warning' | 'over_budget'): string {
@@ -132,8 +133,8 @@ function rateStatusLabel(status: 'normal' | 'warning' | 'over_budget'): string {
 
 function rateStatusColor(status: 'normal' | 'warning' | 'over_budget'): string {
   if (status === 'over_budget') return '#FF4D4D';
-  if (status === 'warning')    return '#BA7517';
-  return '#0F6E56';
+  if (status === 'warning')    return txColors.warning;
+  return txColors.success;
 }
 
 // ─── 进度条组件 ───
@@ -271,9 +272,9 @@ function BudgetModal({ onClose, onSaved }: BudgetModalProps) {
               <label key={pt} style={{
                 display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
                 padding: '6px 14px', borderRadius: 6,
-                background: form.period_type === pt ? '#0F6E5622' : '#0d1e28',
-                border: `1px solid ${form.period_type === pt ? '#0F6E56' : '#2a3a44'}`,
-                color: form.period_type === pt ? '#0F6E56' : '#888',
+                background: form.period_type === pt ? `${txColors.success}22` : '#0d1e28',
+                border: `1px solid ${form.period_type === pt ? txColors.success : '#2a3a44'}`,
+                color: form.period_type === pt ? txColors.success : '#888',
                 fontSize: 13,
               }}>
                 <input
@@ -343,7 +344,7 @@ function BudgetModal({ onClose, onSaved }: BudgetModalProps) {
           </button>
           <button onClick={() => handleSave(true)} disabled={saving} style={{
             padding: '8px 20px', borderRadius: 6, border: 'none',
-            background: saving ? '#0F6E5666' : '#0F6E56', color: '#fff',
+            background: saving ? `${txColors.success}66` : txColors.success, color: '#fff',
             cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
           }}>
             {saving ? '提交中...' : '提交审批'}
@@ -458,7 +459,7 @@ function ExecuteSection({ budgets, onRecorded }: ExecuteSectionProps) {
             {/* 按钮 */}
             <button onClick={handleRecord} disabled={saving} style={{
               padding: '8px 20px', borderRadius: 6, border: 'none',
-              background: saving ? '#185FA566' : '#185FA5', color: '#fff',
+              background: saving ? `${txColors.info}66` : txColors.info, color: '#fff',
               cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 600,
               flexShrink: 0,
             }}>
@@ -469,7 +470,7 @@ function ExecuteSection({ budgets, onRecorded }: ExecuteSectionProps) {
           {msg && (
             <div style={{
               marginTop: 10, fontSize: 13,
-              color: msg.startsWith('✅') ? '#0F6E56' : '#FF4D4D',
+              color: msg.startsWith('✅') ? txColors.success : '#FF4D4D',
             }}>
               {msg}
             </div>
@@ -565,7 +566,7 @@ export function BudgetTrackerPage() {
                 style={{
                   padding: '7px 14px', fontSize: 13, border: 'none',
                   borderLeft: i > 0 ? '1px solid #2a3a44' : 'none',
-                  background: periodType === pt ? '#185FA5' : '#1a2a33',
+                  background: periodType === pt ? txColors.info : '#1a2a33',
                   color: periodType === pt ? '#fff' : '#888',
                   cursor: 'pointer',
                 }}
@@ -594,7 +595,7 @@ export function BudgetTrackerPage() {
             onClick={() => setShowModal(true)}
             style={{
               padding: '8px 16px', borderRadius: 6, border: 'none',
-              background: '#0F6E56', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              background: txColors.success, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600,
             }}
           >
             + 设置预算
@@ -632,7 +633,7 @@ export function BudgetTrackerPage() {
             onClick={() => setShowModal(true)}
             style={{
               padding: '10px 24px', borderRadius: 8, border: 'none',
-              background: '#0F6E56', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+              background: txColors.success, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 600,
             }}
           >
             + 设置预算
@@ -657,7 +658,7 @@ export function BudgetTrackerPage() {
               <div style={{ color: '#888', fontSize: 13, marginTop: 8 }}>
                 已执行：<span style={{ color: '#fff' }}>¥ {fenToYuan(total.executed_amount_fen)}</span>
                 &nbsp;·&nbsp;
-                剩余：<span style={{ color: total.remaining_fen < 0 ? '#FF4D4D' : '#0F6E56' }}>
+                剩余：<span style={{ color: total.remaining_fen < 0 ? '#FF4D4D' : txColors.success }}>
                   ¥ {fenToYuan(Math.abs(total.remaining_fen))}{total.remaining_fen < 0 ? '（超支）' : ''}
                 </span>
               </div>
@@ -789,8 +790,8 @@ export function BudgetTrackerPage() {
       {/* ── 图例说明 ── */}
       {!loading && (
         <div style={{ display: 'flex', gap: 20, marginTop: 16, color: '#888', fontSize: 12 }}>
-          <span>● <span style={{ color: '#0F6E56' }}>正常</span>：执行率 &lt; 80%</span>
-          <span>● <span style={{ color: '#BA7517' }}>警告</span>：执行率 80%–100%</span>
+          <span>● <span style={{ color: txColors.success }}>正常</span>：执行率 &lt; 80%</span>
+          <span>● <span style={{ color: txColors.warning }}>警告</span>：执行率 80%–100%</span>
           <span>● <span style={{ color: '#FF4D4D' }}>超支</span>：执行率 &gt; 100%</span>
         </div>
       )}

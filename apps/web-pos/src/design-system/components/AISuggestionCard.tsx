@@ -23,6 +23,7 @@
  */
 import React from 'react';
 import styles from './AISuggestionCard.module.css';
+import { txColors } from '@tx/tokens';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -50,7 +51,7 @@ export interface AISuggestionCardProps {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const RANK_COLORS = ['#C53030', '#C8923A', '#FF6B35', '#1A7A52', '#722ed1'];
+const RANK_COLORS = ['#C53030', '#C8923A', txColors.primary, '#1A7A52', '#722ed1'];
 
 const DIFFICULTY_MAP: Record<Difficulty, { label: string; cls: string }> = {
   easy:   { label: '容易执行', cls: 'diffEasy'   },
@@ -87,7 +88,7 @@ const AISuggestionCard: React.FC<AISuggestionCardProps> = ({
   style,
   className,
 }) => {
-  const color  = accentColor ?? (rank != null ? RANK_COLORS[(rank - 1) % RANK_COLORS.length] : '#FF6B35');
+  const color  = accentColor ?? (rank != null ? RANK_COLORS[(rank - 1) % RANK_COLORS.length] : txColors.primary);
   const diff   = difficulty ? DIFFICULTY_MAP[difficulty] : null;
   const saving = savingYuan ?? netBenefitYuan;
 

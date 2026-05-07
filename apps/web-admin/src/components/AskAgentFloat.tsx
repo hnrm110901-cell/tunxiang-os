@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { Card } from 'antd';
 import NLQChatPanel from './NLQChatPanel';
+import { txColors } from '@tx/tokens';
 
 const AskAgentFloat = () => {
   const [expanded, setExpanded] = useState(false);
@@ -60,7 +61,7 @@ const AskAgentFloat = () => {
           width: 48,
           height: 48,
           borderRadius: '50%',
-          background: '#FF6B35',
+          background: txColors.primary,
           border: 'none',
           cursor: 'pointer',
           display: 'flex',

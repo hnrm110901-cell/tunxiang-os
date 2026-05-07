@@ -1,4 +1,5 @@
 import { TableStatus } from '../../types/table-card';
+import { txColors } from '@tx/tokens';
 
 /** 桌台状态 → 显示文字 */
 export const getStatusText = (status: TableStatus): string => {
@@ -15,10 +16,10 @@ export const getStatusText = (status: TableStatus): string => {
 /** 桌台状态 → 主题色（CSS 色值） */
 export const getStatusColor = (status: TableStatus): string => {
   const map: Record<TableStatus, string> = {
-    [TableStatus.Empty]: '#0F6E56',
-    [TableStatus.Dining]: '#185FA5',
-    [TableStatus.Reserved]: '#BA7517',
-    [TableStatus.PendingCheckout]: '#A32D2D',
+    [TableStatus.Empty]: txColors.success,
+    [TableStatus.Dining]: txColors.info,
+    [TableStatus.Reserved]: txColors.warning,
+    [TableStatus.PendingCheckout]: txColors.danger,
     [TableStatus.PendingCleanup]: '#555',
   };
   return map[status];

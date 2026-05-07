@@ -49,6 +49,7 @@ import {
 } from '@ant-design/pro-components';
 import type { Dayjs } from 'dayjs';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Text, Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -124,7 +125,7 @@ const CreditProgressBar = ({
 }) => {
   if (limit === 0) return <Text type="secondary">无授信</Text>;
   const pct = Math.min(100, Math.round((used / limit) * 100));
-  const color = pct >= 90 ? '#A32D2D' : pct >= 70 ? '#BA7517' : '#0F6E56';
+  const color = pct >= 90 ? txColors.danger : pct >= 70 ? txColors.warning : txColors.success;
   return (
     <Tooltip title={`已用 ¥${fenToYuan(used)} / 额度 ¥${fenToYuan(limit)}`}>
       <Progress percent={pct} strokeColor={color} showInfo size="small" style={{ minWidth: 120 }} />
@@ -148,7 +149,7 @@ const CustomerArchive = () => {
       width: 160,
       render: (_, r) => (
         <Space>
-          <BankOutlined style={{ color: '#FF6B35' }} />
+          <BankOutlined style={{ color: txColors.primary }} />
           <Text strong>{r.company_name}</Text>
           {r.company_code && <Text type="secondary" style={{ fontSize: 12 }}>({r.company_code})</Text>}
         </Space>
@@ -209,7 +210,7 @@ const CustomerArchive = () => {
       render: (_, r) => {
         const pct = r.credit_limit_fen > 0 ? r.available_credit_fen / r.credit_limit_fen : 1;
         return (
-          <Text style={{ color: pct < 0.1 ? '#A32D2D' : pct < 0.3 ? '#BA7517' : '#0F6E56' }}>
+          <Text style={{ color: pct < 0.1 ? txColors.danger : pct < 0.3 ? txColors.warning : txColors.success }}>
             ¥{fenToYuan(r.available_credit_fen)}
           </Text>
         );
@@ -254,7 +255,7 @@ const CustomerArchive = () => {
         <a
           key="credit"
           onClick={() => setCreditModal({ visible: true, customer: r })}
-          style={{ color: '#185FA5' }}
+          style={{ color: txColors.info }}
         >
           授信详情
         </a>,
@@ -262,7 +263,7 @@ const CustomerArchive = () => {
         <a
           key="edit"
           onClick={() => setEditCustomer(r)}
-          style={{ color: '#FF6B35' }}
+          style={{ color: txColors.primary }}
         >
           编辑
         </a>,
@@ -333,7 +334,7 @@ const CustomerArchive = () => {
             title="新增企业客户"
             trigger={
               <Button type="primary" icon={<PlusOutlined />}
-                style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}>
+                style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}>
                 新增企业客户
               </Button>
             }
@@ -477,20 +478,20 @@ const CustomerArchive = () => {
                 </Col>
                 <Col span={8}>
                   <Statistic title="已用授信" value={fenToYuan(c.used_credit_fen)} prefix="¥"
-                    valueStyle={{ color: pct >= 90 ? '#A32D2D' : '#2C2C2A' }} />
+                    valueStyle={{ color: pct >= 90 ? txColors.danger : '#2C2C2A' }} />
                 </Col>
                 <Col span={8}>
                   <Statistic title="可用授信" value={fenToYuan(c.available_credit_fen)} prefix="¥"
-                    valueStyle={{ color: pct >= 90 ? '#A32D2D' : '#0F6E56' }} />
+                    valueStyle={{ color: pct >= 90 ? txColors.danger : txColors.success }} />
                 </Col>
               </Row>
               <Progress
                 percent={pct}
-                strokeColor={pct >= 90 ? '#A32D2D' : pct >= 70 ? '#BA7517' : '#0F6E56'}
+                strokeColor={pct >= 90 ? txColors.danger : pct >= 70 ? txColors.warning : txColors.success}
                 format={p => `${p}%`}
               />
               {pct >= 90 && (
-                <Space style={{ color: '#A32D2D' }}>
+                <Space style={{ color: txColors.danger }}>
                   <WarningOutlined />
                   <Text type="danger">授信使用率 ≥ 90%，请及时结算或提高额度</Text>
                 </Space>
@@ -611,7 +612,7 @@ const OrderLedger = () => {
       search: false,
       width: 110,
       render: (_, r) => (
-        <Text strong style={{ color: '#FF6B35' }}>
+        <Text strong style={{ color: txColors.primary }}>
           ¥{fenToYuan(r.discounted_amount_fen)}
         </Text>
       ),
@@ -700,7 +701,7 @@ const OrderLedger = () => {
             type="primary"
             icon={<FileTextOutlined />}
             onClick={() => setBulkBillModal(true)}
-            style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
           >
             批量出账
           </Button>,
@@ -714,7 +715,7 @@ const OrderLedger = () => {
         onCancel={() => { setBulkBillModal(false); bulkBillForm.resetFields(); }}
         onOk={() => bulkBillForm.submit()}
         okText="确认出账"
-        okButtonProps={{ style: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { backgroundColor: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form
           form={bulkBillForm}
@@ -745,9 +746,9 @@ const OrderLedger = () => {
             <RangePicker style={{ width: '100%' }} />
           </Form.Item>
         </Form>
-        <Card size="small" style={{ marginTop: 8, backgroundColor: '#FFF3ED' }}>
+        <Card size="small" style={{ marginTop: 8, backgroundColor: txColors.primaryLight }}>
           <Space>
-            <CheckCircleOutlined style={{ color: '#FF6B35' }} />
+            <CheckCircleOutlined style={{ color: txColors.primary }} />
             <Text style={{ fontSize: 12 }}>
               出账后，该企业在账期内所有"未出账"订单将标记为"已出账"，
               并生成账单PDF文本。账单生成后不可撤销，请确认账期无误。
@@ -767,7 +768,7 @@ export default function CorporateCustomerPage() {
   return (
     <div style={{ padding: 24, minWidth: 1280 }}>
       <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-        <TeamOutlined style={{ fontSize: 20, color: '#FF6B35' }} />
+        <TeamOutlined style={{ fontSize: 20, color: txColors.primary }} />
         <Title level={4} style={{ margin: 0 }}>企业客户管理</Title>
         <Tag color="orange" icon={<BankOutlined />}>Y-A9 团餐</Tag>
       </div>

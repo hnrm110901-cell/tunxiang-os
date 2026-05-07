@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * pages/order/index.tsx — 订单列表
  *
@@ -26,7 +27,7 @@ import type { Order, OrderStatus } from '../../api/trade'
 const C = {
   bg:      '#0B1A20',
   card:    '#132029',
-  primary: '#FF6B35',
+  primary: txColors.primary,
   text1:   '#E8F4F8',
   text2:   '#9EB5C0',
   divider: 'rgba(255,255,255,0.06)',
@@ -45,7 +46,7 @@ const STATUS_META: Record<
   OrderStatus,
   { label: string; color: string; bg: string }
 > = {
-  pending_payment: { label: '待付款', color: '#FF6B35',  bg: 'rgba(255,107,53,0.12)' },
+  pending_payment: { label: '待付款', color: txColors.primary,  bg: 'rgba(255,107,53,0.12)' },
   paid:            { label: '已支付', color: '#5FA8E8',  bg: 'rgba(24,95,165,0.15)' },
   preparing:       { label: '备餐中', color: '#5FA8E8',  bg: 'rgba(24,95,165,0.15)' },
   ready:           { label: '待取餐', color: '#3DBE8A',  bg: 'rgba(15,110,86,0.15)' },
@@ -170,7 +171,7 @@ function OrderCard({ order, onReorder, onDelete }: OrderCardProps) {
     Taro.showModal({
       title: '删除订单',
       content: '确定要删除这条订单记录吗？',
-      confirmColor: '#FF6B35',
+      confirmColor: txColors.primary,
       success: ({ confirm }) => { if (confirm) onDelete(order.orderId) },
     })
   }

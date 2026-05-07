@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react';
 import { apiGet, apiPost } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export function BusinessDayConfigPage() {
   };
 
   // ─── 样式 ──────────────────────────────────────────────────────────────────
-  const brand = '#FF6B35';
+  const brand = txColors.primary;
   const bg1 = '#112228';
   const bg2 = '#1a2a33';
   const bg0 = '#0B1A20';
@@ -186,7 +187,7 @@ export function BusinessDayConfigPage() {
             const e = parseTime(mp.end_time);
             const left = (s / 24) * 100;
             const width = e > s ? ((e - s) / 24) * 100 : ((24 - s + e) / 24) * 100;
-            const colors = ['#FF6B35', '#0F6E56', '#185FA5', '#8B5CF6', '#D97706'];
+            const colors = [txColors.primary, txColors.success, txColors.info, '#8B5CF6', '#D97706'];
             const c = colors[idx % colors.length];
             return (
               <div key={mp.id} style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, height: '100%', background: `${c}44`, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -217,8 +218,8 @@ export function BusinessDayConfigPage() {
             const ct = parseTime(cutoffTime);
             const left = (ct / 24) * 100;
             return (
-              <div style={{ position: 'absolute', left: `${left}%`, top: -8, height: 72, borderLeft: '2px dashed #A32D2D', zIndex: 1 }}>
-                <span style={{ position: 'absolute', top: -16, left: 4, fontSize: 10, color: '#A32D2D', fontWeight: 600, whiteSpace: 'nowrap' }}>日结 {cutoffTime}</span>
+              <div style={{ position: 'absolute', left: `${left}%`, top: -8, height: 72, borderLeft: `2px dashed ${txColors.danger}`, zIndex: 1 }}>
+                <span style={{ position: 'absolute', top: -16, left: 4, fontSize: 10, color: txColors.danger, fontWeight: 600, whiteSpace: 'nowrap' }}>日结 {cutoffTime}</span>
               </div>
             );
           })()}
@@ -328,7 +329,7 @@ export function BusinessDayConfigPage() {
                     <input type="checkbox" checked={mp.is_auto_switch} onChange={() => updateMeal(idx, 'is_auto_switch', !mp.is_auto_switch)} style={{ accentColor: brand }} />
                     自动
                   </label>
-                  <button onClick={() => removeMeal(idx)} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${bg2}`, background: 'transparent', color: '#A32D2D', fontSize: 12, cursor: 'pointer' }}>删除</button>
+                  <button onClick={() => removeMeal(idx)} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${bg2}`, background: 'transparent', color: txColors.danger, fontSize: 12, cursor: 'pointer' }}>删除</button>
                 </div>
               ))}
               <button onClick={addMeal} style={{ padding: '10px 20px', borderRadius: 8, border: `1px dashed ${bg2}`, background: 'transparent', color: text2, fontSize: 13, cursor: 'pointer' }}>+ 添加餐段</button>
@@ -353,7 +354,7 @@ export function BusinessDayConfigPage() {
                     结束
                     <input type="time" value={st.end_time} onChange={(e) => updateShift(idx, 'end_time', e.target.value)} style={{ display: 'block', width: '100%', marginTop: 4, padding: '8px 12px', borderRadius: 8, border: `1px solid ${bg2}`, background: bg0, color: text1, fontSize: 14 }} />
                   </label>
-                  <button onClick={() => removeShift(idx)} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${bg2}`, background: 'transparent', color: '#A32D2D', fontSize: 12, cursor: 'pointer' }}>删除</button>
+                  <button onClick={() => removeShift(idx)} style={{ padding: '8px 12px', borderRadius: 8, border: `1px solid ${bg2}`, background: 'transparent', color: txColors.danger, fontSize: 12, cursor: 'pointer' }}>删除</button>
                 </div>
               ))}
               <button onClick={addShift} style={{ padding: '10px 20px', borderRadius: 8, border: `1px dashed ${bg2}`, background: 'transparent', color: text2, fontSize: 13, cursor: 'pointer' }}>+ 添加班次</button>

@@ -47,6 +47,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -417,7 +418,7 @@ export function RolePermissionPage() {
       width: 140,
       render: (_, record) => (
         <Space>
-          {record.is_preset ? <LockOutlined style={{ color: '#FF6B35' }} /> : <SafetyOutlined />}
+          {record.is_preset ? <LockOutlined style={{ color: txColors.primary }} /> : <SafetyOutlined />}
           <span style={{ fontWeight: record.is_preset ? 600 : 400 }}>{record.name}</span>
           {record.is_preset && <Tag color="volcano" style={{ fontSize: 11 }}>预设</Tag>}
         </Space>
@@ -429,7 +430,7 @@ export function RolePermissionPage() {
       dataIndex: 'permission_count',
       width: 100,
       sorter: (a, b) => a.permission_count - b.permission_count,
-      render: (val) => <Badge count={val as number} style={{ backgroundColor: '#FF6B35' }} overflowCount={999} />,
+      render: (val) => <Badge count={val as number} style={{ backgroundColor: txColors.primary }} overflowCount={999} />,
     },
     {
       title: '用户数量',
@@ -637,7 +638,7 @@ export function RolePermissionPage() {
   return (
     <div style={{ padding: '24px 32px', minHeight: '100vh', backgroundColor: '#f5f5f5' }}>
       <Title level={3} style={{ marginBottom: 24 }}>
-        <SafetyOutlined style={{ color: '#FF6B35', marginRight: 8 }} />
+        <SafetyOutlined style={{ color: txColors.primary, marginRight: 8 }} />
         权限与角色管理
       </Title>
 
@@ -667,7 +668,7 @@ export function RolePermissionPage() {
                       type="primary"
                       icon={<PlusOutlined />}
                       onClick={openCreateRole}
-                      style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+                      style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
                     >
                       新建角色
                     </Button>,
@@ -685,7 +686,7 @@ export function RolePermissionPage() {
                   okText={editingRole ? '保存' : '创建'}
                   cancelText="取消"
                   width={640}
-                  okButtonProps={{ style: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' } }}
+                  okButtonProps={{ style: { backgroundColor: txColors.primary, borderColor: txColors.primary } }}
                 >
                   <div style={{ marginBottom: 16 }}>
                     <div style={{ marginBottom: 8, fontWeight: 500 }}>角色名称</div>
@@ -769,7 +770,7 @@ export function RolePermissionPage() {
                   onOk={handleSaveUserRoles}
                   okText="保存"
                   cancelText="取消"
-                  okButtonProps={{ style: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' } }}
+                  okButtonProps={{ style: { backgroundColor: txColors.primary, borderColor: txColors.primary } }}
                 >
                   <div style={{ marginBottom: 8, fontWeight: 500 }}>分配角色</div>
                   <Select
@@ -790,7 +791,7 @@ export function RolePermissionPage() {
                   onOk={handleBatchSetRoles}
                   okText="确认设置"
                   cancelText="取消"
-                  okButtonProps={{ style: { backgroundColor: '#FF6B35', borderColor: '#FF6B35' } }}
+                  okButtonProps={{ style: { backgroundColor: txColors.primary, borderColor: txColors.primary } }}
                 >
                   <div style={{ marginBottom: 8, fontWeight: 500 }}>选择角色</div>
                   <Select

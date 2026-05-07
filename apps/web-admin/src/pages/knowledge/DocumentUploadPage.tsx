@@ -9,15 +9,16 @@ import {
   FileTextOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const { TextArea } = Input;
 const { Dragger } = Upload;
 const { Text } = Typography;
 
 const C = {
-  primary: '#FF6B35',
-  success: '#0F6E56',
-  info: '#185FA5',
+  primary: txColors.primary,
+  success: txColors.success,
+  info: txColors.info,
   textSub: '#5F5E5A',
   textMuted: '#B4B2A9',
 };

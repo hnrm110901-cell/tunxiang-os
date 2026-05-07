@@ -41,11 +41,12 @@ import {
   ClockCircleOutlined,
 } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_DANGER  = '#A32D2D';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_DANGER  = txColors.danger;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

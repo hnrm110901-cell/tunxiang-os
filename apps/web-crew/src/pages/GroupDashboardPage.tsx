@@ -8,6 +8,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 import {
   fetchGroupToday,
   fetchGroupTrend,
@@ -23,7 +24,7 @@ const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
+  accent: txColors.primary,
   green: '#22c55e',
   red: '#ef4444',
   orange: '#f97316',

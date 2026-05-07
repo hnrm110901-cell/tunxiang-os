@@ -67,6 +67,7 @@ import {
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/zh-cn';
+import { txColors } from '@tx/tokens';
 
 dayjs.extend(relativeTime);
 dayjs.locale('zh-cn');
@@ -838,7 +839,7 @@ function OtaManageTab() {
     <div>
       {/* Current version card */}
       {currentVersion && (
-        <Card size="small" style={{ marginBottom: 16, borderLeft: '4px solid #FF6B35' }}>
+        <Card size="small" style={{ marginBottom: 16, borderLeft: `4px solid ${txColors.primary}` }}>
           <Row align="middle" justify="space-between">
             <Col>
               <Space>
@@ -867,7 +868,7 @@ function OtaManageTab() {
               <Col flex="auto">
                 <Space direction="vertical" size={0}>
                   <Space>
-                    <Tag color="#FF6B35">{item.version}</Tag>
+                    <Tag color={txColors.primary}>{item.version}</Tag>
                     <Text type="secondary">{item.size_mb}MB</Text>
                     <Text type="secondary">{dayjs(item.release_date).format('YYYY-MM-DD')}</Text>
                   </Space>
@@ -880,7 +881,7 @@ function OtaManageTab() {
                     type="primary"
                     icon={<CloudDownloadOutlined />}
                     onClick={() => setPushModal(item)}
-                    style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+                    style={{ background: txColors.primary, borderColor: txColors.primary }}
                   >
                     推送更新
                   </Button>
@@ -919,7 +920,7 @@ function OtaManageTab() {
                     percent={p.status === 'completed' ? 100 : p.progress}
                     status={p.status === 'failed' ? 'exception' : p.status === 'completed' ? 'success' : 'active'}
                     size="small"
-                    strokeColor={p.status === 'failed' ? '#f5222d' : '#FF6B35'}
+                    strokeColor={p.status === 'failed' ? '#f5222d' : txColors.primary}
                   />
                   {p.error_msg && <Text type="danger" style={{ fontSize: 12 }}>{p.error_msg}</Text>}
                 </Card>
@@ -949,7 +950,7 @@ function OtaManageTab() {
         onOk={handlePush}
         confirmLoading={pushing}
         okText="开始推送"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form layout="vertical">
           <Form.Item label="推送策略">
@@ -1173,7 +1174,7 @@ function RemoteMonitorTab() {
             type="primary"
             size="small"
             onClick={() => { setEditingRule(null); form.resetFields(); setRuleModal(true); }}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             新增规则
           </Button>
@@ -1231,7 +1232,7 @@ function RemoteMonitorTab() {
         onCancel={() => { setRuleModal(false); setEditingRule(null); }}
         onOk={handleSaveRule}
         okText="保存"
-        okButtonProps={{ style: { background: '#FF6B35', borderColor: '#FF6B35' } }}
+        okButtonProps={{ style: { background: txColors.primary, borderColor: txColors.primary } }}
       >
         <Form form={form} layout="vertical">
           <Form.Item name="name" label="规则名称" rules={[{ required: true, message: '请输入规则名称' }]}>
@@ -1287,8 +1288,8 @@ export function DeviceManagePage() {
             <Statistic
               title="设备总数"
               value={totalCount}
-              prefix={<DesktopOutlined style={{ color: '#FF6B35' }} />}
-              valueStyle={{ color: '#FF6B35' }}
+              prefix={<DesktopOutlined style={{ color: txColors.primary }} />}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>

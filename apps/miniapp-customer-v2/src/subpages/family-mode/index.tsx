@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * family-mode/index.tsx — 家庭/儿童/适老模式
  *
@@ -15,10 +16,10 @@ import Taro from '@tarojs/taro'
 import { useUserStore } from '../../store/useUserStore'
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   kids: '#FF9F0A',       // 儿童模式主色
   kidsBg: '#FFF8E1',
-  elder: '#185FA5',      // 适老模式主色
+  elder: txColors.info,      // 适老模式主色
   elderBg: '#E3F2FD',
   success: '#34C759',
   bgDeep: '#0B1A20',

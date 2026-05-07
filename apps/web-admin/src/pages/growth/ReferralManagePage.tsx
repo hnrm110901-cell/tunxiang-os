@@ -40,6 +40,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import { useRef } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { TabPane } = Tabs;
@@ -226,7 +227,7 @@ const OverviewTab = () => {
               prefix={<TeamOutlined />}
               suffix={
                 stats ? (
-                  <Text style={{ fontSize: 12, color: '#0F6E56' }}>
+                  <Text style={{ fontSize: 12, color: txColors.success }}>
                     +{stats.participant_growth_this_month} 本月
                   </Text>
                 ) : undefined
@@ -249,7 +250,7 @@ const OverviewTab = () => {
               title="本月奖励发放"
               value={stats ? fenToYuan(stats.this_month_issued_fen) : '--'}
               prefix={<GiftOutlined />}
-              valueStyle={{ color: '#FF6B35' }}
+              valueStyle={{ color: txColors.primary }}
             />
           </Card>
         </Col>
@@ -259,7 +260,7 @@ const OverviewTab = () => {
               title="待发放奖励"
               value={stats ? fenToYuan(stats.pending_reward_fen) : '--'}
               prefix={<ClockCircleOutlined />}
-              valueStyle={{ color: '#BA7517' }}
+              valueStyle={{ color: txColors.warning }}
             />
           </Card>
         </Col>
@@ -287,7 +288,7 @@ const OverviewTab = () => {
                     : '0.0'
                 }
                 suffix="%"
-                valueStyle={{ color: '#0F6E56' }}
+                valueStyle={{ color: txColors.success }}
               />
             </Card>
           </Col>
@@ -352,7 +353,7 @@ const OverviewTab = () => {
               type="primary"
               htmlType="submit"
               loading={rulesLoading}
-              style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
             >
               保存规则
             </Button>
@@ -429,7 +430,7 @@ const RelationshipTab = () => {
             type="primary"
             loading={loading}
             onClick={handleSearch}
-            style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
           >
             查询推荐树
           </Button>
@@ -455,7 +456,7 @@ const RelationshipTab = () => {
                 title="下线累计消费"
                 value={fenToYuan(summary.total_fen)}
                 prefix="¥"
-                valueStyle={{ color: '#FF6B35' }}
+                valueStyle={{ color: txColors.primary }}
               />
             </Card>
           </Col>
@@ -520,7 +521,7 @@ const RewardsTab = () => {
       width: 110,
       align: 'right',
       render: (val) => (
-        <Text strong style={{ color: '#FF6B35' }}>
+        <Text strong style={{ color: txColors.primary }}>
           ¥{fenToYuan(Number(val))}
         </Text>
       ),
@@ -630,7 +631,7 @@ const RewardsTab = () => {
           loading={batchIssuing}
           onClick={handleBatchIssue}
           disabled={selectedRowKeys.length === 0}
-          style={{ backgroundColor: '#0F6E56', borderColor: '#0F6E56' }}
+          style={{ backgroundColor: txColors.success, borderColor: txColors.success }}
         >
           批量发放 ({selectedRowKeys.length})
         </Button>,
@@ -690,7 +691,7 @@ const LeaderboardTab = () => {
       dataIndex: 'direct_referrals',
       align: 'right',
       render: (val) => (
-        <Badge count={Number(val)} showZero color="#185FA5" />
+        <Badge count={Number(val)} showZero color={txColors.info} />
       ),
     },
     {
@@ -698,7 +699,7 @@ const LeaderboardTab = () => {
       dataIndex: 'indirect_referrals',
       align: 'right',
       render: (val) => (
-        <Badge count={Number(val)} showZero color="#0F6E56" />
+        <Badge count={Number(val)} showZero color={txColors.success} />
       ),
     },
     {
@@ -706,7 +707,7 @@ const LeaderboardTab = () => {
       dataIndex: 'total_reward_fen',
       align: 'right',
       render: (val) => (
-        <Text strong style={{ color: '#FF6B35', fontSize: 16 }}>
+        <Text strong style={{ color: txColors.primary, fontSize: 16 }}>
           ¥{fenToYuan(Number(val))}
         </Text>
       ),
@@ -727,7 +728,7 @@ const LeaderboardTab = () => {
               onClick={() => setPeriod(p)}
               style={
                 period === p
-                  ? { backgroundColor: '#FF6B35', borderColor: '#FF6B35' }
+                  ? { backgroundColor: txColors.primary, borderColor: txColors.primary }
                   : undefined
               }
             >
@@ -763,7 +764,7 @@ const LeaderboardTab = () => {
                     尾号 {item.phone_tail}
                   </Text>
                   <div style={{ marginTop: 8 }}>
-                    <Text strong style={{ color: '#FF6B35', fontSize: 18 }}>
+                    <Text strong style={{ color: txColors.primary, fontSize: 18 }}>
                       ¥{fenToYuan(item.total_reward_fen)}
                     </Text>
                   </div>
@@ -803,7 +804,7 @@ const ReferralManagePage = () => {
     <div style={{ padding: '24px', minWidth: 1280, background: '#F8F7F5', minHeight: '100vh' }}>
       <div style={{ marginBottom: 24 }}>
         <Title level={4} style={{ margin: 0, color: '#2C2C2A' }}>
-          <BranchesOutlined style={{ marginRight: 8, color: '#FF6B35' }} />
+          <BranchesOutlined style={{ marginRight: 8, color: txColors.primary }} />
           CRM三级分销管理
         </Title>
         <Text type="secondary">私域裂变三级链路 + 奖励体系配置与管理</Text>

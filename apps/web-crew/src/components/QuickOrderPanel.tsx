@@ -9,6 +9,7 @@
  *   2. API GET /api/v1/menu/dishes/popular?store_id=&limit=10
  */
 import { useEffect, useState, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───
 
@@ -284,7 +285,7 @@ export function QuickOrderPanel({
                 <span
                   style={{
                     fontSize: 13,
-                    color: idx < 3 ? '#FF6B35' : '#666',
+                    color: idx < 3 ? txColors.primary : '#666',
                     minWidth: 20,
                     textAlign: 'center',
                     fontWeight: idx < 3 ? 700 : 400,
@@ -318,7 +319,7 @@ export function QuickOrderPanel({
                 </div>
 
                 {/* 价格 */}
-                <span style={{ fontSize: 15, color: '#FF6B35', fontWeight: 600, minWidth: 52, textAlign: 'right' }}>
+                <span style={{ fontSize: 15, color: txColors.primary, fontWeight: 600, minWidth: 52, textAlign: 'right' }}>
                   {fmtPrice(dish.price_fen)}
                 </span>
 
@@ -328,7 +329,7 @@ export function QuickOrderPanel({
                     style={{
                       fontSize: 13,
                       color: '#fff',
-                      background: '#FF6B35',
+                      background: txColors.primary,
                       borderRadius: 10,
                       padding: '2px 7px',
                       fontWeight: 700,
@@ -347,7 +348,7 @@ export function QuickOrderPanel({
                   style={{
                     minHeight: 48,
                     minWidth: 64,
-                    background: isAdding ? '#3a4a55' : '#FF6B35',
+                    background: isAdding ? '#3a4a55' : txColors.primary,
                     border: 'none',
                     borderRadius: 10,
                     color: '#fff',

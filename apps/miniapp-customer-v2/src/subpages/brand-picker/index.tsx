@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * brand-picker/index.tsx — 集团多品牌选择器
  *
@@ -16,7 +17,7 @@ import { txRequest } from '../../utils/request'
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 
 const C = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   bgDeep: '#0B1A20',
   bgCard: '#132029',
   bgHover: '#1A2E38',
@@ -30,9 +31,9 @@ const C = {
 // ─── Fallback brands ──────────────────────────────────────────────────────────
 
 const FALLBACK_BRANDS: BrandInfo[] = [
-  { id: 'brand-xj', name: '徐记海鲜', logo_url: '', theme_color: '#FF6B35' },
-  { id: 'brand-xc', name: '湘厨小馆', logo_url: '', theme_color: '#0F6E56' },
-  { id: 'brand-hw', name: '海味外卖', logo_url: '', theme_color: '#185FA5' },
+  { id: 'brand-xj', name: '徐记海鲜', logo_url: '', theme_color: txColors.primary },
+  { id: 'brand-xc', name: '湘厨小馆', logo_url: '', theme_color: txColors.success },
+  { id: 'brand-hw', name: '海味外卖', logo_url: '', theme_color: txColors.info },
 ]
 
 // ─── Component ────────────────────────────────────────────────────────────────

@@ -17,6 +17,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Token (深色主题) ────────────────────────────────────────────────
 
@@ -27,11 +28,11 @@ const T = {
   text:      '#E0E0E0',
   muted:     '#64748b',
   dim:       '#334155',
-  primary:   '#FF6B35',
+  primary:   txColors.primary,
   success:   '#30D158',
   warning:   '#FF9F0A',
   danger:    '#FF453A',
-  info:      '#185FA5',
+  info:      txColors.info,
 };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -84,7 +85,7 @@ const DIMENSION_LABELS: Record<keyof Dimensions, string> = {
 };
 
 const DIMENSION_COLORS: Record<keyof Dimensions, string> = {
-  revenue: '#FF6B35',
+  revenue: txColors.primary,
   efficiency: '#30D158',
   satisfaction: '#5AC8FA',
   attendance: '#FF9F0A',

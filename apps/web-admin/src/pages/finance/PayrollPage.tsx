@@ -43,6 +43,7 @@ import {
 } from '@ant-design/icons';
 import { txFetchData } from '../../api';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -130,9 +131,9 @@ const STATUS_CONFIG: Record<
   { text: string; color: string; badgeStatus: 'default' | 'processing' | 'success' | 'error' | 'warning' }
 > = {
   draft:    { text: '草稿',   color: 'default',  badgeStatus: 'default' },
-  approved: { text: '已审批', color: '#185FA5',  badgeStatus: 'processing' },
-  paid:     { text: '已发放', color: '#0F6E56',  badgeStatus: 'success' },
-  voided:   { text: '已作废', color: '#A32D2D',  badgeStatus: 'error' },
+  approved: { text: '已审批', color: txColors.info,  badgeStatus: 'processing' },
+  paid:     { text: '已发放', color: txColors.success,  badgeStatus: 'success' },
+  voided:   { text: '已作废', color: txColors.danger,  badgeStatus: 'error' },
 };
 
 const SALARY_TYPE_LABEL: Record<string, string> = {
@@ -193,7 +194,7 @@ function PayrollLineChart({ data }: LineChartProps) {
       <polyline
         points={grossPoints}
         fill="none"
-        stroke="#FF6B35"
+        stroke={txColors.primary}
         strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -203,7 +204,7 @@ function PayrollLineChart({ data }: LineChartProps) {
       <polyline
         points={netPoints}
         fill="none"
-        stroke="#185FA5"
+        stroke={txColors.info}
         strokeWidth={2}
         strokeLinejoin="round"
         strokeLinecap="round"
@@ -212,8 +213,8 @@ function PayrollLineChart({ data }: LineChartProps) {
       {/* 数据点 */}
       {data.map((d, i) => (
         <g key={d.month}>
-          <circle cx={toX(i)} cy={toY(d.gross_pay)} r={4} fill="#FF6B35" />
-          <circle cx={toX(i)} cy={toY(d.net_pay)}   r={3} fill="#185FA5" />
+          <circle cx={toX(i)} cy={toY(d.gross_pay)} r={4} fill={txColors.primary} />
+          <circle cx={toX(i)} cy={toY(d.net_pay)}   r={3} fill={txColors.info} />
           {/* x 轴月份标签 */}
           <text x={toX(i)} y={H - 6} fontSize={10} fill="#5F5E5A" textAnchor="middle">
             {d.month.slice(5)}月
@@ -222,9 +223,9 @@ function PayrollLineChart({ data }: LineChartProps) {
       ))}
 
       {/* 图例 */}
-      <circle cx={PAD.left + 8} cy={10} r={4} fill="#FF6B35" />
+      <circle cx={PAD.left + 8} cy={10} r={4} fill={txColors.primary} />
       <text x={PAD.left + 16} y={14} fontSize={10} fill="#5F5E5A">应发</text>
-      <circle cx={PAD.left + 52} cy={10} r={4} fill="#185FA5" />
+      <circle cx={PAD.left + 52} cy={10} r={4} fill={txColors.info} />
       <text x={PAD.left + 60} y={14} fontSize={10} fill="#5F5E5A">实发</text>
     </svg>
   );
@@ -354,7 +355,7 @@ function RecordsTab({ actionRef }: Tab1Props) {
       width: 100,
       search: false,
       render: (_, r) => (
-        <Text strong style={{ color: '#0F6E56' }}>¥{fenToYuan(r.net_pay)}</Text>
+        <Text strong style={{ color: txColors.success }}>¥{fenToYuan(r.net_pay)}</Text>
       ),
     },
     {
@@ -392,11 +393,11 @@ function RecordsTab({ actionRef }: Tab1Props) {
             okText="确认"
             cancelText="取消"
           >
-            <a style={{ color: '#185FA5' }}>审批</a>
+            <a style={{ color: txColors.info }}>审批</a>
           </Popconfirm>
         ),
         record.status === 'approved' && (
-          <a key="paid" style={{ color: '#0F6E56' }} onClick={() => handleMarkPaid(record)}>
+          <a key="paid" style={{ color: txColors.success }} onClick={() => handleMarkPaid(record)}>
             标记已发
           </a>
         ),
@@ -467,7 +468,7 @@ function RecordsTab({ actionRef }: Tab1Props) {
                 <Text strong style={{ fontSize: 16 }}>¥{fenToYuan(detailRecord.gross_pay)}</Text>
               </Descriptions.Item>
               <Descriptions.Item label="实发" span={2}>
-                <Text strong style={{ fontSize: 16, color: '#0F6E56' }}>
+                <Text strong style={{ fontSize: 16, color: txColors.success }}>
                   ¥{fenToYuan(detailRecord.net_pay)}
                 </Text>
               </Descriptions.Item>
@@ -689,7 +690,7 @@ function HistoryTab() {
                       title="应发"
                       value={fenToWan(h.gross_pay)}
                       suffix="万"
-                      valueStyle={{ fontSize: 18, color: '#FF6B35' }}
+                      valueStyle={{ fontSize: 18, color: txColors.primary }}
                       precision={2}
                     />
                   </Col>
@@ -698,7 +699,7 @@ function HistoryTab() {
                       title="实发"
                       value={fenToWan(h.net_pay)}
                       suffix="万"
-                      valueStyle={{ fontSize: 18, color: '#0F6E56' }}
+                      valueStyle={{ fontSize: 18, color: txColors.success }}
                       precision={2}
                     />
                   </Col>
@@ -737,29 +738,29 @@ export default function PayrollPage() {
       title: '本月员工总数',
       value: summary.headcount,
       suffix: '人',
-      icon: <TeamOutlined style={{ color: '#FF6B35', fontSize: 22 }} />,
-      color: '#FF6B35',
+      icon: <TeamOutlined style={{ color: txColors.primary, fontSize: 22 }} />,
+      color: txColors.primary,
     },
     {
       title: '应发合计',
       value: fenToWan(summary.gross_total),
       suffix: '万',
-      icon: <DollarOutlined style={{ color: '#0F6E56', fontSize: 22 }} />,
-      color: '#0F6E56',
+      icon: <DollarOutlined style={{ color: txColors.success, fontSize: 22 }} />,
+      color: txColors.success,
     },
     {
       title: '已发合计',
       value: fenToWan(summary.paid_total),
       suffix: '万',
-      icon: <CheckCircleOutlined style={{ color: '#185FA5', fontSize: 22 }} />,
-      color: '#185FA5',
+      icon: <CheckCircleOutlined style={{ color: txColors.info, fontSize: 22 }} />,
+      color: txColors.info,
     },
     {
       title: '待审批数量',
       value: summary.pending_approval,
       suffix: '单',
-      icon: <ClockCircleOutlined style={{ color: '#BA7517', fontSize: 22 }} />,
-      color: '#BA7517',
+      icon: <ClockCircleOutlined style={{ color: txColors.warning, fontSize: 22 }} />,
+      color: txColors.warning,
     },
   ];
 
@@ -767,11 +768,11 @@ export default function PayrollPage() {
     <ConfigProvider
       theme={{
         token: {
-          colorPrimary: '#FF6B35',
-          colorSuccess: '#0F6E56',
-          colorWarning: '#BA7517',
-          colorError: '#A32D2D',
-          colorInfo: '#185FA5',
+          colorPrimary: txColors.primary,
+          colorSuccess: txColors.success,
+          colorWarning: txColors.warning,
+          colorError: txColors.danger,
+          colorInfo: txColors.info,
           colorTextBase: '#2C2C2A',
           borderRadius: 6,
           fontSize: 14,

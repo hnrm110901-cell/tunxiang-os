@@ -33,6 +33,7 @@ import {
 import { CheckCircleOutlined, EditOutlined } from '@ant-design/icons';
 import { txFetchData } from '../../../api';
 import { getTokenPayload } from '../../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { TextArea } = Input;
@@ -248,7 +249,7 @@ export default function OnlineScoringPage() {
                     size="small"
                     icon={<EditOutlined />}
                     onClick={() => openScoringDrawer(emp)}
-                    style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+                    style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
                   >
                     打分
                   </Button>
@@ -282,7 +283,7 @@ export default function OnlineScoringPage() {
               type="primary"
               loading={submitting}
               onClick={handleSubmitScore}
-              style={{ backgroundColor: '#FF6B35', borderColor: '#FF6B35' }}
+              style={{ backgroundColor: txColors.primary, borderColor: txColors.primary }}
             >
               提交评分
             </Button>

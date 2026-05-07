@@ -50,6 +50,7 @@ import {
 import { Line } from '@ant-design/charts';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -103,9 +104,9 @@ const SHIFT_LABELS: Record<string, string> = {
 };
 
 const RISK_BORDER_COLOR: Record<string, string> = {
-  red: '#A32D2D',
-  yellow: '#BA7517',
-  green: '#0F6E56',
+  red: txColors.danger,
+  yellow: txColors.warning,
+  green: txColors.success,
 };
 
 const RISK_BADGE_STATUS: Record<string, 'success' | 'warning' | 'error'> = {
@@ -121,9 +122,9 @@ const RISK_LABEL: Record<string, string> = {
 };
 
 function scoreColor(score: number): string {
-  if (score >= 80) return '#0F6E56';
-  if (score >= 60) return '#BA7517';
-  return '#A32D2D';
+  if (score >= 80) return txColors.success;
+  if (score >= 60) return txColors.warning;
+  return txColors.danger;
 }
 
 // ─── 组件 ────────────────────────────────────────────────────────────────────
@@ -295,7 +296,7 @@ export default function StoreReadinessPage() {
         <a key="detail" onClick={() => openDetail(r)}>详情</a>,
         <a key="edit" onClick={() => { setDetailRecord(r); setModalOpen(true); }}>编辑</a>,
         <Popconfirm key="del" title="确认删除？" onConfirm={() => handleDelete(r.id)}>
-          <a style={{ color: '#A32D2D' }}>删除</a>
+          <a style={{ color: txColors.danger }}>删除</a>
         </Popconfirm>,
       ],
     },
@@ -342,15 +343,15 @@ export default function StoreReadinessPage() {
         type: 'line' as const,
         start: ['min', 80] as [string, number],
         end: ['max', 80] as [string, number],
-        style: { stroke: '#0F6E56', lineDash: [4, 4], lineWidth: 1 },
-        text: { content: '80分', position: 'start' as const, style: { fill: '#0F6E56', fontSize: 11 } },
+        style: { stroke: txColors.success, lineDash: [4, 4], lineWidth: 1 },
+        text: { content: '80分', position: 'start' as const, style: { fill: txColors.success, fontSize: 11 } },
       },
       {
         type: 'line' as const,
         start: ['min', 60] as [string, number],
         end: ['max', 60] as [string, number],
-        style: { stroke: '#A32D2D', lineDash: [4, 4], lineWidth: 1 },
-        text: { content: '60分', position: 'start' as const, style: { fill: '#A32D2D', fontSize: 11 } },
+        style: { stroke: txColors.danger, lineDash: [4, 4], lineWidth: 1 },
+        text: { content: '60分', position: 'start' as const, style: { fill: txColors.danger, fontSize: 11 } },
       },
     ],
   };
@@ -369,9 +370,9 @@ export default function StoreReadinessPage() {
             statistic={{
               title: '绿灯门店数',
               value: dashboard?.green_count ?? 0,
-              icon: <CheckCircleOutlined style={{ color: '#0F6E56' }} />,
+              icon: <CheckCircleOutlined style={{ color: txColors.success }} />,
             }}
-            style={{ borderTop: '3px solid #0F6E56' }}
+            style={{ borderTop: `3px solid ${txColors.success}` }}
           />
         </Col>
         <Col span={6}>
@@ -380,9 +381,9 @@ export default function StoreReadinessPage() {
             statistic={{
               title: '黄灯门店数',
               value: dashboard?.yellow_count ?? 0,
-              icon: <ExclamationCircleOutlined style={{ color: '#BA7517' }} />,
+              icon: <ExclamationCircleOutlined style={{ color: txColors.warning }} />,
             }}
-            style={{ borderTop: '3px solid #BA7517' }}
+            style={{ borderTop: `3px solid ${txColors.warning}` }}
           />
         </Col>
         <Col span={6}>
@@ -391,9 +392,9 @@ export default function StoreReadinessPage() {
             statistic={{
               title: '红灯门店数',
               value: dashboard?.red_count ?? 0,
-              icon: <CloseCircleOutlined style={{ color: '#A32D2D' }} />,
+              icon: <CloseCircleOutlined style={{ color: txColors.danger }} />,
             }}
-            style={{ borderTop: '3px solid #A32D2D' }}
+            style={{ borderTop: `3px solid ${txColors.danger}` }}
           />
         </Col>
         <Col span={6}>
@@ -404,7 +405,7 @@ export default function StoreReadinessPage() {
               value: dashboard?.avg_score?.toFixed(1) ?? '—',
               suffix: '分',
             }}
-            style={{ borderTop: '3px solid #185FA5' }}
+            style={{ borderTop: `3px solid ${txColors.info}` }}
           />
         </Col>
       </Row>

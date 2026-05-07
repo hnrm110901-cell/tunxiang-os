@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useLang } from '@/i18n/LangContext';
 import { getOrderStatus } from '@/api/orderApi';
 import type { OrderStatusInfo } from '@/api/orderApi';
+import { txColors } from '@tx/tokens';
 
 const PROGRESS_STEPS = [
   { key: 'received' as const, labelKey: 'stepReceived' as const, pct: 25 },
@@ -88,7 +89,7 @@ export default function PayResultPage() {
           style={{
             marginTop: 32, padding: '14px 48px',
             borderRadius: 'var(--tx-radius-full)',
-            background: '#FF6B35', color: '#fff',
+            background: txColors.primary, color: '#fff',
             fontSize: 'var(--tx-font-md)', fontWeight: 600,
           }}
         >
@@ -125,7 +126,7 @@ export default function PayResultPage() {
         <div style={{
           fontSize: 'var(--tx-font-sm)', color: 'var(--tx-text-tertiary)', marginTop: 4,
         }}>
-          {t('payResultAmount')}: <span style={{ color: '#FF6B35', fontWeight: 600 }}>{t('yuan')}{amount}</span>
+          {t('payResultAmount')}: <span style={{ color: txColors.primary, fontWeight: 600 }}>{t('yuan')}{amount}</span>
         </div>
       </div>
 
@@ -139,7 +140,7 @@ export default function PayResultPage() {
           {t('payResultEstTime')}
         </div>
         <div style={{
-          fontSize: 36, fontWeight: 700, color: '#FF6B35', marginTop: 4,
+          fontSize: 36, fontWeight: 700, color: txColors.primary, marginTop: 4,
         }}>
           ~{estimatedMinutes} <span style={{ fontSize: 'var(--tx-font-md)' }}>{t('payResultMinutes')}</span>
         </div>
@@ -227,7 +228,7 @@ export default function PayResultPage() {
           style={{
             flex: 1, height: 50,
             borderRadius: 'var(--tx-radius-full)',
-            background: '#FF6B35', color: '#fff',
+            background: txColors.primary, color: '#fff',
             fontSize: 'var(--tx-font-sm)', fontWeight: 700,
           }}
         >

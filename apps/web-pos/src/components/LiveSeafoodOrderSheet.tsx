@@ -22,15 +22,16 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { getMacMiniUrl } from '../bridge/TXBridge';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 
 const T = {
-  primary:    'var(--tx-primary, #FF6B35)',
-  primaryDark:'#E55A28',
-  success:    'var(--tx-success, #0F6E56)',
-  danger:     'var(--tx-danger, #A32D2D)',
-  warning:    'var(--tx-warning, #BA7517)',
+  primary:    `var(--tx-primary, ${txColors.primary})`,
+  primaryDark:txColors.primaryActive,
+  success:    `var(--tx-success, ${txColors.success})`,
+  danger:     `var(--tx-danger, ${txColors.danger})`,
+  warning:    `var(--tx-warning, ${txColors.warning})`,
   text1:      'var(--tx-text-1, #2C2C2A)',
   text2:      'var(--tx-text-2, #5F5E5A)',
   bg1:        'var(--tx-bg-1, #FFFFFF)',

@@ -15,6 +15,7 @@ import {
 import { useTableStore } from '../../stores/tableStore';
 import { getStatusText, getStatusColor } from './tableStatusUtils';
 import styles from './TableManagement.module.css';
+import { txColors } from '@tx/tokens';
 
 /**
  * 地图视图Props
@@ -103,7 +104,7 @@ const MapCanvas: React.FC<{
       // 绘制桌台形状
       ctx.fillStyle = statusColor;
       ctx.globalAlpha = isHovered ? 0.9 : 0.7;
-      ctx.strokeStyle = isHovered ? '#FF6B35' : statusColor;
+      ctx.strokeStyle = isHovered ? txColors.primary : statusColor;
       ctx.lineWidth = isHovered ? 3 : 2;
 
       if (layout.shape === 'rect') {
@@ -249,7 +250,7 @@ const MapCanvas: React.FC<{
             position: 'absolute',
             left: `${tooltipPos.x + 10}px`,
             top: `${tooltipPos.y + 10}px`,
-            background: '#1E2A3A',
+            background: txColors.navy,
             border: '1px solid rgba(255,255,255,0.15)',
             borderRadius: 8,
             padding: '8px 12px',
@@ -382,10 +383,10 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
         {/* 图例（替代 antd Tag 色块） */}
         <div className={styles.mapTableLegend}>
           {[
-            { color: '#0F6E56', label: '空台' },
-            { color: '#185FA5', label: '用餐中' },
-            { color: '#BA7517', label: '已预订' },
-            { color: '#A32D2D', label: '待结账' },
+            { color: txColors.success, label: '空台' },
+            { color: txColors.info, label: '用餐中' },
+            { color: txColors.warning, label: '已预订' },
+            { color: txColors.danger, label: '待结账' },
             { color: '#555', label: '待清台' },
           ].map(({ color, label }) => (
             <div key={label} className={styles.legendItem}>

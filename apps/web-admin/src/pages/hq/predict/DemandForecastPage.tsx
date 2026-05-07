@@ -11,6 +11,7 @@ import { Select, Button, Spin, Tag, Modal, message, Input, Collapse } from 'antd
 import { ReloadOutlined, ShoppingCartOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────
 
@@ -36,16 +37,16 @@ interface DemandItem {
 const CATEGORIES: DishCategory[] = ['凉菜', '热菜', '海鲜', '主食', '饮品'];
 
 const CATEGORY_COLORS: Record<DishCategory, string> = {
-  '凉菜': '#185FA5',
-  '热菜': '#A32D2D',
-  '海鲜': '#0F6E56',
-  '主食': '#BA7517',
+  '凉菜': txColors.info,
+  '热菜': txColors.danger,
+  '海鲜': txColors.success,
+  '主食': txColors.warning,
   '饮品': '#8B5CF6',
 };
 
 const TREND_ICONS: Record<string, { icon: string; color: string }> = {
-  up: { icon: '↑', color: '#A32D2D' },
-  down: { icon: '↓', color: '#0F6E56' },
+  up: { icon: '↑', color: txColors.danger },
+  down: { icon: '↓', color: txColors.success },
   flat: { icon: '→', color: '#5F5E5A' },
 };
 
@@ -167,7 +168,7 @@ export function DemandForecastPage() {
             {needPurchase.map(i => (
               <div key={i.dish_id} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                 <span>{i.dish_name}</span>
-                <span style={{ color: '#FF6B35', fontWeight: 600 }}>{i.purchase_needed} {i.unit}</span>
+                <span style={{ color: txColors.primary, fontWeight: 600 }}>{i.purchase_needed} {i.unit}</span>
               </div>
             ))}
           </div>
@@ -196,9 +197,9 @@ export function DemandForecastPage() {
 
   const stockStatus = (item: DemandItem) => {
     const ratio = item.current_stock / Math.max(1, item.predicted_qty);
-    if (ratio >= 1) return { color: '#0F6E56', label: '充足' };
-    if (ratio >= 0.5) return { color: '#BA7517', label: '偏低' };
-    return { color: '#A32D2D', label: '不足' };
+    if (ratio >= 1) return { color: txColors.success, label: '充足' };
+    if (ratio >= 0.5) return { color: txColors.warning, label: '偏低' };
+    return { color: txColors.danger, label: '不足' };
   };
 
   // ─── Collapse items ───
@@ -265,7 +266,7 @@ export function DemandForecastPage() {
                       </span>
                       <Tag
                         style={{ marginLeft: 8, fontSize: 11 }}
-                        color={status.color === '#0F6E56' ? 'green' : status.color === '#BA7517' ? 'orange' : 'red'}
+                        color={status.color === txColors.success ? 'green' : status.color === txColors.warning ? 'orange' : 'red'}
                       >
                         {status.label}
                       </Tag>
@@ -273,7 +274,7 @@ export function DemandForecastPage() {
                     <td style={{
                       padding: '10px 12px', textAlign: 'right',
                       fontWeight: item.purchase_needed > 0 ? 700 : 400,
-                      color: item.purchase_needed > 0 ? '#FF6B35' : '#B4B2A9',
+                      color: item.purchase_needed > 0 ? txColors.primary : '#B4B2A9',
                     }}>
                       {item.purchase_needed > 0 ? `${item.purchase_needed} ${item.unit}` : '-'}
                     </td>
@@ -294,7 +295,7 @@ export function DemandForecastPage() {
                             position: 'absolute', left: 0, top: 0, height: '100%',
                             borderRadius: 2,
                             width: `${item.confidence * 100}%`,
-                            background: item.confidence >= 0.85 ? '#0F6E56' : item.confidence >= 0.7 ? '#BA7517' : '#A32D2D',
+                            background: item.confidence >= 0.85 ? txColors.success : item.confidence >= 0.7 ? txColors.warning : txColors.danger,
                           }} />
                         </div>
                         <span style={{ fontSize: 11, color: '#B4B2A9' }}>
@@ -344,7 +345,7 @@ export function DemandForecastPage() {
             icon={<ShoppingCartOutlined />}
             onClick={handleGeneratePO}
             loading={generating}
-            style={{ background: '#FF6B35', borderColor: '#FF6B35' }}
+            style={{ background: txColors.primary, borderColor: txColors.primary }}
           >
             一键生成采购单
           </Button>
@@ -368,21 +369,21 @@ export function DemandForecastPage() {
           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         }}>
           <div style={{ fontSize: 13, color: '#5F5E5A' }}>需采购品项</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#FF6B35' }}>{totalPurchaseItems}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: txColors.primary }}>{totalPurchaseItems}</div>
         </div>
         <div style={{
           background: '#fff', borderRadius: 8, padding: 16,
           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         }}>
           <div style={{ fontSize: 13, color: '#5F5E5A' }}>总采购量</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#BA7517' }}>{totalPurchaseQty}</div>
+          <div style={{ fontSize: 28, fontWeight: 700, color: txColors.warning }}>{totalPurchaseQty}</div>
         </div>
         <div style={{
           background: '#fff', borderRadius: 8, padding: 16,
           boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         }}>
           <div style={{ fontSize: 13, color: '#5F5E5A' }}>库存充足率</div>
-          <div style={{ fontSize: 28, fontWeight: 700, color: '#0F6E56' }}>
+          <div style={{ fontSize: 28, fontWeight: 700, color: txColors.success }}>
             {items.length > 0 ? ((items.filter(i => i.purchase_needed === 0).length / items.length) * 100).toFixed(0) : 0}%
           </div>
         </div>

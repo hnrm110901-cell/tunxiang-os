@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * KDSStatBar — 出餐统计顶栏
  *
@@ -33,7 +34,7 @@ export function KDSStatBar({ stats }: KDSStatBarProps) {
         style={{
           display: 'flex',
           height: 72,
-          background: '#1E2A3A',
+          background: txColors.navy,
           borderBottom: '2px solid #0F1C2A',
           flexShrink: 0,
         }}
@@ -43,7 +44,7 @@ export function KDSStatBar({ stats }: KDSStatBarProps) {
           label="待出餐"
           value={pending}
           unit="单"
-          valueColor="#BA7517"
+          valueColor={txColors.warning}
         />
 
         <StatDivider />
@@ -53,7 +54,7 @@ export function KDSStatBar({ stats }: KDSStatBarProps) {
           label="今日已完成"
           value={completed}
           unit="单"
-          valueColor="#0F6E56"
+          valueColor={txColors.success}
         />
 
         <StatDivider />
@@ -148,7 +149,7 @@ function StatDivider() {
       style={{
         width: 1,
         margin: '14px 0',
-        background: '#2C3E50',
+        background: txColors.navyLight,
       }}
     />
   );

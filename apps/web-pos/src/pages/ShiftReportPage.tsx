@@ -14,22 +14,23 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /* ─────────────────────────────────────────
    设计 Token（与屯象OS Token 规范对齐）
 ───────────────────────────────────────── */
 const T = {
-  primary:   '#FF6B35',
-  primaryAct:'#E55A28',
-  navy:      '#1E2A3A',
-  navyLight: '#2C3E50',
-  success:   '#0F6E56',
-  danger:    '#A32D2D',
-  warning:   '#BA7517',
-  info:      '#185FA5',
+  primary:   txColors.primary,
+  primaryAct:txColors.primaryActive,
+  navy:      txColors.navy,
+  navyLight: txColors.navyLight,
+  success:   txColors.success,
+  danger:    txColors.danger,
+  warning:   txColors.warning,
+  info:      txColors.info,
   textPri:   '#E2E8F0',
   textSec:   '#94A3B8',
-  border:    '#2C3E50',
+  border:    txColors.navyLight,
   bgBase:    '#0B1820',
   bgCard:    '#112230',
   bgCard2:   '#162A38',
@@ -127,7 +128,7 @@ const MOCK_REPORT: ShiftReport = {
     { method: 'alipay',     label: '支付宝',  amount_fen: 876000,  count: 28, color: '#1677FF', icon: '💙' },
     { method: 'unionpay',   label: '银联刷卡', amount_fen: 428000,  count: 8,  color: '#E6002D', icon: '💳' },
     { method: 'stored',     label: '储值卡',  amount_fen: 218000,  count: 5,  color: '#9B59B6', icon: '🎫' },
-    { method: 'credit',     label: '企业挂账', amount_fen: 62000,   count: 1,  color: '#185FA5', icon: '🏢' },
+    { method: 'credit',     label: '企业挂账', amount_fen: 62000,   count: 1,  color: txColors.info, icon: '🏢' },
   ],
   discounts: [
     { type: 'member',    label: '会员折扣', count: 38, amount_fen: 45000 },

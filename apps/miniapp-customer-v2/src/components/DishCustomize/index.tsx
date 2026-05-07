@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 import { View, Text, ScrollView, Textarea } from '@tarojs/components'
 import React, { useState, useEffect, useCallback } from 'react'
 
@@ -251,7 +252,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                           minHeight: '72rpx',
                           padding: '12rpx 24rpx',
                           borderRadius: '12rpx',
-                          border: isSelected ? '2rpx solid #FF6B35' : '2rpx solid #2A4050',
+                          border: isSelected ? `2rpx solid ${txColors.primary}` : '2rpx solid #2A4050',
                           background: isSelected ? 'rgba(255,107,53,0.12)' : '#0B1A20',
                           display: 'flex',
                           flexDirection: 'column',
@@ -262,7 +263,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                       >
                         <Text
                           style={{
-                            color: isSelected ? '#FF6B35' : '#C8DDE6',
+                            color: isSelected ? txColors.primary : '#C8DDE6',
                             fontSize: '26rpx',
                             fontWeight: isSelected ? '600' : '400',
                           }}
@@ -272,7 +273,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                         {opt.price_delta_fen != null && opt.price_delta_fen !== 0 && (
                           <Text
                             style={{
-                              color: isSelected ? '#FF6B35' : '#6B8A96',
+                              color: isSelected ? txColors.primary : '#6B8A96',
                               fontSize: '20rpx',
                               marginTop: '4rpx',
                             }}
@@ -311,7 +312,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                     width: '64rpx',
                     height: '64rpx',
                     borderRadius: '32rpx',
-                    border: quantity > 1 ? '2rpx solid #FF6B35' : '2rpx solid #2A4050',
+                    border: quantity > 1 ? `2rpx solid ${txColors.primary}` : '2rpx solid #2A4050',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -321,7 +322,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                   }}
                   onClick={() => quantity > 1 && setQuantity((q) => q - 1)}
                 >
-                  <Text style={{ color: '#FF6B35', fontSize: '36rpx', lineHeight: '1' }}>−</Text>
+                  <Text style={{ color: txColors.primary, fontSize: '36rpx', lineHeight: '1' }}>−</Text>
                 </View>
                 <Text style={{ color: '#E8F4F8', fontSize: '32rpx', fontWeight: '600', minWidth: '48rpx', textAlign: 'center' }}>
                   {quantity}
@@ -331,7 +332,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
                     width: '64rpx',
                     height: '64rpx',
                     borderRadius: '32rpx',
-                    background: '#FF6B35',
+                    background: txColors.primary,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -410,7 +411,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
             <Text style={{ color: '#9EB5C0', fontSize: '24rpx' }}>合计</Text>
             <Text
               style={{
-                color: '#FF6B35',
+                color: txColors.primary,
                 fontSize: '40rpx',
                 fontWeight: '700',
                 marginLeft: '8rpx',
@@ -421,7 +422,7 @@ const DishCustomize: React.FC<DishCustomizeProps> = ({ dish, visible, onClose, o
           </View>
           <View
             style={{
-              background: '#FF6B35',
+              background: txColors.primary,
               borderRadius: '48rpx',
               padding: '0 56rpx',
               height: '88rpx',

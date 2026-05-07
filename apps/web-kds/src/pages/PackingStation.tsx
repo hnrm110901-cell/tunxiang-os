@@ -18,6 +18,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { startScan, isAndroidPOS } from '../bridge/TXBridge';
 import { playNewOrder } from '../utils/audio';
+import { txColors } from '@tx/tokens';
 
 // ─── 配置 ───
 
@@ -137,7 +138,7 @@ function formatAge(createdAt: string): string {
 function getAgeColor(createdAt: string): string {
   const diffMin = Math.floor((Date.now() - new Date(createdAt).getTime()) / 60_000);
   if (diffMin >= 15) return '#ff4d4f';
-  if (diffMin >= 8) return '#BA7517';
+  if (diffMin >= 8) return txColors.warning;
   return '#888';
 }
 
@@ -347,7 +348,7 @@ function OrderCard({ order, tick: _tick, confirming, onManualConfirm }: OrderCar
           </span>
           {order.is_new_customer && (
             <span style={{
-              background: '#ff6b35',
+              background: txColors.primary,
               color: '#fff',
               borderRadius: 6,
               padding: '2px 8px',
@@ -597,7 +598,7 @@ export function PackingStation() {
           )}
 
           {noConfig && (
-            <span style={{ fontSize: 16, color: '#BA7517' }}>
+            <span style={{ fontSize: 16, color: txColors.warning }}>
               未配置（需设置 Mac mini 地址/门店/租户）
             </span>
           )}

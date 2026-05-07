@@ -28,6 +28,7 @@ import {
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
 import { FileTextOutlined, PlusOutlined } from '@ant-design/icons';
 import type { ContractTemplate } from '../../../api/contractApi';
+import { txColors } from '@tx/tokens';
 import {
   createContractTemplate,
   fetchContractTemplates,
@@ -35,7 +36,7 @@ import {
 } from '../../../api/contractApi';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 const CONTRACT_TYPE_OPTIONS = [
   { label: '劳动合同', value: 'labor' },

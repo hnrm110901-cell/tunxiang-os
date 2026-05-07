@@ -35,6 +35,7 @@ import {
 } from '@ant-design/pro-components';
 import type { DataNode } from 'antd/es/tree';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 
@@ -53,9 +54,9 @@ interface OrgNode {
 
 const typeIcon: Record<string, React.ReactNode> = {
   group: <ApartmentOutlined />,
-  brand: <ShopOutlined style={{ color: '#FF6B35' }} />,
-  region: <ApartmentOutlined style={{ color: '#185FA5' }} />,
-  store: <ShopOutlined style={{ color: '#0F6E56' }} />,
+  brand: <ShopOutlined style={{ color: txColors.primary }} />,
+  region: <ApartmentOutlined style={{ color: txColors.info }} />,
+  store: <ShopOutlined style={{ color: txColors.success }} />,
   department: <TeamOutlined />,
 };
 

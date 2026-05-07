@@ -75,7 +75,7 @@ const procurementColumns: ProColumns<ProcurementRow>[] = [
   {
     title: '操作', valueType: 'option', width: 110,
     render: () => [
-      <Button key="add" type="primary" size="small" style={{ background: '#FF6B35', border: 'none' }}>
+      <Button key="add" type="primary" size="small" style={{ background: txColors.primary, border: 'none' }}>
         加入采购单
       </Button>,
     ],
@@ -88,7 +88,7 @@ const expiryColumns: ProColumns<ExpiryRow>[] = [
   {
     title: '剩余天数', dataIndex: 'daysLeft', width: 90,
     render: (_, r) => (
-      <span style={{ color: r.daysLeft <= 3 ? '#A32D2D' : '#BA7517', fontWeight: 600 }}>
+      <span style={{ color: r.daysLeft <= 3 ? txColors.danger : txColors.warning, fontWeight: 600 }}>
         {r.daysLeft}天
       </span>
     ),
@@ -114,14 +114,14 @@ const forecastColumns: ProColumns<ForecastRow>[] = [
   {
     title: '预测偏差', dataIndex: 'deviation', width: 90,
     render: (_, r) => (
-      <span style={{ color: r.deviation.startsWith('+') ? '#0F6E56' : '#A32D2D' }}>
+      <span style={{ color: r.deviation.startsWith('+') ? txColors.success : txColors.danger }}>
         {r.deviation}
       </span>
     ),
   },
   {
     title: 'AI置信度', dataIndex: 'confidence', width: 130,
-    render: (_, r) => <Progress percent={r.confidence} size="small" strokeColor="#FF6B35" />,
+    render: (_, r) => <Progress percent={r.confidence} size="small" strokeColor={txColors.primary} />,
   },
 ];
 
@@ -177,7 +177,7 @@ const tabItems: TabsProps['items'] = [
 // ---- 页面组件 ----
 export const ProcurementSuggestionPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部预警 */}
         <Alert
@@ -185,7 +185,7 @@ export const ProcurementSuggestionPage: React.FC = () => {
           showIcon
           message="🛡️ tx-supply 供应链卫士 · 发现 3 个采购风险 · 建议今日处理"
           action={
-            <Button size="small" style={{ background: '#FF6B35', color: 'white', border: 'none' }}>
+            <Button size="small" style={{ background: txColors.primary, color: 'white', border: 'none' }}>
               查看详情
             </Button>
           }
@@ -198,10 +198,10 @@ export const ProcurementSuggestionPage: React.FC = () => {
             <Card><Statistic title="建议采购品类" value={12} suffix="个" /></Card>
           </Col>
           <Col span={6}>
-            <Card><Statistic title="临期预警" value={3} suffix="个" valueStyle={{ color: '#A32D2D' }} /></Card>
+            <Card><Statistic title="临期预警" value={3} suffix="个" valueStyle={{ color: txColors.danger }} /></Card>
           </Col>
           <Col span={6}>
-            <Card><Statistic title="库存不足风险" value={5} suffix="个" valueStyle={{ color: '#BA7517' }} /></Card>
+            <Card><Statistic title="库存不足风险" value={5} suffix="个" valueStyle={{ color: txColors.warning }} /></Card>
           </Col>
           <Col span={6}>
             <Card><Statistic title="预计采购金额" value="8,420" prefix="¥" /></Card>
@@ -215,7 +215,7 @@ export const ProcurementSuggestionPage: React.FC = () => {
 
         {/* 底部操作 */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" style={{ background: '#FF6B35', border: 'none' }}>
+          <Button type="primary" style={{ background: txColors.primary, border: 'none' }}>
             生成采购单
           </Button>
           <Button>发送给供应商</Button>
@@ -227,3 +227,4 @@ export const ProcurementSuggestionPage: React.FC = () => {
 
 // React import needed for JSX
 import React from 'react';
+import { txColors } from '@tx/tokens';

@@ -41,6 +41,7 @@ import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns, ActionType } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
 import { getToken } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
@@ -419,7 +420,7 @@ function ReconciliationTab() {
                 <Statistic
                   title="匹配数"
                   value={report.matched}
-                  valueStyle={{ color: '#0F6E56' }}
+                  valueStyle={{ color: txColors.success }}
                   prefix={<CheckCircleOutlined />}
                 />
               </Card>
@@ -429,7 +430,7 @@ function ReconciliationTab() {
                 <Statistic
                   title="差异数"
                   value={report.unmatched}
-                  valueStyle={{ color: report.unmatched > 0 ? '#A32D2D' : '#0F6E56' }}
+                  valueStyle={{ color: report.unmatched > 0 ? txColors.danger : txColors.success }}
                   prefix={report.unmatched > 0 ? <CloseCircleOutlined /> : <CheckCircleOutlined />}
                   suffix={
                     report.unmatched > 0 ? (
@@ -448,9 +449,9 @@ function ReconciliationTab() {
             <Card
               title={
                 <Space>
-                  <ExclamationCircleOutlined style={{ color: '#BA7517' }} />
+                  <ExclamationCircleOutlined style={{ color: txColors.warning }} />
                   <span>差异记录明细</span>
-                  <Badge count={report.unmatched} color="#BA7517" />
+                  <Badge count={report.unmatched} color={txColors.warning} />
                 </Space>
               }
               extra={
@@ -627,10 +628,10 @@ function RetryQueueTab() {
       <Row gutter={16} align="middle">
         <Col>
           <Space>
-            <Badge count={pendingCount} color="#FF6B35">
+            <Badge count={pendingCount} color={txColors.primary}>
               <Tag>待重试</Tag>
             </Badge>
-            <Badge count={failedCount} color="#A32D2D">
+            <Badge count={failedCount} color={txColors.danger}>
               <Tag>已放弃</Tag>
             </Badge>
           </Space>
@@ -721,7 +722,7 @@ export default function DouyinVoucherPage() {
     <div style={{ padding: 24 }}>
       <div style={{ marginBottom: 16 }}>
         <Title level={4} style={{ marginBottom: 4 }}>
-          <ShopOutlined style={{ marginRight: 8, color: '#FF6B35' }} />
+          <ShopOutlined style={{ marginRight: 8, color: txColors.primary }} />
           抖音团购管理
         </Title>
         <Text type="secondary">

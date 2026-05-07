@@ -20,15 +20,16 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens（Store 终端 CSS Variables）───
 
 const T = {
-  primary: '#FF6B35',
-  primaryActive: '#E55A28',
-  success: '#0F6E56',
+  primary: txColors.primary,
+  primaryActive: txColors.primaryActive,
+  success: txColors.success,
   successBg: '#E6F4F1',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   dangerBg: '#FCEAEA',
   textPrimary: '#2C2C2A',
   textSecondary: '#5F5E5A',

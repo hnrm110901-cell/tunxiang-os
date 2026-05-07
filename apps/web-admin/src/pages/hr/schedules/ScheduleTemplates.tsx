@@ -25,9 +25,10 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ interface TemplateItem {
 }
 
 const COLOR_OPTIONS = [
-  { label: '橙色', value: '#FF6B35' },
+  { label: '橙色', value: txColors.primary },
   { label: '蓝色', value: '#1890ff' },
   { label: '紫色', value: '#722ed1' },
   { label: '绿色', value: '#52c41a' },

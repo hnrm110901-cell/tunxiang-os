@@ -7,6 +7,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ const CSS = {
     color: '#2C2C2A',
   } as React.CSSProperties,
   header: {
-    background: '#1E2A3A',
+    background: txColors.navy,
     padding: '16px 20px',
     display: 'flex',
     alignItems: 'center',
@@ -128,10 +129,10 @@ const CSS = {
     padding: '0 20px',
     fontSize: 17,
     fontWeight: active ? 700 : 400,
-    color: active ? '#FF6B35' : '#5F5E5A',
+    color: active ? txColors.primary : '#5F5E5A',
     background: 'transparent',
     border: 'none',
-    borderBottom: active ? '3px solid #FF6B35' : '3px solid transparent',
+    borderBottom: active ? `3px solid ${txColors.primary}` : '3px solid transparent',
     cursor: 'pointer',
     whiteSpace: 'nowrap' as const,
     WebkitTapHighlightColor: 'transparent',
@@ -167,7 +168,7 @@ const CSS = {
   primaryBtn: {
     minHeight: 56,
     padding: '0 28px',
-    background: '#FF6B35',
+    background: txColors.primary,
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 12,
@@ -181,8 +182,8 @@ const CSS = {
     minHeight: 48,
     padding: '0 20px',
     background: '#FFFFFF',
-    color: '#FF6B35',
-    border: '2px solid #FF6B35',
+    color: txColors.primary,
+    border: `2px solid ${txColors.primary}`,
     borderRadius: 12,
     fontSize: 16,
     fontWeight: 600,
@@ -193,8 +194,8 @@ const CSS = {
     minHeight: 48,
     padding: '0 20px',
     background: '#FFFFFF',
-    color: '#A32D2D',
-    border: '2px solid #A32D2D',
+    color: txColors.danger,
+    border: `2px solid ${txColors.danger}`,
     borderRadius: 12,
     fontSize: 16,
     fontWeight: 600,
@@ -203,17 +204,17 @@ const CSS = {
   } as React.CSSProperties,
   statusBadge: (status: string): React.CSSProperties => {
     const map: Record<string, { bg: string; color: string }> = {
-      ok:       { bg: '#EBF8F4', color: '#0F6E56' },
-      low:      { bg: '#FFF8E1', color: '#BA7517' },
-      out:      { bg: '#FDECEA', color: '#A32D2D' },
-      pending:  { bg: '#FFF8E1', color: '#BA7517' },
-      approved: { bg: '#EBF8F4', color: '#0F6E56' },
-      rejected: { bg: '#FDECEA', color: '#A32D2D' },
-      draft:    { bg: '#EBF0FB', color: '#185FA5' },
-      submitted:{ bg: '#FFF8E1', color: '#BA7517' },
-      confirmed:{ bg: '#EBF8F4', color: '#0F6E56' },
-      shipped:  { bg: '#EBF0FB', color: '#185FA5' },
-      received: { bg: '#EBF8F4', color: '#0F6E56' },
+      ok:       { bg: '#EBF8F4', color: txColors.success },
+      low:      { bg: '#FFF8E1', color: txColors.warning },
+      out:      { bg: '#FDECEA', color: txColors.danger },
+      pending:  { bg: '#FFF8E1', color: txColors.warning },
+      approved: { bg: '#EBF8F4', color: txColors.success },
+      rejected: { bg: '#FDECEA', color: txColors.danger },
+      draft:    { bg: '#EBF0FB', color: txColors.info },
+      submitted:{ bg: '#FFF8E1', color: txColors.warning },
+      confirmed:{ bg: '#EBF8F4', color: txColors.success },
+      shipped:  { bg: '#EBF0FB', color: txColors.info },
+      received: { bg: '#EBF8F4', color: txColors.success },
     };
     const s = map[status] ?? { bg: '#F0EDE6', color: '#5F5E5A' };
     return {
@@ -256,7 +257,7 @@ const CSS = {
   sectionTitle: {
     fontSize: 18,
     fontWeight: 700,
-    color: '#1E2A3A',
+    color: txColors.navy,
     margin: '16px 0 8px',
   } as React.CSSProperties,
 };
@@ -340,7 +341,7 @@ function InventoryTab({ storeId }: { storeId: string }) {
             <div style={CSS.sublabel}>安全库存：{item.safety_stock} {item.unit} · 更新：{item.last_updated}</div>
           </div>
           <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-            <span style={{ fontSize: 22, fontWeight: 700, color: item.status === 'out' ? '#A32D2D' : item.status === 'low' ? '#BA7517' : '#2C2C2A' }}>
+            <span style={{ fontSize: 22, fontWeight: 700, color: item.status === 'out' ? txColors.danger : item.status === 'low' ? txColors.warning : '#2C2C2A' }}>
               {item.quantity} <span style={{ fontSize: 14, color: '#5F5E5A' }}>{item.unit}</span>
             </span>
             <span style={CSS.statusBadge(item.status)}>{STATUS_LABEL[item.status]}</span>
@@ -427,7 +428,7 @@ function StocktakeTab({ storeId }: { storeId: string }) {
               <div style={CSS.label}>{r.created_at}</div>
               <div style={CSS.sublabel}>{r.items_count} 个品项
                 {r.variance_fen !== undefined && (
-                  <span style={{ marginLeft: 8, color: r.variance_fen < 0 ? '#A32D2D' : '#0F6E56' }}>
+                  <span style={{ marginLeft: 8, color: r.variance_fen < 0 ? txColors.danger : txColors.success }}>
                     损益：{r.variance_fen < 0 ? '' : '+'}{(r.variance_fen / 100).toFixed(2)} 元
                   </span>
                 )}
@@ -465,7 +466,7 @@ function StocktakeTab({ storeId }: { storeId: string }) {
                     />
                   </div>
                   <div style={{ minWidth: 80, textAlign: 'right', fontSize: 16, fontWeight: 600,
-                    color: item.variance > 0 ? '#0F6E56' : item.variance < 0 ? '#A32D2D' : '#B4B2A9' }}>
+                    color: item.variance > 0 ? txColors.success : item.variance < 0 ? txColors.danger : '#B4B2A9' }}>
                     {item.variance > 0 ? '+' : ''}{item.variance} {item.unit}
                   </div>
                 </div>
@@ -759,15 +760,15 @@ function ReportTab({ storeId }: { storeId: string }) {
 
       {/* 汇总卡片 */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div style={{ ...CSS.card, borderLeft: '4px solid #0F6E56', marginBottom: 0 }}>
+        <div style={{ ...CSS.card, borderLeft: `4px solid ${txColors.success}`, marginBottom: 0 }}>
           <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 4 }}>盘盈金额</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#0F6E56' }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: txColors.success }}>
             +¥{(totalGain / 100).toFixed(2)}
           </div>
         </div>
-        <div style={{ ...CSS.card, borderLeft: '4px solid #A32D2D', marginBottom: 0 }}>
+        <div style={{ ...CSS.card, borderLeft: `4px solid ${txColors.danger}`, marginBottom: 0 }}>
           <div style={{ fontSize: 14, color: '#5F5E5A', marginBottom: 4 }}>盘亏金额</div>
-          <div style={{ fontSize: 24, fontWeight: 700, color: '#A32D2D' }}>
+          <div style={{ fontSize: 24, fontWeight: 700, color: txColors.danger }}>
             -¥{(totalLoss / 100).toFixed(2)}
           </div>
         </div>
@@ -795,16 +796,16 @@ function ReportTab({ storeId }: { storeId: string }) {
                 <div style={{ fontSize: 16, fontWeight: 500 }}>{item.name}</div>
                 <div style={{ fontSize: 13, color: '#B4B2A9' }}>{item.unit}</div>
               </div>
-              <span style={{ textAlign: 'right', fontSize: 16, color: '#0F6E56', fontWeight: item.gain_qty > 0 ? 600 : 400 }}>
+              <span style={{ textAlign: 'right', fontSize: 16, color: txColors.success, fontWeight: item.gain_qty > 0 ? 600 : 400 }}>
                 {item.gain_qty > 0 ? `+${item.gain_qty}` : '-'}
               </span>
-              <span style={{ textAlign: 'right', fontSize: 16, color: '#A32D2D', fontWeight: item.loss_qty > 0 ? 600 : 400 }}>
+              <span style={{ textAlign: 'right', fontSize: 16, color: txColors.danger, fontWeight: item.loss_qty > 0 ? 600 : 400 }}>
                 {item.loss_qty > 0 ? `-${item.loss_qty}` : '-'}
               </span>
-              <span style={{ textAlign: 'right', fontSize: 15, color: '#0F6E56' }}>
+              <span style={{ textAlign: 'right', fontSize: 15, color: txColors.success }}>
                 {item.gain_fen > 0 ? `+¥${(item.gain_fen / 100).toFixed(0)}` : '-'}
               </span>
-              <span style={{ textAlign: 'right', fontSize: 15, color: '#A32D2D' }}>
+              <span style={{ textAlign: 'right', fontSize: 15, color: txColors.danger }}>
                 {item.loss_fen > 0 ? `-¥${(item.loss_fen / 100).toFixed(0)}` : '-'}
               </span>
             </div>

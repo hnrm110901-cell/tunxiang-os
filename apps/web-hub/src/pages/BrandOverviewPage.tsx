@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from 'react';
 import { hubGet } from '../api/hubApi';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 类型定义 ---------- */
 
@@ -105,7 +106,7 @@ const s = {
     borderRadius: 10, padding: '20px 24px', border: '1px solid #1A3540', marginBottom: 24,
   } as React.CSSProperties,
   brandLogo: {
-    width: 56, height: 56, borderRadius: 12, background: '#FF6B35',
+    width: 56, height: 56, borderRadius: 12, background: txColors.primary,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     fontSize: 26, fontWeight: 700, color: '#FFF', flexShrink: 0,
   } as React.CSSProperties,
@@ -123,7 +124,7 @@ const s = {
     border: '1px solid #1A3540',
   } as React.CSSProperties,
   cardLabel: { fontSize: 12, color: '#6B8A97', marginBottom: 6 } as React.CSSProperties,
-  cardValue: { fontSize: 28, fontWeight: 700, color: '#FF6B35' } as React.CSSProperties,
+  cardValue: { fontSize: 28, fontWeight: 700, color: txColors.primary } as React.CSSProperties,
   cardValueGreen: { fontSize: 28, fontWeight: 700, color: '#22C55E' } as React.CSSProperties,
   cardValueBlue: { fontSize: 28, fontWeight: 700, color: '#3B82F6' } as React.CSSProperties,
   cardValueRed: { fontSize: 28, fontWeight: 700, color: '#EF4444' } as React.CSSProperties,
@@ -156,7 +157,7 @@ const s = {
     borderBottom: '1px solid #112A33', fontSize: 13,
   } as React.CSSProperties,
   logTime: { color: '#6B8A97', whiteSpace: 'nowrap' as const, minWidth: 120 } as React.CSSProperties,
-  logOperator: { color: '#FF6B35', fontWeight: 600, minWidth: 60 } as React.CSSProperties,
+  logOperator: { color: txColors.primary, fontWeight: 600, minWidth: 60 } as React.CSSProperties,
   logContent: { color: '#C0D0D8', flex: 1 } as React.CSSProperties,
 
   /* 待办事项 */
@@ -269,7 +270,7 @@ export function BrandOverviewPage() {
             target="_blank"
             rel="noopener noreferrer"
             onMouseEnter={(e) => {
-              (e.currentTarget as HTMLAnchorElement).style.borderColor = '#FF6B35';
+              (e.currentTarget as HTMLAnchorElement).style.borderColor = txColors.primary;
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLAnchorElement).style.borderColor = '#1A3540';

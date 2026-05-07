@@ -14,6 +14,7 @@
  */
 import type { ReactNode, CSSProperties } from 'react';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
+import { txColors } from '@tx/tokens';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -35,12 +36,12 @@ interface TxButtonProps {
 // ─── Style maps ─────────────────────────────────────────────────────────────────
 
 const VARIANT_BG: Record<TxVariant, string> = {
-  primary: '#FF6B35',
+  primary: txColors.primary,
   secondary: '#1A3A48',
-  danger: '#A32D2D',
+  danger: txColors.danger,
   ghost: 'transparent',
-  success: '#0F6E56',
-  warning: '#BA7517',
+  success: txColors.success,
+  warning: txColors.warning,
 };
 
 const VARIANT_COLOR: Record<TxVariant, string> = {

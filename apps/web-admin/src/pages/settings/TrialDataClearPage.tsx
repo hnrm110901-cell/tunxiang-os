@@ -21,6 +21,7 @@ import {
 } from 'antd';
 import { ExclamationCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { getToken } from '../../api/client';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -263,7 +264,7 @@ export function TrialDataClearPage() {
               size="small"
               dataSource={WILL_CLEAR}
               renderItem={(item) => (
-                <List.Item style={{ padding: '4px 0', color: '#A32D2D' }}>
+                <List.Item style={{ padding: '4px 0', color: txColors.danger }}>
                   · {item}
                 </List.Item>
               )}
@@ -277,7 +278,7 @@ export function TrialDataClearPage() {
               size="small"
               dataSource={WILL_KEEP}
               renderItem={(item) => (
-                <List.Item style={{ padding: '4px 0', color: '#0F6E56' }}>
+                <List.Item style={{ padding: '4px 0', color: txColors.success }}>
                   · {item}
                 </List.Item>
               )}
@@ -410,7 +411,7 @@ export function TrialDataClearPage() {
       <Modal
         open={confirmVisible}
         title={
-          <span style={{ color: '#A32D2D' }}>
+          <span style={{ color: txColors.danger }}>
             <WarningOutlined style={{ marginRight: 8 }} />
             最终确认：执行试营业数据清除
           </span>

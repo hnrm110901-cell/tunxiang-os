@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * subpages/error/index.tsx — 通用错误 / 空状态页
  *
@@ -24,7 +25,7 @@ import { View, Text } from '@tarojs/components'
 
 // ─── Brand tokens ─────────────────────────────────────────────────────────────
 const C = {
-  primary:   '#FF6B35',
+  primary:   txColors.primary,
   primaryBg: 'rgba(255,107,53,0.12)',
   bgDeep:    '#0B1A20',
   bgCard:    '#132029',

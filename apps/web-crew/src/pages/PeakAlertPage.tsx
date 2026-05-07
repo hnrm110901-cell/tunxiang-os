@@ -7,20 +7,21 @@
  */
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */
 const C = {
   bg: '#0B1A20',
   card: '#112228',
   border: '#1a2a33',
-  accent: '#FF6B35',
-  green: '#0F6E56',
+  accent: txColors.primary,
+  green: txColors.success,
   muted: '#64748b',
   text: '#e2e8f0',
   white: '#ffffff',
-  danger: '#A32D2D',
-  warning: '#BA7517',
-  info: '#185FA5',
+  danger: txColors.danger,
+  warning: txColors.warning,
+  info: txColors.info,
 };
 
 /* ---------- 类型 ---------- */

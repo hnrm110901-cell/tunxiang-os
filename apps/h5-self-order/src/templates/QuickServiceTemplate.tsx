@@ -10,6 +10,7 @@ import { useOrderStore } from '@/store/useOrderStore';
 import { fetchCategories, fetchDishes } from '@/api/menuApi';
 import type { Category, DishItem } from '@/api/menuApi';
 import CartBar from '@/components/CartBar';
+import { txColors } from '@tx/tokens';
 
 // ─── 快餐专用类型 ─────────────────────────────────────────────────────────────
 
@@ -169,7 +170,7 @@ export default function QuickServiceTemplate() {
               style={{
                 padding: '8px 16px', borderRadius: 999,
                 fontSize: 14, fontWeight: activeTab === tab.id ? 700 : 400,
-                background: activeTab === tab.id ? 'var(--tx-brand, #FF6B35)' : 'var(--tx-bg-secondary, #F8F7F5)',
+                background: activeTab === tab.id ? `var(--tx-brand, ${txColors.primary})` : 'var(--tx-bg-secondary, #F8F7F5)',
                 color: activeTab === tab.id ? '#fff' : 'var(--tx-text-secondary)',
                 minHeight: 48,
               }}
@@ -211,7 +212,7 @@ export default function QuickServiceTemplate() {
                     />
                     <span
                       className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full text-white"
-                      style={{ background: 'var(--tx-brand, #FF6B35)' }}
+                      style={{ background: `var(--tx-brand, ${txColors.primary})` }}
                     >
                       {combo.tag}
                     </span>
@@ -225,7 +226,7 @@ export default function QuickServiceTemplate() {
                     </div>
                     <div className="flex items-center justify-between mt-2">
                       <div className="flex items-baseline gap-1">
-                        <span className="text-base font-bold" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                        <span className="text-base font-bold" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                           ¥{combo.comboPrice}
                         </span>
                         <span className="text-xs line-through" style={{ color: 'var(--tx-text-tertiary)' }}>
@@ -237,7 +238,7 @@ export default function QuickServiceTemplate() {
                         onClick={() => handleAddCombo(combo)}
                         style={{
                           width: 32, height: 32,
-                          background: 'var(--tx-brand, #FF6B35)', color: '#fff',
+                          background: `var(--tx-brand, ${txColors.primary})`, color: '#fff',
                           minWidth: 48, minHeight: 48, padding: 0,
                         }}
                       >
@@ -288,7 +289,7 @@ export default function QuickServiceTemplate() {
                   {qty > 0 && !dish.soldOut && (
                     <span
                       className="absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                      style={{ background: 'var(--tx-brand, #FF6B35)' }}
+                      style={{ background: `var(--tx-brand, ${txColors.primary})` }}
                     >
                       {qty}
                     </span>
@@ -297,7 +298,7 @@ export default function QuickServiceTemplate() {
                   {dish.tags.length > 0 && (
                     <span
                       className="absolute top-2 left-2 text-xs px-2 py-0.5 rounded-full text-white"
-                      style={{ background: 'var(--tx-brand, #FF6B35)' }}
+                      style={{ background: `var(--tx-brand, ${txColors.primary})` }}
                     >
                       {dish.tags[0].label}
                     </span>
@@ -322,7 +323,7 @@ export default function QuickServiceTemplate() {
                   )}
                   <div className="flex items-center justify-between mt-2">
                     <div className="flex items-baseline gap-1">
-                      <span className="text-base font-bold" style={{ color: 'var(--tx-brand, #FF6B35)' }}>
+                      <span className="text-base font-bold" style={{ color: `var(--tx-brand, ${txColors.primary})` }}>
                         ¥{dish.price}
                       </span>
                       {dish.memberPrice != null && dish.memberPrice < dish.price && (
@@ -337,7 +338,7 @@ export default function QuickServiceTemplate() {
                       onClick={() => addToCart(dish, 1, {})}
                       style={{
                         width: 32, height: 32,
-                        background: dish.soldOut ? 'var(--tx-bg-tertiary)' : 'var(--tx-brand, #FF6B35)',
+                        background: dish.soldOut ? 'var(--tx-bg-tertiary)' : `var(--tx-brand, ${txColors.primary})`,
                         color: dish.soldOut ? 'var(--tx-text-tertiary)' : '#fff',
                         minWidth: 48, minHeight: 48, padding: 0,
                       }}

@@ -13,6 +13,7 @@
  * 调用 GET /api/v1/analytics/region-overview
  */
 import { useState, useEffect, useCallback } from 'react';
+import { txColors } from '@tx/tokens';
 import {
   fetchRegionOverview,
   fetchRegionStores,
@@ -25,11 +26,11 @@ import {
 // 常量 & 工具函数
 // ─────────────────────────────────────────────
 
-const COLOR_PRIMARY = '#FF6B35';
-const COLOR_SUCCESS = '#0F6E56';
-const COLOR_WARNING = '#BA7517';
-const COLOR_ERROR = '#A32D2D';
-const COLOR_INFO = '#185FA5';
+const COLOR_PRIMARY = txColors.primary;
+const COLOR_SUCCESS = txColors.success;
+const COLOR_WARNING = txColors.warning;
+const COLOR_ERROR = txColors.danger;
+const COLOR_INFO = txColors.info;
 
 const BG_PAGE = '#0d1e28';
 const BG_CARD = '#112228';
@@ -163,7 +164,7 @@ function isAnomaly(changeValue: number, isNegativeBetter = false): boolean {
 }
 
 function cellBg(change: number, isNegativeBetter = false): string {
-  return isAnomaly(change, isNegativeBetter) ? '#A32D2D20' : 'transparent';
+  return isAnomaly(change, isNegativeBetter) ? `${txColors.danger}20` : 'transparent';
 }
 
 // ─────────────────────────────────────────────

@@ -19,20 +19,21 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
 import { AddDishSheet } from '../components/AddDishSheet';
+import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
 const T = {
   bg: '#0B1A20',
   card: '#112228',
-  cardAlt: '#1E2A3A',
+  cardAlt: txColors.navy,
   border: '#1a2a33',
-  accent: '#FF6B35',
-  accentActive: '#E55A28',
-  success: '#0F6E56',
-  successLight: '#0F6E5622',
-  warning: '#BA7517',
-  danger: '#A32D2D',
-  dangerLight: '#A32D2D22',
+  accent: txColors.primary,
+  accentActive: txColors.primaryActive,
+  success: txColors.success,
+  successLight: `${txColors.success}22`,
+  warning: txColors.warning,
+  danger: txColors.danger,
+  dangerLight: `${txColors.danger}22`,
   text: '#e2e8f0',
   textSecondary: '#94a3b8',
   muted: '#64748b',

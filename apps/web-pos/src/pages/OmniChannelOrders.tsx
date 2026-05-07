@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLang } from '../i18n/LangContext';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -81,9 +82,9 @@ function getRemainingSeconds(createdAt: string): number {
 /** 倒计时颜色：绿→黄→红 */
 function getCountdownColor(remaining: number): string {
   const ratio = remaining / AUTO_REJECT_SECONDS;
-  if (ratio > 0.5) return '#0F6E56'; // success绿
-  if (ratio > 0.2) return '#BA7517'; // warning黄
-  return '#A32D2D';                  // danger红
+  if (ratio > 0.5) return txColors.success; // success绿
+  if (ratio > 0.2) return txColors.warning; // warning黄
+  return txColors.danger;                  // danger红
 }
 
 function formatTime(isoStr: string): string {
@@ -289,7 +290,7 @@ function OrderCard({
     <>
       <div style={{
         background: '#fff', borderRadius: 12, padding: 16,
-        border: isPending ? '2px solid #FF6B35' : '1.5px solid #E8E6E1',
+        border: isPending ? `2px solid ${txColors.primary}` : '1.5px solid #E8E6E1',
         boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
         marginBottom: 12,
         animation: 'fadeSlideIn 200ms ease-out',
@@ -305,7 +306,7 @@ function OrderCard({
             {isPending && (
               <span style={{
                 display: 'inline-block', fontSize: 11, padding: '1px 6px', borderRadius: 4,
-                background: 'rgba(15,110,86,.15)', color: '#0F6E56',
+                background: 'rgba(15,110,86,.15)', color: txColors.success,
                 fontWeight: 600, marginLeft: 6,
               }}>{t('delivery.canDeliver')}</span>
             )}
@@ -337,8 +338,8 @@ function OrderCard({
         {/* 备注 */}
         {order.notes && (
           <div style={{
-            padding: '6px 10px', background: '#FFF3ED', borderRadius: 8,
-            fontSize: 16, color: '#FF6B35', marginBottom: 10,
+            padding: '6px 10px', background: txColors.primaryLight, borderRadius: 8,
+            fontSize: 16, color: txColors.primary, marginBottom: 10,
           }}>
             {t('delivery.note')}：{order.notes}
           </div>
@@ -372,7 +373,7 @@ function OrderCard({
               onClick={handleAccept}
               style={{
                 flex: 2, minHeight: 56, borderRadius: 12, border: 'none',
-                background: '#0F6E56', color: '#fff',
+                background: txColors.success, color: '#fff',
                 fontSize: 18, fontWeight: 700, cursor: 'pointer',
                 fontFamily: 'inherit',
                 WebkitTapHighlightColor: 'transparent',
@@ -417,7 +418,7 @@ function OrderCard({
         {order.status === 'preparing' && (
           <div style={{
             textAlign: 'center', padding: '10px 0',
-            fontSize: 18, color: '#BA7517', fontWeight: 600,
+            fontSize: 18, color: txColors.warning, fontWeight: 600,
           }}>
             {t('delivery.preparingStatus')}
           </div>
@@ -427,7 +428,7 @@ function OrderCard({
         {order.status === 'done' && (
           <div style={{
             textAlign: 'center', padding: '10px 0',
-            fontSize: 18, color: '#0F6E56', fontWeight: 600,
+            fontSize: 18, color: txColors.success, fontWeight: 600,
           }}>
             {t('delivery.completedStatus')}
           </div>
@@ -690,7 +691,7 @@ export function OmniChannelOrders() {
               onClick={() => setAutoAccept(!autoAccept)}
               style={{
                 width: 44, height: 24, borderRadius: 12, cursor: 'pointer',
-                background: autoAccept ? '#FF6B35' : '#ccc',
+                background: autoAccept ? txColors.primary : '#ccc',
                 position: 'relative', transition: 'background .2s',
               }}
             >
@@ -701,19 +702,19 @@ export function OmniChannelOrders() {
                 background: '#fff', transition: 'left .2s',
               }} />
             </div>
-            {autoAccept && <span style={{ fontSize: 11, color: '#0F6E56' }}>{t('delivery.autoAcceptActive')}</span>}
+            {autoAccept && <span style={{ fontSize: 11, color: txColors.success }}>{t('delivery.autoAcceptActive')}</span>}
           </div>
 
           {/* 连接状态指示器（右上角） */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{
               width: 12, height: 12, borderRadius: '50%',
-              background: wsConnected ? '#0F6E56' : '#A32D2D',
+              background: wsConnected ? txColors.success : txColors.danger,
               boxShadow: wsConnected
                 ? '0 0 0 3px rgba(15,110,86,0.2)'
                 : '0 0 0 3px rgba(163,45,45,0.2)',
             }} />
-            <span style={{ fontSize: 16, color: wsConnected ? '#0F6E56' : '#A32D2D' }}>
+            <span style={{ fontSize: 16, color: wsConnected ? txColors.success : txColors.danger }}>
               {wsConnected ? t('delivery.wsConnected') : t('delivery.wsDisconnected')}
             </span>
           </div>
@@ -731,7 +732,7 @@ export function OmniChannelOrders() {
             <ColumnHeader
               title={t('delivery.pending')}
               count={pendingOrders.length}
-              color="#A32D2D"
+              color={txColors.danger}
             />
             <div style={{
               maxHeight: 'calc(100vh - 120px)',
@@ -764,7 +765,7 @@ export function OmniChannelOrders() {
             <ColumnHeader
               title={t('delivery.preparing')}
               count={preparingOrders.length}
-              color="#BA7517"
+              color={txColors.warning}
             />
             <div style={{
               maxHeight: 'calc(100vh - 120px)',
@@ -797,7 +798,7 @@ export function OmniChannelOrders() {
             <ColumnHeader
               title={t('delivery.completed')}
               count={doneOrders.length}
-              color="#0F6E56"
+              color={txColors.success}
             />
             <div style={{
               maxHeight: 'calc(100vh - 120px)',

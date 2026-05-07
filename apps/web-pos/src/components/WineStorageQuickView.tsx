@@ -11,6 +11,7 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { txFetch } from '../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型 ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +61,7 @@ const CSS = {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 8,
-    background: '#FF6B35',
+    background: txColors.primary,
     color: '#FFFFFF',
     padding: '10px 16px',
     borderRadius: 12,
@@ -135,7 +136,7 @@ const CSS = {
   },
   card: (warning: boolean): React.CSSProperties => ({
     background: '#FFFFFF',
-    border: `2px solid ${warning ? '#A32D2D' : '#E8E6E1'}`,
+    border: `2px solid ${warning ? txColors.danger : '#E8E6E1'}`,
     borderRadius: 12,
     padding: '16px',
     marginTop: 12,
@@ -158,8 +159,8 @@ const CSS = {
     color: '#5F5E5A',
   },
   qtyBadge: (warning: boolean): React.CSSProperties => ({
-    background: warning ? '#FEE2E2' : '#FFF3ED',
-    color: warning ? '#A32D2D' : '#FF6B35',
+    background: warning ? '#FEE2E2' : txColors.primaryLight,
+    color: warning ? txColors.danger : txColors.primary,
     padding: '4px 10px',
     borderRadius: 8,
     fontSize: 16,
@@ -172,12 +173,12 @@ const CSS = {
   },
   dateLabel: (danger: boolean): React.CSSProperties => ({
     fontSize: 16,
-    color: danger ? '#A32D2D' : '#5F5E5A',
+    color: danger ? txColors.danger : '#5F5E5A',
     fontWeight: danger ? 700 : 400,
   }),
   expiryWarning: {
     background: '#FEE2E2',
-    color: '#A32D2D',
+    color: txColors.danger,
     padding: '6px 10px',
     borderRadius: 8,
     fontSize: 16,
@@ -185,7 +186,7 @@ const CSS = {
   },
   takeBtn: {
     height: 56,
-    background: '#FF6B35',
+    background: txColors.primary,
     color: '#FFFFFF',
     border: 'none',
     borderRadius: 12,
@@ -254,7 +255,7 @@ const CSS = {
   confirmBtn: (disabled: boolean): React.CSSProperties => ({
     flex: 1,
     height: 56,
-    background: disabled ? '#E8E6E1' : '#FF6B35',
+    background: disabled ? '#E8E6E1' : txColors.primary,
     color: disabled ? '#B4B2A9' : '#FFFFFF',
     border: 'none',
     borderRadius: 12,
@@ -387,7 +388,7 @@ export function WineStorageQuickView({ tableId, tableName, onTakeSuccess }: Prop
         className="tx-wine-badge"
         style={{
           ...CSS.badge,
-          background: hasWarning ? '#A32D2D' : '#FF6B35',
+          background: hasWarning ? txColors.danger : txColors.primary,
         }}
         onClick={handleOpenSheet}
         aria-label={`${tableName}有${summary?.active_count ?? '...'}瓶存酒待取`}
@@ -411,7 +412,7 @@ export function WineStorageQuickView({ tableId, tableName, onTakeSuccess }: Prop
 
             <div style={CSS.scrollArea}>
               {loading && <p style={CSS.loadingState}>加载中...</p>}
-              {error && <p style={{ ...CSS.loadingState, color: '#A32D2D' }}>{error}</p>}
+              {error && <p style={{ ...CSS.loadingState, color: txColors.danger }}>{error}</p>}
               {!loading && !error && activeRecords.length === 0 && (
                 <p style={CSS.emptyState}>暂无存酒记录</p>
               )}

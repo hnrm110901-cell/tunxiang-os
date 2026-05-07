@@ -3,6 +3,7 @@
  * 路由: /me/hr
  */
 import { useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 const T = {
   bg:       '#0B1A20',
@@ -10,7 +11,7 @@ const T = {
   border:   '#1a2a33',
   text:     '#E0E0E0',
   muted:    '#64748b',
-  primary:  '#FF6B35',
+  primary:  txColors.primary,
 };
 
 interface HREntry {

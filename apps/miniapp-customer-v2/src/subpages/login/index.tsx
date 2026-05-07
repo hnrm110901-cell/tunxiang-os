@@ -1,3 +1,4 @@
+import { txColors } from '@tx/tokens';
 /**
  * login/index.tsx — 登录 / 引导页
  *
@@ -21,7 +22,7 @@ const C = {
   cardBg:     '#132029',
   surface:    '#1A2E38',
   border:     '#1E3340',
-  primary:    '#FF6B35',
+  primary:    txColors.primary,
   wechat:     '#07C160',
   wechatDark: '#059B4F',
   text1:      '#FFFFFF',

@@ -4,6 +4,7 @@
  */
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { txColors } from '@tx/tokens';
 
 // ---------- 路由 -> 面包屑映射 ----------
 
@@ -238,7 +239,7 @@ export function Breadcrumb() {
                   transition: 'color 0.15s',
                 }}
                 onMouseEnter={(e) => {
-                  if (crumb.path) e.currentTarget.style.color = 'var(--brand, #FF6B35)';
+                  if (crumb.path) e.currentTarget.style.color = `var(--brand, ${txColors.primary})`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.color = 'var(--text-3, #999)';

@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatPrice } from '@tx-ds/utils';
+import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
 const fen2yuan = (fen: number) => `¥${(fen / 100).toFixed(2)}`;
@@ -163,7 +164,7 @@ export function ShiftPage() {
           <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8 }}>尚未开班</div>
           <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 32 }}>点击下方按钮开始当班营业</div>
           <button type="button" onClick={handleOpenShift} disabled={loading}
-            style={{ padding: '16px 60px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 10, fontSize: 20, fontWeight: 600, cursor: 'pointer', minHeight: 56 }}>
+            style={{ padding: '16px 60px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 20, fontWeight: 600, cursor: 'pointer', minHeight: 56 }}>
             {loading ? '开班中...' : '开始营业'}
           </button>
         </div>
@@ -180,10 +181,10 @@ export function ShiftPage() {
           <div style={{ fontSize: 48, marginBottom: 16 }}>✅</div>
           <div style={{ fontSize: 20, fontWeight: 600, marginBottom: 8, color: '#52c41a' }}>本班已结束</div>
           <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 8 }}>
-            营业额: <strong style={{ color: '#FF6B35' }}>{fen2yuan(summary.totalRevenueFen)}</strong> · {summary.totalOrders}单
+            营业额: <strong style={{ color: txColors.primary }}>{fen2yuan(summary.totalRevenueFen)}</strong> · {summary.totalOrders}单
           </div>
           <button type="button" onClick={handleOpenShift}
-            style={{ marginTop: 32, padding: '14px 48px', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
+            style={{ marginTop: 32, padding: '14px 48px', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 10, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
             开始下一班
           </button>
         </div>
@@ -246,7 +247,7 @@ export function ShiftPage() {
             <tr style={{ borderTop: '2px solid #333' }}>
               <td style={{ padding: 12, fontWeight: 600 }}>合计</td>
               <td style={{ padding: 12, textAlign: 'right', fontWeight: 600 }}>{summary.channels.reduce((s, c) => s + c.count, 0)}</td>
-              <td style={{ padding: 12, textAlign: 'right', fontWeight: 600, color: '#FF6B35' }}>{fen2yuan(summary.totalRevenueFen)}</td>
+              <td style={{ padding: 12, textAlign: 'right', fontWeight: 600, color: txColors.primary }}>{fen2yuan(summary.totalRevenueFen)}</td>
               <td style={{ padding: 12, textAlign: 'right' }}>100%</td>
             </tr>
           </tbody>
@@ -286,7 +287,7 @@ export function ShiftPage() {
           刷新数据
         </button>
         <button type="button" onClick={() => setShowCloseConfirm(true)}
-          style={{ flex: 2, padding: '14px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
+          style={{ flex: 2, padding: '14px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 18, fontWeight: 600, cursor: 'pointer', minHeight: 52 }}>
           确认交接班
         </button>
       </div>
@@ -296,7 +297,7 @@ export function ShiftPage() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowCloseConfirm(false)}>
           <div style={{ background: '#1a2a33', borderRadius: 12, padding: 24, width: 400, maxWidth: '90vw' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16 }}>确认交接班？</div>
-            <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 8 }}>本班营业额: <strong style={{ color: '#FF6B35' }}>{fen2yuan(summary.totalRevenueFen)}</strong></div>
+            <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 8 }}>本班营业额: <strong style={{ color: txColors.primary }}>{fen2yuan(summary.totalRevenueFen)}</strong></div>
             <div style={{ fontSize: 16, color: '#9CA3AF', marginBottom: 8 }}>总单数: <strong>{summary.totalOrders}</strong> 单</div>
             {actualCash && cashVarianceFen !== 0 && (
               <div style={{ fontSize: 16, color: '#ff4d4f', marginBottom: 8 }}>现金差异: {cashVarianceFen > 0 ? '+' : ''}{fen2yuan(cashVarianceFen)}</div>
@@ -305,7 +306,7 @@ export function ShiftPage() {
               <button type="button" onClick={() => setShowCloseConfirm(false)}
                 style={{ flex: 1, padding: '12px 0', background: '#333', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, cursor: 'pointer', minHeight: 48 }}>取消</button>
               <button type="button" onClick={handleCloseShift} disabled={closing}
-                style={{ flex: 1, padding: '12px 0', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer', minHeight: 48, opacity: closing ? 0.6 : 1 }}>
+                style={{ flex: 1, padding: '12px 0', background: txColors.primary, color: '#fff', border: 'none', borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: 'pointer', minHeight: 48, opacity: closing ? 0.6 : 1 }}>
                 {closing ? '提交中...' : '确认交班'}
               </button>
             </div>
@@ -331,7 +332,7 @@ function KPICard({ label, value, highlight, danger }: { label: string; value: st
   return (
     <div style={{ padding: 16, background: '#112228', borderRadius: 10, textAlign: 'center' }}>
       <div style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: danger ? '#ff4d4f' : highlight ? '#FF6B35' : '#fff' }}>{value}</div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: danger ? '#ff4d4f' : highlight ? txColors.primary : '#fff' }}>{value}</div>
     </div>
   );
 }

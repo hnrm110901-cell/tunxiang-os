@@ -4,6 +4,7 @@
  */
 import { useState, FormEvent } from 'react';
 import { setStoreToken } from '../api/index';
+import { txColors } from '@tx/tokens';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -65,7 +66,7 @@ export function ReceptionLoginPage({ onLogin }: ReceptionLoginPageProps) {
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 22, fontWeight: 900, color: '#fff', marginBottom: 16,
           }}>TX</div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: '#1E2A3A' }}>屯象迎宾</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: txColors.navy }}>屯象迎宾</div>
           <div style={{ fontSize: 16, color: '#8899AA', marginTop: 6 }}>请登录迎宾接待系统</div>
         </div>
 

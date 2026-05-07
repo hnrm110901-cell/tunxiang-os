@@ -5,6 +5,7 @@
  * Sprint 2：菜品智能体 + 客户大脑 POS 层
  */
 import { TXButton } from '@tx/touch';
+import { txColors } from '@tx/tokens';
 
 interface CustomerProfile {
   memberId: string;
@@ -172,7 +173,7 @@ export default function CustomerBrainPanel({
         <div
           style={{
             fontSize: 12,
-            color: '#BA7517',
+            color: txColors.warning,
             fontWeight: 600,
             marginBottom: 12,
           }}

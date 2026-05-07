@@ -32,6 +32,7 @@ import {
   ProTable,
 } from '@ant-design/pro-components';
 import type { ActionType, ProColumns } from '@ant-design/pro-components';
+import { txColors } from '@tx/tokens';
 import {
   AuditOutlined,
   CheckCircleOutlined,
@@ -56,7 +57,7 @@ import {
 } from '../../../api/contractApi';
 
 const { Title } = Typography;
-const TX_PRIMARY = '#FF6B35';
+const TX_PRIMARY = txColors.primary;
 
 const STATUS_MAP: Record<string, { label: string; color: string }> = {
   draft:            { label: '草稿',     color: 'default' },

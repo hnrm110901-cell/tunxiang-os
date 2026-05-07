@@ -9,6 +9,7 @@ import {
 import { ProTable } from '@ant-design/pro-components';
 import type { ProColumns } from '@ant-design/pro-components';
 import { Progress } from 'antd';
+import { txColors } from '@tx/tokens';
 
 // ---- 类型 ----
 interface ForecastRow {
@@ -51,7 +52,7 @@ const columns: ProColumns<ForecastRow>[] = [
   {
     title: '预测偏差', dataIndex: 'deviation', width: 90,
     render: (_, r) => (
-      <span style={{ color: r.deviation.startsWith('+') ? '#0F6E56' : '#A32D2D', fontWeight: 500 }}>
+      <span style={{ color: r.deviation.startsWith('+') ? txColors.success : txColors.danger, fontWeight: 500 }}>
         {r.deviation}
       </span>
     ),
@@ -62,14 +63,14 @@ const columns: ProColumns<ForecastRow>[] = [
   },
   {
     title: 'AI置信度', dataIndex: 'confidence', width: 130,
-    render: (_, r) => <Progress percent={r.confidence} size="small" strokeColor="#FF6B35" />,
+    render: (_, r) => <Progress percent={r.confidence} size="small" strokeColor={txColors.primary} />,
   },
 ];
 
 // ---- 页面组件 ----
 export const DemandForecastPage: React.FC = () => {
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#FF6B35' } }}>
+    <ConfigProvider theme={{ token: { colorPrimary: txColors.primary } }}>
       <div style={{ padding: 24, background: '#f5f5f5', minHeight: '100vh' }}>
         {/* 顶部筛选栏 */}
         <Row justify="end" style={{ marginBottom: 12 }}>
@@ -85,7 +86,7 @@ export const DemandForecastPage: React.FC = () => {
               ]}
             />
             <Button.Group>
-              <Button type="primary" style={{ background: '#FF6B35', border: 'none' }}>本周</Button>
+              <Button type="primary" style={{ background: txColors.primary, border: 'none' }}>本周</Button>
               <Button>上周</Button>
               <Button>本月</Button>
             </Button.Group>
@@ -115,7 +116,7 @@ export const DemandForecastPage: React.FC = () => {
 
         {/* 底部操作 */}
         <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
-          <Button type="primary" style={{ background: '#FF6B35', border: 'none' }}>
+          <Button type="primary" style={{ background: txColors.primary, border: 'none' }}>
             同步至采购建议
           </Button>
           <Button>导出预测报告</Button>

@@ -9,6 +9,7 @@
 import { useState, useMemo } from 'react';
 import type { AgentInsight } from '../hooks/useAgentInsights';
 import { A2UIRenderer, parseA2UIFromAgent } from './a2ui/A2UIRenderer';
+import { txColors } from '@tx/tokens';
 
 // ─── 样式 ──────────────────────────────────────────────────────────────────────
 
@@ -57,7 +58,7 @@ const C = {
     padding: '6px 12px', borderRadius: 6, border: 'none',
     fontSize: 12, fontWeight: 600, cursor: 'pointer',
     background: 'rgba(255,107,53,0.12)',
-    color: '#FF6B35',
+    color: txColors.primary,
     minHeight: 32,
   } as React.CSSProperties,
 

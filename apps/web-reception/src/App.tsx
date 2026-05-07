@@ -11,6 +11,7 @@ import { CheckInPage } from './pages/CheckInPage';
 import { QueuePage } from './pages/QueuePage';
 import { SeatAssignPage } from './pages/SeatAssignPage';
 import { VIPAlertPage } from './pages/VIPAlertPage';
+import { txColors } from '@tx/tokens';
 
 const NAV_ITEMS = [
   { path: '/reservations', label: '预订台账', icon: '📋' },
@@ -59,7 +60,7 @@ function SideNav() {
     <nav style={{
       width: 100,
       minHeight: '100vh',
-      background: '#1E2A3A',
+      background: txColors.navy,
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',

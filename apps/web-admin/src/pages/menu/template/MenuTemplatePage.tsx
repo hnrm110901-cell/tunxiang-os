@@ -63,6 +63,7 @@ import {
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 const { Title, Text } = Typography;
 const { Panel } = Collapse;
@@ -70,20 +71,20 @@ const { Option } = Select;
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────
 
-const TX_PRIMARY = '#FF6B35';
-const TX_SUCCESS = '#0F6E56';
-const TX_WARNING = '#BA7517';
-const TX_INFO = '#185FA5';
+const TX_PRIMARY = txColors.primary;
+const TX_SUCCESS = txColors.success;
+const TX_WARNING = txColors.warning;
+const TX_INFO = txColors.info;
 const TX_BG_SECONDARY = '#F8F7F5';
 const TX_BORDER = '#E8E6E1';
-const TX_NAVY = '#1E2A3A';
+const TX_NAVY = txColors.navy;
 
 const txAdminTheme = {
   token: {
     colorPrimary: TX_PRIMARY,
     colorSuccess: TX_SUCCESS,
     colorWarning: TX_WARNING,
-    colorError: '#A32D2D',
+    colorError: txColors.danger,
     colorInfo: TX_INFO,
     colorTextBase: '#2C2C2A',
     colorBgBase: '#FFFFFF',
@@ -1038,7 +1039,7 @@ const PublishTab: React.FC<PublishTabProps> = ({ template }) => {
                       padding: '8px 12px',
                       border: `1px solid ${selectedStoreIds.includes(store.id) ? TX_PRIMARY : TX_BORDER}`,
                       borderRadius: 6,
-                      background: selectedStoreIds.includes(store.id) ? '#fff3ed' : '#fff',
+                      background: selectedStoreIds.includes(store.id) ? txColors.primaryLight : '#fff',
                       gap: 8,
                     }}
                   >
@@ -1242,7 +1243,7 @@ const VersionHistoryTab: React.FC<VersionHistoryTabProps> = ({ template }) => {
                 size="small"
                 style={{
                   border: `1px solid ${index === 0 ? TX_PRIMARY : TX_BORDER}`,
-                  background: index === 0 ? '#fff3ed' : '#fff',
+                  background: index === 0 ? txColors.primaryLight : '#fff',
                   borderRadius: 6,
                   marginBottom: 8,
                 }}
@@ -1474,7 +1475,7 @@ export function MenuTemplatePage() {
                         style={{
                           padding: '10px 12px',
                           cursor: 'pointer',
-                          background: isSelected ? '#fff3ed' : 'transparent',
+                          background: isSelected ? txColors.primaryLight : 'transparent',
                           borderLeft: `3px solid ${isSelected ? TX_PRIMARY : 'transparent'}`,
                           borderBottom: `1px solid ${TX_BORDER}`,
                           transition: 'all 0.15s',

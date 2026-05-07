@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { formatPrice } from '@tx-ds/utils';
 import { Alert, Button } from 'antd';
 import { txFetchData } from '../../../api';
+import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───
 
@@ -77,9 +78,9 @@ const STORES = [
 function statusConfig(status: IngredientStock['status']): { label: string; color: string; bg: string } {
   switch (status) {
     case 'out_of_stock': return { label: '缺货',   color: '#FF4D4D', bg: '#FF4D4D22' };
-    case 'critical':     return { label: '临界',   color: '#E55A28', bg: '#E55A2822' };
-    case 'low':          return { label: '低库存', color: '#BA7517', bg: '#BA751722' };
-    case 'normal':       return { label: '正常',   color: '#0F6E56', bg: '#0F6E5622' };
+    case 'critical':     return { label: '临界',   color: txColors.primaryActive, bg: `${txColors.primaryActive}22` };
+    case 'low':          return { label: '低库存', color: txColors.warning, bg: `${txColors.warning}22` };
+    case 'normal':       return { label: '正常',   color: txColors.success, bg: `${txColors.success}22` };
     default:             return { label: status,   color: '#888',    bg: '#88888822' };
   }
 }
@@ -87,9 +88,9 @@ function statusConfig(status: IngredientStock['status']): { label: string; color
 function urgencyConfig(urgency?: string): { label: string; color: string } {
   switch (urgency) {
     case 'urgent': return { label: '紧急', color: '#FF4D4D' };
-    case 'high':   return { label: '高',   color: '#E55A28' };
-    case 'medium': return { label: '中',   color: '#BA7517' };
-    default:       return { label: '低',   color: '#0F6E56' };
+    case 'high':   return { label: '高',   color: txColors.primaryActive };
+    case 'medium': return { label: '中',   color: txColors.warning };
+    default:       return { label: '低',   color: txColors.success };
   }
 }
 
@@ -288,7 +289,7 @@ export function InventoryIntelPage() {
         showIcon
         banner
         message="🛡️ tx-supply 供应链卫士：濑尿虾库存异常消耗，预计今日14:30沽清；鲍鱼临期3天，建议优先出餐"
-        action={<Button size="small" style={{background:'#FF6B35',color:'white',border:'none'}}>查看采购建议</Button>}
+        action={<Button size="small" style={{background:txColors.primary,color:'white',border:'none'}}>查看采购建议</Button>}
         style={{marginBottom: 16}}
         closable
       />
@@ -335,7 +336,7 @@ export function InventoryIntelPage() {
             disabled={aiLoading}
             style={{
               padding: '7px 18px', borderRadius: 8,
-              border: 'none', background: aiLoading ? '#2a3a44' : '#FF6B35',
+              border: 'none', background: aiLoading ? '#2a3a44' : txColors.primary,
               color: '#fff', cursor: aiLoading ? 'not-allowed' : 'pointer',
               fontSize: 13, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6,
             }}
@@ -356,10 +357,10 @@ export function InventoryIntelPage() {
           {/* ── 统计行 ── */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
             <StatCard emoji="🚨" label="缺货"     value={summary.out_of_stock  ?? 0} color="#FF4D4D" bg="#FF4D4D22" />
-            <StatCard emoji="⚠️"  label="临界"     value={summary.critical      ?? 0} color="#E55A28" bg="#E55A2822" />
-            <StatCard emoji="📉" label="低库存"   value={summary.low_stock     ?? 0} color="#BA7517" bg="#BA751722" />
-            <StatCard emoji="✅" label="正常"     value={summary.normal        ?? 0} color="#0F6E56" bg="#0F6E5622" />
-            <StatCard emoji="⏰" label="即将临期" value={summary.expiring_soon ?? 0} color="#BA7517" bg="#BA751722" />
+            <StatCard emoji="⚠️"  label="临界"     value={summary.critical      ?? 0} color={txColors.primaryActive} bg="#E55A2822" />
+            <StatCard emoji="📉" label="低库存"   value={summary.low_stock     ?? 0} color={txColors.warning} bg="#BA751722" />
+            <StatCard emoji="✅" label="正常"     value={summary.normal        ?? 0} color={txColors.success} bg="#0F6E5622" />
+            <StatCard emoji="⏰" label="即将临期" value={summary.expiring_soon ?? 0} color={txColors.warning} bg="#BA751722" />
             <StatCard emoji="❌" label="已过期"   value={summary.expired       ?? 0} color="#FF4D4D" bg="#FF4D4D22" />
           </div>
 
@@ -383,8 +384,8 @@ export function InventoryIntelPage() {
                     onClick={exportCSV}
                     style={{
                       padding: '5px 14px', borderRadius: 6,
-                      border: '1px solid #0F6E56', background: '#0F6E5622',
-                      color: '#0F6E56', cursor: 'pointer', fontSize: 12,
+                      border: `1px solid ${txColors.success}`, background: `${txColors.success}22`,
+                      color: txColors.success, cursor: 'pointer', fontSize: 12,
                     }}
                   >
                     📤 导出选中 ({selectedIds.size})
@@ -417,7 +418,7 @@ export function InventoryIntelPage() {
                         checked={allSelected}
                         ref={(el) => { if (el) el.indeterminate = someSelected; }}
                         onChange={toggleSelectAll}
-                        style={{ cursor: 'pointer', accentColor: '#FF6B35' }}
+                        style={{ cursor: 'pointer', accentColor: txColors.primary }}
                       />
                     </th>
                     {['食材名', '当前库存', '安全库存', '状态', '建议补货量', '首选供应商', '最后进价', '操作'].map((h) => (
@@ -437,14 +438,14 @@ export function InventoryIntelPage() {
                         key={item.id}
                         style={{
                           borderBottom: '1px solid #2a3a4440',
-                          background: isSelected ? '#FF6B3510' : 'transparent',
+                          background: isSelected ? `${txColors.primary}10` : 'transparent',
                           transition: 'background 0.15s',
                         }}
                         onMouseEnter={(e) => {
                           if (!isSelected) (e.currentTarget as HTMLTableRowElement).style.background = '#ffffff08';
                         }}
                         onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLTableRowElement).style.background = isSelected ? '#FF6B3510' : 'transparent';
+                          (e.currentTarget as HTMLTableRowElement).style.background = isSelected ? `${txColors.primary}10` : 'transparent';
                         }}
                       >
                         {/* Checkbox */}
@@ -453,7 +454,7 @@ export function InventoryIntelPage() {
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelect(item.id)}
-                            style={{ cursor: 'pointer', accentColor: '#FF6B35' }}
+                            style={{ cursor: 'pointer', accentColor: txColors.primary }}
                           />
                         </td>
 
@@ -463,7 +464,7 @@ export function InventoryIntelPage() {
                             {item.name}
                           </div>
                           {item.expiry_date && (
-                            <div style={{ fontSize: 11, color: '#BA7517', marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: txColors.warning, marginTop: 2 }}>
                               ⏰ 到期 {item.expiry_date}
                             </div>
                           )}
@@ -531,9 +532,9 @@ export function InventoryIntelPage() {
                             disabled={isSelected}
                             style={{
                               padding: '4px 12px', borderRadius: 6,
-                              border: `1px solid ${isSelected ? '#0F6E56' : '#2a3a44'}`,
-                              background: isSelected ? '#0F6E5622' : 'transparent',
-                              color: isSelected ? '#0F6E56' : '#888',
+                              border: `1px solid ${isSelected ? txColors.success : '#2a3a44'}`,
+                              background: isSelected ? `${txColors.success}22` : 'transparent',
+                              color: isSelected ? txColors.success : '#888',
                               cursor: isSelected ? 'default' : 'pointer',
                               fontSize: 12, whiteSpace: 'nowrap',
                             }}
@@ -568,7 +569,7 @@ export function InventoryIntelPage() {
                         置信度 {Math.round(aiPlan.confidence * 100)}%
                         · 耗时 {aiPlan.execution_ms}ms
                         {aiPlan.constraints_ok
-                          ? <span style={{ color: '#0F6E56' }}> · ✓ 硬约束通过</span>
+                          ? <span style={{ color: txColors.success }}> · ✓ 硬约束通过</span>
                           : <span style={{ color: '#FF4D4D' }}> · ✗ 约束警告</span>}
                       </div>
                     )}
@@ -580,8 +581,8 @@ export function InventoryIntelPage() {
                       onClick={exportCSV}
                       style={{
                         padding: '5px 14px', borderRadius: 6,
-                        border: '1px solid #FF6B35', background: '#FF6B3522',
-                        color: '#FF6B35', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                        border: `1px solid ${txColors.primary}`, background: `${txColors.primary}22`,
+                        color: txColors.primary, cursor: 'pointer', fontSize: 12, fontWeight: 600,
                       }}
                     >
                       📤 导出为采购单
@@ -615,10 +616,10 @@ export function InventoryIntelPage() {
                     {/* AI 综合分析说明 */}
                     {(aiOrchestrate?.synthesis || aiPlan?.ai_reasoning) && (
                       <div style={{
-                        background: '#185FA522', border: '1px solid #185FA544',
+                        background: `${txColors.info}22`, border: `1px solid ${txColors.info}44`,
                         borderRadius: 10, padding: '14px 18px', marginBottom: 20,
                       }}>
-                        <div style={{ color: '#185FA5', fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
+                        <div style={{ color: txColors.info, fontSize: 12, fontWeight: 700, marginBottom: 6 }}>
                           🧠 AI 分析说明
                         </div>
                         <div style={{ color: '#ccc', fontSize: 13, lineHeight: 1.7 }}>
@@ -641,8 +642,8 @@ export function InventoryIntelPage() {
                             }}>
                               <span style={{
                                 fontSize: 11, padding: '2px 8px', borderRadius: 8, flexShrink: 0,
-                                background: action.priority === 'high' ? '#A32D2D22' : '#185FA522',
-                                color: action.priority === 'high' ? '#A32D2D' : '#185FA5',
+                                background: action.priority === 'high' ? `${txColors.danger}22` : `${txColors.info}22`,
+                                color: action.priority === 'high' ? txColors.danger : txColors.info,
                                 fontWeight: 600,
                               }}>
                                 {action.priority === 'high' ? '高优先' : action.priority}
