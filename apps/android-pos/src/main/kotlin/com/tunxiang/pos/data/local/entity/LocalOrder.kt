@@ -78,6 +78,11 @@ data class LocalOrder(
 
     @ColumnInfo(name = "synced")
     val synced: Boolean = false,                 // Whether synced to server
+                                                 // INVARIANT (D3 W1, 2026-05-07): synced must equal
+                                                 // (source != SyncSource.LOCAL_PENDING). v1 SyncWorker
+                                                 // reads `synced`; D3 stage 2 Repository write paths
+                                                 // must keep both fields consistent. D6 cleanup may
+                                                 // drop `synced` once no v1 callers remain.
 
     @ColumnInfo(name = "server_id")
     val serverId: String? = null,                // Server-assigned ID after sync
