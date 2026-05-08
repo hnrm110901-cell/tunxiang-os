@@ -15,6 +15,16 @@ class Table(TenantBase):
     """桌台"""
 
     __tablename__ = "tables"
+    # extend_existing=True 兜住 pytest 跨测试文件双重 import 引发的
+    # `Table 'tables' is already defined for this MetaData instance` 冲突：
+    # services/tx-trade/src/tests/ 下不同 test 文件以裸 `services.X`
+    # 与全路径 `services.tx_trade.src.services.X` 加载同一磁盘文件
+    # cashier_engine.py / order_service.py，各自相对 `from ..models.tables`
+    # 解析到不同 module key（`models.tables` vs
+    # `services.tx_trade.src.models.tables`），共享同一 TenantBase.metadata
+    # 时 SQLAlchemy 拒绝重复声明。生产链路单一 import 路径，extend_existing
+    # 是 no-op。长期收敛：统一 src/tests/ import 风格（follow-up issue）。
+    __table_args__ = {"extend_existing": True}
 
     store_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("stores.id"), nullable=False, index=True)
     table_no: Mapped[str] = mapped_column(String(20), nullable=False, comment="桌号如A01")
