@@ -33,9 +33,29 @@ AMOUNT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# 白名单：字段名含 rate/ratio/pct/percent（百分比/比例字段，非金额）
-# 收紧自 PR #264 verifier 反馈："rate" 单词太宽泛
-RATE_PATTERN = re.compile(r"(rate|ratio|pct|percent)", re.IGNORECASE)
+# 白名单 1：物理单位后缀（不可能是金额，任意 scale / type 跳过）
+# 例：total_mileage_km Numeric(10,2) 是 GPS 公里数，邻位 total_cost_fen 是真钱
+UNIT_SUFFIX_PATTERN = re.compile(
+    r"_(?:km|kg|count|qty|pieces|seconds|minutes|hours|days|ms)$",
+    re.IGNORECASE,
+)
+
+# 白名单 2：比率词作后缀（_rate / _ratio / _pct / _percent，严格 end-of-name）
+# 例：food_cost_rate / deposit_ratio Numeric(5,2) 表达 "30.00%" 格式比率，
+# 邻位 deposit_fen / total_cost_fen 才是真钱
+RATIO_SUFFIX_PATTERN = re.compile(
+    r"_(?:rate|ratio|pct|percent)$",
+    re.IGNORECASE,
+)
+
+# 白名单 3：margin 词（毛利率 / 利润率），允许 _before / _after 等时间维度变体
+# 例：gross_margin / gross_margin_before / profit_margin —— 创始人 5/8 决策：
+# margin 在屯象OS Ontology 中专指比率，非金额；shared/ontology/ §18 冻结但可在
+# 扫描器侧通过启发式豁免，不需修 entities.py
+MARGIN_TOKEN_PATTERN = re.compile(
+    r"(?:^|_)margin(?:_\w+)?$",
+    re.IGNORECASE,
+)
 
 # 只对 scale = 2 的报 high，其他报 warning
 HIGH_SEVERITY_SCALE = 2
@@ -112,15 +132,34 @@ def _severity(scale: int | None) -> str:
     return "warning"
 
 
-def _should_skip_rate_field(column_name: str, scale: int | None) -> bool:
-    """税率/百分比字段白名单：字段名含 rate/ratio/pct/percent **且** scale >= 4 则跳过。
+def _should_skip_rate_field(column_name: str, scale: int | None) -> bool:  # noqa: ARG001
+    """单位 / 比率 / 毛利率字段白名单（PR #B-3 收紧）：
 
-    收紧自 PR #264 verifier 反馈：
-      - 旧规则 `scale <= 4` 太宽，会把 `deposit_ratio Numeric(5,2)` 误白名单
-      - 新规则 `scale >= 4`：真税率 (Numeric(5,4)) 仍跳过，
-        scale=2 的"看似比例实际可能是金额"的 ratio 字段需人工 review
+    任一命中即跳过（不再依赖 scale 阈值）：
+    1. UNIT_SUFFIX：`_km / _kg / _count / _qty / _pieces / _seconds / ...` 物理单位
+    2. RATIO_SUFFIX：`_rate / _ratio / _pct / _percent` 严格 end-of-name 后缀
+    3. MARGIN_TOKEN：`margin` 词，含 `_margin / _margin_before / _margin_after / ...` 变体
+
+    设计变更（vs PR #264）：
+      - 旧规则要求 `scale >= 4` 才豁免 rate token，把 Numeric(5,2) 表达"30.00%"
+        格式的真比率（deposit_ratio / food_cost_rate）误报为 high 金额违规
+      - 新规则按命名清晰度豁免：`_rate$` / `_ratio$` / `_margin*` 后缀语义明确即跳过
+      - margin token 加入：创始人 5/8 决策，shared/ontology/ §18 冻结的
+        4 处 *_margin 应在扫描器侧豁免（不修 entities.py）
+
+    Trade-off（reviewer 注意）：
+      - 接受小概率 false-negative：理论上 `total_rate_amount` 这种"中含 rate token
+        但实为金额"命名会被错跳；实际 codebase 不存在此命名风格
+      - `tax_rate Numeric(5,4)` 等真税率原 scale>=4 规则覆盖，新规则后缀匹配仍
+        覆盖，无 regression
+
+    `scale` 参数保留签名兼容（调用方继续传），不参与新逻辑。
     """
-    if RATE_PATTERN.search(column_name) and scale is not None and scale >= 4:
+    if UNIT_SUFFIX_PATTERN.search(column_name):
+        return True
+    if RATIO_SUFFIX_PATTERN.search(column_name):
+        return True
+    if MARGIN_TOKEN_PATTERN.search(column_name):
         return True
     return False
 
@@ -345,7 +384,11 @@ def _output_md(violations: list[Violation], root_label: str) -> str:
     lines.append("- `high`：`Numeric(M, 2)` — 明显的人民币元/角格式，必须修为 `Integer`")
     lines.append("- `warning`：`Numeric(M, N≠2)` — 疑似金额但 scale 异常，需人工核查")
     lines.append("")
-    lines.append("**白名单（不报警）：** 字段名含 `rate` 且 scale ≤ 4 的百分比字段（如 `tax_rate Numeric(5,4)`）。")
+    lines.append("**白名单（不报警）：**")
+    lines.append("")
+    lines.append("- 物理单位后缀：`_km` / `_kg` / `_count` / `_qty` / `_pieces` / `_seconds` / `_minutes` / `_hours` / `_days` / `_ms`")
+    lines.append("- 比率后缀：`_rate` / `_ratio` / `_pct` / `_percent`（严格 end-of-name）")
+    lines.append("- 毛利率/利润率 token：`margin` 词（含 `_margin` / `_margin_before` / `_margin_after` 等变体）")
 
     return "\n".join(lines)
 

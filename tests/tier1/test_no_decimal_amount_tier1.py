@@ -44,8 +44,6 @@ from scan_decimal_amount_columns import scan_directory  # noqa: E402
 # 其余条目待后续专项 PR 修复后逐步递减。
 KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
     [
-        # ── tx-expense ──────────────────────────────────────────────────
-        ("services/tx-expense/src/models/travel.py", 117, "total_mileage_km"),
         # ── tx-finance ──────────────────────────────────────────────────
         ("services/tx-finance/src/models/cost_snapshot.py", 56, "raw_material_cost"),
         ("services/tx-finance/src/models/cost_snapshot.py", 57, "labor_cost_allocated"),
@@ -69,9 +67,6 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         ("services/tx-member/src/models/stored_value_account.py", 174, "gift_balance_before"),
         ("services/tx-member/src/models/stored_value_account.py", 180, "gift_balance_after"),
         # ── tx-trade ────────────────────────────────────────────────────
-        # 新增（rate 白名单收紧 scale>=4 后捕获，需人工 review 是否真金额）：
-        ("services/tx-trade/src/models/banquet_ai.py", 90, "food_cost_rate"),
-        ("services/tx-trade/src/models/banquet_contract.py", 39, "deposit_ratio"),
         ("services/tx-trade/src/models/chef_performance_daily.py", 22, "dish_amount"),
         # 待专项 PR 修复后删除：
         ("services/tx-trade/src/models/discount_audit_log.py", 43, "original_amount"),
@@ -80,15 +75,19 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         # 待 P0-2 修复后删除（PR #272 fix/p0-2-wine-storage-fen）：
         ("services/tx-trade/src/models/wine_storage.py", 61, "storage_price"),
         ("services/tx-trade/src/models/wine_storage.py", 92, "price_at_trans"),
-        # ── shared/ontology/ ────────────────────────────────────────────
-        # 新增（PR #264 round-2 反馈：shared/ 域加入扫描）
-        # 4 项均为 *_margin Numeric(5,2) 百分比字段（注释「毛利率(%)」等），
-        # 业务语义是百分比非金额，但因 §18 ontology 冻结规则不能动 entities.py
-        # 修；标注为 known-acceptable，待创始人决策"是否扩 RATE_PATTERN 加 margin"
-        ("shared/ontology/src/entities.py", 250, "profit_margin"),
-        ("shared/ontology/src/entities.py", 390, "gross_margin_before"),
-        ("shared/ontology/src/entities.py", 391, "gross_margin_after"),
-        ("shared/ontology/src/entities.py", 422, "gross_margin"),
+        # ── 已豁免（PR #B-3 启发式收紧 2026-05-08）─────────────────────
+        # 以下条目原在 baseline，本次启发式收紧后扫描器不再误报，已从 baseline 移除：
+        #   - services/tx-expense/src/models/travel.py:117 total_mileage_km
+        #     → UNIT_SUFFIX `_km` 命中（GPS 公里数，邻位 total_cost_fen 是真钱）
+        #   - services/tx-trade/src/models/banquet_ai.py:90 food_cost_rate
+        #     → RATIO_SUFFIX `_rate$` 命中（餐饮成本率 %，同表 repeat_rate /
+        #       cancellation_rate 同形态原本就未被报）
+        #   - services/tx-trade/src/models/banquet_contract.py:39 deposit_ratio
+        #     → RATIO_SUFFIX `_ratio$` 命中（注释「定金比例%」，邻位 deposit_fen 是真钱）
+        #   - shared/ontology/src/entities.py {250, 390, 391, 422}
+        #     {profit_margin, gross_margin_before, gross_margin_after, gross_margin}
+        #     → MARGIN_TOKEN 命中（毛利率 %，§18 ontology 冻结仍守住，
+        #       创始人 5/8 决策：margin 在 Ontology 中专指比率，非金额）
     ]
 )
 
