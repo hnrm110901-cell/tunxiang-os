@@ -21,11 +21,21 @@ export function useAgentConsoleHotkey() {
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       // Cmd+J（mac）或 Ctrl+J（其他平台）
-      // 即使光标在输入框中也允许触发（业界惯例：AI 唤起优先级高）
-      if ((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J')) {
-        e.preventDefault();
-        openChat();
+      if (!((e.metaKey || e.ctrlKey) && (e.key === 'j' || e.key === 'J'))) {
+        return;
       }
+      // 输入框 / 表单 / 富文本 / chat input 内跳过：让 'j' 字符正常输入。
+      // 在 AgentConsole.chat 已开的情况下用户多半在编辑追问，再 Cmd+J 静默拦截
+      // 既不打开新会话，又拦了击键，给"按了什么都没发生"的体验。
+      const target = e.target as HTMLElement | null;
+      if (target) {
+        const tag = target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) {
+          return;
+        }
+      }
+      e.preventDefault();
+      openChat();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
