@@ -14,13 +14,48 @@
 
 from __future__ import annotations
 
+import os
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 # Pin 数量上限（每 tenant），超出 FIFO 淘汰最旧项
 PIN_LIMIT_PER_TENANT = 20
+
+# 显式 acknowledge in-memory store 在生产 / 预发的风险
+_ACK_MODE = "in_memory_acknowledged"
+_PROD_LIKE_ENVS = ("production", "staging")
+
+
+def _assert_pin_store_mode_safe(env: Optional[Mapping[str, str]] = None) -> None:
+    """生产 / 预发启动 fail-fast — 多 worker 部署 _PINNED_STORE 数据分裂保护。
+
+    PR1 仅 in-memory store，N worker 部署时每 worker 持有独立 dict，pin add 在
+    worker-A 但下次请求路由到 worker-B 看不到 → 静默数据分裂。PR2 接 DB 持久化
+    （issue #291，迁移 v230+ dashboard_pinned 表 + RLS）解决。
+
+    在此之前生产 / 预发部署必须显式 acknowledge：
+      TUNXIANG_ENV ∈ {production, staging} 且 TX_PIN_STORE_MODE != in_memory_acknowledged
+      → module 加载抛 RuntimeError，让 ImagePullPolicy 把启动失败写入 K8s event。
+
+    Args:
+        env: 测试注入用 env 字典，None 时读 os.environ。
+    """
+    e = env if env is not None else os.environ
+    tx_env = (e.get("TUNXIANG_ENV") or "").strip().lower()
+    mode = (e.get("TX_PIN_STORE_MODE") or "").strip().lower()
+    if tx_env in _PROD_LIKE_ENVS and mode != _ACK_MODE:
+        raise RuntimeError(
+            f"tx-analytics pinned_dashboard PR1 仅 in-memory store，"
+            f"TUNXIANG_ENV={tx_env!r} 部署多 worker 会数据分裂。等 PR2 DB 持久化 "
+            f"（issue #291）；如需单 worker 提前试用，设 "
+            f"TX_PIN_STORE_MODE={_ACK_MODE} 显式承认风险。"
+        )
+
+
+# Module-load 一次校验：让 K8s pod 启动失败优于静默错乱
+_assert_pin_store_mode_safe()
 
 
 @dataclass

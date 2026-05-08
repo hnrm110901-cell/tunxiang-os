@@ -21,6 +21,7 @@ import pytest
 from ..services.pinned_dashboard import (
     PIN_LIMIT_PER_TENANT,
     PinnedItem,
+    _assert_pin_store_mode_safe,
     _clear_for_test,
     add_pin,
     list_pins,
@@ -131,3 +132,39 @@ class TestPinnedDashboardT3:
             list_pins("")
         with pytest.raises(ValueError, match="tenant_id"):
             remove_pin(tenant_id="", pin_id="anything")
+
+
+class TestPinStoreFailFastT3:
+    """生产 / 预发启动 fail-fast — 多 worker 部署 in-memory store 数据分裂保护。
+
+    PR1 阶段 _PINNED_STORE 是 module-level dict，N worker 部署时每 worker 持有
+    独立副本。pin add 在 worker-A，下次请求路由到 worker-B 看不到 → 静默数据
+    分裂。本组测试验证 module-load 校验把"已知缺陷"转成"启动失败"。
+    """
+
+    def test_production_without_ack_raises(self):
+        """TUNXIANG_ENV=production 未 ack → 抛 RuntimeError，K8s pod 启动失败。"""
+        with pytest.raises(RuntimeError, match="多 worker"):
+            _assert_pin_store_mode_safe({"TUNXIANG_ENV": "production"})
+
+    def test_staging_without_ack_raises(self):
+        """TUNXIANG_ENV=staging 未 ack → 抛 RuntimeError（预发同生产对待）。"""
+        with pytest.raises(RuntimeError, match="多 worker"):
+            _assert_pin_store_mode_safe({"TUNXIANG_ENV": "staging"})
+
+    def test_production_with_acknowledged_passes(self):
+        """生产 + TX_PIN_STORE_MODE=in_memory_acknowledged → 放行（单 worker 试用）。"""
+        _assert_pin_store_mode_safe(
+            {
+                "TUNXIANG_ENV": "production",
+                "TX_PIN_STORE_MODE": "in_memory_acknowledged",
+            }
+        )
+
+    def test_dev_environment_passes_silently(self):
+        """开发环境无需任何 env，import 不抛错（既有测试不被破坏）。"""
+        _assert_pin_store_mode_safe({"TUNXIANG_ENV": "development"})
+
+    def test_unset_env_passes(self):
+        """完全空 env → 不抛错（CI / 本地测试 / docker compose without TUNXIANG_ENV）。"""
+        _assert_pin_store_mode_safe({})
