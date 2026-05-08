@@ -13,6 +13,7 @@ import { getToken, clearAuth, isTokenExpired } from './api/client';
 import { LangProvider, useLang } from './i18n/LangContext';
 import { ShellHQ } from './shell/ShellHQ';
 import { AdminCommandPalette } from './components/AdminCommandPalette';
+import { useAgentConsoleHotkey } from './hooks/useAgentConsoleHotkey';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { DailyPlanPage } from './pages/DailyPlanPage';
@@ -231,6 +232,9 @@ function AppContent() {
   const { lang } = useLang();
 
   useEffect(() => { restore(); }, [restore]);
+
+  // Sprint 4 / S4-01：Cmd+J / Ctrl+J 唤起 AgentConsole.chat
+  useAgentConsoleHotkey();
 
   const antLocale = lang === 'en' ? enUS : lang === 'ms' ? enUS : zhCN;
 

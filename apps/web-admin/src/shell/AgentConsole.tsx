@@ -13,9 +13,10 @@
  *
  * 决策3（商务建议）：底部显示"本月 AI 为你节省了 ¥XX"
  */
-import { useState } from 'react';
+import { useAgentConsoleStore, type AgentTab } from '../store/agentConsoleStore';
+import { AdminAgentChatBox } from '../components/agent-chat/AdminAgentChatBox';
 
-type Tab = 'feed' | 'chat' | 'audit';
+type Tab = AgentTab;
 
 const MOCK_FEED = [
   { id: '1', type: 'crit', agent: '折扣守护', title: '毛利底线告警', detail: 'A03桌订单折扣率62%，已超毛利底线', time: '2分钟前' },
@@ -37,7 +38,8 @@ const typeStyle: Record<string, { bg: string; border: string; label: string }> =
 };
 
 export function AgentConsole() {
-  const [tab, setTab] = useState<Tab>('feed');
+  const tab = useAgentConsoleStore((s) => s.tab);
+  const setTab = useAgentConsoleStore((s) => s.setTab);
 
   return (
     <aside style={{
@@ -92,27 +94,8 @@ export function AgentConsole() {
         </div>
       )}
 
-      {/* Chat */}
-      {tab === 'chat' && (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: 12 }}>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-4)' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 32, marginBottom: 8 }}>💬</div>
-              <div style={{ fontSize: 13 }}>用自然语言查询经营数据</div>
-              <div style={{ fontSize: 11, color: 'var(--text-4)', marginTop: 4 }}>
-                试试："今天营收多少？" "鲈鱼损耗排名？"
-              </div>
-            </div>
-          </div>
-          <input
-            placeholder="输入问题..."
-            style={{
-              padding: '10px 12px', borderRadius: 8, border: '1px solid var(--bg-2)',
-              background: 'var(--bg-0)', color: 'var(--text-2)', fontSize: 13, outline: 'none',
-            }}
-          />
-        </div>
-      )}
+      {/* Chat — Sprint 4 / S4-01：升级为完整对话面板 */}
+      {tab === 'chat' && <AdminAgentChatBox />}
 
       {/* Audit */}
       {tab === 'audit' && (
