@@ -78,6 +78,38 @@
 
 ---
 
+## 2026-05-08 15:30 · main Tier 1 Gate 转绿（Week 1 Tier1 攻坚收尾）
+
+### 完成状态
+- [x] **main Tier 1 Gate 长期红 → 绿** — HEAD `5198db2e` conclusion success ✅
+- [x] **#280 Ruff F401 cleanup** — cherry-pick 5/7 未推 commit `46928e5b` 到独立 PR
+- [x] **#286 tier1-gate.yml pinzhi 漂移** — `tests/tier1` 子集转绿
+- [x] **#287 Table extend_existing band-aid** — `services/tx-trade/src/tests` 子集转绿
+- [x] **6 条 follow-up issue 建账** — #274-#279（5/7 handoff §六）
+- [x] **SSH key 注册** — 一次性根除代理对 github.com:443 push 阻塞
+- [x] **5 个 worktree 清理** — ruff-cleanup-274 + p0-3/p0-7/p0-8 + tier1-fix × 2
+- [ ] **4 条本会话 cleanup follow-up issue** — 待建（aiqiwei/meituan drift / app.models.base 死代码 / src/tests import 风格统一）
+- [ ] **P0-4 CRDT 文档对齐** — worktree `fix/p0-4-crdt-doc-alignment` 已起，未动笔
+
+### 关键决策
+- **决策 40：#287 用 `extend_existing=True` band-aid 而非真结构修** — 真结构修需收敛 30+ 测试文件 import 风格，scope 超 Tier 1 Gate 红线修复；生产链路 import 路径单一时 extend_existing 是 no-op，副作用 0；长期收敛走独立 follow-up issue
+- **决策 41：debugger agent 报告作素材不直接执行** — agent 给的"改 test_cashier_engine 全路径"方案在 Tier 1 Gate batch 视角下会反向破坏其它 _tier1 文件；CI 实验先验证假设再下手
+- **决策 42：SSH 切 git@github.com 但不动 origin remote** — 防 `feedback_parallel_claude_sessions.md` 互踩；并发会话仍用 HTTPS push，本会话用 `git push git@github.com:...` 显式 URL
+- **决策 43：失败 3 次代理 push 立即报告用户切手动** — 避免硬撑（从 1 PR 阻塞蔓延到全会话停摆）
+
+### 下一步
+- 进 P0-4 CRDT 文档对齐（G1=A 决策已落，1d 纯文档活）
+- 顺手建 4 条 cleanup follow-up issue（aiqiwei drift / meituan drift / app.models.base 死代码 / src/tests import 风格统一）
+- 等 #271 staging 反馈推进 #272 stack
+
+### 已知风险
+- **#287 extend_existing 是 band-aid** — agent 警告"masking the symptom"。生产 no-op 但测试侧仍存在双重注册，未来加新模型时如果同名冲突可能被静默吃掉。结构修跟进 follow-up issue
+- **9 个 python-lint-test 跨服务红 pre-existing** — main 持续带病；独立 lint 清理 PR，handoff §七 已记
+- **#271/#272 仍等 DBA staging** — 5/7 handoff §五 4 条命令未跑回执
+- **4 条 cleanup follow-up issue 已建** — #295 (aiqiwei drift) / #296 (meituan drift) / #297 (table.py 死代码) / #298 (src/tests import 风格统一替换 #287 band-aid)
+
+---
+
 ## 2026-05-07 23:03 · Sprint 2 #262 闸门评审 → 9/10 + M1 通过
 
 ### 完成状态

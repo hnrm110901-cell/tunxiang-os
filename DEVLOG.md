@@ -49,6 +49,70 @@
 
 ---
 
+## 2026-05-08 main Tier 1 Gate 转绿（4 PR 串攻）
+
+### 今日完成
+
+#### 起点：Week 1 Tier1 攻坚 follow-up（基于 2026-05-07 handoff）
+
+继 5/7 #264/#265/#266 已合的 P0-3/P0-7/P0-8 攻坚，本会话补完未推 commit + 修 main 长期红：
+
+#### #280 Ruff F401 + I001 cleanup（cherry-pick 46928e5b）— `803fd777`
+- 5/7 PR #265 round-2 修复后 commit `46928e5b` 因代理 502 没推；原分支 squash merged 死掉
+- cherry-pick 到 `chore/ruff-f401-cleanup-tx-trade` 新分支（off origin/main）
+- 删 `cashier_engine.py` + `order_service.py` 未用的 `InvalidTransitionError` import + 测试 import 整理
+- 1 file × 3 / +2 / -4 / `ruff check` 全绿
+- 配套：注册 SSH key 到 GitHub `hnrm110901-cell` —— 一次性根除代理对 github.com:443 push 阻塞
+
+#### debugger agent 诊断 main Tier 1 Gate 长期红根因
+- main HEAD `ba80c9a0` 起 25+ push 持续 Tier 1 Gate 失败
+- 失败 A：`test_order_transition_guard_tier1.py` 两测试报 `Table 'tables' is already defined for this MetaData instance`
+- 失败 B：`test_paths_include_pos_adapters` 报 `POS adapter shared/adapters/pinzhi_pos/ 未在 paths`
+
+#### #286 tier1-gate.yml pinzhi → pinzhi_pos 命名漂移修 — `38795103`
+- yaml 写 `shared/adapters/pinzhi/**` 但磁盘是 `shared/adapters/pinzhi_pos/`（带 `_pos`）
+- 测试断言子串 `"shared/adapters/pinzhi_pos/"` 在 yaml → 失败
+- L37 `pinzhi/**` → `pinzhi_pos/**`，L199 `pinzhi/` → `pinzhi_pos/`
+- 1 file / +2 / -2 / Tier 1 `tests/tier1` 子集转绿
+
+#### #287 Table 模型 `extend_existing=True` band-aid — `5198db2e`
+- 根因（debugger + CI 实验交叉验证）：`services/tx-trade/src/tests/` 下不同测试文件混用裸 `services.X` 与全路径 `services.tx_trade.src.services.X`，加载同一磁盘文件导致 SQLAlchemy 双重注册
+- 尝试 1（裸→裸对齐）：触发新错误 `ImportError: attempted relative import beyond top-level package`（Tier 1 Gate workflow 仅跑 `_tier1.py`，test_cashier_engine 不在批次内，没有它先填 sys.modules['models.tables'] 缓存）
+- 尝试 2（裸→全路径对齐）：会反向破坏 test_scan_order/test_tables 等 ~20 个仍走裸 import 的 _tier1 文件
+- 真结构修需收敛 30+ 测试文件 import 风格 → scope 远超本红线修复
+- 选择最小风险方案：Table 模型加 `__table_args__ = {'extend_existing': True}` + 9 行注释
+- 生产链路 import 路径单一，extend_existing 是 no-op；测试场景 silently 接受重复声明
+- 1 file / +10 / 0 / Tier 1 `services/tx-trade/src/tests` 子集转绿
+
+#### follow-up issues 落账（10 条）
+- 6 条来自 5/7 handoff §六：#274 (Ruff cleanup)/#275 (诺诺金额对账 [T1])/#276 (raw_payload [T1])/#277 (after-commit hook [T1])/#278 (approval emit 时序 [T1])/#279 (WineStorageResponse [T2])
+- 4 条本会话挖出（计划本会话尾建）：aiqiwei drift / meituan drift / app.models.base 死代码 / src/tests import 风格统一（替换 extend_existing）
+
+### 数据变化
+- 4 PR merged：#280/#286/#287（Tier 1 主线）
+- 6 issue created：#274-#279（5/7 handoff follow-up）
+- 0 alembic 迁移
+- worktree：27 → 24（清 5 个 + 起 2 个 + 清 2 个 + 起 1 个 P0-4）
+
+### 验收
+- `gh run list --branch main --workflow "Tier 1 Gate"` HEAD `5198db2e` conclusion **success** ✅
+- `services/tx-trade/src/tests` + `tests/tier1` + `Tier 1 门禁判定` 三关全过
+- 9 个 pre-existing python-lint-test 跨服务红 + Ruff Lint & Format（tx-agent F401/F541）+ frontend-build：仍红，handoff §七 已记，独立 PR 修不阻塞 Tier 1
+
+### 遗留问题
+- **#271 P0-1 invoice fen** — 等 staging（DBA 必须执行 4 条命令，见 5/7 handoff §五）
+- **#272 P0-2 wine fen** — stack-on #271，#271 进 main 后 rebase
+- **9 个 python-lint-test 跨服务红** — 独立 lint 清理 PR
+- **extend_existing band-aid** — 长期收敛见即将建的 follow-up issue
+
+### 明日计划
+- 进 P0-4 CRDT 文档对齐（worktree 已起 `fix/p0-4-crdt-doc-alignment`，G1=A 决策落，1d 纯文档活）
+- #271 staging 反馈到位后推进 #272 rebase
+- 进 P0-4 CRDT 文档对齐（G1=A 决策落，纯文档活）
+- 已建 4 条 cleanup follow-up issue (#295/#296/#297/#298)
+
+---
+
 ## 2026-05-08 M2-W0 + Sprint 3 全冲：10 issue 闭环（A 路线 + Sprint 3）
 
 ### 今日完成（按时间顺序）
