@@ -1,3 +1,74 @@
+## 2026-05-08 S4-03 第一刀 — NLQ → 三类操作 dispatcher 19/19 测试（PR #301 / T1）
+
+### 今日完成
+
+**S4-03 PR #301（2 commits / 4 files / +569）**
+- commit `b5f8eff5` — `test(tx-brain): NLQ → 三类操作 dispatcher Tier 1 测试（TDD red）`
+- commit `ff0be439` — `feat(tx-brain): NLQ → 三类操作 dispatcher + actionId 白名单`
+
+**新增 services/tx-brain/src/services/**
+- `nlq_action_types.py` — Pydantic 类型
+  - `ActionId` Literal: 4 个白名单（`menu.toggle_availability` / `menu.update_price` / `inventory.86` / `roster.update`）
+  - `ActionRequest` / `DryRunDiff` / `ConfirmRequest` / `ActionResult`
+- `nlq_action_registry.py` — 白名单 firewall（纯函数）
+  - `ALLOWED_ACTIONS` 从 `ActionId` Literal `get_args` 派生（**单一来源**）
+  - `assert_action_id_allowed` → `UnknownActionError`
+- `nlq_action_dispatcher.py` — dispatch + handler 注册
+  - `@register_action` 装饰器
+  - `dispatch_dry_run`: firewall → handler dry-run → constraints stub → DryRunDiff
+  - 4 stub handlers（PR2 接 tx-menu / tx-supply / tx-org RPC）
+  - `_check_hard_constraints` stub（PR2 接 `tx-agent constraints.run_checks`）
+  - `gen_confirmation_token`: SHA256 deterministic（PR2 升级 nonce 防重放）
+
+**新增 services/tx-brain/src/tests/test_nlq_action_dispatch_tier1.py（19/19，0.35s）**
+- 5 actionId 白名单（4 合法 + 2 反例）
+- 5 dispatch_dry_run（4 actionId stub + ValueError 透出）
+- 3 Pydantic schema 校验
+- 4 三条硬约束守门 stub
+- 2 confirmation_token
+
+### 数据变化
+- 新增后端文件：4 个（types + registry + dispatcher + test）
+- 新增测试：19 个（mock-based，超 #290 整体 ≥18 门槛 PR1 已达成）
+- TDD 留痕：commit test (red) → feat (green)
+- pytest 通过：19/19，0.35s
+
+### 关键决策
+1. **actionId 单一来源** — `ActionId` Literal 在 types.py 定义，`ALLOWED_ACTIONS` 在 registry.py 用 `typing.get_args` 派生（防漂移）
+2. **跨服务 import 暂不接 tx-agent constraints** — `_check_hard_constraints` PR1 stub 简单逻辑，PR2 解决跨服务 import 设计（可能把 `constraints/` 移 `shared/`）
+3. **confirmation_token PR1 deterministic hash + PR2 nonce 持久化** — PR1 满足"不可跨 actionId 重用"基础；PR2 加 nonce 表 + 单次性使用 + 时间戳过期防双花
+4. **execute_action / DB 持久化 / SSE 端点全部留 PR2** — PR1 聚焦 actionId 白名单 + dry-run + 硬约束守门骨架，避免被跨服务依赖拖慢
+
+### 网络/工具变更（全局）
+**GitHub HTTPS push 持续 502 → 原远端 origin 切 SSH**
+- user 加 SSH key `reclaude`（PK SHA256:KCTm2XZODIU/dEPr4jjkcED5EDszrP4SLm2kexMpKWw）
+- worktree 共享 `.git`，origin URL 由 `https://github.com/...` 切到 `git@github.com:...`
+  → main 仓 + 所有 21+ worktree 全局生效（不再受 HTTPS 502 影响）
+- gh CLI 仍走 HTTPS API（PR create 直通）
+
+### 遗留问题（follow-up PR）
+- `execute_action` 真实执行 + SAVEPOINT 回滚
+- `AgentDecisionLog` schema 扩字段（`action_id` / `payload` / `dry_run_diff` / `user_confirmed_at` / `executed_at` / `result`）+ 迁移
+- `POST /nlq/action` SSE 端点（StreamEvent 协议契约与 web-admin `mockSSE.ts` 对齐）
+- 跨服务 RPC 调用 tx-menu / tx-supply / tx-org（4 stub handler 替换为真实 dry-run + execute）
+- `_check_hard_constraints` 接通 `services.tx_agent.constraints.run_checks`（先解决跨服务 import 设计）
+- `confirmation_token` 升级 nonce 持久化防重放
+- DEMO 录屏每类操作 1 个完整流程
+
+### 明日计划
+- 选择推进路径：
+  - S4-02 PR2（白名单 schema 视图迁移 + 真 DB RLS 反测，**这个最先 demo-ready**）
+  - S4-03 PR2（execute + DB + SSE）
+  - S4-04（Pin 洞察 — T3，最轻）
+
+### §19 独立验证触发
+本 PR 涉及 4 文件 + 新建 Tier 1 路径，触发 §19 独立验证。建议 PR review 阶段开新会话从徐记海鲜收银员视角评估：
+1. 4 actionId 是否覆盖管理层"AI 改业务"全部真实场景（要不要扩 5/6 个）
+2. `_check_hard_constraints` stub 与真实 `constraints.run_checks` 语义一致（防 PR1 stub 通过、PR2 真 check 拒的回归）
+3. `confirmation_token` deterministic hash 防重放够不够（"防双花"要 PR2 nonce）
+
+---
+
 ## 2026-05-08 S4-02 第一刀 — SQL 沙箱 + 防火墙 24/24 测试（PR #299 / T1）
 
 ### 今日完成

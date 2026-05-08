@@ -1,3 +1,37 @@
+## 2026-05-08 18:00 · S4-03 第一刀 PR #301（commits `b5f8eff5` + `ff0be439` / Tier 1）
+
+### 完成状态
+- [x] actionId 白名单 firewall（4 个：`menu.toggle_availability` / `menu.update_price` / `inventory.86` / `roster.update`）
+- [x] Pydantic 类型完整：ActionRequest / DryRunDiff / ConfirmRequest / ActionResult（金额 fen 整数）
+- [x] dispatch_dry_run + 4 stub handlers（PR2 接真实 RPC）
+- [x] `_check_hard_constraints` stub（PR2 接 `tx-agent constraints.run_checks`）
+- [x] `gen_confirmation_token` SHA256 deterministic（PR2 升级 nonce 持久化）
+- [x] 19/19 测试（mock-based，超 #290 整体 ≥18 门槛 PR1 已达成）
+- [x] PR #301 已 push（origin 切 SSH 绕过 GitHub HTTPS 502）
+- [ ] `execute_action`（PR2）
+- [ ] `AgentDecisionLog` schema + 迁移（PR2）
+- [ ] `POST /nlq/action` SSE 端点（PR2）
+- [ ] DEMO 录屏（PR2 后）
+
+### 关键决策
+- **决策 55：actionId 单一来源** — `ActionId` Literal 是源，`ALLOWED_ACTIONS` 用 `typing.get_args` 派生；防 Literal 与 frozenset 两处不一致漂移
+- **决策 56：跨服务 import 暂不接 tx-agent constraints** — PR1 stub 简单逻辑；PR2 解决跨服务 import 设计（可能把 `constraints/` 移 `shared/`）
+- **决策 57：confirmation_token PR1 deterministic hash + PR2 nonce 持久化** — PR1 满足"不可跨 actionId 重用"基础；PR2 加 nonce 表 + 单次性使用 + 时间戳过期防双花
+- **决策 58：4 stub handlers 占位 + PR2 替换真实 RPC** — 单元测试独立闭环，避免 PR1 被跨服务依赖拖慢
+- **决策 59：origin 切 SSH 绕 GitHub HTTPS 502** — user 加 SSH key `reclaude`；worktree 共享 `.git`，所有 worktree + main 全局生效
+
+### 下一步
+- PR #301 review + merge
+- 选择：S4-02 PR2（schema 视图 + 真 DB RLS 反测）/ S4-03 PR2（execute + DB + SSE）/ S4-04（Pin）
+
+### 已知风险
+- 跨服务 import 设计未定（`constraints/` 仍在 tx-agent，未来移 `shared/` 或 RPC 调用待 PR2 拍板）
+- `confirmation_token` 同 req 重复执行的"防双花"问题留 PR2（PR1 deterministic hash 不防双花）
+- `_check_hard_constraints` stub 与真 `constraints.run_checks` 语义可能漂移（PR2 接通时需对照测试通过率，避免回归）
+- §19 独立验证未做（修改 4 文件 + 新建 Tier 1 路径）— PR review 阶段建议开新会话评估
+
+---
+
 ## 2026-05-08 16:30 · S4-02 第一刀 PR #299（commits `0a12c21b` + `a5012cbd` / Tier 1）
 
 ### 完成状态
