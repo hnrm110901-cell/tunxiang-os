@@ -127,7 +127,9 @@ async def _check_hard_constraints(
 
     PR1 简单逻辑：
       - menu.update_price + payload.cost_fen 已知 + new_price < cost → 毛利底线触发
-      - inventory.86 + payload.has_unfinished_order=True → 客户体验触发
+      - inventory.86 + payload.has_expired_batch=True → 食安合规触发
+      - inventory.86 + payload.unfinished_orders > 0 → 客户体验触发（食安优先）
+      - menu.toggle_availability + toggle_to=off + unfinished_orders > 0 → 客户体验触发
       - 其他场景一律放行
     """
     payload = req.payload
@@ -154,6 +156,20 @@ async def _check_hard_constraints(
                 "name": "food_safety",
                 "reason": "待 86 食材批次含过期记录（食安合规）",
                 "details": {"ingredient_id": payload.get("ingredient_id")},
+            }
+        # 86 食材仍被未完成订单引用 → 客户体验（与 menu.toggle_availability 对称）
+        # 食安合规先短路：过期食材绝对不能用，比"已下单客人吃不上"更严重
+        unfinished = payload.get("unfinished_orders", 0)
+        if isinstance(unfinished, int) and unfinished > 0:
+            return {
+                "name": "customer_experience",
+                "reason": (
+                    f"待 86 食材仍被 {unfinished} 单未完成订单引用（客户体验）"
+                ),
+                "details": {
+                    "ingredient_id": payload.get("ingredient_id"),
+                    "unfinished_orders": unfinished,
+                },
             }
 
     if req.action_id == "menu.toggle_availability":
