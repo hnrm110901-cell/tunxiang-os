@@ -14,8 +14,6 @@
 S4-02 Issue #289 / Tier 1：read-only + RLS 不可绕 + 防火墙 + 超时 + 行限
 
 后续优化（follow-up）：
-  - DB 层 LIMIT 包装（WITH user_query AS (...) SELECT * FROM user_query LIMIT N+1）
-    现在 Python 层 enforce — 10001 行结果集仍会全量 fetch；max_rows=10000 时影响有限
   - 沙箱 result.columns 含全部映射（暂用 rows[0].keys() 快速派生）
 """
 
@@ -112,9 +110,19 @@ async def run_safe_query(
         text(f"SET LOCAL statement_timeout = '{timeout_ms_int}ms'")
     )
 
-    # 第三关：执行 + 异常类型化
+    # 第三关：DB 层 LIMIT 包装（WITH ... SELECT * FROM ... LIMIT N+1）
+    # 把 row-count enforce 从 Python 层下推到 DB，防 LLM 误生成笛卡尔积返回 N×M 行
+    # 后用 list(result.mappings()) 把整个结果集物化到 Python 内存，OOM 沙箱进程。
+    # firewall 接受 "SELECT 1;"（单尾分号），但 PG 不允许 CTE body 内含 ;，须先剥离。
+    user_sql = sql.rstrip().rstrip(";").rstrip()
+    wrapped_sql = (
+        f"WITH __nlq_user_query AS ({user_sql}) "
+        f"SELECT * FROM __nlq_user_query LIMIT {max_rows + 1}"
+    )
+
+    # 第四关：执行 + 异常类型化
     try:
-        result = await session.execute(text(sql))
+        result = await session.execute(text(wrapped_sql))
     except DBAPIError as exc:
         # asyncpg QueryCanceledError 透过 sqlalchemy DBAPIError 包装上来
         if "canceling statement due to statement timeout" in str(exc):
@@ -123,11 +131,11 @@ async def run_safe_query(
             ) from exc
         raise
 
-    # 第四关：行数上限
+    # 行数上限：DB 已 LIMIT N+1，返回 == N+1 即触发；fetch 上限恒定 N+1 行
     rows = list(result.mappings())
     if len(rows) > max_rows:
         raise RowLimitExceeded(
-            f"NLQ 查询返回 {len(rows)} 行，超过沙箱上限 {max_rows}"
+            f"NLQ 查询超过沙箱上限 {max_rows} 行（DB LIMIT {max_rows + 1} 触发）"
         )
 
     cols = list(rows[0].keys()) if rows else []
