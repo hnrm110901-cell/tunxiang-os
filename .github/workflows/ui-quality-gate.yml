@@ -50,8 +50,8 @@ jobs:
           node-version: 18
 
       # 4 道闸门并联（任一 fail 整体 fail）
-      - name: lint:no-antd-in-store
-        run: node scripts/lint-ui/no-antd-in-store.mjs
+      - name: lint:no-antd-in-store (strict — #268 已清零)
+        run: node scripts/lint-ui/no-antd-in-store.mjs --strict
 
       - name: lint:hardcoded-color (strict — #273 已清零)
         run: node scripts/lint-ui/hardcoded-color.mjs --strict

@@ -128,9 +128,10 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
                 style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 4,
-                  padding: '8px 14px',
-                  minHeight: 40,
+                  gap: 6,
+                  padding: '0 16px',
+                  minHeight: 48,
+                  minWidth: 48,
                   border: 'none',
                   borderRadius: 6,
                   background: viewMode === mode ? txColors.primary : 'transparent',
@@ -141,6 +142,8 @@ export const TableManagementPage: React.FC<TableManagementPageProps> = ({
                   transition: 'background 200ms ease',
                   fontFamily: 'inherit',
                 }}
+                aria-pressed={viewMode === mode}
+                aria-label={`切换至${VIEW_CONFIG[mode].label}视图`}
               >
                 <span>{VIEW_CONFIG[mode].icon}</span>
                 <span>{VIEW_CONFIG[mode].label}</span>

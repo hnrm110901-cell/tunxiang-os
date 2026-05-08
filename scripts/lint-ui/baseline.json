@@ -12,7 +12,7 @@
     "tap-target": "包含 base-theme.ts 已 deprecated 的 44px legacy（S1-08 #251 同步移除 shim 时降）",
     "font-size": "需扩展跟踪 issue（packages/tx-touch 多组件 caption/spec/badge 仍用 13-15px 写死）"
   },
-  "no-antd-in-store": 3,
+  "no-antd-in-store": 0,
   "hardcoded-color": 0,
   "tap-target": 447,
   "font-size": 1711,

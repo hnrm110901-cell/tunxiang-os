@@ -155,24 +155,26 @@ const AreaPanel: React.FC<{
                   }}>
                     {getStatusText(table.status)}
                   </span>
-                  {/* 关键字段标签组（替代 antd Tag） */}
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {/* 关键字段标签组（替代 antd Tag）— 触控对齐宪法 §3.2 (≥ 48px) */}
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                     {topFields.map((field) => (
                       <button
                         key={field.key}
                         type="button"
                         onClick={() => onFieldClick(table.table_no, field)}
                         style={{
-                          padding: '4px 10px',
-                          borderRadius: 6,
+                          padding: '0 14px',
+                          borderRadius: 8,
                           background: getAlertBgColor(field.alert),
                           border: '1px solid rgba(255,255,255,0.12)',
                           cursor: 'pointer',
-                          fontSize: 13,
+                          fontSize: 16,
                           color: '#fff',
                           fontFamily: 'inherit',
-                          minHeight: 32,
+                          minHeight: 48,
+                          minWidth: 48,
                         }}
+                        aria-label={`${table.table_no} ${field.label}: ${field.value}`}
                       >
                         {field.label}: {field.value}
                       </button>
