@@ -1,3 +1,54 @@
+## 2026-05-08 Sprint 4 启动 + S4-01 第一刀（PR #293 / T2）
+
+### 今日完成
+
+**Sprint 4 issue 全建（Epic #292 + 4 子 issue）**
+- #292 Epic 总览（M2 W3-W4 提前启动，原 dev plan W7-W8）
+- #288 [S4-01] AgentConsole.chat 升级 + Cmd+J 全局唤起 — 5 人天 T2 ← **本 PR #293**
+- #289 [S4-02] NLQ → tx-brain → SQL 沙箱 — 5 人天 T1（必须 TDD + DEMO）
+- #290 [S4-03] NLQ → 三类操作 + 二次确认 + AgentDecisionLog — 5 人天 T1（必须 TDD + DEMO）
+- #291 [S4-04] Pin 洞察到驾驶舱 Feed — 3 人天 T3
+
+**S4-01 边界修订**
+- 原 issue 写"新建组件"撞到现状：AdminCommandPalette 已占 Cmd+K，AgentConsole 三 tab 已存在但 chat tab 空占位
+- 实际工作 = 升级 AgentConsole.chat + Cmd+J 唤起（不动 Cmd+K）
+- issue #288 body 已 `gh issue edit` 修订留痕
+
+**S4-01 第一刀（PR #293 / commit `7e698cc0`）**
+- 新增 `store/agentConsoleStore`（visible/tab/openChat 替代 ShellHQ + AgentConsole local useState）
+- 新增 `hooks/useAgentConsoleHotkey`（Cmd+J / Ctrl+J 监听）
+- 新增 `components/agent-chat/AdminAgentChatBox`（输入 + 流式 typewriter + A2UI Surface 内联渲染）
+- 新增 `components/agent-chat/mockSSE`（StreamEvent 协议契约 — S4-02 接通后替换实现，签名不变）
+- 复制 `components/a2ui/*` 从 web-pos（**决策 C**：S4-01 用 copy 走通链路，Sprint 4 收尾再抽 packages/tx-a2ui）
+- 修改 ShellHQ + AgentConsole + App.tsx 接入 store/hook
+- 不动：AdminCommandPalette / AgentConsole 的 feed/audit tab / ShellHQ 整体布局
+
+### 数据变化
+- 新增 issue：5 个（Sprint 4 Epic + 4 子）
+- 新增前端文件：4 个（store + hook + 2 chat 组件）
+- 复制前端文件：3 个（A2UI 三件套）
+- 修改前端文件：3 个（ShellHQ / AgentConsole / App.tsx）
+- 新增测试：0（Tier 2 — 集成测试 + 浏览器手动验证；vitest 框架推迟到 typecheck-web-admin CI follow-up）
+- typecheck（web-admin local）：我新加文件 0 错误（pre-existing 错误未改）
+
+### 关键决策
+1. **A2UI 共享路径 = 决策 C**：S4-01 用 copy 走链路，Sprint 4 收尾再抽 `packages/tx-a2ui/`（避免 A2UI 协议快速演化期 + S4-01 被 packages 重构拖慢）
+2. **快捷键分配 = 选项 X**：Cmd+K 保留命令面板 / Cmd+J 唤起 AI（业界 Linear / Notion 模式，不破坏现有肌肉记忆）
+3. **actionId 白名单细化 = 4 个**（菜单上下架 / 改价 / 86 / 排班）— 原 issue 写"三类"细化为 4 个 actionId 利于 RLS+payload 校验单测覆盖
+4. **mockSSE 协议契约固化** — StreamEvent 联合类型在 mock 阶段就锁死，S4-02 接通真接口时只换实现不换签名
+
+### 遗留问题
+- web-admin pre-existing tsc 错误 ~50+（GeoSEO / Reputation / Alliance 等页面）— typecheck-web-admin CI 落地前需先清零（沿用 #268 web-pos 模式）
+- pnpm-lock.yaml 在 main 上有 #269 留下的 drift（packages/tx-touch storybook 6 个依赖未同步）— 影响 frozen-lockfile install，本 PR 已隔离不污染
+- web-admin 当前未装 vitest / Storybook 框架
+- A2UIRenderer 复制后双源（web-pos + web-admin）— Sprint 4 收尾抽 packages 前期间，A2UI 协议变更需双改
+
+### 明日计划
+- S4-01 follow-up：IndexedDB 7 天历史 / typecheck-web-admin CI（先清零再 enforce）
+- S4-02 启动（T1，SQL 沙箱 + RLS 反测，必须 TDD）
+
+---
+
 ## 2026-05-08 M2-W0 + Sprint 3 全冲：10 issue 闭环（A 路线 + Sprint 3）
 
 ### 今日完成（按时间顺序）

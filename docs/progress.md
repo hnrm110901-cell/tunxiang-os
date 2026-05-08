@@ -1,3 +1,83 @@
+## 2026-05-08 14:30 · S4-01 第一刀 PR #293（commit `7e698cc0`）
+
+### 完成状态
+- [x] AgentConsole.chat 升级为完整对话面板（输入 + 流式 typewriter + A2UI Surface 内联渲染）
+- [x] Cmd+J / Ctrl+J 全局快捷键唤起（不动 Cmd+K）
+- [x] mockSSE StreamEvent 协议契约固化（token / surface / done / error）
+- [x] A2UIRenderer 复制到 web-admin（决策 C）
+- [x] ShellHQ + AgentConsole + App.tsx 接入 store/hook
+- [x] PR #293 已 push，linked to #288
+- [ ] IndexedDB 7 天历史（follow-up）
+- [ ] typecheck-web-admin CI（follow-up，需先清零 pre-existing ~50+ 错误）
+- [ ] Storybook 框架（web-admin 当前未装）
+
+### 关键决策
+- **决策 47：A2UI 共享 = 决策 C** — S4-01 copy 走链路，Sprint 4 收尾抽 packages/tx-a2ui，避免 A2UI 协议快速演化期两 app 同步压力
+- **决策 48：快捷键分配 = X** — Cmd+K 保留命令面板（AdminCommandPalette 175 行已成型）/ Cmd+J 唤起 AI（业界 Linear/Notion 模式）
+- **决策 49：S4-01 边界修订** — 原 issue 写"新建组件"撞到现状（AgentConsole.chat tab 已存在但只 emoji 占位），改为升级而非新建；issue #288 body 已 `gh issue edit` 修订
+- **决策 50：mockSSE 协议契约 = StreamEvent 联合类型** — token / surface / done / error 四种事件，S4-02 接通后只换实现不换签名
+
+### 下一步
+- 等 PR #293 review + merge
+- 启动 S4-02（T1，SQL 沙箱 + RLS 反测，必须 TDD）
+
+### 已知风险
+- web-admin pre-existing tsc 错误 ~50+（GeoSEO / Reputation / Alliance 等页面）— typecheck-web-admin CI 落地前需先清零（沿用 #268 web-pos 模式）
+- pnpm-lock.yaml 在 main 上有 #269 留下的 drift（packages/tx-touch storybook 6 个依赖未同步）— 影响 frozen-lockfile install，本 PR 已隔离不污染
+- A2UIRenderer 复制后双源（web-pos + web-admin）— Sprint 4 收尾抽 packages 前期间，A2UI 协议变更需双改
+
+---
+
+## 2026-05-08 13:00 · Sprint 4 启动 — 5 issue 全建（Epic #292 + 4 子）
+
+### 完成状态
+- [x] Epic #292 Sprint 4 — Admin AI NLQ（M2 W3-W4 提前，原 W7-W8）
+- [x] #288 [S4-01] AgentConsole.chat + Cmd+J — 5 人天 T2
+- [x] #289 [S4-02] NLQ → tx-brain → SQL 沙箱 — 5 人天 T1
+- [x] #290 [S4-03] NLQ → 三类操作 + AgentDecisionLog — 5 人天 T1
+- [x] #291 [S4-04] Pin 洞察到驾驶舱 Feed — 3 人天 T3
+
+### 关键决策
+- **决策 44：Sprint 4 共用 frontend / backend label，不新建 sprint-N 标签** — 跟 #283 Sprint 3 一致，避免标签膨胀
+- **决策 45：actionId 白名单 4 个**（菜单上下架 / 改价 / 86 / 排班）— 原 handoff 写"三类"细化为 4 个 actionId 利于 RLS+payload 校验单测覆盖
+- **决策 46：S4-01 mock SSE 优先**（不阻塞前端推进）— S4-02 接通后替换 mockSSE 实现即可，协议契约 StreamEvent 已固化
+
+### 下一步
+- S4-01 第一刀实施
+
+### 已知风险
+- S4-02/03 是 T1 必须 TDD + DEMO 验收，进度风险高于 T2
+- LLM 生成 SQL 偶发非确定性（缓解：白名单 schema + 危险关键字防火墙）
+- tenant 越权是致命风险（缓解：RLS 反测必跑 + Tier 1 TDD）
+
+---
+
+## 2026-05-08 12:00 · M2-W0 follow-up + Sprint 3 全冲（10 issue 闭环）
+
+### 完成状态
+- [x] M2-W0 follow-up 5 PR：#273 hardcoded-color strict / #267 web-pos typecheck enforce / #270 useOffline DI / #268 tap-target strict / #269 tx-touch Storybook
+- [x] Sprint 3 4 PR：#281 A2UI 白名单 14→20 / #282 协议文档 / #284 Surface 生成器 ×3 / #285 TXAgentAlert TTS
+- [x] Epic #283 关闭
+- [x] 33 个新测试（前端 23 + 后端 10）
+- [x] CI 闸门：no-antd strict 0 / hardcoded-color strict 0 / typecheck-web-pos enforce
+
+### 关键决策
+- **决策 40：alpha overlay 用 @lint-ignore-color 而非新增 token** — StatCard 8-digit hex 无对应 token，新增扩大语义混乱
+- **决策 41：tx-tokens 用结构化 ThemeConfig 而非 import antd** — 保 tx-tokens 零 antd 依赖
+- **决策 42：DI 第二参数可选** — replayOperation 向后兼容 12 老测试
+- **决策 43：Sprint 3 提前 1 月启动** — dev plan W5-W6 → 2026-05-08 实际启动，M2-W0 加速买 buffer
+
+### 下一步
+- Sprint 4 启动（M2 W3-W4 提前）
+
+### 已知风险
+- #260 商米 T2 现场（待客户协调）
+- Storybook 4 组件待补（TXScrollList/Selector/PaymentPanel + TXAgentAlert 当日已补）
+- web-admin pre-existing tsc 错误（不在 Sprint 3 scope）
+- font-size baseline 1710 减负（M2 中后期）
+
+---
+
 ## 2026-05-07 23:03 · Sprint 2 #262 闸门评审 → 9/10 + M1 通过
 
 ### 完成状态
