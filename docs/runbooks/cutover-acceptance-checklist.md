@@ -22,7 +22,7 @@ pytest tests/tier1/ -v --tb=short --maxfail=1 2>&1 | tee /tmp/tier1-result.log
 **验收**：
 - [ ] Pass rate = 100%（任何 fail 即立即回滚）
 - [ ] 含以下 8 项 Tier 1 域全绿：
-  - 订单状态机 / 支付 Saga / RLS 隔离 / POS 写入 / 存酒押金 / 全电发票 / CRDT / 三条硬约束
+  - 订单状态机 / 支付 Saga / RLS 隔离 / POS 写入 / 存酒押金 / 全电发票 / LWW 冲突解析（终态豁免）/ 三条硬约束
 
 ---
 
@@ -105,7 +105,7 @@ curl --max-time 5 "http://staging-node-ip:30001/api/v1/orders" 2>&1 | grep -E "t
 
 ---
 
-## 5️⃣ 断网 4h 恢复（CRDT / sync-engine）
+## 5️⃣ 断网 4h 恢复（LWW + 终态豁免 / sync-engine）
 
 ```bash
 # 在 staging-edge-1 (Mac mini staging 环境) 模拟断网
@@ -132,7 +132,7 @@ diff /tmp/edge_count.txt /tmp/cloud_count.txt
 
 **验收**：
 - [ ] 边缘 PG 订单数 == 云端 PG 订单数
-- [ ] 无 CRDT 冲突（检查 `crdt_conflicts_total` 指标 = 0）
+- [ ] 无未收敛冲突（检查 `lww_unresolved_conflicts_total` 指标 = 0；指标名仍可能为 `crdt_conflicts_total` — 见 sync-engine /metrics）
 - [ ] sync-engine 无 fatal error log（grep "level=ERROR" /var/log/sync-engine/*.log）
 
 ---

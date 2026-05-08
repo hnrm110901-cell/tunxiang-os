@@ -75,7 +75,7 @@
 | 储值消费原子性（`consume`）| `WHERE balance >= amt RETURNING` | ✅ |
 | 宴会定金抵扣（`apply_deposit`）| `FOR UPDATE` 行锁 | ✅ |
 | RLS 多租户隔离 | `app.tenant_id` session 变量 | ✅ |
-| CRDT 冲突解析 | 云端为主 | ✅ |
+| LWW 冲突解析（终态豁免） | 云端为主 + 已落终态订单豁免 | ✅ |
 
 ### 依赖与构建可重现性
 
@@ -103,7 +103,7 @@
 | 5 | 菜单模板 | 早期 | ✅ |
 | 6 | 薪资引擎 | v120 | ✅ + v265 sales_target Tier 1 |
 | 7 | 审批流 | v121 | ✅ |
-| 8 | 同步引擎 | edge | ✅ CRDT + 断网 4h E2E 3/3 green |
+| 8 | 同步引擎 | edge | ✅ LWW（CRDT 子集）+ 终态豁免 + 断网 4h E2E 3/3 green |
 | 9 | RLS 多租户隔离 | v063 | 🟡 PG.7 28 表 UPDATE policy 缺 WITH CHECK，v400/v401/v402（PR #187/#189/#192）+ lint（#186）+ CI 接入（#193）等 admin merge |
 | 10 | 外卖聚合 | 早期 | ✅ 美团/饿了么/抖音/小红书 |
 
