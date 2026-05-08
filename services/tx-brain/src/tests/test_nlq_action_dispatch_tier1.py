@@ -227,19 +227,25 @@ class TestHardConstraintsStubTier1:
 
 
 class TestConfirmationTokenTier1:
-    """confirmation_token 生成 — 防重放基础（PR2 升级 nonce）。"""
+    """confirmation_token 生成 — nonce 一次性（PR2 持久化 nonce 表防重放）。"""
 
     @pytest.mark.asyncio
-    async def test_same_request_yields_same_token(self):
-        """相同 req+diff → 相同 token（deterministic hash）。"""
+    async def test_same_request_yields_different_tokens_due_to_nonce(self):
+        """同 req 多次调用 → 不同 token（nonce 强制）。
+
+        Code review (#301) 反转语义：原 deterministic hash 让同 token 可被 PR2 多次
+        confirm（双花）；现在每次 nonce 不同，PR2 持久化 token 表后单次性使用。
+        """
         req = _req("menu.update_price", {"new_price_fen": 9900, "cost_fen": 5000})
         diff1 = await dispatch_dry_run(req)
         diff2 = await dispatch_dry_run(req)
-        assert gen_confirmation_token(req, diff1) == gen_confirmation_token(req, diff2)
+        token1 = gen_confirmation_token(req, diff1)
+        token2 = gen_confirmation_token(req, diff2)
+        assert token1 != token2, "nonce 必须让同 req 多次生成的 token 不同（防双花）"
 
     @pytest.mark.asyncio
     async def test_different_action_yields_different_token(self):
-        """不同 actionId → 不同 token，防止 token 跨 actionId 重用。"""
+        """不同 actionId → 不同 token（防 token 跨 actionId 重用）。"""
         req_price = _req("menu.update_price", {"new_price_fen": 9900})
         req_toggle = _req("menu.toggle_availability", {"toggle_to": "off"})
         diff_price = await dispatch_dry_run(req_price)
@@ -247,3 +253,12 @@ class TestConfirmationTokenTier1:
         assert gen_confirmation_token(req_price, diff_price) != gen_confirmation_token(
             req_toggle, diff_toggle
         )
+
+    @pytest.mark.asyncio
+    async def test_token_format_is_32_char_hex(self):
+        """token 必须是 32 字符十六进制（SHA256 截断），稳定 schema 给 PR2 nonce 表用。"""
+        req = _req("menu.update_price", {"new_price_fen": 9900})
+        diff = await dispatch_dry_run(req)
+        token = gen_confirmation_token(req, diff)
+        assert len(token) == 32
+        assert all(c in "0123456789abcdef" for c in token)

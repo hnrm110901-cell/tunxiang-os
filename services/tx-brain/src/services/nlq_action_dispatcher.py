@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 from typing import Any, Awaitable, Callable, Optional
 
 from .nlq_action_registry import assert_action_id_allowed
@@ -83,10 +84,14 @@ async def dispatch_dry_run(req: ActionRequest) -> DryRunDiff:
 
 
 def gen_confirmation_token(req: ActionRequest, diff: DryRunDiff) -> str:
-    """根据请求 + diff 生成确认 token（防重放：用户必须把 dry-run 阶段拿到的 token 回传）。
+    """根据请求 + diff + nonce 生成一次性确认 token（防重放：每次 dry-run 都不同）。
 
-    PR1 设计：deterministic hash（同 req+diff 对应同 token）。
-    PR2 升级：加 timestamp + 持久化 nonce 表防重放。
+    设计：每次调用注入 uuid.uuid4() nonce 入 hash payload，token 不可重现。
+    PR2 升级：把 token 持久化到 nonce 表，confirm 时 SELECT/UPDATE 标记已用。
+
+    Code review (#301) 修：原 deterministic hash 同 req+diff 永远产生同 token，
+    PR2 接 execute 时同一改价指令可被无限次提交（双花），必须从 PR1 就加 nonce
+    锁定 token 契约（PR2 改 hash 算法会破坏兼容性）。
     """
     payload = {
         "action_id": req.action_id,
@@ -94,6 +99,7 @@ def gen_confirmation_token(req: ActionRequest, diff: DryRunDiff) -> str:
         "operator_id": req.operator_id,
         "summary": diff.summary,
         "fields": diff.fields,
+        "nonce": uuid.uuid4().hex,  # 一次性，PR2 持久化 token 防重放
     }
     return hashlib.sha256(
         json.dumps(payload, sort_keys=True, ensure_ascii=False).encode("utf-8")
