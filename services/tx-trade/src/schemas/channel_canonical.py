@@ -14,7 +14,7 @@ E1 范围（红线：本模块为新增契约，不修改现有适配器）：
   - CanonicalOrderRecord    — DB 读模型（GET 路由响应 data 字段）
 
 后续 E2/E3：
-  - 各适配器（pinjin/aiqiwei/meituan/eleme/douyin/...）以纯函数方式
+  - 各适配器（pinzhi_pos/aoqiwei/meituan/eleme/douyin/...）以纯函数方式
     将渠道原始报文映射为 CanonicalOrderRequest，实现彻底解耦
 """
 
@@ -67,7 +67,7 @@ class CanonicalOrderItem(BaseModel):
 class CanonicalOrderRequest(BaseModel):
     """POST /channels/canonical/orders 入参。
 
-    适配器侧（pinjin/aiqiwei/meituan/...）将渠道原始报文映射为本模型。
+    适配器侧（pinzhi_pos/aoqiwei/meituan/...）将渠道原始报文映射为本模型。
     payload 字段保留原始报文，后续若 mapping 需升级可基于 payload 重建。
     """
 
