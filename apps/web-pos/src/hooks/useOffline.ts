@@ -74,6 +74,40 @@ interface UseOfflineResult {
   clearQueue: () => Promise<void>;
 }
 
+/**
+ * useOffline 可选 DI 参数。所有字段都有默认值（保留 zero-arg 调用 API）。
+ *
+ * 用途：
+ *   - 单测/Storybook 注入 mock fetch / 自定义 replay
+ *   - 跨终端复用（如 KDS 离线模式）只需改 apiBaseUrl + customReplay
+ *   - 业务知识从 hook 模块中抽离，hook 仅负责"队列持久化 + 网络监听 + 调度"
+ */
+export interface UseOfflineOptions {
+  /** API 基址。默认: import.meta.env.VITE_API_BASE_URL */
+  apiBaseUrl?: string;
+  /** 多租户 ID（注入到 X-Tenant-ID）。默认: import.meta.env.VITE_TENANT_ID */
+  tenantId?: string;
+  /** 心跳检测路径。默认: /api/v1/health */
+  heartbeatPath?: string;
+  /** 心跳轮询间隔 (ms)。默认: 15_000 */
+  heartbeatIntervalMs?: number;
+  /** 同步重试次数上限。默认: 5 */
+  maxRetry?: number;
+  /**
+   * 自定义 replay 函数。提供后覆盖默认按 op.type 路由的内置逻辑。
+   * 用于：跨终端复用（不同 API 路径）、测试注入、未来 op 类型扩展。
+   */
+  customReplay?: (op: OfflineOperation, ctx: ReplayContext) => Promise<boolean>;
+}
+
+/** replayOperation 的 DI 上下文 */
+export interface ReplayContext {
+  apiBaseUrl: string;
+  tenantId: string;
+  /** 注入 fetch 实现（默认 globalThis.fetch），便于测试 */
+  fetch?: typeof fetch;
+}
+
 // ─── IndexedDB 工具 ─────────────────────────────────────────────────────────
 
 const DB_NAME = 'tunxiang_pos_offline';
@@ -141,21 +175,34 @@ async function clearAllOps(): Promise<void> {
 
 // ─── API 重放 ───────────────────────────────────────────────────────────────
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-const TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
+const ENV_API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const ENV_TENANT_ID = import.meta.env.VITE_TENANT_ID || '';
+
+const DEFAULT_REPLAY_CONTEXT: ReplayContext = {
+  apiBaseUrl: ENV_API_BASE_URL,
+  tenantId: ENV_TENANT_ID,
+};
 
 /**
  * 单条 op 重放。R-补2-1（Tier1）：必须带 `X-Idempotency-Key` header，让 server
  * replay cache 在跨会话/重启场景下拦截重复请求，防止同单双扣。
  *
+ * @param op  离线操作
+ * @param ctx 可选 DI 上下文。未提供时从环境变量取（保持原行为，单测便于注入）。
+ *
  * 暴露为模块级 export 便于单测，非业务 UI 直接调用。
  */
-export async function replayOperation(op: OfflineOperation): Promise<boolean> {
+export async function replayOperation(
+  op: OfflineOperation,
+  ctx: ReplayContext = DEFAULT_REPLAY_CONTEXT,
+): Promise<boolean> {
   const idempotencyKey = deriveIdempotencyKey(op);
+  const { apiBaseUrl, tenantId } = ctx;
+  const fetchImpl = ctx.fetch ?? fetch;
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'X-Idempotency-Key': idempotencyKey,
-    ...(TENANT_ID ? { 'X-Tenant-ID': TENANT_ID } : {}),
+    ...(tenantId ? { 'X-Tenant-ID': tenantId } : {}),
   };
 
   let path = '';
@@ -192,7 +239,7 @@ export async function replayOperation(op: OfflineOperation): Promise<boolean> {
       return false;
   }
 
-  const resp = await fetch(`${BASE_URL}${path}`, {
+  const resp = await fetchImpl(`${apiBaseUrl}${path}`, {
     method: 'POST',
     headers,
     body,
@@ -201,15 +248,22 @@ export async function replayOperation(op: OfflineOperation): Promise<boolean> {
   return json.ok;
 }
 
-// ─── 心跳检测 ───────────────────────────────────────────────────────────────
+// ─── 心跳检测 默认值 ────────────────────────────────────────────────────────
 
-const HEARTBEAT_URL = `${BASE_URL}/api/v1/health`;
-const HEARTBEAT_INTERVAL_MS = 15_000;
-const MAX_RETRY = 5;
+const DEFAULT_HEARTBEAT_PATH = '/api/v1/health';
+const DEFAULT_HEARTBEAT_INTERVAL_MS = 15_000;
+const DEFAULT_MAX_RETRY = 5;
 
 // ─── Hook ───────────────────────────────────────────────────────────────────
 
-export function useOffline(): UseOfflineResult {
+export function useOffline(options: UseOfflineOptions = {}): UseOfflineResult {
+  const apiBaseUrl = options.apiBaseUrl ?? ENV_API_BASE_URL;
+  const tenantId = options.tenantId ?? ENV_TENANT_ID;
+  const heartbeatPath = options.heartbeatPath ?? DEFAULT_HEARTBEAT_PATH;
+  const heartbeatIntervalMs = options.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS;
+  const maxRetry = options.maxRetry ?? DEFAULT_MAX_RETRY;
+  const customReplay = options.customReplay;
+
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [offlineQueue, setOfflineQueue] = useState<OfflineOperation[]>([]);
   const [syncing, setSyncing] = useState(false);
@@ -236,9 +290,10 @@ export function useOffline(): UseOfflineResult {
 
   // 心跳检测 — 补偿 navigator.onLine 不可靠的场景
   useEffect(() => {
+    const heartbeatUrl = `${apiBaseUrl}${heartbeatPath}`;
     const doHeartbeat = async () => {
       try {
-        const resp = await fetch(HEARTBEAT_URL, {
+        const resp = await fetch(heartbeatUrl, {
           method: 'GET',
           cache: 'no-store',
           signal: AbortSignal.timeout(5000),
@@ -253,11 +308,11 @@ export function useOffline(): UseOfflineResult {
       }
     };
 
-    heartbeatRef.current = setInterval(doHeartbeat, HEARTBEAT_INTERVAL_MS);
+    heartbeatRef.current = setInterval(doHeartbeat, heartbeatIntervalMs);
     return () => {
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
     };
-  }, []);
+  }, [apiBaseUrl, heartbeatPath, heartbeatIntervalMs]);
 
   // 初始化：加载队列
   useEffect(() => {
@@ -298,16 +353,19 @@ export function useOffline(): UseOfflineResult {
     syncingRef.current = true;
     setSyncing(true);
 
+    const replayCtx: ReplayContext = { apiBaseUrl, tenantId };
+    const replay = customReplay ?? ((op: OfflineOperation) => replayOperation(op, replayCtx));
+
     try {
       const ops = await getAllOps();
       const sorted = ops.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
       for (const op of sorted) {
         try {
-          const ok = await replayOperation(op);
+          const ok = await replay(op, replayCtx);
           if (ok) {
             await deleteOp(op.id);
-          } else if (op.retryCount >= MAX_RETRY) {
+          } else if (op.retryCount >= maxRetry) {
             console.error('离线操作重试次数超限，已丢弃:', op);
             await deleteOp(op.id);
           } else {
@@ -324,7 +382,7 @@ export function useOffline(): UseOfflineResult {
       setSyncing(false);
       await refreshQueue();
     }
-  }, [refreshQueue]);
+  }, [refreshQueue, apiBaseUrl, tenantId, customReplay, maxRetry]);
 
   // 清空队列
   const clearQueue = useCallback(async () => {
