@@ -1,0 +1,129 @@
+"""NLQ SQL 沙箱执行器 — S4-02 Tier 1 后端核心。
+
+职责：
+  1. 危险关键字防火墙（assert_safe_sql）— 第一关：拒绝写入语句、多语句、SECURITY DEFINER
+  2. PG statement_timeout 注入（防 LLM 输出长查询拖死 DB）
+  3. 行数上限 enforce（防意外超大结果集占用内存 / 超长响应）
+  4. 异常类型化（UnsafeSqlError / SandboxTimeoutError / RowLimitExceeded）
+
+调用约定（路由层负责）：
+  - 用 TenantSession(tenant_id) 注入 app.tenant_id（RLS 强制） + 校验 UUID
+  - 用 readonly DB role 连接（生产部署：tx_nlq_readonly，仅 SELECT 权限）
+  - 本模块在已注入 tenant 的 session 上跑
+
+S4-02 Issue #289 / Tier 1：read-only + RLS 不可绕 + 防火墙 + 超时 + 行限
+
+后续优化（follow-up）：
+  - DB 层 LIMIT 包装（WITH user_query AS (...) SELECT * FROM user_query LIMIT N+1）
+    现在 Python 层 enforce — 10001 行结果集仍会全量 fetch；max_rows=10000 时影响有限
+  - 沙箱 result.columns 含全部映射（暂用 rows[0].keys() 快速派生）
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any, Mapping
+
+from sqlalchemy import text
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from .nlq_keyword_firewall import UnsafeSqlError, assert_safe_sql
+
+# 行数上限（防 LLM 输出无 LIMIT 全表查询）
+DEFAULT_MAX_ROWS = 10000
+
+# PG statement_timeout（防 LLM 输出 pg_sleep / 笛卡尔积长查询）
+DEFAULT_TIMEOUT_MS = 5000
+
+
+class SandboxTimeoutError(RuntimeError):
+    """PG statement_timeout 触发（asyncpg QueryCanceledError）。"""
+
+
+class RowLimitExceeded(RuntimeError):
+    """结果集行数超过沙箱上限。"""
+
+
+@dataclass
+class SandboxResult:
+    rows: list[Mapping[str, Any]] = field(default_factory=list)
+    row_count: int = 0
+    columns: list[str] = field(default_factory=list)
+    truncated: bool = False
+
+
+__all__ = (
+    "DEFAULT_MAX_ROWS",
+    "DEFAULT_TIMEOUT_MS",
+    "RowLimitExceeded",
+    "SandboxResult",
+    "SandboxTimeoutError",
+    "UnsafeSqlError",
+    "run_safe_query",
+)
+
+
+async def run_safe_query(
+    session: AsyncSession,
+    sql: str,
+    *,
+    max_rows: int = DEFAULT_MAX_ROWS,
+    timeout_ms: int = DEFAULT_TIMEOUT_MS,
+) -> SandboxResult:
+    """在已注入 tenant_id 的 session 上跑 NLQ SQL，按沙箱规则约束。
+
+    Tier 1 安全前置（调用方负责）：
+      - TenantSession(tenant_id) 注入 app.tenant_id（RLS 强制）
+      - readonly DB role 连接（不能用 superuser）
+
+    Args:
+        session: 已注入 app.tenant_id 的 AsyncSession
+        sql: LLM 生成的 SQL（仅 SELECT/WITH）
+        max_rows: 行数上限（默认 10000）
+        timeout_ms: PG statement_timeout（默认 5000ms）
+
+    Raises:
+        UnsafeSqlError: SQL 含写入关键字 / 多语句 / SECURITY DEFINER 等
+        SandboxTimeoutError: PG statement_timeout 触发
+        RowLimitExceeded: 结果集行数 > max_rows
+        ValueError: timeout_ms 非正数
+    """
+    # 第一关：防火墙（在 DB 调用前）
+    assert_safe_sql(sql)
+
+    # 校验 timeout_ms（PG SET 命令不接受 bind parameter，必须强制 int 防注入）
+    timeout_ms_int = int(timeout_ms)
+    if timeout_ms_int <= 0:
+        raise ValueError(f"timeout_ms 必须为正整数，收到 {timeout_ms!r}")
+
+    # 第二关：超时注入（SET LOCAL 仅本事务生效，与 set_config('app.tenant_id') 同 session）
+    await session.execute(
+        text(f"SET LOCAL statement_timeout = '{timeout_ms_int}ms'")
+    )
+
+    # 第三关：执行 + 异常类型化
+    try:
+        result = await session.execute(text(sql))
+    except DBAPIError as exc:
+        # asyncpg QueryCanceledError 透过 sqlalchemy DBAPIError 包装上来
+        if "canceling statement due to statement timeout" in str(exc):
+            raise SandboxTimeoutError(
+                f"NLQ 查询超时（{timeout_ms_int}ms 上限触发）"
+            ) from exc
+        raise
+
+    # 第四关：行数上限
+    rows = list(result.mappings())
+    if len(rows) > max_rows:
+        raise RowLimitExceeded(
+            f"NLQ 查询返回 {len(rows)} 行，超过沙箱上限 {max_rows}"
+        )
+
+    cols = list(rows[0].keys()) if rows else []
+    return SandboxResult(
+        rows=rows,
+        row_count=len(rows),
+        columns=cols,
+        truncated=False,
+    )
