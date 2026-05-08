@@ -3,7 +3,7 @@ name: Tier 1 Gate
 # Tier 1 契约测试门禁（CLAUDE.md § 17 + § 20）
 #
 # Tier 1 路径：订单状态机 / 支付 Saga / RLS 隔离 / POS 数据 / 存酒押金 /
-#              全电发票 / CRDT 冲突 / 三条硬约束
+#              全电发票 / LWW 冲突解析（终态豁免）/ 三条硬约束
 #
 # 任何修改 Tier 1 路径或其测试文件的 PR 必须全绿。
 # CI 分组跑（不同 service 的 conftest.py 会冲突，不能一次性全跑）。
@@ -20,7 +20,7 @@ on:
       - 'scripts/audit/**'
       # Tier 1 路径 — CLAUDE.md § 17 列表：
       # 订单状态机 + 支付 Saga + 存酒/押金 + POS 数据 + 全电发票 +
-      # CRDT 冲突 + 三条硬约束 + RLS
+      # LWW 冲突解析（终态豁免）+ 三条硬约束 + RLS
       - 'services/tx-trade/src/services/order_service.py'
       - 'services/tx-trade/src/services/cashier_engine.py'          # 订单状态机
       - 'services/tx-trade/src/services/payment_saga_service.py'
@@ -43,7 +43,8 @@ on:
       # Agent 三条硬约束（毛利/食安/客户体验 checker）
       - 'services/tx-agent/src/constraints/**'
       - 'services/tx-agent/src/services/constraint_checker*.py'
-      # CRDT 冲突解析
+      # LWW 冲突解析（终态豁免）
+      - 'edge/sync-engine/src/lww_register.py'
       - 'edge/sync-engine/src/conflict_resolver.py'
       - 'edge/sync-engine/src/offline_sync_service.py'
       - 'edge/sync-engine/src/sync_engine.py'

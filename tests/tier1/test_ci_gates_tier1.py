@@ -117,7 +117,7 @@ class TestTier1GateWorkflow:
         assert "shared/db-migrations/versions/**" in source
 
     def test_triggers_on_sync_engine(self, source):
-        """edge/sync-engine 变更触发（CRDT 相关）"""
+        """edge/sync-engine 变更触发（LWW 冲突解析 / 终态豁免）"""
         assert "edge/sync-engine/" in source
 
     def test_has_discover_job(self, source):
