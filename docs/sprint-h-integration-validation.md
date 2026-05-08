@@ -124,7 +124,7 @@ psql $DATABASE_URL -v tenant_id="'$DEMO_TENANT_ID'" \
 ### Mac mini 故障
 
 降级方案：切云端直连 POS。演示无 Core ML 边缘加速，延迟从 200ms 升到 800ms。
-恢复后自动同步 + CRDT 冲突解析。
+恢复后自动同步 + LWW 冲突解析（终态豁免）。
 
 ### Claude API 不可用
 

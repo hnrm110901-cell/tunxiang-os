@@ -116,7 +116,7 @@ bash scripts/demo-reset.sh
 
 - 存酒押金多次续存（wine_storage） — §19 二审中
 - 支付 Saga 长链超时回滚 — Tier 1 待审
-- CRDT 4 小时断网恢复 — 不要现场制造断网
+- LWW 4 小时断网恢复（终态豁免）— 不要现场制造断网
 - 金税四期发票实发 — 只演申请/预览，不发送
 - Master Agent 链式编排 — Wave 4 H2 在做，不展示
 - "全量同步"按钮（含 broad except 的适配器） — 不要触发

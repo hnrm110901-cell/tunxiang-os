@@ -91,7 +91,7 @@ L0  设备适配层      安卓POS（商米 SDK）+ Mac mini（Core ML）
 ### 4.1 断网 4h 验证
 
 - 演示 nightly E2E：`infra/nightly/offline-e2e-results.json` 连续 3 日绿
-- **机制**：Mac mini 本地 PG 副本 + CRDT 冲突解析，断网期间门店收银不受影响
+- **机制**：Mac mini 本地 PG 副本 + LWW 冲突解析（CRDT 子集，已落终态订单豁免合并覆盖），断网期间门店收银不受影响
 
 ### 4.2 数据库备份
 

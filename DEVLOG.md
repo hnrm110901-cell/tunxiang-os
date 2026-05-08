@@ -56,6 +56,50 @@
 
 ---
 
+## 2026-05-08 P0-4 文档对齐：CRDT → LWW + 终态豁免（T3）
+
+### 完成
+
+**Constitution 层（CLAUDE.md）**
+- §17 Tier 1 路径表 `CRDT 冲突解析` → `LWW 冲突解析（终态豁免）`，核心文件由 `—` → `lww_register.py`
+- §20 Tier 1 用例方法名 `test_offline_4h_crdt_no_data_loss` → `test_offline_4h_lww_no_data_loss`，docstring 加 "LWW 收敛 + 终态豁免"
+- §22 Week 8 验收门槛 `CRDT 验证` → `LWW + 终态豁免验证`
+
+**测试 / CI**
+- `tests/tier1/test_offline_crdt_tier1.py` 头部 docstring 加术语解释（LWW = CRDT 子集；终态豁免 = 已落 paid/cancelled 等终态订单不再合并覆盖；算法实现指针 → `lww_register.py`）
+- `tests/tier1/test_ci_gates_tier1.py:120` 注释更新（LWW 冲突解析 / 终态豁免）
+- `.github/workflows/tier1-gate.yml` 顶部注释 + line 23/46 段头同步；Tier 1 path trigger 增加 `edge/sync-engine/src/lww_register.py`
+- 文件名 `test_offline_crdt_tier1.py` 不改（外部引用面广，scope 风险）；docstring 已自洽
+- `tests/tier1/test_ci_gates_tier1.py` 全集 51 测试 pass
+
+**对外文案 / 售前**
+- `README.md` ×2 sites：路径表 + 十大差距修复进度
+- `docs/demo/scripts/01-operations-story.md` ×2 sites：日结演示亮点 + Q&A 断网回答
+- `docs/demo/scripts/02-it-architecture.md` 灾难恢复机制
+- `docs/merchant-playbooks/{README,sgc,czyz}.md` 演示禁忌项
+- `docs/runbooks/cutover-acceptance-checklist.md` ×3 sites：8 项 Tier 1 域 + §5 标题 + 验收指标命名说明（保留 `crdt_conflicts_total` 历史指标名兼容说明）
+- `docs/sprint-h-integration-validation.md` Mac mini 故障降级
+- `docs/ui-ux-development-plan-2026-q3-q4.md` S8-05 sprint 任务名
+- `docs/ui-ux-gap-analysis-2026-05.md` 验收对照表
+
+**故意保留 CRDT 字样的位置**
+- 历史 DEVLOG / progress 条目（不改写历史）
+- `edge/sync-engine/src/lww_register.py` docstring（"CRDT (LWW-Register)" 是技术上准确表述）
+- `docs/m1-gate-review-2026-05-07.md` / `docs/audit-regression-2026-07.md` / `docs/w8-go-no-go-self-audit-2026-05-04.md`（时间锚点档案）
+- `shared/db-migrations/versions/v393_sync_checkpoints_token.py:1` migration 头注释（W12-3 时点的描述）
+- `.claude/agents/docs-writer-zh.md`（agent 提示词，独立维护）
+- `cutover-acceptance-checklist.md` 指标 `crdt_conflicts_total`（运行时指标名，改名需 sync-engine /metrics 同步迁移）
+
+### 数据变化
+- 修改文件：14 个（CLAUDE.md / README.md / 9 docs / 3 tests-and-yml）
+- 新增/删除文件：0 个
+- 新增测试：0 个（tier1-gate-test 仍 51 全绿）
+
+### 决策追加（45）
+- **45** P0-4 G1=A 落地：术语统一为 "LWW + 终态豁免"，技术准确度 ↑（从泛 CRDT 到 LWW-Register 子集）+ 业务可读性 ↑（"终态豁免" 直接对应已结账订单不被翻盘的承诺）。文件改名延后做以避免 scope 蔓延。
+
+---
+
 ## 2026-05-08 Sprint 4 启动 + S4-01 第一刀（PR #293 / T2）
 
 ### 今日完成

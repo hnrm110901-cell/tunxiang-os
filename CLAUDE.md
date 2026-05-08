@@ -595,7 +595,7 @@ asyncio.create_task(emit_event(
 | POS 数据写入与结算 | tx-trade | adapters/pinjin / aiqiwei / meituan |
 | 存酒 / 押金 / 协议挂账 | tx-trade / tx-finance | wine_storage_service.py |
 | 全电发票 / 金税四期 | tx-finance | invoice_service.py |
-| CRDT 冲突解析 | edge/sync-engine | — |
+| LWW 冲突解析（终态豁免） | edge/sync-engine | lww_register.py |
 | 三条硬约束校验 | tx-agent | 毛利底线 / 食安合规 / 客户体验 |
 
 **Tier 1 验收标准：**
@@ -717,8 +717,8 @@ class TestOrderStateMachineTier1:
     def test_payment_timeout_saga_full_rollback(self):
         """支付超时后，座位状态/库存/积分全部回滚，无半状态"""
 
-    def test_offline_4h_crdt_no_data_loss(self):
-        """断网 4 小时重连后，订单数据无丢失、无冲突"""
+    def test_offline_4h_lww_no_data_loss(self):
+        """断网 4 小时重连后，LWW 收敛 + 终态豁免：订单数据无丢失、无冲突"""
 
     def test_wine_storage_multi_topup_balance_correct(self):
         """存酒 3 次续存后，押金余额计算与手工账核对一致"""
@@ -781,7 +781,7 @@ DEV 环境功能验证
 | Tier 1 全绿 | 100% 测试通过 | 订单/支付/RLS/POS/存酒/发票 |
 | P99 延迟 | < 200ms | 200 桌并发场景 |
 | 支付成功率 | > 99.9% | 含超时/失败回滚 |
-| 断网恢复 | 4 小时内无数据丢失 | CRDT 验证 |
+| 断网恢复 | 4 小时内无数据丢失 | LWW + 终态豁免验证 |
 | 收银员操作 | 无需技术培训即可使用 | 现场用户测试 |
 
 **这 5 个数字是屯象OS的真实交付标准，不是代码跑通。**

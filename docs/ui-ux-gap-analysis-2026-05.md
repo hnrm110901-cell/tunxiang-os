@@ -240,7 +240,7 @@ info       #185FA5   AI 推荐标记/Agent 建议/CDP 洞察
 | Tier 1 全绿 | 100% 测试通过 | pytest tier1 全集 |
 | P99 延迟 | < 200ms | 200 桌并发压测 |
 | 支付成功率 | > 99.9% | 含超时/失败回滚 |
-| 断网恢复 | 4h 内无数据丢失 | CRDT 验证 |
+| 断网恢复 | 4h 内无数据丢失 | LWW + 终态豁免验证 |
 | **触控达标率** | ≥ 95% Store 终端 | CI lint + axe-core |
 | **a11y 评分** | ≥ 80 | axe-core / Lighthouse |
 | **品牌色一致性** | 100% 引用 Token | grep 硬编码 hex 应为 0 |
