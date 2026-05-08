@@ -16,6 +16,9 @@ import type {
   A2UINode, A2UIDeclaration, A2UIActionCallback, A2UIRenderContext,
   A2UIButtonProps, A2UICardProps, A2UIListProps, A2UIListItem,
   A2UITableProps, A2UIProgressProps, A2UIBadgeProps, A2UIChartProps,
+  // Sprint 3 S3-01 新增 6 种
+  A2UIFormProps, A2UIMapProps, A2UIHeatmapProps, A2UITimelineProps,
+  A2UICascaderProps, A2UICascaderOption, A2UITabsProps,
 } from './types';
 
 // ─── Design Tokens ──────────────────────────────────────────────────────────────
@@ -375,11 +378,318 @@ function renderNode(
       );
     }
 
+    // ──────────── Sprint 3 S3-01: 6 新组件 ────────────
+
+    // ── Form ──
+    case 'form': {
+      const fp = props as unknown as A2UIFormProps;
+      return <A2UIForm key={id} id={id} formProps={fp} onAction={onAction} />;
+    }
+
+    // ── Map ──
+    case 'map': {
+      const mp = props as unknown as A2UIMapProps;
+      return <A2UIMap key={id} id={id} mapProps={mp} onAction={onAction} />;
+    }
+
+    // ── Heatmap ──
+    case 'heatmap': {
+      const hp = props as unknown as A2UIHeatmapProps;
+      return <A2UIHeatmap key={id} {...hp} />;
+    }
+
+    // ── Timeline ──
+    case 'timeline': {
+      const tp = props as unknown as A2UITimelineProps;
+      return <A2UITimeline key={id} {...tp} ctx={ctx} />;
+    }
+
+    // ── Cascader ──
+    case 'cascader': {
+      const cp = props as unknown as A2UICascaderProps;
+      return <A2UICascader key={id} id={id} cascaderProps={cp} onAction={onAction} />;
+    }
+
+    // ── Tabs ──
+    case 'tabs': {
+      const tabsP = props as unknown as A2UITabsProps;
+      return <A2UITabs key={id} id={id} tabsProps={tabsP} childrenNodes={children} onAction={onAction} ctx={ctx} />;
+    }
+
     default: {
       console.warn(`[A2UI] Unknown component type: ${type}, node: ${id}`);
       return null;
     }
   }
+}
+
+// ─── Sprint 3 S3-01: 6 新组件实现 ─────────────────────────────────────────────
+
+/** Form — Agent 引导填表（白名单 fields 类型，无 raw HTML） */
+function A2UIForm({
+  id, formProps, onAction,
+}: { id: string; formProps: A2UIFormProps; onAction?: A2UIActionCallback }) {
+  // 不持久化 form state — Agent submit 时通过 actionPayload 整体传出
+  // 这里只读 + 提交时拿当前 DOM value
+  const formId = `a2ui-form-${id}`;
+  const submit = () => {
+    const formEl = document.getElementById(formId) as HTMLFormElement | null;
+    if (!formEl || !formProps.submitAction) return;
+    const formData = new FormData(formEl);
+    const payload: Record<string, unknown> = {};
+    for (const field of formProps.fields) {
+      payload[field.key] = formData.get(field.key);
+    }
+    onAction?.(id, formProps.submitAction, payload);
+  };
+  return (
+    <form id={formId} onSubmit={(e) => { e.preventDefault(); submit(); }} style={{ display: 'flex', flexDirection: 'column', gap: 12, padding: 12 }}>
+      {formProps.fields.map((field) => (
+        <label key={field.key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <span style={{ fontSize: 13, color: T.text2, fontWeight: 600 }}>
+            {field.label}{field.required && <span style={{ color: T.danger }}> *</span>}
+          </span>
+          {field.type === 'select' ? (
+            <select name={field.key} required={field.required}
+              style={{ height: 44, padding: '0 12px', borderRadius: 8, background: '#1A3A48', border: `1px solid ${T.cardBorder}`, color: T.text, fontSize: 14 }}>
+              {(field.options ?? []).map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          ) : field.type === 'textarea' ? (
+            <textarea name={field.key} required={field.required} placeholder={field.placeholder}
+              rows={3}
+              style={{ padding: 10, borderRadius: 8, background: '#1A3A48', border: `1px solid ${T.cardBorder}`, color: T.text, fontSize: 14, resize: 'vertical' }} />
+          ) : (
+            <input
+              type={field.type}
+              name={field.key}
+              required={field.required}
+              placeholder={field.placeholder}
+              min={field.min}
+              max={field.max}
+              style={{ height: 44, padding: '0 12px', borderRadius: 8, background: '#1A3A48', border: `1px solid ${T.cardBorder}`, color: T.text, fontSize: 14 }}
+            />
+          )}
+        </label>
+      ))}
+      <button type="submit"
+        style={{ marginTop: 8, padding: '10px 16px', minHeight: 48, background: T.accent, color: '#fff', border: 'none', borderRadius: 8, fontSize: 15, fontWeight: 700, cursor: 'pointer' }}>
+        {formProps.submitLabel ?? '提交'}
+      </button>
+    </form>
+  );
+}
+
+/** Map — 标注点地图（无 raw URL；坐标 0-100 百分比） */
+function A2UIMap({
+  id, mapProps, onAction,
+}: { id: string; mapProps: A2UIMapProps; onAction?: A2UIActionCallback }) {
+  const w = mapProps.width ?? 320;
+  const h = mapProps.height ?? 240;
+  const colorMap: Record<string, string> = {
+    success: T.success, warning: T.warning, danger: T.danger, info: T.info,
+  };
+  return (
+    <div style={{ position: 'relative', width: w, height: h, background: 'linear-gradient(135deg, #1A3A48, #0F2530)', borderRadius: 10, border: `1px solid ${T.cardBorder}`, overflow: 'hidden' }}>
+      {mapProps.markers.map((m) => (
+        <button
+          key={m.id}
+          type="button"
+          onClick={() => m.actionId && onAction?.(id, 'select', { markerId: m.id })}
+          aria-label={m.label}
+          style={{
+            position: 'absolute',
+            left: `${Math.max(0, Math.min(100, m.x))}%`,
+            top: `${Math.max(0, Math.min(100, m.y))}%`,
+            transform: 'translate(-50%, -50%)',
+            minWidth: 48, minHeight: 48,
+            borderRadius: '50%', border: '2px solid rgba(255,255,255,0.6)',
+            background: m.color ? colorMap[m.color] : T.accent,
+            color: '#fff', fontSize: 12, fontWeight: 700,
+            cursor: m.actionId ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 4, lineHeight: 1.1,
+          }}
+        >
+          {m.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Heatmap — 二维矩阵热力图（值 clamp 到 0-1） */
+function A2UIHeatmap(props: A2UIHeatmapProps) {
+  const low = props.gradient?.low ?? 'rgba(15, 110, 86, 0.15)';
+  const high = props.gradient?.high ?? T.accent;
+  const cellW = 40;
+  const cellH = 28;
+
+  function clamp01(v: number): number {
+    return Math.max(0, Math.min(1, v));
+  }
+
+  function lerp(t: number): string {
+    // 简化为 alpha 渐变：低=透明 / 高=不透明 accent
+    return `color-mix(in oklab, ${low} ${(1 - t) * 100}%, ${high} ${t * 100}%)`;
+  }
+
+  return (
+    <div style={{ overflowX: 'auto' }}>
+      {props.title && <div style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 8 }}>{props.title}</div>}
+      <table style={{ borderCollapse: 'separate', borderSpacing: 2 }}>
+        <thead>
+          <tr>
+            <th style={{ width: 80 }} />
+            {props.colLabels.map((c) => (
+              <th key={c} style={{ width: cellW, fontSize: 11, color: T.text2, fontWeight: 500, padding: 2 }}>{c}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {props.data.map((row, i) => (
+            <tr key={props.rowLabels[i] ?? i}>
+              <td style={{ fontSize: 12, color: T.text2, padding: '4px 8px', textAlign: 'right' }}>
+                {props.rowLabels[i] ?? `行 ${i + 1}`}
+              </td>
+              {row.map((value, j) => {
+                const v = clamp01(value);
+                return (
+                  <td key={j} style={{ width: cellW, height: cellH, background: lerp(v), color: v > 0.6 ? '#fff' : T.text2, fontSize: 11, textAlign: 'center', borderRadius: 4 }}>
+                    {Math.round(v * 100)}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Timeline — 订单时间线（severity 圆点 + ISO 时间） */
+function A2UITimeline({ items, limit, ctx }: A2UITimelineProps & { ctx?: A2UIRenderContext }) {
+  const showItems = limit ? items.slice(0, limit) : items;
+  const sevColor: Record<string, string> = {
+    success: T.success, warning: T.warning, danger: T.danger, info: T.info,
+  };
+  const fmt = ctx?.formatTime ?? ((iso: string) => iso.slice(11, 16));
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', position: 'relative', paddingLeft: 24 }}>
+      <div style={{ position: 'absolute', left: 8, top: 8, bottom: 8, width: 1, background: T.cardBorder }} />
+      {showItems.map((item) => (
+        <div key={item.id} style={{ position: 'relative', paddingBottom: 14 }}>
+          <div style={{
+            position: 'absolute', left: -19, top: 4,
+            width: 11, height: 11, borderRadius: '50%',
+            background: sevColor[item.severity ?? 'info'] ?? T.info,
+            border: `2px solid ${T.bg}`,
+          }} />
+          <div style={{ fontSize: 11, color: T.text3, marginBottom: 2 }}>{fmt(item.timestamp)}</div>
+          <div style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{item.title}</div>
+          {item.description && <div style={{ fontSize: 12, color: T.text2, marginTop: 2 }}>{item.description}</div>}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Cascader — 多级菜单（深度上限 5，防递归攻击） */
+function A2UICascader({
+  id, cascaderProps, onAction,
+}: { id: string; cascaderProps: A2UICascaderProps; onAction?: A2UIActionCallback }) {
+  const MAX_DEPTH = 5;
+
+  function renderColumn(options: A2UICascaderOption[], path: string[], depth: number): ReactNode {
+    if (depth >= MAX_DEPTH) {
+      console.warn(`[A2UI] Cascader 深度超限 ${MAX_DEPTH}，截断渲染`);
+      return null;
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 140, padding: 6, borderRight: `1px solid ${T.cardBorder}` }}>
+        {options.map((opt) => {
+          const newPath = [...path, opt.value];
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => cascaderProps.changeAction && onAction?.(id, cascaderProps.changeAction, { values: newPath })}
+              style={{
+                textAlign: 'left', padding: '8px 10px', minHeight: 40,
+                background: 'transparent', border: 'none',
+                borderRadius: 6, cursor: 'pointer',
+                color: T.text, fontSize: 13,
+              }}
+            >
+              {opt.label}
+              {opt.children && opt.children.length > 0 && <span style={{ float: 'right', color: T.text3 }}>›</span>}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: 'flex', overflowX: 'auto', background: T.card, borderRadius: 8, border: `1px solid ${T.cardBorder}` }}>
+      {renderColumn(cascaderProps.options, [], 0)}
+    </div>
+  );
+}
+
+/** Tabs — 多视图切换（数量上限 12） */
+function A2UITabs({
+  id, tabsProps, childrenNodes, onAction, ctx,
+}: { id: string; tabsProps: A2UITabsProps; childrenNodes?: A2UINode[]; onAction?: A2UIActionCallback; ctx?: A2UIRenderContext }) {
+  const MAX_TABS = 12;
+  const tabs = tabsProps.tabs.slice(0, MAX_TABS);
+  if (tabs.length < tabsProps.tabs.length) {
+    console.warn(`[A2UI] Tabs 数量超限 ${MAX_TABS}，已截断 ${tabsProps.tabs.length - MAX_TABS} 个`);
+  }
+  const activeKey = tabsProps.activeKey ?? tabs[0]?.key;
+  const activeTab = tabs.find((t) => t.key === activeKey);
+  const activeContent = activeTab && childrenNodes?.find((n) => n.id === activeTab.contentId);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${T.cardBorder}`, padding: 4 }}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            disabled={tab.disabled}
+            onClick={() => tabsProps.changeAction && onAction?.(id, tabsProps.changeAction, { key: tab.key })}
+            aria-selected={tab.key === activeKey}
+            role="tab"
+            style={{
+              padding: '0 16px', minHeight: 48, minWidth: 48,
+              background: tab.key === activeKey ? T.accent : 'transparent',
+              color: tab.key === activeKey ? '#fff' : T.text2,
+              border: 'none', borderRadius: '6px 6px 0 0',
+              fontSize: 14, fontWeight: 600,
+              cursor: tab.disabled ? 'not-allowed' : 'pointer',
+              opacity: tab.disabled ? 0.4 : 1,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            {tab.label}
+            {tab.badge && tab.badge > 0 && (
+              <span style={{ background: T.danger, color: '#fff', borderRadius: 8, padding: '0 6px', fontSize: 11, minWidth: 16, height: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+                {tab.badge >= 10 ? '9+' : tab.badge}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+      <div style={{ padding: 12 }} role="tabpanel">
+        {activeContent ? renderNode(activeContent, onAction, ctx) : (
+          <div style={{ color: T.text3, fontSize: 13, padding: 16, textAlign: 'center' }}>无内容</div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── 顶层渲染器组件 ──────────────────────────────────────────────────────────────
