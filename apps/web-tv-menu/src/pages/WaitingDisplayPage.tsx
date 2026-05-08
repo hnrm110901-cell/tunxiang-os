@@ -250,7 +250,7 @@ export default function WaitingDisplayPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <div style={{
             width: 36, height: 36, borderRadius: 6,
-            background: 'linear-gradient(135deg, #FF6B35, #FF8555)',
+            background: 'linear-gradient(135deg, var(--tx-primary), var(--tx-primary-hover))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18, fontWeight: 900, color: '#fff',
           }}>TX</div>

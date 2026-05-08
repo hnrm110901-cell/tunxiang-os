@@ -502,7 +502,7 @@ function RevenueStatsTab() {
                   <div style={{
                     height: '100%',
                     width: `${Math.round(ratio * 100)}%`,
-                    background: `linear-gradient(90deg, #FF6B35, #FF8555)`,
+                    background: `linear-gradient(90deg, var(--tx-primary), var(--tx-primary-hover))`,
                     borderRadius: 6,
                     display: 'flex',
                     alignItems: 'center',

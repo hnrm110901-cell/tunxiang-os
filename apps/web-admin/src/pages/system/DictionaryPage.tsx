@@ -540,7 +540,7 @@ export function DictionaryPage() {
                   label="值"
                   rules={[{ required: true, message: '请输入值' }]}
                 />
-                <ProFormText name="color" label="颜色 (如 #FF6B35)" />
+                <ProFormText name="color" label="颜色 (如 #FF6B35)" /> {/* @lint-ignore-color: 表单 label 文档示例 */}
                 <ProFormText name="icon" label="图标 (Ant Design 图标名)" />
                 <ProFormDigit
                   name="sort_order"

@@ -281,7 +281,7 @@ export function TimeoutAlert() {
           50% { opacity: 0.7; }
         }
         @keyframes timeout-flash {
-          0%, 100% { border-color: #A32D2D; background-color: #1a0505; }
+          0%, 100% { border-color: var(--tx-danger); background-color: #1a0505; }
           50% { border-color: #ff4d4f; background-color: #2a0a0a; }
         }
       `}</style>

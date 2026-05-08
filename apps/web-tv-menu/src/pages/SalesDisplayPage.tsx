@@ -394,7 +394,7 @@ export default function SalesDisplayPage() {
           {/* Logo占位 */}
           <div style={{
             width: 48, height: 48, borderRadius: 8,
-            background: 'linear-gradient(135deg, #FF6B35, #FF8555)',
+            background: 'linear-gradient(135deg, var(--tx-primary), var(--tx-primary-hover))',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, fontWeight: 900, color: '#fff',
           }}>TX</div>

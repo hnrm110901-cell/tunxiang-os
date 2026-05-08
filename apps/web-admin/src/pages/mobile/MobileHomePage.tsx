@@ -85,7 +85,7 @@ function MiniTrend5Day({ data }: { data: DashboardStats['trend_5day'] }) {
               maxWidth: 36,
               height,
               background: isToday
-                ? 'linear-gradient(180deg, #FF6B35 0%, #E55A28 100%)'
+                ? 'linear-gradient(180deg, var(--tx-primary) 0%, var(--tx-primary-active) 100%)'
                 : '#E8E6E1',
               borderRadius: '4px 4px 0 0',
               transition: 'height 0.4s ease',
@@ -167,7 +167,7 @@ export function MobileHomePage() {
 
         {/* ── 今日营业额 大字卡片 ── */}
         <div style={{
-          background: 'linear-gradient(135deg, #FF6B35 0%, #E55A28 100%)',
+          background: 'linear-gradient(135deg, var(--tx-primary) 0%, var(--tx-primary-active) 100%)',
           borderRadius: 14,
           padding: '20px 18px',
           color: '#fff',

@@ -321,7 +321,7 @@ function DashboardTab() {
                       style={{
                         width: `${(row.total_fee_fen / maxFee) * 100}%`,
                         height: '100%',
-                        background: 'linear-gradient(90deg, #FF6B35, #FF8555)',
+                        background: 'linear-gradient(90deg, var(--tx-primary), var(--tx-primary-hover))',
                         borderRadius: 4,
                         transition: 'width 0.5s ease',
                       }}

@@ -407,7 +407,7 @@ function TopDishes({ data }: TopDishesProps) {
               <div style={{
                 width: `${pct}%`, height: '100%', borderRadius: 6,
                 background: isTop3
-                  ? `linear-gradient(90deg, ${T.brand}, #FF8555)`
+                  ? `linear-gradient(90deg, ${T.brand}, var(--tx-primary-hover))`
                   : '#374151',
                 transition: 'width 0.6s ease',
               }} />

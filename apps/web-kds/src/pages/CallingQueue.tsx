@@ -618,7 +618,7 @@ const ANIMATIONS_CSS = `
     50% { opacity: 0.5; }
   }
   @keyframes calling-border-flash {
-    0%, 100% { border-color: #A32D2D; }
+    0%, 100% { border-color: var(--tx-danger); }
     50% { border-color: #ff4d4f; }
   }
 `;

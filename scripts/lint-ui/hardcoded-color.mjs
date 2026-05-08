@@ -27,13 +27,22 @@ const EXEMPT_PATHS = [
   'packages/tx-tokens/src/tokens.css',
   'packages/tx-tokens/src/tokens.ts',
   'packages/tx-tokens/src/miniapp.scss',
+  'packages/tx-tokens/src/antd-theme.ts',
   'packages/tx-touch/src/styles/base-theme.ts',
+  'apps/web-pos/src/design-system/tokens/colors.ts',
+  'shared/design-system/src/tokens/colors.ts',
   '.storybook/',
+];
+
+const EXEMPT_PATH_PATTERNS = [
+  /\/e2e\/fixtures\//,
 ];
 
 function isExempt(file) {
   const rel = file.slice(ROOT.length + 1);
-  return EXEMPT_PATHS.some(p => rel === p || rel.startsWith(p));
+  if (EXEMPT_PATHS.some(p => rel === p || rel.startsWith(p))) return true;
+  if (EXEMPT_PATH_PATTERNS.some(re => re.test(rel))) return true;
+  return false;
 }
 
 const violations = [];
@@ -48,8 +57,16 @@ function isExemptLine(line, hexMatch, hexIdx) {
   const trimmed = line.trim();
   if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('*/')) return true;
   if (line.includes('// @lint-ignore-color')) return true;
-  // inline 注释：hex 出现在行内 // 之后
+  if (line.includes('@lint-ignore-color')) return true;
+  // Block comment line `/* ... #HEX ... */` 或 `... /* #HEX */ ...`
   const beforeHex = line.slice(0, hexIdx);
+  const afterHex = line.slice(hexIdx);
+  const blockOpen = beforeHex.lastIndexOf('/*');
+  const blockClose = beforeHex.lastIndexOf('*/');
+  if (blockOpen > blockClose && afterHex.includes('*/')) return true;
+  // 整行 /* ... */ 块注释（含 hex）
+  if (trimmed.startsWith('/*') && trimmed.includes('*/')) return true;
+  // inline 注释：hex 出现在行内 // 之后
   const inlineSlash = beforeHex.lastIndexOf('//');
   // 排除 url 中的 // (如 'https://...'), 简单启发：// 前不能是 :
   if (inlineSlash >= 0 && beforeHex.charAt(inlineSlash - 1) !== ':') return true;

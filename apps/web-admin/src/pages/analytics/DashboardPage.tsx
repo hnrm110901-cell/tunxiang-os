@@ -238,7 +238,7 @@ function StoreRankingChart({ data }: StoreRankingChartProps) {
                 height: '100%',
                 width: `${pct}%`,
                 background: isChamp
-                  ? 'linear-gradient(90deg, #FF6B35, #FF8555)'
+                  ? 'linear-gradient(90deg, var(--tx-primary), var(--tx-primary-hover))'
                   : '#374151',
                 borderRadius: 3,
                 transition: 'width 0.6s ease',

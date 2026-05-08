@@ -376,7 +376,7 @@ export function WineStorageQuickView({ tableId, tableName, onTakeSuccess }: Prop
         }
         .tx-wine-badge:active {
           transform: scale(0.97);
-          background: #E55A28 !important;
+          background: var(--tx-primary-active) !important;
         }
         .tx-wine-take-btn:active {
           transform: scale(0.97);

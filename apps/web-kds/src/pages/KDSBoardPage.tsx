@@ -37,18 +37,16 @@ import { txColors } from '@tx/tokens';
 
 // ─── CSS Variables ──────────────────────────────────────
 
+// 注：--tx-primary / --tx-success / --tx-warning / --tx-danger 由 @tx/tokens 全局注入（main.tsx 中 import）
+// 此处仅声明 KDS 专属覆盖（深色主题 + KDS 倒计时色阶）
 const CSS_VARS = `
   :root {
-    --tx-primary: #FF6B35;
-    --tx-success: #0F6E56;
-    --tx-warning: #BA7517;
-    --tx-danger: #A32D2D;
     --tx-bg-dark: #0D1117;
     --tx-bg-card: #111827;
     --tx-border: rgba(255,255,255,0.08);
     --tx-text-1: #F0F0F0;
     --tx-text-2: rgba(255,255,255,0.55);
-    --tx-kds-green: #0F6E56;
+    --tx-kds-green: var(--tx-success);
     --tx-kds-amber: #f5a623;
     --tx-kds-red: #ff4d4f;
   }

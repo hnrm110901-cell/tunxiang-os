@@ -78,7 +78,7 @@ export function BarInventoryPlaceholder({ title }: { title: string }) {
   const navigate = useNavigate();
   return (
     <div className="min-h-screen bg-[#F8F7F5] font-sans text-[#2C2C2A]">
-      <header className="flex items-center justify-between bg-[#1E2A3A] px-5 py-4">
+      <header className="flex items-center justify-between bg-[var(--tx-navy)] px-5 py-4">
         <button
           className="text-base font-medium text-white"
           onClick={() => navigate('/bar-inventory')}
@@ -104,7 +104,7 @@ export default function BarInventoryPage() {
   return (
     <div className="min-h-screen bg-[#F8F7F5] font-sans text-[#2C2C2A]">
       {/* ── 顶栏 ── */}
-      <header className="flex items-center justify-between bg-[#1E2A3A] px-5 py-4">
+      <header className="flex items-center justify-between bg-[var(--tx-navy)] px-5 py-4">
         <button
           className="text-base font-medium text-white"
           onClick={() => navigate(-1)}

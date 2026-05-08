@@ -356,11 +356,12 @@ export function InventoryIntelPage() {
         <>
           {/* ── 统计行 ── */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
+            {/* StatCard.bg 使用 8-digit hex (RRGGBBAA) — 13% alpha overlay，无对应 token */}
             <StatCard emoji="🚨" label="缺货"     value={summary.out_of_stock  ?? 0} color="#FF4D4D" bg="#FF4D4D22" />
-            <StatCard emoji="⚠️"  label="临界"     value={summary.critical      ?? 0} color={txColors.primaryActive} bg="#E55A2822" />
-            <StatCard emoji="📉" label="低库存"   value={summary.low_stock     ?? 0} color={txColors.warning} bg="#BA751722" />
-            <StatCard emoji="✅" label="正常"     value={summary.normal        ?? 0} color={txColors.success} bg="#0F6E5622" />
-            <StatCard emoji="⏰" label="即将临期" value={summary.expiring_soon ?? 0} color={txColors.warning} bg="#BA751722" />
+            <StatCard emoji="⚠️"  label="临界"     value={summary.critical      ?? 0} color={txColors.primaryActive} bg="#E55A2822" /* @lint-ignore-color */ />
+            <StatCard emoji="📉" label="低库存"   value={summary.low_stock     ?? 0} color={txColors.warning} bg="#BA751722" /* @lint-ignore-color */ />
+            <StatCard emoji="✅" label="正常"     value={summary.normal        ?? 0} color={txColors.success} bg="#0F6E5622" /* @lint-ignore-color */ />
+            <StatCard emoji="⏰" label="即将临期" value={summary.expiring_soon ?? 0} color={txColors.warning} bg="#BA751722" /* @lint-ignore-color */ />
             <StatCard emoji="❌" label="已过期"   value={summary.expired       ?? 0} color="#FF4D4D" bg="#FF4D4D22" />
           </div>
 

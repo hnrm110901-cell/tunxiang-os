@@ -6,13 +6,12 @@ import ComboShowcase from './pages/ComboShowcase';
 import WelcomeScreen from './pages/WelcomeScreen';
 import AdminConfig from './pages/AdminConfig';
 
-/** 全局CSS变量 — 大屏深色主题 */
+/** 全局CSS变量 — 大屏深色主题
+ *  品牌/语义色（--tx-primary / --tx-success / --tx-warning / --tx-danger / --tx-info）
+ *  由 @tx/tokens 全局注入（main.tsx）；此处仅 TV 大屏专属色（深背景 + 金银铜 + 海鲜价格）
+ */
 const globalStyles = `
   :root {
-    --tx-primary: #FF6B35;
-    --tx-primary-hover: #FF8555;
-    --tx-primary-active: #E55A28;
-    --tx-primary-light: rgba(255, 107, 44, 0.15);
     --tx-bg-dark: #0A0A0A;
     --tx-bg-card: #1A1A1A;
     --tx-bg-card-hover: #222222;
@@ -20,10 +19,6 @@ const globalStyles = `
     --tx-text-primary: #FFFFFF;
     --tx-text-secondary: #B0B0B0;
     --tx-text-tertiary: #666666;
-    --tx-success: #0F6E56;
-    --tx-warning: #BA7517;
-    --tx-danger: #A32D2D;
-    --tx-info: #185FA5;
     --tx-gold: #FFD700;
     --tx-silver: #C0C0C0;
     --tx-bronze: #CD7F32;

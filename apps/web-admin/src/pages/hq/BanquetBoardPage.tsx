@@ -943,14 +943,14 @@ export function BanquetBoardPage() {
         }
         .ant-table-wrapper .ant-pagination { color: #888; }
         .ant-pagination-item a { color: #888; }
-        .ant-pagination-item-active { border-color: #FF6B35 !important; }
-        .ant-pagination-item-active a { color: #FF6B35 !important; }
+        .ant-pagination-item-active { border-color: var(--tx-primary) !important; }
+        .ant-pagination-item-active a { color: var(--tx-primary) !important; }
         /* DatePicker */
         .ant-picker { background: #0B1A20 !important; border-color: #2a3a43 !important; color: #fff !important; }
         .ant-picker input { color: #ccc !important; }
         .ant-picker-suffix { color: #555 !important; }
         /* Spin */
-        .ant-spin-dot-item { background-color: #FF6B35 !important; }
+        .ant-spin-dot-item { background-color: var(--tx-primary) !important; }
         /* Timeline */
         .ant-timeline-item-tail { border-color: #2a3a43 !important; }
         /* Select dropdown (form inside Modal uses portal) */

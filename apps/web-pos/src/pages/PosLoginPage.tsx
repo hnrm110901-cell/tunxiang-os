@@ -61,7 +61,7 @@ export function PosLoginPage({ onLogin }: PosLoginPageProps) {
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{
             width: 64, height: 64, borderRadius: 16,
-            background: 'linear-gradient(135deg, #FF6B35, #FF8F5E)',
+            background: 'linear-gradient(135deg, var(--tx-primary), #FF8F5E)',
             display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 24, fontWeight: 900, color: '#fff', marginBottom: 16,
           }}>TX</div>
@@ -121,7 +121,7 @@ export function PosLoginPage({ onLogin }: PosLoginPageProps) {
             style={{
               width: '100%', height: 72, borderRadius: 14, border: 'none',
               background: (!loading && username && password)
-                ? 'linear-gradient(135deg, #FF6B35, #FF8F5E)'
+                ? 'linear-gradient(135deg, var(--tx-primary), #FF8F5E)'
                 : 'rgba(255,107,44,0.25)',
               color: '#fff', fontSize: 20, fontWeight: 700,
               cursor: (!loading && username && password) ? 'pointer' : 'not-allowed',

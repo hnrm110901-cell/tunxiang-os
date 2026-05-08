@@ -273,7 +273,7 @@ const PointsBalance: React.FC<PointsBalanceProps> = ({
               style={{
                 height: '12rpx',
                 width: `${progressPct}%`,
-                background: 'linear-gradient(90deg, #FF6B35 0%, #FF9F0A 100%)',
+                background: 'linear-gradient(90deg, var(--tx-primary) 0%, #FF9F0A 100%)',
                 borderRadius: '6rpx',
                 transition: 'width 0.5s ease',
               }}

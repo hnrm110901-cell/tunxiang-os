@@ -410,7 +410,7 @@ export function BookingPrepView() {
           50% { opacity: 0.6; }
         }
         @keyframes bp-urgent-flash {
-          0%, 100% { border-color: #A32D2D; }
+          0%, 100% { border-color: var(--tx-danger); }
           50% { border-color: #ff4d4f; }
         }
       `}</style>

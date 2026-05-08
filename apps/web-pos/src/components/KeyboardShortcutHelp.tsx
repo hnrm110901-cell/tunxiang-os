@@ -72,7 +72,7 @@ function ensureHelpPanelStyle(): void {
       to   { opacity: 1; transform: translateY(0) scale(1); }
     }
     @keyframes tx-kbd-key-flash {
-      0%   { background-color: #FF6B35; color: #fff; }
+      0%   { background-color: var(--tx-primary); color: #fff; }
       100% { background-color: #1E3A48; color: #E0E0E0; }
     }
   `;

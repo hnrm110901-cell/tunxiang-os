@@ -13,7 +13,7 @@
     "font-size": "需扩展跟踪 issue（packages/tx-touch 多组件 caption/spec/badge 仍用 13-15px 写死）"
   },
   "no-antd-in-store": 3,
-  "hardcoded-color": 69,
+  "hardcoded-color": 0,
   "tap-target": 447,
   "font-size": 1711,
   "a11y-img-no-alt": 0,

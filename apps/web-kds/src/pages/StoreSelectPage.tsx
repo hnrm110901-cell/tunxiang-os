@@ -70,7 +70,7 @@ export function StoreSelectPage() {
             width: 80,
             height: 80,
             borderRadius: 20,
-            background: 'linear-gradient(135deg, #FF6B35, #FF8F5E)',
+            background: 'linear-gradient(135deg, var(--tx-primary), #FF8F5E)',
             fontSize: 32,
             fontWeight: 900,
             color: '#fff',

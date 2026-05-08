@@ -21,16 +21,9 @@ const NAV_ITEMS = [
   { path: '/vip', label: '宴请接待', icon: '⭐' },
 ];
 
-/** CSS 变量 — 遵循屯象Design Token */
+/** CSS 变量 — 品牌 / 语义色 由 @tx/tokens 全局注入（main.tsx）；此处仅迎宾端布局 token */
 const CSS_VARS = `
 :root {
-  --tx-primary: #FF6B35;
-  --tx-primary-active: #E55A28;
-  --tx-primary-light: #FFF3ED;
-  --tx-success: #0F6E56;
-  --tx-warning: #BA7517;
-  --tx-danger: #A32D2D;
-  --tx-info: #185FA5;
   --tx-text-1: #2C2C2A;
   --tx-text-2: #5F5E5A;
   --tx-text-3: #B4B2A9;
