@@ -118,19 +118,20 @@
 - [x] **6 条 follow-up issue 建账** — #274-#279（5/7 handoff §六）
 - [x] **SSH key 注册** — 一次性根除代理对 github.com:443 push 阻塞
 - [x] **5 个 worktree 清理** — ruff-cleanup-274 + p0-3/p0-7/p0-8 + tier1-fix × 2
-- [ ] **4 条本会话 cleanup follow-up issue** — 待建（aiqiwei/meituan drift / app.models.base 死代码 / src/tests import 风格统一）
-- [ ] **P0-4 CRDT 文档对齐** — worktree `fix/p0-4-crdt-doc-alignment` 已起，未动笔
+- [x] **4 条本会话 cleanup follow-up issue** — #295 (aiqiwei drift) / #296 (meituan drift) / #297 (table.py 死代码) / #298 (src/tests import 风格统一替换 #287 band-aid)
+- [x] **P0-4 CRDT 文档对齐** — `fix/p0-4-crdt-doc-alignment` 14 文件落地：CLAUDE.md §17/§20/§22 + 测试/CI 注释 + README + 售前文案 + runbook + UI plan/gap 全部对齐到 "LWW + 终态豁免"；测试文件不改名（scope 风险），docstring 自洽即可
 
 ### 关键决策
 - **决策 40：#287 用 `extend_existing=True` band-aid 而非真结构修** — 真结构修需收敛 30+ 测试文件 import 风格，scope 超 Tier 1 Gate 红线修复；生产链路 import 路径单一时 extend_existing 是 no-op，副作用 0；长期收敛走独立 follow-up issue
 - **决策 41：debugger agent 报告作素材不直接执行** — agent 给的"改 test_cashier_engine 全路径"方案在 Tier 1 Gate batch 视角下会反向破坏其它 _tier1 文件；CI 实验先验证假设再下手
 - **决策 42：SSH 切 git@github.com 但不动 origin remote** — 防 `feedback_parallel_claude_sessions.md` 互踩；并发会话仍用 HTTPS push，本会话用 `git push git@github.com:...` 显式 URL
 - **决策 43：失败 3 次代理 push 立即报告用户切手动** — 避免硬撑（从 1 PR 阻塞蔓延到全会话停摆）
+- **决策 45：P0-4 G1=A 落地用"LWW + 终态豁免"作为正名** — 技术准确度 ↑（从泛 CRDT 到 LWW-Register 子集，与 `lww_register.py` 实现完全对齐），业务可读性 ↑（"终态豁免" 直接对应"已结账订单不会被覆盖"的承诺）；保留 `crdt_conflicts_total` 指标名兼容（运行时改名需 /metrics 端口同步）；测试文件名 `test_offline_crdt_tier1.py` 暂不重命名，docstring 自洽即可，避免 scope 蔓延到 nightly pipeline / sync-engine 适配
 
 ### 下一步
-- 进 P0-4 CRDT 文档对齐（G1=A 决策已落，1d 纯文档活）
-- 顺手建 4 条 cleanup follow-up issue（aiqiwei drift / meituan drift / app.models.base 死代码 / src/tests import 风格统一）
 - 等 #271 staging 反馈推进 #272 stack
+- 等 P0-4 PR CI / 合并
+- 推 #295-#298 cleanup（按优先级：#298 Tier 1 优先 → #297 死代码 → #295/#296 drift）
 
 ### 已知风险
 - **#287 extend_existing 是 band-aid** — agent 警告"masking the symptom"。生产 no-op 但测试侧仍存在双重注册，未来加新模型时如果同名冲突可能被静默吃掉。结构修跟进 follow-up issue
