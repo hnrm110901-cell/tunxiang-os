@@ -97,6 +97,15 @@ class TestNlqKeywordFirewallTier1:
         with pytest.raises(UnsafeSqlError, match="ALTER"):
             assert_safe_sql("ALTER TABLE orders ADD COLUMN backdoor TEXT")
 
+    def test_merge_into_with_cte_is_rejected(self):
+        """WITH cte AS (...) MERGE INTO orders → 必须拒（PG15+ MERGE 是写入语法，不能因 WITH 头放行）。"""
+        with pytest.raises(UnsafeSqlError, match="MERGE"):
+            assert_safe_sql(
+                "WITH cte AS (SELECT id FROM reports.dishes) "
+                "MERGE INTO orders USING cte ON orders.dish_id = cte.id "
+                "WHEN MATCHED THEN DELETE"
+            )
+
     def test_security_definer_is_rejected(self):
         """SECURITY DEFINER 是绕 RLS 的标准技巧 → 必须拒（且 violation 报 SECURITY DEFINER 而非 CREATE）。"""
         with pytest.raises(UnsafeSqlError) as exc_info:

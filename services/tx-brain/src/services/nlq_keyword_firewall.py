@@ -41,6 +41,9 @@ _FORBIDDEN_KEYWORDS = (
     "CALL",
     "COPY",
     "VACUUM",
+    # PR1 fix: PG15+ MERGE 是标准写入语法，可与 WITH 组合绕过原防火墙
+    # 攻击路径：WITH cte AS (SELECT 1) MERGE INTO orders USING cte ...
+    "MERGE",
 )
 
 # 短语类（不能用单 word boundary 匹配）
