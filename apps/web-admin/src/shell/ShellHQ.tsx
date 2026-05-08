@@ -12,6 +12,7 @@ import { IconRail } from './IconRail';
 import { SidebarHQ } from './SidebarHQ';
 import { AgentConsole } from './AgentConsole';
 import { TopbarHQ } from './TopbarHQ';
+import { useAgentConsoleStore } from '../store/agentConsoleStore';
 
 interface ShellHQProps {
   children: ReactNode;
@@ -56,7 +57,8 @@ export function ShellHQ({ children, onLogout }: ShellHQProps) {
   const location = useLocation();
   const derivedModule = useMemo(() => deriveModuleFromPath(location.pathname), [location.pathname]);
   const [manualModule, setManualModule] = useState<string | null>(null);
-  const [agentVisible, setAgentVisible] = useState(true);
+  const agentVisible = useAgentConsoleStore((s) => s.visible);
+  const toggleAgent = useAgentConsoleStore((s) => s.toggleVisible);
 
   // 点击IconRail手动切换模块，URL变化时自动同步
   const activeModule = manualModule ?? derivedModule;
@@ -91,7 +93,7 @@ export function ShellHQ({ children, onLogout }: ShellHQProps) {
       {/* Topbar — 贯穿全宽 */}
       <div style={{ gridColumn: '1 / -1' }}>
         <TopbarHQ
-          onToggleAgent={() => setAgentVisible(!agentVisible)}
+          onToggleAgent={toggleAgent}
           userName={userName}
           userRole={userRole}
           onLogout={onLogout}
