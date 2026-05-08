@@ -1,3 +1,61 @@
+## 2026-05-08 晚段 · 命名漂移 sweep 收尾 + #279 阻塞 triage（PR #305 / #307 / Issue #306）
+
+### 今日完成
+
+**PR #305 — CLAUDE.md §17 + channel_canonical docstring 命名漂移修复 [T3]**
+- `CLAUDE.md:595` `adapters/pinjin → adapters/pinzhi_pos`（#286 followup；aiqiwei 已被 #304 修过）
+- `services/tx-trade/src/schemas/channel_canonical.py:17,70` 模块/类 docstring `pinjin/aiqiwei → pinzhi_pos/aoqiwei`（#295 followup）
+- 2 文件 +3/-3，纯 docstring + markdown，零运行时风险
+- branch `chore/docs-channel-naming-drift` / commit `f0cad857` / SSH 直推
+- worktree `.tunxiang-p0-worktrees/chore-channel-drift`（待 merge 后 prune）
+
+**Issue #306 建账 + PR #307 闭环**
+- repo-wide sweep 发现剩两处 pinjin 残余：
+  - `apps/web-devforge/src/api/applications.ts:58,62` — DevForge mock-4 数据 `code: 'adapter-pinjin'` + `repo_path: 'shared/adapters/pinjin'`
+  - `docs/ui-ux-development-plan-2026-q3-q4.md:36,90` — 客户里程碑表 + S2-07 行 `adapters/pinjin` + `test_pinjin_tier1.py`（实际文件名 `test_pinzhi_pos_tier1.py`）
+- PR #307 一发清完（2 文件 +4/-4 / T3 / commit `0f783f68` / `Closes #306`）
+- worktree `.tunxiang-p0-worktrees/cleanup-pinjin-residue`
+- **至此 main 上 pinjin/aiqiwei 双 adapter 命名漂移活体痕迹清零**（5 PR 闭环：#286 + #295 + #304 + #305 + #307）
+
+**Sweep 误报更正（重要教训）**
+- 初次 sweep 在落后 6 PR 的本地文件上跑，错误报警 `tier1-gate.yml` + `test_ci_gates_tier1.py` 仍有 `aiqiwei` 残留
+- 重读 `origin/main` 确认 #304 已正确修这两处（`aiqiwei → aoqiwei`），**不需起 P0 issue**
+- → 5/9 起手默认先 `git fetch` + 用 `git show origin/main:<file>` 看真实 baseline
+
+**#279 阻塞 triage（未启动，纯调研）**
+- #279 issue body 明文"等 PR #272 merge 后再处理"，#272 OPEN（14 红 / 13 绿 / 1 pending，0 人 review，软阻塞 #271 等 DBA staging）
+- #275-#278 全 Tier 1 多日 TDD（不是 30-45min 暖手）；#275/#276 软阻塞 #271，#278 硬阻塞 #277
+- dev-plan-60d P0-3/P0-7/P0-8 全 4-6d Tier 1，不是暖手；P0-5/P0-6/P0-18 全部 gating 阻塞
+- **决策**：今日 5/7 + 5/8 共 9 PR + 4 issue 吞吐已撑爆，按 §16 收工；新 Tier 1 任务移到 5/9 整时间块开
+
+### 数据变化
+- 新增 PR：2 个（#305 #307），合计 4 文件 +7/-7
+- 新增 issue：1 个（#306，已被 PR #307 自动 close）
+- 命名漂移残余：5 处全清（CLAUDE.md / channel_canonical / applications.ts / ui-ux 计划）
+- 测试新增：0（纯 docstring + mock 数据 + planning markdown）
+- 迁移：无
+
+### 关键决策
+1. **A1 守约不扩范围** — sweep 发现 yaml/test/applications.ts/ui-ux 额外漂移后选择 #305 只清 handoff 明列 2 处，其余开 issue 单独走（重申 surgical + 防文档 PR 越界改 CI/前端）
+2. **5 处一并清完** — #305 + #307 把 main 上 pinjin/aiqiwei 命名漂移活体痕迹清零，#286/#295/#304/#305/#307 五 PR 完整闭环
+3. **#279 不强行启动** — 阻塞链清晰且非 30-45min 暖手；按 §16 收工而非疲劳期开 Tier 1
+4. **sweep 默认基于 origin/main** — 5/8 因落后本地误报浪费排查时间，5/9 起手默认 fetch ff
+
+### 遗留问题
+- **PR #305 / #307 等 review/merge** — Tier 3 doc-only，按 reviewer 9 红 baseline 容忍政策可快速 merge
+- **#296 meituan drift** — 仍需创始人确认 meituan 在 Tier 1 表里指 `meituan-saas/` 还是 `meituan_delivery_adapter.py`（5/9 1 句话即解锁）
+- **worktree 保留**：`chore-channel-drift` + `cleanup-pinjin-residue` 待 PR merge 后 `git worktree remove`
+
+### 明日计划（5/9）
+- 优先：审查 / merge #305 #307
+- 然后选整时间块：
+  - **P0-8 Phase 1** AST decimal 扫描脚本 + 报告（不动业务，纯静态分析）— 2-4h，最低风险
+  - **P0-3** order_service state_machine guard TDD 红测试（红测试单 PR 1-2h + 实现数日另起）
+  - **#279 / #275-#278** 等 #271 / #272 merge 后再启
+- 落盘 `docs/session-handoff-2026-05-09.md`（已写）
+
+---
+
 ## 2026-05-08 Sprint 4 PR1 全 merge（4 PR + 2 review fix）— main d3bbc762
 
 ### 今日完成

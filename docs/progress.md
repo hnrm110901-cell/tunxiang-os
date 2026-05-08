@@ -1,3 +1,35 @@
+## 2026-05-08 22:30 · 命名漂移 sweep 收尾（PR #305 / #307）+ #279 阻塞 triage 收工
+
+### 完成状态
+- [x] PR #305 — `CLAUDE.md` §17 `pinjin → pinzhi_pos` + `channel_canonical.py` docstring `pinjin/aiqiwei → pinzhi_pos/aoqiwei`（2 文件 +3/-3 / T3 / commit `f0cad857`）
+- [x] Issue #306 建账（覆盖 sweep 发现的 web-devforge mock + ui-ux 计划文档残余）
+- [x] PR #307 — `apps/web-devforge/src/api/applications.ts` mock-4 + `docs/ui-ux-development-plan-2026-q3-q4.md` L36/L90（2 文件 +4/-4 / T3 / commit `0f783f68` / `Closes #306`）
+- [x] sweep 误报更正：`tier1-gate.yml` + `test_ci_gates_tier1.py` 在 origin/main 已被 #304 修，不需 P0 issue
+- [x] #279 阻塞 triage：等 #272 merge；#275-#278 全 Tier 1 多日 TDD；P0-3/P0-7/P0-8 全 4-6d
+- [x] 决定按 §16 收工不强启 Tier 1（疲劳期纪律）
+- [x] DEVLOG.md + 本文件 + `docs/session-handoff-2026-05-09.md` 落盘
+
+### 关键决策
+- **决策 68：A1 守约不扩范围** — sweep 发现 yaml/test/applications.ts/ui-ux 额外漂移后选择 #305 只清 handoff 明列 2 处，其余开 issue 单独走（重申 surgical 原则 + 文档 PR 越界改 CI/前端的并发 session 互踩防护）
+- **决策 69：5 处一并清完** — #305 + #307 把 main 上 pinjin/aiqiwei 命名漂移活体痕迹清零（主 issue #286/#295 + 5/8 cleanup #304 + docstring 收尾 #305 + mock/计划收尾 #307 共 5 PR 完整闭环）
+- **决策 70：sweep 必须基于 origin/main，不基于落后本地** — 5/9 起手默认 fetch ff，避免 false positive 浪费排查精力（5/8 误报 yaml/test 的血泪）
+
+### 下一步（5/9）
+- 优先 review/merge #305 #307（T3 容忍 9 红 baseline）
+- 然后选整时间块：
+  - **P0-8 Phase 1** AST decimal 扫描脚本 + 报告落盘（不动业务，纯静态分析，2-4h，最低风险）
+  - **P0-3** 红测试单 PR（1-2h 红 + 数日实现另起）
+- 等 #271 DBA staging：解锁 #272 → #279 + #275/#276
+- #296 meituan 跟创始人对一句即可解锁
+
+### 已知风险
+- PR #305 / #307 在 main 9 条 pre-existing 红 baseline 上跑，admin merge 容忍政策依赖 reviewer 信任
+- worktree 总数 30+（含今日新增 2 个）— 5/9 review/merge 后批量 prune 一次
+- #296 meituan 决策悬而未决，会续命下次 sweep 时再次报警
+- pinjin 命名史在 #259 issue 标题里仍是历史名（issue 编号永久），未来 grep 时会再次发现，属"已知历史误差"不动
+
+---
+
 ## 2026-05-08 19:30 · Sprint 4 PR1 全 merge — main d3bbc762
 
 ### 完成状态
