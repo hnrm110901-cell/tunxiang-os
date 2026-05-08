@@ -1,3 +1,41 @@
+## 2026-05-08 19:00 · S4-04 第一刀 PR #303（Sprint 4 全 4 子 issue PR1 收齐 / Tier 3）
+
+### 完成状态
+- [x] `PinnedItem` dataclass（A2UI surface_snapshot + 元数据）
+- [x] add_pin / list_pins / remove_pin（in-memory store + FIFO 20）
+- [x] tenant 隔离 stub（dict 按 tenant_id 分区）
+- [x] 8 个测试（含跨 tenant remove 守门 + tenant_id 空 ValueError 防绕过）
+- [x] PR #303 已 push
+- [ ] HTTP 路由 + main.py 注册（PR2）
+- [ ] DB 迁移 dashboard_pinned 表 + RLS policy（PR2）
+- [ ] 真 RLS 反测（PR2）
+- [ ] web-admin AgentConsole Pin 按钮 + 驾驶舱 Feed 渲染（PR2/3）
+
+### 关键决策
+- **决策 60：PR1 仅 service 层 + in-memory store** — HTTP 路由 / DB 迁移 / 前端 UI 全留 PR2，避免 PR 巨量化
+- **决策 61：tenant 隔离 stub vs 真 RLS contract by-design** — in-memory dict 分区，PR2 上 RLS policy 后语义不变
+- **决策 62：FIFO 淘汰在 service 层 enforce** — Python 切尾巴，PR2 上 DB 后改 SQL `LIMIT 20`；测试契约不变
+- **决策 63：跨 tenant remove 必须返 False** — test 守门（防 RLS 绕过）
+
+### Sprint 4 PR1 全收（4 子 issue）
+| Issue | PR | T | 测试 |
+|------|-----|---|------|
+| #288 S4-01 | #293 | T2 | mock SSE |
+| #289 S4-02 | #299 | T1 | 24/24 |
+| #290 S4-03 | #301 | T1 | 19/19 |
+| #291 S4-04 | #303 | T3 | 8/8 |
+
+### 下一步
+- 4 PR review + merge（建议优先 T1 #299 #301）
+- 然后选 PR2: S4-02 schema/RLS / S4-03 execute+DB+SSE / S4-04 HTTP+DB+前端
+
+### 已知风险
+- 4 PR 同时 open 给 user review 负担高（memory: "Tier1 PR review 多轮越审越深"）— 建议设 round-N 用真 BUG 停止线
+- §19 独立验证 4 PR 都触发但都未做 — review 阶段建议各开新会话验证
+- in-memory store 多实例部署不一致 → 必须先 PR2 上 DB 才能生产部署
+
+---
+
 ## 2026-05-08 18:00 · S4-03 第一刀 PR #301（commits `b5f8eff5` + `ff0be439` / Tier 1）
 
 ### 完成状态

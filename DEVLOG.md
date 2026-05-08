@@ -1,3 +1,48 @@
+## 2026-05-08 S4-04 第一刀 — 驾驶舱 Pin 洞察 service 层 8/8 测试（PR #303 / T3）
+
+### 今日完成
+
+**S4-04 PR #303（1 commit / 2 files / +240）— Sprint 4 全 4 子 issue 第一刀全收**
+- `services/tx-analytics/src/services/pinned_dashboard.py` — service 层
+  - `PinnedItem` dataclass（pin_id / tenant_id / pinner_user_id / pinned_at / `surface_snapshot`(A2UI JSON) / source_query_id / source_natural_query）
+  - `add_pin` / `list_pins` / `remove_pin`
+  - In-memory store: `dict[tenant_id, list[PinnedItem]]`（PR2 上 DB 后此 store 删除）
+  - FIFO 淘汰：每 tenant `PIN_LIMIT_PER_TENANT=20`，超出从最旧砍掉
+  - `tenant_id` 空 → ValueError（防 RLS 绕过）
+- `services/tx-analytics/src/tests/test_pinned_dashboard_t3.py` — 8 测试（超 #291 ≥5 门槛）
+
+### 数据变化
+- 新增后端文件：2 个（service + test）
+- 新增测试：8 个（mock-based）
+- pytest 通过：8/8，0.04s
+
+### 关键决策
+1. **PR1 仅 service 层 + in-memory store** — HTTP 路由 / DB 迁移 / 前端 UI 全留 PR2，避免 PR 巨量化
+2. **tenant 隔离 stub** — in-memory dict 按 tenant_id 分区；PR2 上真 RLS policy 后语义不变（contract by-design）
+3. **FIFO 淘汰在 service 层 enforce** — Python 端切尾巴，PR2 上 DB 后改 `(tenant_id, pinned_at DESC) LIMIT 20` SQL；测试契约不变
+4. **跨 tenant remove 必须返 False** — `test_remove_does_not_cross_tenant` 守门（防 RLS 绕过）
+
+### 遗留问题（follow-up PR）
+- HTTP 路由 `services/tx-analytics/src/api/dashboard_pinned_routes.py` + `main.py` 注册（`POST /append` / `GET /list` / `DELETE /{pin_id}`）
+- DB 迁移：`dashboard_pinned` 表 + RLS policy + `(tenant_id, pinned_at DESC)` 索引
+- 真 RLS 反测（tenant=A 用户 set_config 后能查到 tenant=B pin → 致命缺陷一票否决）
+- `web-admin/AgentConsole` 内 Pin 按钮 + 驾驶舱 Feed 渲染（前端 + Storybook）
+
+### Sprint 4 阶段总览（**今日全 4 子 issue PR1 完成**）
+| Issue | T | PR1 | 测试 | 状态 |
+|------|---|-----|------|-----|
+| #288 [S4-01] | T2 | #293 | mock SSE 链路 | OPEN，等 review |
+| #289 [S4-02] | T1 | #299 | 24/24 防火墙+沙箱 | OPEN，等 review |
+| #290 [S4-03] | T1 | #301 | 19/19 dispatcher | OPEN，等 review |
+| #291 [S4-04] | T3 | #303 | 8/8 pin service | OPEN，等 review |
+| Epic #292 | — | — | — | OPEN，4 子 issue PR1 全交 |
+
+### 明日计划
+- 优先：4 PR review + merge（review 负担高 — 建议优先 #299 #301 两个 T1）
+- 然后选：S4-02 PR2（schema 视图 + 真 DB RLS 反测）/ S4-03 PR2（execute + DB + SSE）/ S4-04 PR2（HTTP 路由 + DB + 前端）
+
+---
+
 ## 2026-05-08 S4-03 第一刀 — NLQ → 三类操作 dispatcher 19/19 测试（PR #301 / T1）
 
 ### 今日完成
