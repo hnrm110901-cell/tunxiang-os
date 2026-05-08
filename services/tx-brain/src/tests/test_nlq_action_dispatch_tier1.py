@@ -242,6 +242,38 @@ class TestHardConstraintsStubTier1:
         assert diff.constraint_block is not None
         assert diff.constraint_block["name"] == "customer_experience"
 
+    @pytest.mark.asyncio
+    async def test_inventory_86_with_unfinished_orders_triggers_cx_block(self):
+        """86 食材但仍被 N 单未完成订单引用 → 客户体验触发（与 toggle_availability 对称）。
+
+        徐记海鲜场景：服务员收银时已下"清蒸鲈鱼" 5 单未出菜，厨师长此时 86 鲈鱼
+        会让那 5 桌客人收到"无法上菜"通知，必须在 dispatcher 层提前拦截。
+        """
+        req = _req(
+            "inventory.86",
+            {"ingredient_id": "ing-luyu-001", "unfinished_orders": 5},
+        )
+        diff = await dispatch_dry_run(req)
+        assert diff.constraint_block is not None
+        assert diff.constraint_block["name"] == "customer_experience"
+        assert any("客户体验" in w for w in diff.risk_warnings)
+
+    @pytest.mark.asyncio
+    async def test_inventory_86_food_safety_takes_priority_over_cx(self):
+        """同时含过期批次 + 未结订单 → 食安合规优先（更严重的约束在前）。"""
+        req = _req(
+            "inventory.86",
+            {
+                "ingredient_id": "ing-luyu-001",
+                "has_expired_batch": True,
+                "unfinished_orders": 5,
+            },
+        )
+        diff = await dispatch_dry_run(req)
+        assert diff.constraint_block is not None
+        # 食安合规先于客户体验返回（短路）— 过期食材是绝对不能用的
+        assert diff.constraint_block["name"] == "food_safety"
+
 
 # ─── confirmation_token ───
 
