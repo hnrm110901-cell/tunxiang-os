@@ -88,6 +88,7 @@ async def run_safe_query(
         SandboxTimeoutError: PG statement_timeout 触发
         RowLimitExceeded: 结果集行数 > max_rows
         ValueError: timeout_ms 非正数
+        RuntimeError: session 处于 AUTOCOMMIT 模式（SET LOCAL 会静默失效）
     """
     # 第一关：防火墙（在 DB 调用前）
     assert_safe_sql(sql)
@@ -96,6 +97,15 @@ async def run_safe_query(
     timeout_ms_int = int(timeout_ms)
     if timeout_ms_int <= 0:
         raise ValueError(f"timeout_ms 必须为正整数，收到 {timeout_ms!r}")
+
+    # 事务前置：SET LOCAL statement_timeout 仅在事务内生效。
+    # 调用方若错用 AUTOCOMMIT engine 取 session，PG 会接受 SET LOCAL 但事务边界
+    # 立即结束，超时防护静默失效，沙箱失去第二关。fail-fast 杜绝该路径。
+    if not session.in_transaction():
+        raise RuntimeError(
+            "run_safe_query 必须在已开启的事务中调用 — "
+            "AUTOCOMMIT 模式下 SET LOCAL statement_timeout 会静默失效，沙箱失去超时防护"
+        )
 
     # 第二关：超时注入（SET LOCAL 仅本事务生效，与 set_config('app.tenant_id') 同 session）
     await session.execute(
