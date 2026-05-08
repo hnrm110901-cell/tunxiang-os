@@ -1,3 +1,31 @@
+## 2026-05-08 23:30 · P0-8 启发式 round-3 + worktree 大批 prune 真收工（PR #310）
+
+### 完成状态
+- [x] PR #310 — `scan_decimal` 启发式三档独立白名单（UNIT_SUFFIX / RATIO_SUFFIX / MARGIN_TOKEN），7 baseline 误报清除（3 services + 4 ontology margin），pytest 双向守门 ✅，3 文件 +74/-36 / commit `100eba74`
+- [x] worktree 35 → 19（删 16 merged + 1 force-pycache，4 dirty 留 user adjudicate，2 新并发 worktree 保留）
+- [x] 发现 4 P1 PR + 2 worktree 来自并发 session（#308/#309/#311/#312 + p1-5/p1-6）— PR queue 7 OPEN
+- [x] DEVLOG + 本文件 + handoff 5/9 三件套同步更新
+
+### 关键决策
+- **决策 71：B-3 启发式收紧**（创始人 5/8 决策）— margin token 在屯象OS Ontology 中专指比率非金额，扫描器侧豁免不修 entities.py（§18 ontology 冻结仍守住）；接受小概率 false-negative（理论 `total_rate_amount` 命名错跳，实际 codebase 无此命名）
+- **决策 72：分支 `chore/audit-scan-decimal-heuristic-r3` 而非 dev-plan 列的 `chore/p0-8-decimal-amount-scan`** — 后者被 #264 历史 dev 分支占位（squash 后未删 5 commits），不能覆盖；`r3` 后缀显式标记 PR #264 round-3
+- **决策 73：worktree dirty 不强删** — 4 个含真 WIP（datetime-pg2 1 modified test / pj3-tzinfo 2 modified + 1 new test / sql-param 1 untracked md / s4-01-cmdk pnpm-lock drift）—— 强删可能丢未提交工作；只 force-pycache-only 的 pytest
+- **决策 74：dev-plan-60d 文档腐化承认** — 5/7 写的计划在 5/8 已大量过时（P0-8 完成 / P0-4 完成 / S4-01..S4-04 全 PR1 merged），dev-plan 需要 5/9 重写一份新的 30 天计划（不在本会话范围）
+
+### 下一步（5/9）
+- 优先 review/merge：#305 #307 #310（doc + audit T1）→ 然后 #308/#309/#311/#312（P1 sandbox/dispatcher/inv86 smell）
+- 4 dirty worktree 一次性 review 决定保留/删除
+- dev-plan-60d 重写（基于当前 main 状态 + 7 OPEN PR queue + #271 阻塞链）
+- 等 #271 DBA staging 解锁 #272 → #279 + #275/#276
+
+### 已知风险
+- PR queue 7 OPEN，review 负担显著高于 5/7 状态；需用 B 选项（真 BUG only）严守 Tier 1 review 停止线，避免越审越深
+- 4 dirty worktree 内含真 WIP，若 user 不及时 review 决断，未来 sweep 时会再次出现且记忆衰减
+- `chore/p0-8-decimal-amount-scan` 历史分支占位继续存在 — 未来 `dev-plan-60d` 重写时需注意分支名冲突
+- 并发 session 同时推 4 P1 PR + 2 worktree，main 推进速度高 — `git fetch` ff 必须每次起手第一步（5/8 已立"先 fetch 再 sweep"血泪教训）
+
+---
+
 ## 2026-05-08 22:30 · 命名漂移 sweep 收尾（PR #305 / #307）+ #279 阻塞 triage 收工
 
 ### 完成状态

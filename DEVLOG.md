@@ -1,3 +1,57 @@
+## 2026-05-08 深夜 · P0-8 启发式 round-3 + worktree 大批 prune（PR #310）
+
+### 今日完成
+
+**PR #310 — scan_decimal 启发式收紧 [Tier1]**
+- branch `chore/audit-scan-decimal-heuristic-r3`（dev-plan 列的 `chore/p0-8-decimal-amount-scan` 被 PR #264 历史 dev 分支占用，无法覆盖）
+- 启发式三档独立白名单（去掉 scale>=4 阈值）：
+  - `UNIT_SUFFIX_PATTERN`：`_km / _kg / _count / _qty / _pieces / _seconds / _minutes / _hours / _days / _ms`
+  - `RATIO_SUFFIX_PATTERN`：`_rate$ / _ratio$ / _pct$ / _percent$`（严格 end-of-name）
+  - `MARGIN_TOKEN_PATTERN`：`margin` 词含 `_margin / _margin_before / _margin_after` 等变体（创始人 5/8 决策）
+- 7 条 baseline 误报清除：3 services（travel.py `total_mileage_km` / banquet_ai.py `food_cost_rate` / banquet_contract.py `deposit_ratio`）+ 4 ontology margin（解锁 #264 round-2 遗留 known-acceptable）
+- pytest 双向守门 ✅（24 ⊆ 24，无 ghost 无 new）
+- 报告 27 → 24（services 单根扫描口径）
+- 3 文件 +74/-36 / commit `100eba74`
+
+**Worktree 大批 prune（35 → 19）**
+- 删 16 个 merged-PR worktree：compose / datetime-pg2 ⛔dirty 跳过 / forge / franchise-backfill / pay / pj2-concurrently / pj3-tzinfo ⛔dirty / pj4-backfill / pj6-guards-doc / pytest（force pycache 垃圾）/ sql-param ⛔dirty / strict / s4-01-cmdk ⛔dirty / s4-02-sql-sandbox / s4-03-nlq-action / s4-04-pin / pj1-sync-pull / pj5-known-broken / pk0-rls-injection / pk01-set-config / pk1-tx-trade-fstring / tunxiang-os-dedup
+- 4 dirty 含真 WIP 未强删（datetime-pg2 / pj3-tzinfo / sql-param / s4-01-cmdk）— 留给后续会话 review
+- 9 keep（含 3 in-flight + 4 P1 新发现 + 2 阻塞 + v4 + 2 .claude/worktrees）
+
+**意外发现：4 个并发 session 推的 P1 PR + 2 个新 worktree**
+- `#308 fix/p1-1-sandbox-autocommit-assert` OPEN
+- `#309 fix/p1-2-sandbox-db-layer-limit` OPEN
+- `#311 fix/p1-3-dispatcher-error-contract` OPEN
+- `#312 fix/p1-4-inv86-unfinished-cx` OPEN
+- 2 新 worktree（`p1-5-hotkey-input` / `p1-6-a2ui-ssrf`）来自同期并发 session — 对应 #294 PR description 列出的 4 个高优 smell + 2 个新（hotkey input passthrough / a2ui image SSRF allowlist）
+
+**main PR queue 现状**：7 OPEN（#305 / #307 / #308 / #309 / #310 / #311 / #312）
+
+### 数据变化
+- 新增 PR：1 个（#310），3 文件 +74/-36
+- worktree：35 → 19（删 16）
+- 测试：双向守门 24/24 ✅
+- 报告：27 → 24 violations
+
+### 关键决策
+- **决策 71：B-3 启发式收紧**（创始人选 B-3 解锁 ontology margin 4 处 known-acceptable）— 接受小概率 false-negative（理论 `total_rate_amount` 命名会错跳，实际 codebase 无此命名）
+- **决策 72：分支 `chore/audit-scan-decimal-heuristic-r3` 而非 dev-plan 列名** — `chore/p0-8-decimal-amount-scan` 被 #264 历史 dev 分支占位，不能覆盖；`r3` 后缀显式标记轮次
+- **决策 73：worktree dirty 不强删** — 4 个含真 WIP（不是 pycache 垃圾），强删可能丢未提交工作；只 force-pycache-only 的 pytest
+
+### 遗留问题
+- 4 dirty worktree 待 review（datetime-pg2 / pj3-tzinfo / sql-param / s4-01-cmdk）— 各 1-3 个 modified/untracked 文件，原 PR 已 merged
+- PR #310 等 review/merge（Tier 1 启发式 ≠ 业务代码，但仍按 Tier 1 治）
+- PR queue 7 OPEN，review 负担高 — 需按 Tier × 优先级排队
+- `chore/p0-8-decimal-amount-scan` 历史分支占位 — 后续可建议 `archive/...` 重命名
+
+### 明日计划（5/9 更新）
+- 优先：审 PR #305 / #307 / #310（T3/T1 doc + audit 启发式）
+- 然后审 #308/#309/#311/#312（4 个 P1 sandbox/dispatcher/inv86 smell fix）
+- 4 dirty worktree 一次性 review 决定保留/删除
+- 等 #271 DBA staging 解锁 #272 → #279 + #275/#276
+
+---
+
 ## 2026-05-08 晚段 · 命名漂移 sweep 收尾 + #279 阻塞 triage（PR #305 / #307 / Issue #306）
 
 ### 今日完成
