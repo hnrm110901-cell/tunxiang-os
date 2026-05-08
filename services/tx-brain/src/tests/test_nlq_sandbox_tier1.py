@@ -185,6 +185,7 @@ class TestSqlSandboxRunSafeQueryTier1:
     async def test_pg_statement_timeout_raises_sandbox_timeout(self):
         """LLM 输出 SELECT pg_sleep(60) → PG 5s 后中断，沙箱抛 SandboxTimeoutError。"""
         session = AsyncMock()
+        session.in_transaction = MagicMock(return_value=True)
         session.execute = AsyncMock(
             side_effect=[
                 MagicMock(),  # SET LOCAL ok
@@ -201,6 +202,24 @@ class TestSqlSandboxRunSafeQueryTier1:
                 "SELECT pg_sleep(60) FROM reports.daily_revenue",
                 timeout_ms=5000,
             )
+
+    @pytest.mark.asyncio
+    async def test_autocommit_session_fails_fast(self):
+        """AUTOCOMMIT engine session 调 run_safe_query → 必须 fail-fast 不发任何 SQL。
+
+        路由层若错误用 AUTOCOMMIT engine 取 session，PG 会接受 SET LOCAL statement_timeout
+        但事务边界结束立即丢弃，沙箱失去超时防护，恶意/错误 SQL 可拖死 DB。
+        运行时断言强制调用方在已开启的事务中调用，杜绝该静默失效路径。
+        """
+        session = AsyncMock()
+        session.in_transaction = MagicMock(return_value=False)
+        session.execute = AsyncMock()
+        with pytest.raises(RuntimeError, match="AUTOCOMMIT|事务"):
+            await run_safe_query(
+                session, "SELECT day FROM reports.daily_revenue"
+            )
+        # 任何 SQL（含 SET LOCAL）都不应被发出，否则给假象
+        session.execute.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_set_local_statement_timeout_uses_int_value(self):
@@ -229,6 +248,7 @@ class TestSqlSandboxRunSafeQueryTier1:
 def _mock_session_returning(rows: list) -> AsyncMock:
     """构造 AsyncMock session：第一次 execute = SET LOCAL ok / 第二次 = 实际 query 返回 rows。"""
     session = AsyncMock()
+    session.in_transaction = MagicMock(return_value=True)
     query_result = MagicMock()
     query_result.mappings.return_value = rows
     session.execute = AsyncMock(side_effect=[MagicMock(), query_result])
