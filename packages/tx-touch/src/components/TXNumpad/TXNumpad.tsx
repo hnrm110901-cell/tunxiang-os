@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './TXNumpad.module.css';
 
 export interface TXNumpadProps {

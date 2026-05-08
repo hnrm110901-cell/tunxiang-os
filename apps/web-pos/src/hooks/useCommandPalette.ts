@@ -10,9 +10,9 @@
  *
  * 触屏设备: isKeyboardDevice() 返回 false 时不挂载键盘监听
  */
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { isKeyboardDevice, POS_SHORTCUTS, SHORTCUT_CATEGORIES } from './useKeyboardShortcuts';
+import { isKeyboardDevice, POS_SHORTCUTS } from './useKeyboardShortcuts';
 import { agentExecute } from '../api/tradeApi';
 import type { ShortcutCategory } from './useKeyboardShortcuts';
 
@@ -176,7 +176,6 @@ export function useCommandPalette(): UseCommandPaletteReturn {
   const [agentResult, setAgentResult] = useState<string | null>(null);
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // 构建命令（navigate 稳定，不必用 useMemo）
   const commands = buildCommands(navigate);
@@ -184,8 +183,6 @@ export function useCommandPalette(): UseCommandPaletteReturn {
   // 过滤
   const filtered = filterCommands(commands, query);
 
-  // 分组 — 若查询未匹配任何命令且 >= 3 字符，追加 Agent 入口
-  const showAgentEntry = !agentMode && query.trim().length >= 3 && filtered.length === 0;
   const groupedItems = GROUP_ORDER
     .filter((g) => filtered.some((c) => c.group === g))
     .map((group) => ({

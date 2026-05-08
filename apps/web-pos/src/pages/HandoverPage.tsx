@@ -9,7 +9,6 @@
  */
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /* ---------- 样式常量 ---------- */

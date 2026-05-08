@@ -286,17 +286,6 @@ function formatDate(dateStr: string | null): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function statusLabel(status: string): string {
-  const map: Record<string, string> = {
-    stored: '存储中',
-    partial: '部分取出',
-    taken: '已取完',
-    expired: '已过期',
-    written_off: '已核销',
-  };
-  return map[status] || status;
-}
-
 // ─── 主组件 ──────────────────────────────────────────────────────────────────
 
 export function WineStorageQuickView({ tableId, tableName, onTakeSuccess }: Props) {

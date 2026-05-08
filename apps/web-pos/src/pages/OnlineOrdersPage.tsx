@@ -77,14 +77,11 @@ const REJECT_REASONS: { code: number; label: string }[] = [
   { code: 9, label: '其他原因' },
 ];
 
-// ─── TXBridge 类型声明（安卓 POS 注入） ───────────────────────────────────────
+// ─── TXBridge 类型 由 src/bridge/TXBridge.ts 全局声明 ─────────────────────────
+// 此处仅扩展非外设全局变量
 
 declare global {
   interface Window {
-    TXBridge?: {
-      print: (content: string) => void;
-      getMacMiniUrl?: () => string;
-    };
     __STORE_ID__?: string;
     __POS_HOST_URL__?: string;
   }

@@ -5,7 +5,6 @@
  * 收银员可选择一张券核销，或跳过不使用。
  */
 import type { EligibleCoupon } from '../api/couponApi';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */

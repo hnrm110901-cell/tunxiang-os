@@ -6,7 +6,6 @@
  * 布局：档口选择器 → 3列（品项 | 订单明细 | 结算面板）→ 底部Tab
  */
 import { useState, useCallback } from 'react';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── Design Token（CSS 变量）────────────────────────────────────────────────

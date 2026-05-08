@@ -21,7 +21,6 @@ import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import DishRecommendBanner from '../components/DishRecommendBanner';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
 import type { ComboSelectorSheetProps } from '../components/ComboSelectorSheet';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── 扩展类型 ──────────────────────────────────────────────────────────────────

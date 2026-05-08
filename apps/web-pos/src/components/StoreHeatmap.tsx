@@ -83,15 +83,15 @@ const ZONE_PADDING = 24;
 // ─── 工具函数 ────────────────────────────────────────────────────────────────────
 
 /** 十六进制颜色插值 */
-function lerpColor(a: string, b: string, t: number): string {
-  const ah = parseInt(a.slice(1), 16);
-  const bh = parseInt(b.slice(1), 16);
+function lerpColor(colorA: string, colorB: string, t: number): string {
+  const ah = parseInt(colorA.slice(1), 16);
+  const bh = parseInt(colorB.slice(1), 16);
   const ar = (ah >> 16) & 0xff, ag = (ah >> 8) & 0xff, ab = ah & 0xff;
   const br = (bh >> 16) & 0xff, bg = (bh >> 8) & 0xff, bb = bh & 0xff;
   const r = Math.round(ar + (br - ar) * t);
   const g = Math.round(ag + (bg - ag) * t);
-  const b = Math.round(ab + (bb - ab) * t);
-  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+  const blue = Math.round(ab + (bb - ab) * t);
+  return `#${((1 << 24) | (r << 16) | (g << 8) | blue).toString(16).slice(1)}`;
 }
 
 function roundRect(

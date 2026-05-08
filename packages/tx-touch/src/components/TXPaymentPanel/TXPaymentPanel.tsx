@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { TXButton } from '../TXButton/TXButton';
 import { TXNumpad } from '../TXNumpad/TXNumpad';
 import { fenToYuan } from '../../utils/currency';

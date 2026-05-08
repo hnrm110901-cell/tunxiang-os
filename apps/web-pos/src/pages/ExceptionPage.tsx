@@ -11,7 +11,6 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 const BASE = import.meta.env.VITE_API_BASE_URL || '';

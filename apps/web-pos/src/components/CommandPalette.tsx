@@ -13,7 +13,6 @@
  */
 import { useState, useEffect, useRef } from 'react';
 import { useCommandPalette } from '../hooks/useCommandPalette';
-import type { Command, CommandGroup } from '../hooks/useCommandPalette';
 import { A2UIRenderer, parseA2UIFromAgent } from './a2ui/A2UIRenderer';
 import { txColors } from '@tx/tokens';
 

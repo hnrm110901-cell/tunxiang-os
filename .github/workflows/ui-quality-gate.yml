@@ -68,3 +68,21 @@ jobs:
       - name: 汇总（lint:ui）
         run: node scripts/lint-ui/all.mjs
         if: always()
+
+  typecheck-web-pos:
+    name: Typecheck (web-pos — #267 已清零)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+      - name: tsc --noEmit
+        working-directory: apps/web-pos
+        run: pnpm typecheck

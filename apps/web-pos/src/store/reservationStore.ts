@@ -18,7 +18,7 @@ interface ReservationState {
   clearError: () => void;
 }
 
-export const useReservationStore = create<ReservationState>()((set, get) => ({
+export const useReservationStore = create<ReservationState>()((set) => ({
   reservations: [],
   loading: false,
   error: null,

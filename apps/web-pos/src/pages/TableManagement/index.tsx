@@ -4,14 +4,7 @@
  * @module pages/TableManagement
  */
 
-import React, { useEffect, useMemo } from 'react';
-import { Segmented, Button, message } from 'antd';
-import {
-  BgColorsOutlined,
-  UnorderedListOutlined,
-  EnvironmentOutlined,
-  ReloadOutlined,
-} from '@ant-design/icons';
+import { useEffect, useMemo } from 'react';
 import { TXButton } from '@tx/touch';
 import { useTableStore } from '../../stores/tableStore';
 import { ViewMode } from '../../types/table-card';

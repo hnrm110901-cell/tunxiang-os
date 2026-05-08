@@ -15,7 +15,6 @@
  *   window.TXBridge?.print(text) || fetch('/api/device/print', { method:'POST', body: text });
  */
 
-import { formatPrice } from '@tx-ds/utils';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 

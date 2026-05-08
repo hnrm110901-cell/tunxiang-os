@@ -9,33 +9,27 @@ import { en } from './en';
 import { ms } from './ms';
 import { vi } from './vi';
 import { id } from './id';
-import type { TranslationKeys } from './types';
-
 export type Lang = 'zh' | 'en' | 'ms' | 'vi' | 'id';
 
-type Translations = typeof zh;
-type NestedKeyOf<T> = T extends Record<string, unknown>
-  ? { [K in keyof T]: T[K] extends string ? K : `${K & string}.${NestedKeyOf<T[K]> & string}` }[keyof T]
-  : never;
-
-type FlatKey = NestedKeyOf<Translations>;
+// 各语言字典只在 value 字面量上不同；结构相同 → flatten 接受任意 nested string-record
+type NestedStringRecord = { [key: string]: string | NestedStringRecord };
 
 const dictMap: Record<Lang, Record<string, string>> = {
-  zh: _flatten(zh),
-  en: _flatten(en),
-  ms: _flatten(ms),
-  vi: _flatten(vi),
-  id: _flatten(id),
+  zh: _flatten(zh as NestedStringRecord),
+  en: _flatten(en as NestedStringRecord),
+  ms: _flatten(ms as NestedStringRecord),
+  vi: _flatten(vi as NestedStringRecord),
+  id: _flatten(id as NestedStringRecord),
 };
 
-function _flatten(obj: Translations, prefix = ''): Record<string, string> {
+function _flatten(obj: NestedStringRecord, prefix = ''): Record<string, string> {
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(obj)) {
     const fullKey = prefix ? `${prefix}.${key}` : key;
     if (typeof value === 'string') {
       result[fullKey] = value;
     } else if (typeof value === 'object' && value !== null) {
-      Object.assign(result, _flatten(value as Translations, fullKey));
+      Object.assign(result, _flatten(value, fullKey));
     }
   }
   return result;

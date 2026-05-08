@@ -181,7 +181,10 @@ function SessionSelector({
   useEffect(() => {
     setLoading(true);
     txFetch('/api/v1/banquet/sessions?status=confirmed&size=50')
-      .then((r: { data?: { items?: BanquetSession[] } }) => setSessions(r?.data?.items ?? []))
+      .then((r) => {
+        const typed = r as { data?: { items?: BanquetSession[] } };
+        setSessions(typed?.data?.items ?? []);
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, []);

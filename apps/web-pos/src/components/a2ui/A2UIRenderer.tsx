@@ -153,7 +153,7 @@ function renderNode(
   onAction?: A2UIActionCallback,
   ctx?: A2UIRenderContext,
 ): ReactNode {
-  const { type, id, props, children, actionId } = node;
+  const { type, id, props, children } = node;
 
   switch (type) {
     // ── Card ──
@@ -294,7 +294,7 @@ function renderNode(
     case 'section': {
       return (
         <div key={id} style={{ margin: '8px 0' }}>
-          {props.title && (
+          {Boolean(props.title) && (
             <div style={{ fontSize: 12, fontWeight: 700, color: T.text2, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
               {String(props.title)}
             </div>
@@ -448,7 +448,8 @@ export function parseA2UIFromAgent(data: Record<string, unknown> | unknown): A2U
   }
 
   // 如果 Agent 返回的是业务数据，自动包装成 Card
-  const alert = d.alert || d.alerts?.[0] || d.recommendation || d.result || null;
+  const alerts = d.alerts as unknown[] | undefined;
+  const alert = d.alert || alerts?.[0] || d.recommendation || d.result || null;
   if (alert && typeof alert === 'object') {
     const a = alert as Record<string, unknown>;
     const severity = (a.severity as string) === 'critical' ? 'critical' :

@@ -17,6 +17,11 @@
  */
 import { useState, useCallback, useRef, useEffect } from 'react';
 
+// SpeechRecognition 不在 TypeScript 标准 DOM lib 中（仅 webkit 前缀实现），
+// 此处声明最小可用类型避免 typecheck 报错；实际能力由 capability detection 控制。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SpeechRecognition = any;
+
 // ─── 类型 ──────────────────────────────────────────────────────────────────────
 
 export interface VoiceCommand {
@@ -138,8 +143,8 @@ export function useVoiceAgent(options: UseVoiceAgentOptions = {}): UseVoiceAgent
   const startListening = useCallback(() => {
     if (!recognitionSupported) return;
 
-    const SpeechRecognitionAPI = (window as unknown as Record<string, unknown>).SpeechRecognition as typeof SpeechRecognition
-      || (window as unknown as Record<string, unknown>).webkitSpeechRecognition as typeof SpeechRecognition;
+    const SpeechRecognitionAPI = ((window as unknown as Record<string, unknown>).SpeechRecognition
+      || (window as unknown as Record<string, unknown>).webkitSpeechRecognition) as { new (): SpeechRecognition } | undefined;
 
     if (!SpeechRecognitionAPI) return;
 

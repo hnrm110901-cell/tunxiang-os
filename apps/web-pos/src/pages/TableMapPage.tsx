@@ -77,7 +77,7 @@ export function TableMapPage() {
     {
       key: POS_SHORTCUTS.TABLE_MAP.key,     // F5
       label: '刷新桌台状态',
-      handler: loadTables,
+      handler: () => loadTables(),
     },
     {
       key: POS_SHORTCUTS.SHIFT_HANDOVER.key, // F9

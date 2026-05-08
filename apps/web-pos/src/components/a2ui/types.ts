@@ -7,8 +7,6 @@
  * 组件白名单: Card | Text | Button | List | Input | Image | Chart | Badge |
  *             Progress | Table | ActionsBar | Section | Divider | Spinner
  */
-import type { ReactNode } from 'react';
-
 // ─── A2UI 基础组件类型 ─────────────────────────────────────────────────────────
 
 export type A2UIComponentType =

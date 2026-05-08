@@ -17,7 +17,7 @@ interface CustomerProfile {
   preferences: string[];  // 偏好标签，如 ['靠窗位', '少辣', '清蒸系']
   avoidances?: string[];  // 忌口
   wineStorage?: { name: string; remainMl: number } | null;
-  aiActions: { label: string; type: 'primary' | 'default' | 'dashed' }[];
+  aiActions: { label: string; type: 'primary' | 'default' | 'dashed'; onPress?: () => void }[];
 }
 
 interface CustomerBrainPanelProps {
@@ -186,9 +186,10 @@ export default function CustomerBrainPanel({
       {data.aiActions.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {data.aiActions.map((action, i) => (
-            <Button
+            <TXButton
               key={i}
-              type={action.type}
+              variant={action.type === 'primary' ? 'primary' : 'secondary'}
+              onPress={action.onPress ?? (() => {})}
               style={{
                 width: '100%',
                 minHeight: 44,
@@ -198,7 +199,7 @@ export default function CustomerBrainPanel({
               }}
             >
               {action.label}
-            </Button>
+            </TXButton>
           ))}
         </div>
       )}

@@ -8,7 +8,7 @@
  *
  * 展示：桌号、单号、菜品列表、状态、倒计时、操作按钮
  */
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import styles from './OrderTicketCard.module.css';
 import { cn } from '../../utils/cn';
 import { useSwipe } from '../../hooks/useSwipe';
@@ -77,14 +77,6 @@ export interface OrderTicketCardProps {
   swipeLabel?: string;
 }
 
-const STATUS_META: Record<TicketStatus, { label: string; className: string }> = {
-  pending:   { label: '等待', className: 'statusPending' },
-  cooking:   { label: '制作中', className: 'statusCooking' },
-  done:      { label: '已出', className: 'statusDone' },
-  timeout:   { label: '超时', className: 'statusTimeout' },
-  cancelled: { label: '已取消', className: 'statusCancelled' },
-};
-
 const PRIORITY_META: Record<TicketPriority, { label: string; className: string }> = {
   normal: { label: '', className: '' },
   rush:   { label: '加急', className: 'priorityRush' },
@@ -109,7 +101,6 @@ export default function OrderTicketCard({
   onSwipeComplete,
   swipeLabel = '完成',
 }: OrderTicketCardProps) {
-  const statusMeta = STATUS_META[ticket.status] ?? STATUS_META.pending;
   const priorityMeta = PRIORITY_META[ticket.priority ?? 'normal'];
 
   // Calculate elapsed time

@@ -5,7 +5,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */

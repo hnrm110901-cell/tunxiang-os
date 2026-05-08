@@ -21,7 +21,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import ReactDOM from 'react-dom';
 import { getMacMiniUrl } from '../bridge/TXBridge';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───────────────────────────────────────────────────────────

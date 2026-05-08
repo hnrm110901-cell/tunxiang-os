@@ -18,7 +18,6 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { DiscountAlert } from '../hooks/usePOSAlerts';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── 常量 ───

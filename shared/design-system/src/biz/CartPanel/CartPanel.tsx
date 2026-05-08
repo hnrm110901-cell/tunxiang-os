@@ -1,4 +1,3 @@
-import React from 'react';
 import styles from './CartPanel.module.css';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';

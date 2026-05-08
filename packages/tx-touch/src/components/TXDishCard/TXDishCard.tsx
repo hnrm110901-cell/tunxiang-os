@@ -1,4 +1,3 @@
-import React from 'react';
 import { useLongPress } from '../../hooks/useLongPress';
 import { fenToYuan } from '../../utils/currency';
 import styles from './TXDishCard.module.css';

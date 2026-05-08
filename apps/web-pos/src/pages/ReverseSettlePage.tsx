@@ -6,7 +6,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { getOrder } from '../api/tradeApi';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */

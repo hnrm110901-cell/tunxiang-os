@@ -7,7 +7,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment } from '../api/tradeApi';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */

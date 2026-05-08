@@ -5,11 +5,9 @@
  * @module pages/TableManagement/TableMapView
  */
 
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
   TableCardData,
-  TableStatus,
-  TableLayout,
   CardField,
 } from '../../types/table-card';
 import { useTableStore } from '../../stores/tableStore';
@@ -44,14 +42,8 @@ const MapCanvas: React.FC<{
   const tooltipRef = useRef<HTMLDivElement>(null);
 
   // 鼠标悬停的桌台
-  const [hoveredTableNo, setHoveredTableNo] = React.useState<string | null>(null);
-  const [tooltipPos, setTooltipPos] = React.useState<{ x: number; y: number } | null>(null);
-
-  // 计算缩放因子（将百分比坐标转换为像素）
-  const scale = {
-    x: width / 100,
-    y: height / 100,
-  };
+  const [hoveredTableNo, setHoveredTableNo] = useState<string | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   const padding = 40;
   const drawableWidth = width - padding * 2;
@@ -298,7 +290,7 @@ export const TableMapView: React.FC<TableMapViewProps> = ({
 }) => {
   const { trackFieldClick } = useTableStore();
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = React.useState({ width: 800, height: 500 });
+  const [dimensions, setDimensions] = useState({ width: 800, height: 500 });
 
   // 监听容器大小变化
   useEffect(() => {

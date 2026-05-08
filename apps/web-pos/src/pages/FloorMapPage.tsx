@@ -6,7 +6,6 @@
 import { useState, useEffect, useCallback, useRef, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../api/index';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /* ─── 颜色常量 ─── */

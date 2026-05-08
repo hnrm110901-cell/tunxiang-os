@@ -24,7 +24,7 @@ const C = {
     position: 'relative',
   }),
 
-  toggle: (open: boolean): React.CSSProperties => ({
+  toggle: (_open: boolean): React.CSSProperties => ({
     position: 'absolute', left: -36, top: 16,
     width: 36, height: 36,
     borderRadius: '8px 0 0 8px',

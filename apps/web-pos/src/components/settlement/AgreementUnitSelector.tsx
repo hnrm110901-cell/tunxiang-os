@@ -10,7 +10,6 @@
  *  - 无 Ant Design 依赖
  */
 import { useEffect, useRef, useState } from 'react';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────

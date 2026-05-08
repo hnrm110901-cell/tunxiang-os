@@ -26,7 +26,6 @@ import { DiscountPreviewSheet, type DiscountParams } from '../components/Discoun
 import CustomerBrainPanel from '../components/CustomerBrainPanel';
 import { CouponEligibleSheet } from '../components/CouponEligibleSheet';
 import { useCouponEligibility } from '../hooks/useCouponEligibility';
-import { formatPrice } from '@tx-ds/utils';
 import { useKeyboardShortcuts, POS_SHORTCUTS } from '../hooks/useKeyboardShortcuts';
 import { txColors } from '@tx/tokens';
 

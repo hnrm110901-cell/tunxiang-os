@@ -19,7 +19,6 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens（Store 终端 CSS Variables）───

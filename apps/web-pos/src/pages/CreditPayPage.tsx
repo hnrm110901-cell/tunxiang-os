@@ -8,7 +8,6 @@ import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { useOrderStore } from '../store/orderStore';
 import { createPayment, settleOrder, printReceipt as apiPrintReceipt } from '../api/tradeApi';
 import { printReceipt as bridgePrint } from '../bridge/TXBridge';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 /** @deprecated Use formatPrice from @tx-ds/utils */

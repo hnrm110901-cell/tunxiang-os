@@ -15,7 +15,6 @@ import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
 import { fetchDishes, type DishItem } from '../api/menuApi';
 import { DishGrid, CategoryNav, MenuSearch, CartPanel } from '@tx-ds/biz';
 import type { DishData, CartItem } from '@tx-ds/biz';
-import { formatPrice } from '@tx-ds/utils';
 import { LiveSeafoodOrderSheet } from '../components/LiveSeafoodOrderSheet';
 import { ComboSelectorSheet } from '../components/ComboSelectorSheet';
 import type { LiveSeafoodOrderSheetProps } from '../components/LiveSeafoodOrderSheet';
@@ -25,7 +24,6 @@ import { KeyboardShortcutHelp } from '../components/KeyboardShortcutHelp';
 import { ShortcutOverlay } from '../components/ShortcutOverlay';
 import { SmartSidebar } from '../components/SmartSidebar';
 import { VoiceCommandBar, matchVoiceCommand } from '../components/VoiceCommandBar';
-import { useTouchFeedback } from '../hooks/useTouchFeedback';
 
 // ─── 扩展菜品类型（增加活鲜/套餐字段）────────────────────────────────────────
 
@@ -174,7 +172,6 @@ export function CashierPage() {
   const [activeCategory, setActiveCategory] = useState('all');
   const [showHelpPanel, setShowHelpPanel] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const tf = useTouchFeedback();
 
   // 活鲜弹层状态
   const [seafoodSheet, setSeafoodSheet] = useState<{
@@ -399,16 +396,6 @@ export function CashierPage() {
     [items],
   );
 
-  // ── 辅助函数 ─────────────────────────────────────────────────────────────────
-
-  const getQuantityForDish = useCallback(
-    (dishId: string) => {
-      const item = items.find((i) => i.dishId === dishId);
-      return item?.quantity ?? 0;
-    },
-    [items],
-  );
-
   // ── DishGrid 适配 ───────────────────────────────────────────────────────────
 
   /** dishId → ExtendedDishItem 查找表，用于 DishGrid 回调中还原原始菜品对象 */
@@ -492,7 +479,7 @@ export function CashierPage() {
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         }}>
           <span style={{ color: '#EB5757', fontSize: 13 }}>{error}</span>
-          <button onClick={() => { setError(null); setLoading(true); createOrder(STORE_ID, tableNo).then((res) => { store.setOrder(res.order_id, res.order_no, tableNo); setError(null); }).catch((e) => { console.error(e); setError('开单失败，请重试'); }).finally(() => setLoading(false)); }} style={{
+          <button onClick={() => { if (!tableNo) { setError('桌号缺失，请返回桌台'); return; } setError(null); setLoading(true); createOrder(STORE_ID, tableNo).then((res) => { store.setOrder(res.order_id, res.order_no, tableNo); setError(null); }).catch((e) => { console.error(e); setError('开单失败，请重试'); }).finally(() => setLoading(false)); }} style={{
             padding: '4px 12px', borderRadius: 6, border: '1px solid #EB5757',
             background: 'transparent', color: '#EB5757', cursor: 'pointer', fontSize: 12,
             minHeight: 32,

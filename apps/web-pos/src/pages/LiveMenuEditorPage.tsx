@@ -8,7 +8,6 @@
  * 因缺货下架的菜品显示"等待食材"状态，食材到货后变为"恢复上架"。
  */
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── 类型 ───

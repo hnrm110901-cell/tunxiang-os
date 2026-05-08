@@ -4,10 +4,8 @@
  * @module pages/TableManagement/TableListView
  */
 
-import React, { useMemo, useCallback, useState } from 'react';
-import { Table, Tag, Collapse, Spin } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { TXCard, TXScrollList } from '@tx/touch';
+import { useMemo, useCallback, useState } from 'react';
+import { TXScrollList } from '@tx/touch';
 import {
   CardField,
   TableCardData,

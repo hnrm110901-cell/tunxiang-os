@@ -24,6 +24,7 @@ import { useNavigate } from 'react-router-dom';
 import { txFetch } from '../../api/index';
 import { KdsTimeline, deriveStageDurations } from '../../components/KdsTimeline';
 import { VoiceCommandBar, matchVoiceCommand } from '../../components/VoiceCommandBar';
+import { useTouchFeedback } from '../../hooks/useTouchFeedback';
 import { txColors } from '@tx/tokens';
 
 // ─── Design Tokens ───
@@ -116,6 +117,7 @@ const MOCK_ORDERS: FastFoodOrder[] = [
 
 export function FastFoodKDSView() {
   const navigate = useNavigate();
+  const tf = useTouchFeedback();
   const [orders, setOrders] = useState<FastFoodOrder[]>(MOCK_ORDERS);
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
   const [, forceUpdate] = useState(0); // timer-driven re-render for elapsed time

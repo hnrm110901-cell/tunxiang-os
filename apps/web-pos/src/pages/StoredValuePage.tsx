@@ -6,7 +6,6 @@
  */
 import { useState, useCallback } from 'react';
 import { txFetch } from '../api/index';
-import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ───────────────────────────────────────────────────────────────

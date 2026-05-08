@@ -20,7 +20,6 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTouchFeedback } from '../hooks/useTouchFeedback';
 import { VoiceCommandBar, matchVoiceCommand } from '../components/VoiceCommandBar';
 import { fetchDishes, fetchCategories, type DishItem } from '../api/menuApi';
 import { printReceipt as bridgePrint, openCashBox } from '../bridge/TXBridge';
@@ -663,7 +662,6 @@ export function QuickCashierPage() {
   const navigate = useNavigate();
   const scanInputRef = useRef<HTMLInputElement>(null);
   const storeId = getStoreId();
-  const tf = useTouchFeedback();
 
   // ── 菜品数据 ──
   const [categories, setCategories] = useState<string[]>(MOCK_CATEGORIES);
@@ -1406,7 +1404,7 @@ export function QuickCashierPage() {
         onCommand={(cmd) => {
           const action = matchVoiceCommand(cmd.text, '收银台');
           if (action === 'quick_cash' && cart.length > 0) {
-            setShowPayModal(true);
+            setPayModal((prev) => ({ ...prev, open: true }));
           }
         }}
       />

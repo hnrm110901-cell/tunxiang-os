@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import styles from './SpecSheet.module.css';
 import { formatPrice } from '../../utils/formatPrice';
 import { cn } from '../../utils/cn';

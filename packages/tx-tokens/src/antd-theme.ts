@@ -1,5 +1,15 @@
-import type { ThemeConfig } from 'antd';
 import { txColors, txRadius } from './tokens';
+
+// 注：tx-tokens 不直接依赖 antd（保持 zero-dep 稳态）。
+// ThemeConfig 由消费方（web-admin / web-hub 等）的 antd 版本结构兼容；
+// 这里使用结构化类型避免循环依赖。
+type ThemeConfig = {
+  token?: Record<string, unknown>;
+  components?: Record<string, Record<string, unknown>>;
+  algorithm?: unknown;
+  cssVar?: unknown;
+  hashed?: boolean;
+};
 
 export const txAdminTheme: ThemeConfig = {
   token: {
