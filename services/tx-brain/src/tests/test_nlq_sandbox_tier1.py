@@ -241,6 +241,41 @@ class TestSqlSandboxRunSafeQueryTier1:
         with pytest.raises(ValueError):
             await run_safe_query(session, "SELECT 1", timeout_ms=-1)
 
+    @pytest.mark.asyncio
+    async def test_user_sql_wrapped_in_cte_with_db_layer_limit(self):
+        """LLM 输出无 LIMIT 全表查询 → 沙箱 DB 层用 WITH ... LIMIT N+1 包装，
+        而非把 N+1 行结果集传到 Python 内存（防笛卡尔积内存炸弹）。
+        """
+        session = _mock_session_returning([])
+        await run_safe_query(
+            session,
+            "SELECT id FROM reports.dishes",
+            max_rows=100,
+        )
+        # 第二次 execute 是被沙箱包装后的 SQL
+        wrapped_sql = str(session.execute.call_args_list[1].args[0])
+        assert "WITH " in wrapped_sql
+        # 用户原 SQL 完整保留在 CTE 内
+        assert "SELECT id FROM reports.dishes" in wrapped_sql
+        # DB 层 LIMIT = max_rows + 1（探测溢出 + 不放行多 1 行内存）
+        assert "LIMIT 101" in wrapped_sql
+
+    @pytest.mark.asyncio
+    async def test_trailing_semicolon_stripped_before_wrap(self):
+        """LLM 偶尔输出带尾分号的 SELECT 1; → 沙箱去尾分号再包 CTE，
+        否则 PG 会因 CTE 内含 ; 报语法错。"""
+        session = _mock_session_returning([])
+        await run_safe_query(
+            session,
+            "SELECT day FROM reports.daily_revenue ;  ",
+        )
+        wrapped_sql = str(session.execute.call_args_list[1].args[0])
+        # CTE 内部不能含 ;（PG 语法限制）
+        cte_open = wrapped_sql.index("(")
+        cte_close = wrapped_sql.rindex(")")
+        cte_body = wrapped_sql[cte_open + 1 : cte_close]
+        assert ";" not in cte_body
+
 
 # ─────────────── helpers ───────────────
 
