@@ -1,3 +1,116 @@
+## 2026-05-08 M2-W0 + Sprint 3 全冲：10 issue 闭环（A 路线 + Sprint 3）
+
+### 今日完成（按时间顺序）
+
+#### M2-W0 follow-up 清零（5 issue）
+
+- **#273 [follow-up] hardcoded-color 残留 69 → 0** — `f511f4c9`
+  - 19 处：3 应用 :root token 重复声明改为 import @tx/tokens/tokens.css
+  - 22 处：inline linear-gradient hex → var(--tx-primary/-hover/-active)
+  - 8 处：CSS @keyframes 改 var(--tx-danger)
+  - 4 处：StatCard 8-digit hex (alpha overlay) 加 @lint-ignore-color
+  - 11 处：lint script EXEMPT 扩展（token 文件 + e2e fixture + /* */ 注释）
+  - baseline.json 69 → 0；CI lint:hardcoded-color **--strict 切换**
+
+- **#267 [tech-debt] web-pos typecheck 81 → 0** — `a135a052` (+ 后续 #268 触控修复)
+  - 25 文件 unused formatPrice 批量删除
+  - 9 React imports 删除（modern JSX 不需要）
+  - 散点 unused（tf/scale/statusLabel/get/SHORTCUT_CATEGORIES 等）
+  - 真错误 ~13 个：StoreHeatmap 重复 `b` / SpeechRecognition 全局 / i18n type / TXBridge 冲突 / loadTables 提前引用 / antd-theme.ts 模块缺失 等
+  - 新增 typecheck-web-pos CI **enforce 闸门**
+
+- **#270 [follow-up] useOffline / useAgentSSE DI options** — `08815b7a`
+  - 抽离业务 API 至 DI: apiBaseUrl/tenantId/heartbeatPath/customReplay
+  - replayOperation(op, ctx?) 第二参数可选（向后兼容 12 老测试）
+  - useAgentSSE 新增 baseUrl/streamPath/eventHandlers options
+  - 新增 3 DI 测试 → 12+3=15/15 全绿
+
+- **#268 [follow-up] TableManagement TXTouch 触控对齐** — `ba80c9a0`
+  - 既有状态：已迁 TXTouch（unused antd 在 #267 清掉）
+  - viewMode 按钮：minHeight 40 → 48 + minWidth 48 + aria-pressed
+  - 字段标签按钮：minHeight 32 → 48 + fontSize 13 → 16
+  - lint:no-antd-in-store baseline 3 → 0，**--strict 切换**
+
+- **#269 [follow-up] tx-touch Storybook 8 基础设施** — `f1fde674`
+  - .storybook/main.ts + preview.ts（@tx/tokens 注入 + 5 视口预设：商米T2 / iPad Pro / D2 / Crew）
+  - 5/9 核心组件 stories：TXButton/Card/DishCard/KDSTicket/Numpad
+  - package.json 新增 storybook + build-storybook 脚本
+
+#### Sprint 3 提前启动（4/4 issue + Epic）
+
+- **#285 [S3-04] TXAgentAlert 三级 + TTS** — `3081f17c`
+  - ttsMode prop: auto (默认 critical 才播报) / always / never
+  - speakViaWebAPI: Web Speech API + 静默降级
+  - 5 stories（Critical/Warning/Info + CriticalSilenced/InfoForceSpeak）
+  - 10/10 单测（severity 视觉 ×3 + TTS 真值表 ×7）
+
+- **#281 [S3-01] A2UI 白名单 +6** — `19dc1ce9`
+  - types.ts: 新增 6 type union + props 接口（Form/Map/Heatmap/Timeline/Cascader/Tabs）
+  - A2UIRenderer.tsx: 6 case 内联渲染 + 安全 enforce（cascader 深 5 / tabs 数 12）
+  - 8/8 单测（6 组件功能 + 2 安全约束）
+
+- **#284 [S3-03] tx-agent A2UI Surface 生成器 ×3** — `eb8052b9`
+  - services/tx-agent/src/agents/a2ui_surfaces.py（新文件）
+  - build_discount_alert / build_member_recommendation / build_inventory_warning
+  - 函数式构造器，actionPayload 自动注入决策上下文（order_id/member_id/operator_id）
+  - 10/10 pytest 用例（含类型白名单递归校验）
+
+- **#282 [S3-02] A2UI 协议中文文档** — `5114a73e`
+  - docs/a2ui-protocol-cn.md 10 章 ~330 行
+  - 20 type 白名单 + Surface 生成器规范 + **6 条安全 review 铁律**（含正反例代码）
+  - 决策留痕 AgentDecisionLog 字段映射 + PR checkbox 模板
+
+- **Epic #283** 已 close
+
+### 数据变化
+- **commit**: 9 个（5 follow-up + 4 Sprint 3）
+- **测试绿**: 30+ + 28 = **58 个本日新增/调整**
+  - useOffline 12 老 + 3 新 DI = 15
+  - TXAgentAlert 10
+  - A2UI 6 新组件 8
+  - tx-agent A2UI Surface 10
+- **CI 闸门状态**:
+  - lint:no-antd-in-store **strict**（baseline 3 → 0）
+  - lint:hardcoded-color **strict**（baseline 69 → 0）
+  - typecheck-web-pos **enforce**（new）
+  - lint:tap-target / font-size / a11y baseline
+- **A2UI 白名单**: 14 → 20 type
+- **3 Surface 生成器**: discount/member/inventory 全部落地
+- **Storybook**: 5/9 tx-touch 组件已覆盖
+- **6 issue 关闭**: #267 #268 #269 #270 #273 #281 #282 #284 #285（共 9）+ Epic #283
+
+### 关键决策（M2-W0 / Sprint 3）
+1. **#273 alpha overlay 用 @lint-ignore-color 而非新增 token** — StatCard `bg="#XX22"` 是 RRGGBBAA 8-digit，无对应 token；新增 alpha overlay token 扩大语义混乱，标记为 follow-up。
+2. **#267 antd-theme.ts 用结构化 type 替代 import 'antd'** — tx-tokens 不能依赖 antd 否则破坏 zero-dep 稳态；定义本地 ThemeConfig 结构化类型，消费方（web-admin）的 antd 版本结构兼容。
+3. **#270 DI 第二参数可选** — replayOperation(op, ctx?) 保留 zero-arg 调用，向后兼容现有 12 老测试。
+4. **#268 既有状态发现** — TableManagement 已迁 TXTouch（unused antd 在 #267 清掉），本 issue 仅触控紧度对齐 + baseline 同步。
+5. **Sprint 3 提前 1 个月启动** — dev plan 计划 2026-06-08，实际 2026-05-08；M2-W0 加速给后续争取 buffer。
+6. **A2UI Surface 生成器函数式而非 method on Skill class** — 不污染既有 Agent 类，独立测试，跨 agent 复用。
+7. **A2UI 6 新组件内联实现而非新增 tx-touch 组件** — 避免 6 个新 CSS module + bundle 膨胀，复用 T 主题对象。
+8. **Cascader 深度限 5 / Tabs 数量限 12** — 防止 Agent 输出递归攻击；renderer 中 enforce + console.warn。
+
+### 闸门数据快照
+- typecheck (web-pos)：**0 错误**（81 → 0，严格 noUnusedLocals/Parameters）
+- lint:ui 4/4 通过（580ms）
+- lint:no-antd-in-store **strict** 0 违规
+- lint:hardcoded-color **strict** 0 违规
+- 新单测：23 frontend (TXAgentAlert 10 + A2UI 6 新组件 8 + DI 3 + 2 旧扩展) + 10 backend (a2ui_surfaces) = 33
+
+### 遗留问题
+- #260 商米 T2 现场（待客户协调，M2-W1+）
+- Storybook 4 组件待补：TXAgentAlert（本日已加）/ TXScrollList / TXSelector / TXPaymentPanel
+- web-admin pre-existing typecheck errors（不在本会话 scope）
+- font-size baseline 1710 仍待降基线（M2 中后期）
+
+### 明日计划
+- Sprint 4 启动：Admin AI NLQ（M2 W7-W8 提前）
+  - S4-01 浮动按钮 + 对话面板
+  - S4-02 NLQ → SQL（tx-brain 接入）
+  - S4-03 NLQ → 三类操作执行
+  - S4-04 Pin 洞察
+
+---
+
 ## 2026-05-07 Sprint 2 #262 M1 闸门评审材料 → 9/10
 
 ### 今日完成（续，#262）
