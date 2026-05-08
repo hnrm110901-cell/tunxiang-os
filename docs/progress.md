@@ -1,3 +1,30 @@
+## 2026-05-09 00:30 · 4 dirty worktree 全清 + stale-HEAD 错觉教训
+
+### 完成状态
+- [x] datetime-pg2 / pj3-tzinfo / sql-param / s4-01-cmdk 全 force-delete（0 PR 抢救，全是错觉 WIP）
+- [x] 验证手法：`diff <worktree-file> <(git show origin/main:<path>)` 比对，确认 4 处 modified 全等 main 已有内容
+- [x] 意外发现 3 处并发 session 推进：worktree `p1-7-pin-failfast` 新建 + `p1-2 / p1-4` 两个 P1 worktree HEAD 推进（PR #309 / #312 review fix）
+- [x] worktree 终态：5/8 prune 35 → 19，5/9 凌晨 19 - 4 + 1 = 16
+
+### 关键决策
+- **决策 75：stale branch HEAD 错觉验证规则**（CLAUDE.md §19 独立验证规则补充）：
+  - `git status --short` 的 "modified" 是相对 worktree branch HEAD 的差异
+  - branch HEAD 落后 main HEAD 时（squash merge 后 worktree 未 ff），modified 可能全等于 main 已有内容
+  - 必须 `diff <worktree-file> <(git show origin/main:<path>)` 验证真新增，不要只看 git status
+  - 5/8 晚段 sweep 同根因：必须基于 origin/main，不基于落后本地
+
+### 下一步（5/9 白天）
+- review/merge PR queue 7 OPEN（#305 #307 #310 + #308/#309/#311/#312）
+- p1-5/p1-6/p1-7 worktree → PR 状态确认（`gh pr list --state open`）
+- 等 #271 DBA staging
+- dev-plan-60d 重写
+
+### 已知风险
+- 5/9 凌晨 1 小时内 main 已被并发 session 多次推进（worktree HEAD drift 已观察到）—— `git fetch` 在每个写入操作前必跑
+- p1-7-pin-failfast worktree 创建但 PR 未确认存在（branch 在本地，不在 origin gh pr list 上）—— 可能是 in-progress
+
+---
+
 ## 2026-05-08 23:30 · P0-8 启发式 round-3 + worktree 大批 prune 真收工（PR #310）
 
 ### 完成状态

@@ -1,3 +1,38 @@
+## 2026-05-09 凌晨 · 4 dirty worktree 全清 + stale-HEAD 错觉教训
+
+### 今日完成
+
+**4 dirty worktree 全 force-delete（0 PR / 0 抢救）**
+- `datetime-pg2` / `pj3-tzinfo` / `sql-param` / `s4-01-cmdk` 全删
+- 重核内容发现：**全部 4 处所谓"WIP"实为 stale branch HEAD 错觉** ——
+  - `pj3-tzinfo` 3 modified + 1 new 文件全部已通过 PR #158 (`a83247f2`) squash 到 main
+  - `sql-param` 的 `multi-agent-concurrency-protocol.md` 已在 main，且 main 版本 241 行 > worktree 206 行（PJ.6 又补充了 35 行"删除/重命名 fallback"段）
+  - `datetime-pg2` 是 cosmetic 折行，无价值
+  - `s4-01-cmdk` 是 pnpm-lock 漂移，可重生
+- 验证手法：`git show origin/main:<file>` 比对 worktree 文件内容；branch HEAD 落后 main HEAD 时 `git status` 的 "modified" 是相对 branch HEAD 的差异，不是相对 main 的真新增
+
+**意外发现：3 个并发 session 推进**
+- 新增 worktree `p1-7-pin-failfast`（pending PR `fix/p1-7-pinstore-prod-failfast`）
+- `p1-2-sandbox-db-limit` HEAD `1c85ae5f → 0f479a30`（PR #309 review fix push）
+- `p1-4-inv86-cx` HEAD `b8013f6a → 8c192146`（PR #312 review fix push）
+
+**worktree 终态**：35 → 19 → 16（5/8 prune 16 + 5/9 凌晨 dirty 4 - 并发新 1）
+
+### 关键决策
+- **决策 75：stale branch HEAD 错觉验证规则** — `git status --short` 显示的 "modified" 是相对 worktree branch HEAD 的差异；当 branch 落后 main HEAD（squash merge 后未 ff）时，modified 文件可能完全等于 main 已有内容（illusory WIP）。判定 dirty worktree 是否真有 WIP 必须 `diff <worktree-file> <(git show origin/main:<path>)` 比对，不要只看 git status
+
+### 遗留问题
+- 16 个 worktree 中 `p1-5-hotkey-input` / `p1-6-a2ui-ssrf` / `p1-7-pin-failfast` 仍是 pending PR 状态（并发 session 推），等 5/9 review 时一并看
+- PR queue 7 OPEN（隔夜 0 merge）— review 仍是 5/9 第一优先
+
+### 明日（5/9 白天）计划
+- 优先 review/merge：#305 #307 #310 + #308/#309/#311/#312
+- p1-5/p1-6/p1-7 PR 状态确认（看 gh pr list）
+- 等 #271 DBA staging 解锁 #272 → #279 + #275/#276
+- dev-plan-60d 重写
+
+---
+
 ## 2026-05-08 深夜 · P0-8 启发式 round-3 + worktree 大批 prune（PR #310）
 
 ### 今日完成
