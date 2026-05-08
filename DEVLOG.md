@@ -1,3 +1,48 @@
+## 2026-05-09 凌晨 续 · 并发 7 P1 PR merge wave + 7 worktree prune（worktree 9 个，最干净状态）
+
+### 今日完成
+
+**并发 session 一夜推 7 P1 PR 全 admin merged**（5/9 13:33–14:05 UTC）：
+| PR | 内容 | T | merge commit |
+|----|------|---|------|
+| #308 | tx-brain NLQ 沙箱 `in_transaction()` 断言防 AUTOCOMMIT 静默失效 | T1 | `0511d45d` |
+| #309 | tx-brain NLQ 沙箱 DB 层 `LIMIT N+1` 包装防内存炸弹 | T1 | `2159cb1e` |
+| #311 | tx-brain NLQ dispatcher `ActionPayloadError` 错误契约 | T1 | `c984ada2` |
+| #312 | tx-brain inventory.86 补客户体验守门 + 食安优先 | T1 | `43671b96` |
+| #313 | web-admin Cmd+J 在 INPUT/TEXTAREA/contentEditable 跳过 | T2 | `32506913` |
+| #314 | web-pos / web-admin A2UI image src 白名单防 SSRF / DNS rebinding | T1 | `3695e318` |
+| #315 | tx-analytics pinned_dashboard 生产 / 预发启动 fail-fast | T3 | `9d559a40` |
+
+来源：`PR #294` description 列出的 4 个高优 smell + #303/#293/#299/#301 review 提的 3 个新 smell（Cmd+J / image src / pin store fail-fast），并发 session 一晚通通推完。
+
+**7 worktree prune（16 → 9）**
+- p1-1-sandbox-assert / p1-2-sandbox-db-limit / p1-3-action-payload-error / p1-4-inv86-cx / p1-5-hotkey-input / p1-6-a2ui-ssrf / p1-7-pin-failfast
+- 全 `git worktree remove`（branch 在 origin 已删，本地无 dirty），干净退出
+
+**main 一夜推进总览**（5/8 23:30 → 5/9 01:00，1.5h 内 9 commits）：
+- 7 业务 PR squash + 我 2 chore(docs) commits
+
+### 数据变化
+- 新增 main commits：7 P1（并发）+ 1 chore（我，本笔）= 8
+- worktree：16 → 9（删 7）
+- 测试：7 P1 PR 各自带 Tier 1 守门测试（具体数 TBD，需各 PR description）
+
+### 关键决策
+- **决策 76：5/9 凌晨 P1 wave 不主动追赶记账** — 以前每次 main 推进都做 chore(docs) 跟进；从今天起接受"DEVLOG 是 session-level 而非 commit-level snapshot"，并发 session 推的内容由 PR description + commit message 自承载，DEVLOG 只补关键 wave 总览（如本段）
+
+### 遗留问题
+- 我的 3 PR 仍 OPEN（#305 #307 #310），非 P1 wave 未触及它们
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 仍 OPEN
+
+### 明日（5/9 白天）计划
+- 优先 review/merge 我的 3 PR（#305 T3 + #307 T3 + #310 T1）
+- 等 #271 DBA staging
+- 看是否有更多并发 session 推 wave（main 有 7 P1 一晚的吞吐说明白天会更快）
+- dev-plan-60d 重写（5/8 决策 73 待办）
+
+---
+
 ## 2026-05-09 凌晨 · 4 dirty worktree 全清 + stale-HEAD 错觉教训
 
 ### 今日完成

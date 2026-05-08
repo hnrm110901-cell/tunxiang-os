@@ -1,3 +1,25 @@
+## 2026-05-09 01:00 · 并发 7 P1 PR merge wave + 7 worktree prune（worktree 9 个）
+
+### 完成状态
+- [x] 观察并记录并发 session 一夜 7 P1 PR 全 admin merged（#308/#309/#311/#312/#313/#314/#315）
+- [x] 7 P1 worktree 全 prune（p1-1..p1-7）→ 16 → 9
+- [x] main `02520596` rebase + ff `43671b96`（origin 推进 2 commit 后我 rebase 1 commit 上推）
+
+### 关键决策
+- **决策 76：DEVLOG/progress 不主动追赶并发 main 推进** — 以前每次 main 前进都做 chore(docs) 跟进，5/8 晚段 → 5/9 凌晨 1.5 小时内已 4 笔 chore commit；从今起接受"DEVLOG 是 session-level snapshot 而非 commit-level"，并发 session 推的内容自承载于 PR description + commit message；DEVLOG 只补关键 wave 总览（如本段）+ 跨 session 教训（如 stale-HEAD 错觉）
+
+### 下一步（5/9 白天）
+- 优先 review/merge 我的 3 PR（#305 T3 + #307 T3 + #310 T1）
+- 看新一波并发 session（白天吞吐预计更高）
+- 等 #271 DBA staging
+- dev-plan-60d 重写（5/8 决策 73 + 5/9 已观察的 P1 wave 速度需反映在新计划）
+
+### 已知风险
+- 5/8 晚段 → 5/9 凌晨 main 推进 9 commit / 1.5h，速度比白天高几倍 —— 我的 3 PR 在 review queue 里位置可能被持续插队
+- worktree 9 个清单干净但 P0-1/P0-2 worktree 长期占位（DBA 阻塞中），下次 prune wave 不要误删
+
+---
+
 ## 2026-05-09 00:30 · 4 dirty worktree 全清 + stale-HEAD 错觉教训
 
 ### 完成状态
