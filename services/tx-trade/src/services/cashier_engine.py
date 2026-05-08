@@ -25,7 +25,6 @@ from ..models.enums import TableStatus
 from ..models.tables import Table
 from .state_machine import (
     TABLE_STATES,
-    InvalidTransitionError,
     can_table_transition,
     transition_order,
 )

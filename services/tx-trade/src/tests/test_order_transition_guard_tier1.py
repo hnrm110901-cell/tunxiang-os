@@ -13,9 +13,7 @@
 
 from __future__ import annotations
 
-import os
 import re
-import subprocess
 import uuid
 from pathlib import Path
 
@@ -27,6 +25,7 @@ from services.state_machine import (  # type: ignore[import-not-found]
     can_order_status_transition,
     transition_order,
 )
+
 from shared.ontology.src.enums import OrderStatus
 
 
