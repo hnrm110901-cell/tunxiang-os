@@ -35,7 +35,7 @@ on:
       - 'services/tx-finance/src/models/**'
       # POS 数据写入（CLAUDE.md § 17 Tier 1）
       - 'shared/adapters/pinzhi_pos/**'
-      - 'shared/adapters/aiqiwei/**'
+      - 'shared/adapters/aoqiwei/**'
       - 'shared/adapters/meituan/**'
       - 'shared/adapters/meituan-saas/**'
       - 'shared/adapters/eleme/**'
@@ -198,7 +198,7 @@ jobs:
             'services/tx-finance/src/services/wine_storage_service.py'
             'services/tx-finance/src/services/stored_value_service.py'
             'shared/adapters/pinzhi_pos/'
-            'shared/adapters/aiqiwei/'
+            'shared/adapters/aoqiwei/'
             'shared/adapters/meituan/'
             'services/tx-agent/src/constraints/'
             'edge/sync-engine/src/conflict_resolver.py'

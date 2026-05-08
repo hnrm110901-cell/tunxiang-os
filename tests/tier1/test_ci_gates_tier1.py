@@ -171,7 +171,7 @@ class TestTier1GateWorkflow:
         """CLAUDE.md § 17：POS 数据写入 Tier 1 — 6 大 adapter"""
         for adapter in (
             "shared/adapters/pinzhi_pos/",
-            "shared/adapters/aiqiwei/",
+            "shared/adapters/aoqiwei/",
             "shared/adapters/meituan/",
         ):
             assert adapter in source, f"POS adapter {adapter} 未在 paths"

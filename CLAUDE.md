@@ -592,7 +592,7 @@ asyncio.create_task(emit_event(
 | 订单状态机 | tx-trade | cashier_engine.py / order_service.py |
 | 支付补偿 Saga | tx-trade | payment_saga_service.py |
 | RLS 多租户隔离 | 全局 | 所有 *_rls.sql |
-| POS 数据写入与结算 | tx-trade | adapters/pinjin / aiqiwei / meituan |
+| POS 数据写入与结算 | tx-trade | adapters/pinjin / aoqiwei / meituan |
 | 存酒 / 押金 / 协议挂账 | tx-trade / tx-finance | wine_storage_service.py |
 | 全电发票 / 金税四期 | tx-finance | invoice_service.py |
 | LWW 冲突解析（终态豁免） | edge/sync-engine | lww_register.py |
