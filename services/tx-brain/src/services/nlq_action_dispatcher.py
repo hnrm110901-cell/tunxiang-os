@@ -31,6 +31,15 @@ from .nlq_action_types import ActionId, ActionRequest, DryRunDiff
 ActionHandler = Callable[[ActionRequest], Awaitable[DryRunDiff]]
 
 
+class ActionPayloadError(ValueError):
+    """Handler 发现 payload 字段缺失/类型错误 — 路由层据此映射 HTTP 400。
+
+    继承 ValueError 保留向后兼容（既有 except ValueError 仍能捕获），但暴露具体
+    类型供 PR2 /nlq/action 路由 except ActionPayloadError → 400，与未知异常 → 500
+    精确区分。LLM 输出契约错就该回 4xx 让上游修，不应混入 5xx 触发告警。
+    """
+
+
 _ACTION_HANDLERS: dict[str, ActionHandler] = {}
 
 
@@ -170,7 +179,7 @@ async def _menu_update_price_dry_run(req: ActionRequest) -> DryRunDiff:
     """改价 dry-run（PR1 stub — PR2 接 tx-menu API 查现价）。"""
     new_price = req.payload.get("new_price_fen")
     if not isinstance(new_price, int):
-        raise ValueError("payload.new_price_fen 必须为 int（分）")
+        raise ActionPayloadError("payload.new_price_fen 必须为 int（分）")
     return DryRunDiff(
         summary=f"改价 → ¥{new_price / 100:.2f}（PR1 stub，PR2 查现价填 before）",
         fields={"price_fen": {"before": None, "after": new_price}},
@@ -183,7 +192,7 @@ async def _menu_toggle_availability_dry_run(req: ActionRequest) -> DryRunDiff:
     """上下架 dry-run（PR1 stub — PR2 接 tx-menu API）。"""
     toggle_to = req.payload.get("toggle_to", "off")
     if toggle_to not in ("on", "off"):
-        raise ValueError("payload.toggle_to 必须为 'on' 或 'off'")
+        raise ActionPayloadError("payload.toggle_to 必须为 'on' 或 'off'")
     return DryRunDiff(
         summary=f"切换上下架 → {toggle_to}（PR1 stub）",
         fields={"availability": {"before": None, "after": toggle_to}},
@@ -196,7 +205,7 @@ async def _inventory_86_dry_run(req: ActionRequest) -> DryRunDiff:
     """库存清零 dry-run（PR1 stub — PR2 接 tx-supply API）。"""
     ingredient_id = req.payload.get("ingredient_id")
     if not ingredient_id:
-        raise ValueError("payload.ingredient_id 必填")
+        raise ActionPayloadError("payload.ingredient_id 必填")
     return DryRunDiff(
         summary=f"86 食材 {ingredient_id}（PR1 stub）",
         fields={"qty_remaining": {"before": None, "after": 0}},
@@ -210,7 +219,7 @@ async def _roster_update_dry_run(req: ActionRequest) -> DryRunDiff:
     employee_id = req.payload.get("employee_id")
     new_shift = req.payload.get("new_shift")
     if not employee_id or not new_shift:
-        raise ValueError("payload.employee_id / new_shift 必填")
+        raise ActionPayloadError("payload.employee_id / new_shift 必填")
     return DryRunDiff(
         summary=f"调整员工 {employee_id} → {new_shift} 班（PR1 stub）",
         fields={"shift": {"before": None, "after": new_shift}},
