@@ -23,6 +23,7 @@ import pytest
 from pydantic import ValidationError
 
 from ..services.nlq_action_dispatcher import (
+    ActionPayloadError,
     dispatch_dry_run,
     gen_confirmation_token,
 )
@@ -127,10 +128,29 @@ class TestDispatchDryRunTier1:
 
     @pytest.mark.asyncio
     async def test_handler_validation_error_propagates(self):
-        """改价 payload 缺 new_price_fen → handler 抛 ValueError 透出（不被沙箱吞）。"""
+        """改价 payload 缺 new_price_fen → handler 抛 ActionPayloadError 透出（不被沙箱吞）。"""
         req = _req("menu.update_price", {})
-        with pytest.raises(ValueError, match="new_price_fen"):
+        with pytest.raises(ActionPayloadError, match="new_price_fen"):
             await dispatch_dry_run(req)
+
+    def test_action_payload_error_is_value_error_subclass(self):
+        """ActionPayloadError 必须是 ValueError 子类（向后兼容既有 except ValueError）。"""
+        assert issubclass(ActionPayloadError, ValueError)
+
+    @pytest.mark.asyncio
+    async def test_each_handler_payload_error_uses_action_payload_error(self):
+        """4 个 stub handler payload 字段错 → 必须抛具体 ActionPayloadError，
+        而非裸 ValueError，否则 PR2 路由层 except 无法精准映射 400。"""
+        bad_cases = [
+            ("menu.update_price", {}),  # 缺 new_price_fen
+            ("menu.toggle_availability", {"toggle_to": "evil"}),  # 非 on/off
+            ("inventory.86", {}),  # 缺 ingredient_id
+            ("roster.update", {"employee_id": "emp-1"}),  # 缺 new_shift
+        ]
+        for action_id, payload in bad_cases:
+            req = _req(action_id, payload)
+            with pytest.raises(ActionPayloadError):
+                await dispatch_dry_run(req)
 
 
 # ─── Pydantic schema 校验 ───
