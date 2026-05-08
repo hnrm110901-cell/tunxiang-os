@@ -12,6 +12,7 @@
  */
 import { type ReactNode } from 'react';
 import { txColors } from '@tx/tokens';
+import { sanitizeImageSrc } from './sanitizeImageSrc';
 import type {
   A2UINode, A2UIDeclaration, A2UIActionCallback, A2UIRenderContext,
   A2UIButtonProps, A2UICardProps, A2UIListProps, A2UIListItem,
@@ -366,7 +367,9 @@ function renderNode(
 
     // ── Image ──
     case 'image': {
-      const imgSrc = String(props.src || '');
+      // P1 #6: src 经白名单 sanitize（data:image / 同源 / VITE_A2UI_IMG_HOSTS）
+      // 不放行外部任意 host —— LLM 输出 src 可能触发 SSRF / DNS rebinding
+      const imgSrc = sanitizeImageSrc(props.src);
       if (!imgSrc) return null;
       return (
         <img
