@@ -1,3 +1,61 @@
+## 2026-05-08 S4-02 第一刀 — SQL 沙箱 + 防火墙 24/24 测试（PR #299 / T1）
+
+### 今日完成
+
+**S4-02 PR #299（2 commits / 3 files / +472）**
+- commit `0a12c21b` — `test(tx-brain): NLQ SQL 沙箱 Tier 1 测试（TDD red）`
+- commit `a5012cbd` — `feat(tx-brain): NLQ SQL 沙箱 + 危险关键字防火墙`
+
+**新增 services/tx-brain/src/services/**
+- `nlq_keyword_firewall.py` — 纯函数防火墙
+  - 拒绝 13 写入关键字：DROP / DELETE / UPDATE / INSERT / TRUNCATE / GRANT / REVOKE / CREATE / ALTER / EXECUTE / CALL / COPY / VACUUM
+  - 拒绝 SECURITY DEFINER（绕 RLS 标准技巧）— **优先级先于 keyword**
+  - 拒绝多语句（注释剥离后 ; 后还有非空 token）
+  - 拒绝注释攻击（行 `--` / 块 `/* */` 包裹注入）
+  - 必须以 SELECT / WITH 起首
+- `sql_sandbox.py` — Tier 1 执行器
+  - `run_safe_query(session, sql, *, max_rows=10000, timeout_ms=5000)`
+  - 调用约定：路由层用 `TenantSession(tenant_id)` 注入 + readonly DB role
+  - 四关防御：firewall → SET LOCAL statement_timeout（int 防注入） → execute → 行数上限
+  - 异常类型化：UnsafeSqlError / SandboxTimeoutError / RowLimitExceeded / ValueError
+
+**新增 services/tx-brain/src/tests/test_nlq_sandbox_tier1.py（24/24，0.24s）**
+- 18 firewall（3 正例 + 13 反例 + 2 边界）— 测试用例描述按 §20 真实餐厅场景
+- 6 run_safe_query（mock session）— 含**防御深度验证**：DROP 攻击不到达 DB
+
+### 数据变化
+- 新增后端文件：3 个（firewall + sandbox + test）
+- 新增测试：24 个（mock-based，超 #289 验收门槛 ≥15）
+- TDD 留痕：commit 顺序 test (red) → feat (green)
+- pytest 通过：24/24，0.24s
+
+### 关键决策
+1. **TDD 先红后绿，commit 顺序留痕** — commit 1 = test only（单 checkout 红），commit 2 = feat（绿）；CI 在 PR HEAD 跑绿，git bisect 时 commit 1 红是 TDD 痕迹
+2. **SECURITY DEFINER 检测优先级 > keyword** — `CREATE FUNCTION ... SECURITY DEFINER` 既含 CREATE 又含 SECURITY DEFINER，让 violation 报 SECURITY DEFINER 比 CREATE 更利于使用方理解 RLS 绕过风险
+3. **firewall 设计为纯函数 + sandbox 接外部 session** — 无 DB 副作用单元可测；路由层 manage TenantSession context 分离关注点
+4. **timeout_ms 强制 int 防 SQL 注入** — PG `SET LOCAL statement_timeout` 命令不接受 bind parameter，必须强制类型转换 + 正数校验
+
+### 遗留问题（follow-up PR）
+- 白名单 schema 视图迁移（v230+）：`reports.*` / `orders.*` 视图 + `tx_nlq_readonly` role + RLS policy
+- **真 DB RLS 反测**（tenant=A 查到 tenant=B → 致命缺陷一票否决）— 必须真 DB
+- LLM SQL 生成（ModelRouter + Claude API）
+- `POST /nlq/query` SSE 端点（StreamEvent 协议契约与 web-admin mockSSE.ts 对齐）
+- DB 层 LIMIT 包装优化（现 Python 层 enforce — 10001 行结果集仍会全量 fetch）
+- 防火墙未覆盖 PG 全部写入语法（MERGE / LOCK / LISTEN / NOTIFY / RESET / DECLARE / FETCH / CLOSE）— 建议 follow-up 补完整列表
+- DEMO 录屏 3 业务场景
+
+### 明日计划
+- S4-02 follow-up：白名单 schema 视图迁移 + 真 DB RLS 反测（先把 schema/role 落到位）
+- 或 S4-03 启动（actionId 白名单 + 二次确认 + AgentDecisionLog，T1 必须 TDD）
+
+### §19 独立验证触发
+本 PR 涉及 3 文件 + 新建 Tier 1 路径，触发 CLAUDE.md §19 独立验证条件。建议 PR review 阶段开新会话从徐记海鲜收银员视角评估：
+1. 200 桌并发高峰 NLQ 是否会拖累交易链路 DB
+2. RLS 注入路径在所有调用点都生效（SECURITY DEFINER 防御 + readonly role 部署）
+3. 防火墙未覆盖的 PG 写入语法补完整
+
+---
+
 ## 2026-05-08 Sprint 4 启动 + S4-01 第一刀（PR #293 / T2）
 
 ### 今日完成

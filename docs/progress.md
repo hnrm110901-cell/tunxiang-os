@@ -1,3 +1,33 @@
+## 2026-05-08 16:30 · S4-02 第一刀 PR #299（commits `0a12c21b` + `a5012cbd` / Tier 1）
+
+### 完成状态
+- [x] 防火墙：`assert_safe_sql` 纯函数（13 写入关键字 + SECURITY DEFINER + 多语句 + 注释攻击 + 非 SELECT 起首）
+- [x] 沙箱：`run_safe_query` 四关（firewall → SET LOCAL statement_timeout → execute → 行限）+ 异常类型化
+- [x] 24 个 mock-based 测试（18 firewall + 6 sandbox），超 #289 验收门槛 ≥15
+- [x] TDD 留痕：commit 顺序 test (red) → feat (green)
+- [x] PR #299 已 push，linked to #289
+- [ ] 白名单 schema 视图（v230+）+ 真 DB RLS 反测（follow-up）
+- [ ] LLM SQL 生成 + SSE 端点（follow-up，等真接口替换 mockSSE）
+- [ ] DEMO 录屏 3 业务场景（follow-up）
+
+### 关键决策
+- **决策 51：firewall 检测优先级 SECURITY DEFINER > keyword** — 让 violation 报 SECURITY DEFINER 比 CREATE 更利于使用方理解 RLS 绕过风险
+- **决策 52：firewall 纯函数 + sandbox 接外部 session** — 分离关注点；路由层 manage `TenantSession(tenant_id)` context；单元测试无需 mock context manager
+- **决策 53：timeout_ms 强制 int 防 SQL 注入** — PG `SET LOCAL` 命令不接受 bind parameter，必须强类型 + 正数校验
+- **决策 54：TDD 双 commit 留痕** — commit 1 test only（单 checkout 红） / commit 2 feat（绿）；CI 在 PR HEAD 跑绿；git bisect 时 commit 1 红是 TDD 痕迹
+
+### 下一步
+- S4-02 follow-up：白名单 schema 视图迁移 + 真 DB RLS 反测
+- 或 S4-03 启动（actionId 白名单 + 二次确认 + AgentDecisionLog）
+
+### 已知风险
+- 字符串字面量内的关键字会触发误报（如 `SELECT 'DROP' AS x`）— S4-02 阶段 LLM 不会生成含字面量查询，acceptable 保守边界
+- Python 层行数 enforce 在 fetch 完后才检测 — 10001 行仍全量传输；max_rows=10000 时影响有限，DB 层 LIMIT 包装留 follow-up
+- §19 独立验证未做（修改 3 文件 + 新建 Tier 1 路径触发）— PR review 阶段建议开新会话从徐记海鲜收银员视角评估
+- 防火墙未覆盖 PG 全部写入语法（MERGE / LOCK / LISTEN / NOTIFY / RESET / DECLARE / FETCH / CLOSE）— 建议 follow-up 补完整列表
+
+---
+
 ## 2026-05-08 14:30 · S4-01 第一刀 PR #293（commit `7e698cc0`）
 
 ### 完成状态
