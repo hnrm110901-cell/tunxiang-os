@@ -1,3 +1,54 @@
+## 2026-05-08 Sprint 4 PR1 全 merge（4 PR + 2 review fix）— main d3bbc762
+
+### 今日完成
+
+**Code review（独立 sub-agent context，按 §19 触发条件审查）**
+2 个真 BUG 找出 → 修复 → push 原分支：
+- 🔴 **#299** `e693dc8a` — `_FORBIDDEN_KEYWORDS` 加 `MERGE`（PG15+ 写入语法，`WITH cte AS ... MERGE INTO orders ...` 可绕过）→ 25/25 测试
+- 🔴 **#301** `67159ebb` — `gen_confirmation_token` 加 `uuid.uuid4()` nonce（原 deterministic hash 同 token 可被无限重放执行 = 双花漏洞）→ 20/20 测试
+
+reviewer 还提了 4 个高优 smell（建议 merge 后 follow-up）：
+- #299 SET LOCAL 在 AUTOCOMMIT session 静默失效 / 10001 行 Python 层 enforce 内存风险
+- #301 handler ValueError 无错误契约 → 路由层会 500 / inventory.86 守门漏 has_unfinished_order
+- #293 useAgentConsoleHotkey 输入框中拦截 Cmd+J / A2UIRenderer image src 无 origin 白名单
+- #303 多 worker 部署 _PINNED_STORE 不一致（已知）
+
+**Sprint 4 PR1 全 merge（squash）**
+| Issue | PR | 测试 | merge commit |
+|------|-----|------|------|
+| #289 [S4-02] T1 | #299 | 25/25 | `57b12ffb` |
+| #290 [S4-03] T1 | #301 | 20/20 | `d5494336` |
+| #288 [S4-01] T2 | #293 | mock SSE | `3eb94d61` |
+| #291 [S4-04] T3 | #303 | 8/8 | `d3bbc762` |
+
+**期间并发会话 push（同日 main 推进）**
+- `#295` (aiqiwei → aoqiwei 拼写漂移修复 [T3])
+- `#297` (删 tx-trade table.py + table_card_click_log.py 死代码 [T3])
+
+**main HEAD = `d3bbc762`** — Sprint 4 4 子 issue PR1 全部上线。
+
+### 数据变化
+- 4 PR merge：+~3000 LoC（含 A2UIRenderer 793 行复制）
+- 测试新增：25 + 20 + 8 = **53 个 mock-based**（S4-01 mock SSE 浏览器手验，未计单测）
+- 决策点：5 hard decisions（C/X/4 actionId/SSE protocol/SSH origin）+ 2 review fix（MERGE/nonce）
+
+### 关键决策
+1. **Sprint 4 拆 PR1 + PR2 节奏** — PR1 全是骨架/接口/stub（依赖少、可独立 review），PR2 接通真 DB + 跨服务 RPC + DEMO 录屏闭环 issue
+2. **review fix 必须在 PR1 阶段 lock token 契约** — confirmation_token nonce 不能等 PR2 加（hash payload 变会破坏 token schema 兼容）
+3. **squash merge** — 每个 PR 是一个 logical change，TDD 双 commit 留痕靠 PR description 保留
+
+### 遗留问题（每个 issue 的 PR2）
+- **#289 S4-02 PR2**：白名单 schema 视图（v230+）+ `tx_nlq_readonly` role + RLS policy + 真 DB RLS 反测 + LLM SQL 生成 + `POST /nlq/query` SSE 端点
+- **#290 S4-03 PR2**：`execute_action` + SAVEPOINT 回滚 + `AgentDecisionLog` schema 扩字段 + 迁移 + `POST /nlq/action` SSE 端点 + 跨服务 RPC（接 tx-menu / tx-supply / tx-org）+ token 持久化 nonce 表
+- **#288 S4-01 PR2**：IndexedDB 7 天历史 + `typecheck-web-admin` CI（先清零 ~50 pre-existing 错误）+ Storybook 框架 + 替换 mockSSE 为真 SSE
+- **#291 S4-04 PR2**：HTTP 路由 + main.py 注册 + DB 迁移（`dashboard_pinned` 表 + RLS policy + 索引）+ web-admin AgentConsole Pin 按钮 + 驾驶舱 Feed 渲染
+
+### 明日计划
+- 选择推进路径（4 选 1）：S4-02 PR2（schema 视图 + RLS 反测，**离 demo 最近**）/ S4-03 PR2（execute + DB + SSE）/ S4-04 PR2（HTTP + DB + 前端）/ S4-01 PR2（IndexedDB + CI）
+- §19 follow-up：4 个高优 smell 一并修（约 4 个独立小 PR）
+
+---
+
 ## 2026-05-08 S4-04 第一刀 — 驾驶舱 Pin 洞察 service 层 8/8 测试（PR #303 / T3）
 
 ### 今日完成

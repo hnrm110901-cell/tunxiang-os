@@ -1,3 +1,34 @@
+## 2026-05-08 19:30 · Sprint 4 PR1 全 merge — main d3bbc762
+
+### 完成状态
+- [x] code-reviewer 独立 sub-agent 审查 4 PR（CLAUDE.md §19 触发：每 PR 修改 3+ 文件 + 新建 Tier 1 路径）
+- [x] 2 个真 BUG 修复 push 原分支：
+  - #299 加 `MERGE` 到禁用关键字（PG15+ WITH+MERGE 绕过漏洞）→ commit `e693dc8a`
+  - #301 `confirmation_token` 加 `uuid.uuid4()` nonce（双花漏洞）→ commit `67159ebb`
+- [x] 4 PR squash merge：
+  - #299 → `57b12ffb`
+  - #301 → `d5494336`
+  - #293 → `3eb94d61`
+  - #303 → `d3bbc762`
+- [x] main HEAD = d3bbc762
+
+### 关键决策
+- **决策 64：review fix 必须在 PR1 阶段 lock token 契约** — `confirmation_token` 加 nonce 不能等 PR2（hash payload 变会破坏 token schema 兼容性）
+- **决策 65：MERGE 漏拦截视为 Tier 1 安全 BUG（merge blocker）** — 不是 follow-up smell，必须 fix → merge
+- **决策 66：squash merge 4 PR** — 每个 PR 是一个 logical change，TDD 双 commit 留痕靠 PR description 保留
+- **决策 67：reviewer 4 个高优 smell 留 follow-up** — SET LOCAL 断言 / 行限内存 / ValueError 契约 / Cmd+J 输入框 / image src 白名单 等不是 merge blocker，独立小 PR fix
+
+### 下一步
+- 选择 PR2 推进（4 选 1）：S4-02 PR2（schema + RLS 反测）/ S4-03 PR2（execute + DB + SSE）/ S4-04 PR2（HTTP + DB + 前端）/ S4-01 PR2（IndexedDB + CI）
+- 4 个高优 smell 独立 PR 修
+
+### 已知风险
+- 4 个高优 smell 仍在 main（merge 时已知，acceptable 因为不是 merge blocker），但合并 follow-up 越拖越糟
+- Sprint 4 全 4 issue 都是 PR1，**距离 issue 整体闭环（DEMO 录屏验收）还差 PR2/3 的真 DB + 跨服务 RPC + LLM 接通**
+- worktree 4 个仍存活（s4-01 / s4-02 / s4-03 / s4-04），可保留给 PR2 用或清理
+
+---
+
 ## 2026-05-08 19:00 · S4-04 第一刀 PR #303（Sprint 4 全 4 子 issue PR1 收齐 / Tier 3）
 
 ### 完成状态
