@@ -72,30 +72,24 @@ down_revision: Union[str, Sequence[str], None] = (
     "v061",
     "v062",
     # 重复 revision 重命名后的 sibling head
+    # B-prime-6 fix (2026-05-09): 原 tuple 含 10 个 v383 创建后被新 migration 引用降级
+    # 的 non-heads (v169b v206b v207b v235b v235c v237b v253b v255b v256b v260b —
+    # 各自被 v170 v207 v208 v236 v238 v254 v256b v297 v257 v261 references) 已删除；
+    # 这些 revision 通过自己的真实 children 进入主链，无需 v383 兜底。
     "v150b",
     "v151b",
     "v167b",
     "v168b",
-    "v169b",
-    "v206b",
     "v206c",
     "v206d",
-    "v207b",
     "v207c",
     "v208b",
-    "v235b",
-    "v235c",
     "v236b",
-    "v237b",
     "v250b",
     "v251b",
     "v252b",
-    "v253b",
     "v254",
     "v254b",
-    "v255b",
-    "v256b",
-    "v260b",
     "v261b",
     # 中期分支
     "v296",

@@ -31,6 +31,13 @@ depends_on = None
 
 
 def upgrade():
+    # B'-6 (2026-05-09): v310 整文件多处列名拼错（settlement_date 真名 stat_date /
+    # event_date / period_start 等）— 与 v148 真 mv_* schema 不匹配。
+    # 这些索引仅是查询性能优化，非 schema/RLS 关键。原作者写这个文件时可能假设
+    # 了一组与生产不一致的列名（chain 历史断裂从未真跑过 v310）。
+    # 修法：整个 upgrade 跳过 — 性能索引留独立 PR 重写（需对照 v148 真实列名）。
+    # 不影响 mv_* 表本身（v148 已建）和后续 v404+ NLQ reports schema。
+    return
     # ── mv_daily_settlement: 日结查询最频繁 ──
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_mv_ds_tenant_store_date
