@@ -1,3 +1,46 @@
+## 2026-05-09 晚上 续 · #298 codemod Phase 4 — tx-member 30 文件 / 112 import (#338) + RBAC follow-up (#336)
+
+### 今日完成（傍晚→晚上 2 PR）
+
+- **#336 OPEN**（stacked on #335，1 commit / +15/-2）— `[Tier2] fix(test): test_trade_promotions 7 测试转绿`
+  - RBAC dev_bypass `os.environ.setdefault("TX_AUTH_ENABLED", "false")` 修 5 RBAC 401
+  - 2 consume mock data 修（UPDATE RETURNING 行 + insufficient SELECT 行）
+  - 数据：10/10 PASS（原 #335 后 3/10 + 7 fail → 本 PR 后 10/10）
+
+- **#338 OPEN**（base main，3 commit / +237/-133）— `[Tier1] chore(test): #298 codemod Phase 4 — tx-member 30 文件 / 112 import`
+  - RED `b3f9f48e`：AST 守门 fixture
+  - GREEN `0fe49fc6`：codemod 应用 30 文件 / 112 处
+  - fix `5102371d`：**关键发现** — Phase 4 前置 `services/tx-member/conftest.py` 必须新建（与 tx-trade 同模板），否则全路径 import ImportError；+ 21 处 drift（11 test_stored_value patch + 7 test_gdpr patch + 3 test_points_tier1 from-api-import-module）
+  - 数据：main 28 collection error → 11；299 测试可跑（+许多）；**0 codemod-introduced regression**
+
+### 关键决策（新增）
+
+- **决策 83：每服务首接入 codemod chain 需新建 services/<svc>/conftest.py 建立 namespace package magic** — tx-trade 已有，tx-member 没有，本 PR 新建。Phase 5+ 推 tx-org / tx-finance / tx-supply / tx-growth 等必须先建对应 conftest（与 tx-trade/tx-member 同模板）。Why：codemod 改 import 用 services.<svc>.src.X 全路径，需 namespace package 解析；root conftest 只处理 services.<bare>，不处理 services.<svc>.src 链。How to apply：codemod chain 推到新服务时第 1 步先建 conftest（≤53 行 boilerplate）。
+
+- **决策 84：codemod chain 暴露 from-NS-import-module 形式 codex 漏抓** — codemod 抓 `from api.X import Y` / `import api.X`，不抓 `from api import X` 形式。tx-member test_points_tier1 有 3 处后者，造成 dual-namespace loading（patch 在短路径 module 实例，路由用长路径实例）。Why：scanner 启发式只识别 `from <NS>.<TOKEN>` 不识别 `from <NS> import <TOKEN>`。How：决策 78 + 本地 pytest 实跑必须，每个 codemod PR 不靠 codex 守门。
+
+### 数据变化（5/9 累计）
+
+- 累计 #298 chain：tx-trade (#322 #335) + tx-member (#338) = 72 文件 / ~417 处 import 全路径化
+- chain 进度 ~70%（按 668 baseline 总裸算）
+- 余 12 服务 ~499 裸待清（tx-org 102 / tx-supply 96 / tx-growth 70 / tx-finance 62 等）
+
+### 遗留问题
+- 本批 53 fail 全 pre-existing test setup（main collection-blocked 隐藏）需独立 follow-up PR：
+  - test_members_routes 4 fail（真 DB 调用未 mock）
+  - test_stamp_card_routes 5 fail（async mock 问题）
+  - test_gdpr 1 fail（错误响应格式断言）
+  - 11 仍 collection error 文件需逐个诊断
+- #336 stacked on #335，等 #335 merge 后自动 rebase
+- 决策 79 Phase 2 scan_order ontology（需创始人 §18）
+- 决策 79 Phase 3 v500 drop sales_channel 列（独立 sprint）
+- shared.security 包缺失诊断（test_trade_webhook 6 / test_trade_extended 10）
+
+### 下次 session 起手
+见 `docs/session-handoff-2026-05-09-night.md`
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

@@ -1,3 +1,33 @@
+## 2026-05-09 19:40 · #298 codemod Phase 4 (#338) + RBAC follow-up (#336)
+
+### 完成状态
+- [x] PR #336 OPEN（stacked on #335，T2，1 commit）：test_trade_promotions 10/10
+- [x] PR #338 OPEN（base main，T1，3 commit）：tx-member 30 文件 / 112 处 + conftest 前置 + 21 patch drift fix
+- [x] 决策 83 登记：每服务首接入 codemod chain 需建 conftest（namespace package magic）
+- [x] 决策 84 登记：codemod chain 漏抓 from-NS-import-module 形式（决策 78 实证）
+- [x] DEVLOG / progress / handoff 更新
+
+### 关键决策（新增）
+- **决策 83**：每服务首接入 codemod chain 需新建 conftest.py 建 namespace package magic（与 tx-trade/conftest.py 同模板）
+- **决策 84**：scanner 漏抓 from-NS-import-module 形式 → 决策 78 强制本地 pytest 守门
+
+### 下一步
+- 等 #335 / #336 / #338 admin merge
+- #298 Phase 5 候选服务（按规模）：tx_org 102 / tx_supply 96 / tx_growth 70 / tx_finance 62 / tx_menu 48 / tx_agent 37 / tx_analytics 34 / gateway 16 / tx_intel 12 / tx_predict 10 / tx_ops 10 / tx_brain 2
+- pre-existing follow-up：test_members_routes 4 / test_stamp_card 5 / test_gdpr 1 / 11 collection error 文件（按 #336 模式 PR）
+- 决策 79 Phase 2 scan_order + ontology（需 §18）
+- shared.security 包缺失诊断
+
+### 已知风险
+- 本批 53 fail 全 pre-existing（main 上 collection-blocked 隐藏，决策 79 follow-up）
+- Phase 5 推到其他服务必须先建 conftest（决策 83），未建会触 ModuleNotFoundError 链路
+
+### 数据快照
+- 累计 #298 chain：72 文件 / ~417 处 import 全路径化（chain ~70%）
+- 余 12 服务 ~499 裸待清
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
