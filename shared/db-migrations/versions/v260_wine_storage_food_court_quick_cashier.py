@@ -141,7 +141,7 @@ def upgrade() -> None:
                 "unified_cashier", sa.Boolean, nullable=False, server_default="true", comment="是否启用统一收银台"
             ),
             sa.Column(
-                "config", JSONB, nullable=True, server_default="'{}'", comment="扩展配置 JSON（营业时间、收银台数量等）"
+                "config", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb"), comment="扩展配置 JSON（营业时间、收银台数量等）"
             ),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -177,7 +177,7 @@ def upgrade() -> None:
                 server_default="'active'",
                 comment="active=正常营业 / inactive=暂停 / suspended=被暂停",
             ),
-            sa.Column("settlement_account", JSONB, nullable=True, server_default="'{}'", comment="结算账户信息 JSON"),
+            sa.Column("settlement_account", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb"), comment="结算账户信息 JSON"),
             sa.Column(
                 "display_order",
                 sa.Integer,
@@ -313,7 +313,7 @@ def upgrade() -> None:
             ),
             sa.Column("settled_at", sa.TIMESTAMP(timezone=True), nullable=True, comment="结算确认时间"),
             sa.Column("operator_id", sa.String(50), nullable=True, comment="财务确认人 ID"),
-            sa.Column("details", JSONB, nullable=True, server_default="'{}'", comment="结算明细快照 JSON"),
+            sa.Column("details", JSONB, nullable=True, server_default=sa.text("'{}'::jsonb"), comment="结算明细快照 JSON"),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("updated_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
             sa.Column("is_deleted", sa.Boolean, nullable=False, server_default="false"),
@@ -367,7 +367,7 @@ def upgrade() -> None:
                 "config",
                 JSONB,
                 nullable=False,
-                server_default="'{}'",
+                server_default=sa.text("'{}'::jsonb"),
                 comment="档口配置 JSON（最大排队数、叫号前缀等）",
             ),
             sa.Column("created_at", sa.TIMESTAMP(timezone=True), server_default=sa.text("now()"), nullable=False),
@@ -403,7 +403,7 @@ def upgrade() -> None:
                 "customer_info",
                 JSONB,
                 nullable=False,
-                server_default="'{}'",
+                server_default=sa.text("'{}'::jsonb"),
                 comment="顾客信息（手机号/会员 ID 等，非必填）",
             ),
             sa.Column(

@@ -87,11 +87,11 @@ def upgrade() -> None:
             comment="覆盖区域服务模式（如午市大厅=scan_and_pay，晚市=dine_first）",
         ),
         sa.Column(
-            "pricing_override", JSONB, server_default="'{}'",
+            "pricing_override", JSONB, server_default=sa.text("'{}'::jsonb"),
             comment="时段定价覆盖：{min_consumption_fen, room_fee_fen, surcharge_rate}",
         ),
         sa.Column(
-            "target_metrics", JSONB, server_default="'{}'",
+            "target_metrics", JSONB, server_default=sa.text("'{}'::jsonb"),
             comment="时段经营目标：{target_turnover_rate, target_avg_spend_fen, target_duration_min}",
         ),
         sa.Column("is_active", sa.Boolean, nullable=False, server_default="true"),

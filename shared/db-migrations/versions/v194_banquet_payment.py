@@ -34,7 +34,7 @@ def upgrade() -> None:
             sa.Column("banquet_date", sa.DATE(), nullable=False),
             sa.Column("banquet_time", sa.TIME(), nullable=False),
             sa.Column("guest_count", sa.Integer(), nullable=False, server_default="0"),
-            sa.Column("table_ids", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="'[]'"),
+            sa.Column("table_ids", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default=sa.text("'[]'::jsonb")),
             sa.Column("total_fen", sa.BigInteger(), nullable=False, server_default="0"),
             sa.Column(
                 "deposit_rate", sa.NUMERIC(4, 2), nullable=False, server_default="0.30", comment="定金比例，默认30%"
