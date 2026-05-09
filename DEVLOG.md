@@ -1,3 +1,72 @@
+## 2026-05-09 夜里 — B'-5 · banquet 全链 DROP CASCADE 扩展 + RLS 类 F 新发现
+
+### 今日完成
+B'-4 后第五批 — 完成 banquet 群所有撞 schema 修复 + 顺道发现并批量修复新
+**类 F bug**（_enable_rls helper 在 INSERT POLICY 错用 USING 而非 WITH CHECK）。
+链路从 v316 推进到 v378（**60+ migration 解锁**）。
+
+**3 个 commit：**
+
+1. **类 A 残留 — banquet 群核心 4 文件 DROP CASCADE (v316/v317/v318/v319)**
+   - v316: banquet_quote_items + banquet_quotes + banquet_menu_templates
+   - v317: banquet_venue_bookings + banquet_venues
+   - v318: banquet_table_groups
+   - v319: banquet_status_logs + banquets
+   - 同 PR #342 v315 模式（先 DROP CASCADE 再 CREATE）
+
+2. **类 A 残留续补 — v336/v344 (banquet_contracts + banquet_feedbacks)**
+   - v336: banquet_contract_amendments + banquet_contracts (vs v282)
+   - v344: banquet_referrals + banquet_feedbacks
+
+3. **类 F 新发现 — _enable_rls helper INSERT 用 WITH CHECK (6 文件批量)**
+   - PG: `CREATE POLICY ... FOR INSERT ... USING (...)` 拒绝，必须 `WITH CHECK`
+   - 共享 buggy helper 的 6 文件：v377_customer_journey / v378_daily_scorecard /
+     v379_dynamic_pricing_ai / v380_invoice_ocr / v381_delivery_disputes /
+     v391_delivery_dispatches
+   - 修法：`clause = "WITH CHECK" if action == "INSERT" else "USING"` 为每个
+     action 选对子句
+
+### 数据变化
+- migration 文件改：12 个（v316-v319 / v336 / v344 / v377-v381 / v391）
+- 净 +53 行（DROP 块新增 + RLS helper 内 1 行加 clause 选择）
+
+### 验证证据
+- `alembic upgrade head` 在 fresh pgvector PG 上：
+  - 之前 (B'-4): 卡 v316 `column "event_type" does not exist`
+  - 现在 (B'-5): 跨过 v316 → v317 → v318 → v319 → v320..v336 → v337..v344 →
+    v345..v377 → v378 ✓ → 卡 **v378 第 3 表 store_lifecycle_stages**
+    `generation expression is not immutable`
+
+### 链路解锁度（**最大单批进度**）
+- 之前 (B'-4): v001 → v316 (~76%)
+- 现在 (B'-5): v001 → v378 (~93%)
+- 60+ migration 单批解锁
+
+### 卡在 v378 (**新 bug 类 G — 非不可变生成列表达式**，B'-6 范畴)
+v378 创建 `store_lifecycle_stages` 表，含：
+```sql
+months_since_opening INT GENERATED ALWAYS AS (
+    (EXTRACT(YEAR FROM age(CURRENT_DATE, opened_date)) * 12
+     + EXTRACT(MONTH FROM age(CURRENT_DATE, opened_date)))::INT
+) STORED
+```
+- `CURRENT_DATE` 和 `age()` 都是 STABLE 不是 IMMUTABLE → PG STORED 生成列拒
+- 修复方向：改 VIRTUAL（PG 16+ 支持）/ 或删生成列改 view / 或改普通列在
+  trigger 中维护
+
+### 遗留问题（按 ROI 排序）
+- v378 类 G 生成列（独立 PR，~5 行 diff）
+- v379-v406 段还可能有零星 bug 未摸排
+- 类 A 第四组 approval_instances（v031/v059/v235c）— 最复杂，业务 audit
+- v310 mv_* 性能索引列名拼错（弃用 / 重写）
+- v332 → v406 段（7% 剩余链路）摸排
+
+### 明日计划
+- 看 user 决策：B'-6 = v378 生成列改 + v379+ 摸排，还是先停下等 PR review
+- approval_instances 仍待独立 audit + 修
+
+---
+
 ## 2026-05-09 傍晚 — B'-4 · banquet 双类 A 副本去重（**部分解锁**，仅过 v315）
 
 ### 今日完成

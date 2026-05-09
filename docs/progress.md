@@ -1,3 +1,44 @@
+## 2026-05-09 夜里 · B'-5 banquet 全链 DROP CASCADE + 类 F RLS helper 批量修复
+
+### 完成状态
+- [x] 类 A 残留 — banquet 群 4 核心文件 (v316/v317/v318/v319) DROP CASCADE
+- [x] 类 A 残留续 — v336 banquet_contracts + v344 banquet_aftercare DROP CASCADE
+- [x] 类 F 新发现 — _enable_rls helper INSERT 用 WITH CHECK 批量修 (6 文件)
+- [x] DEVLOG / progress 同步
+- [x] 真 PG 验证：链路从 v316 推进到 v378（60+ migration 解锁，~93%）
+- [ ] **v378 store_lifecycle_stages 生成列非不可变（类 G 新）** — 独立 PR
+- [ ] v379-v406 段尚未完全摸排（7% 剩余链路）
+- [ ] 类 A 第四组 approval_instances (v031/v059/v235c) — 复杂，需 audit
+- [ ] v310 mv_* 性能索引列名拼错
+
+### 关键决策
+- **批量同模式 vs 单文件提交**：banquet 群 4 文件 (v316-v319) 同模式 + 同根因
+  → 单 commit；v336/v344 是 banquet 群续补 → 独立 commit；6 RLS 文件是新类
+  → 独立 commit。3 commit 共 12 文件
+- **B'-5 大单批 ROI 最高**：60+ migration 单 PR 解锁，~93% 链路覆盖。剩余 7%
+  （v378-v406）只剩类 G 生成列 + 零星未知，独立 PR 处理
+- **类 F (RLS helper INSERT) 是新发现**：B' 系列前 5 PR 没暴露过，因为它埋在
+  v37x-v39x Sprint G 系列；这次 banquet 全链解锁后才走到
+- **B'-4 + B'-5 实际重合 audit**：B'-4 banquet_leads/quotes 无业务闭环价值
+  论断成立 — 必须 stack PR #342 + 本 PR 一起 review/merge 才解锁 banquet 链路
+
+### 下一步
+- B'-6 候选：v378 类 G 生成列改 (~5 行 diff) → unlock v379+
+- v379-v406 段（剩余 7%）摸排
+- approval_instances 类 A 第四组 audit（独立 PR）
+- v310 mv_* 索引重写或弃用
+
+### 已知风险
+- **类 F batch fix 等价于改 RLS POLICY 实际行为**：原 USING (tenant_id = X)
+  对 INSERT 实际不生效（PG 静默允许所有 INSERT），改 WITH CHECK 后才真正
+  按租户校验 — 这是 **修复隐藏的 RLS 跨租户 INSERT 漏洞**。CLAUDE.md §17
+  Tier 1 强约束。**应配套 RLS 反测验证**（独立 PR）
+- **DROP CASCADE 在生产无影响**（chain 历史断裂，从未跑过 banquet 后续链）
+- **生成列改 VIRTUAL 需 PG 16**：postgres:16-alpine 已支持，但生产 PG 版本
+  需确认（公司 docker-compose 用 postgres:16-alpine ✓）
+
+---
+
 ## 2026-05-09 傍晚 · B'-4 banquet 双类 A 副本去重（partial — 仅过 v315）
 
 ### 完成状态
