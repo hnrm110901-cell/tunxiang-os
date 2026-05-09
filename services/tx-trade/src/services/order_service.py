@@ -178,7 +178,7 @@ class OrderService:
             table_number=_resolved_table_no,
             customer_id=uuid.UUID(customer_id) if customer_id else None,
             waiter_id=waiter_id,
-            sales_channel=order_type,
+            order_type=order_type,
             total_amount_fen=0,
             discount_amount_fen=0,
             final_amount_fen=0,
