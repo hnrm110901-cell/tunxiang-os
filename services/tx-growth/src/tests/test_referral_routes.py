@@ -96,7 +96,7 @@ _sqla_parent.select = MagicMock(
     )
 )
 
-from api.referral_routes import router  # noqa: E402
+from services.tx_growth.src.api.referral_routes import router  # noqa: E402
 
 # ─── Build app with middleware that injects mock DB ────────────────────────
 

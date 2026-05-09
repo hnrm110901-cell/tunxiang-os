@@ -137,7 +137,7 @@ sys.modules.setdefault("services.brand_strategy_db_service", _svc_db)
 # 导入路由
 # ---------------------------------------------------------------------------
 
-from api.brand_strategy_routes import _svc, router
+from services.tx_growth.src.api.brand_strategy_routes import _svc, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

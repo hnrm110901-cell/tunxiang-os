@@ -63,10 +63,10 @@ if not hasattr(sys.modules["shared.events.src.emitter"], "emit_event"):
 
 # ── 加载路由 ──────────────────────────────────────────────────────────────────
 
-from api.channel_routes import get_db as channel_get_db
-from api.channel_routes import router as channel_router
-from api.content_routes import get_db as content_get_db
-from api.content_routes import router as content_router
+from services.tx_growth.src.api.channel_routes import get_db as channel_get_db
+from services.tx_growth.src.api.channel_routes import router as channel_router
+from services.tx_growth.src.api.content_routes import get_db as content_get_db
+from services.tx_growth.src.api.content_routes import router as content_router
 
 channel_app = FastAPI()
 channel_app.include_router(channel_router)

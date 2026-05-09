@@ -59,7 +59,7 @@ def _make_db(*execute_results):
 # ── 加载路由（patch emit_event + get_db） ────────────────────────────────────
 
 with patch("shared.events.src.emitter.emit_event", new=AsyncMock()):
-    from api.coupon_routes import get_db, router
+    from services.tx_growth.src.api.coupon_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)

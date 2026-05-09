@@ -94,7 +94,7 @@ with patch.dict(
     },
 ):
     with patch("src.services.campaign_engine.CampaignEngine", _fake_engine_mod.CampaignEngine):
-        from api.growth_campaign_routes import get_db, router
+        from services.tx_growth.src.api.growth_campaign_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)

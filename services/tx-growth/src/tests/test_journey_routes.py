@@ -100,7 +100,7 @@ with patch("engine.journey_engine.JourneyEngine", return_value=_fake_engine):
     sys.modules["engine"] = engine_mod
     sys.modules["engine.journey_engine"] = engine_mod.journey_engine
 
-    from api.journey_routes import router
+    from services.tx_growth.src.api.journey_routes import router
 
 app = FastAPI()
 app.include_router(router)

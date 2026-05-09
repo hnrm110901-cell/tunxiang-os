@@ -69,7 +69,7 @@ sys.modules.setdefault("shared.ontology", _shared_onto)
 sys.modules.setdefault("shared.ontology.src", _shared_onto_src)
 sys.modules["shared.ontology.src.database"] = _shared_onto_db
 
-from api.touch_attribution_routes import router  # noqa: E402
+from services.tx_growth.src.api.touch_attribution_routes import router  # noqa: E402
 
 app = FastAPI()
 app.include_router(router)
