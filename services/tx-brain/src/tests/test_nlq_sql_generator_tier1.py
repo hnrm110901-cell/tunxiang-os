@@ -22,6 +22,7 @@ S4-02 PR2.B.1 — sql_generator.py 骨架（mock LLM，不接真 ModelRouter）�
 
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import UUID
 
@@ -36,6 +37,11 @@ from services.sql_generator import (
 
 _TENANT = UUID("11111111-1111-1111-1111-111111111111")
 _REQUEST = UUID("22222222-2222-2222-2222-222222222222")
+
+
+def _wrap(sql: str) -> str:
+    """LLM 响应包装：合法 JSON `{"sql": "..."}`（不能用 !r，那是 Python repr）。"""
+    return json.dumps({"sql": sql}, ensure_ascii=False)
 
 
 class _FakeRouter:
@@ -103,7 +109,7 @@ async def test_normal_path_returns_safe_sql() -> None:
 )
 @pytest.mark.asyncio
 async def test_firewall_rejects_writes(malicious_sql: str) -> None:
-    router = _FakeRouter(response_text=f'{{"sql": {malicious_sql!r}}}')
+    router = _FakeRouter(response_text=_wrap(malicious_sql))
     gen = SqlGenerator(model_router=router)
     with pytest.raises(SqlGenerationError):
         await gen.generate(
@@ -129,7 +135,7 @@ async def test_firewall_rejects_writes(malicious_sql: str) -> None:
 async def test_whitelist_rejects_non_reports_schema(
     out_of_scope_sql: str,
 ) -> None:
-    router = _FakeRouter(response_text=f'{{"sql": {out_of_scope_sql!r}}}')
+    router = _FakeRouter(response_text=_wrap(out_of_scope_sql))
     gen = SqlGenerator(model_router=router)
     with pytest.raises(SqlGenerationError, match="reports"):
         await gen.generate(
