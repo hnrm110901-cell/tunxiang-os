@@ -3,7 +3,7 @@
 ## 上一 session 终态（2026-05-09 23:00）
 
 main HEAD: `9f0ca7d4`
-我侧 OPEN：**5 PR**（#335 Phase 3 / #336 RBAC follow-up / #338 Phase 4 / #341 Phase 5 / **#XXX Phase 6**）
+我侧 OPEN：**5 PR**（#335 Phase 3 / #336 RBAC follow-up / #338 Phase 4 / #341 Phase 5 / **#344 Phase 6**）
 
 ### 战绩（5/9 一日 5 PR）
 
@@ -13,7 +13,7 @@ main HEAD: `9f0ca7d4`
 | #336 | RBAC follow-up — test_trade_promotions 10/10 | #335 | T2 | OPEN（stacked） |
 | #338 | Phase 4 tx-member 30/112 + conftest 新建 + 21 drift | main | T1 | OPEN |
 | #341 | Phase 5 tx-org 39/102 + 24 drift | main | T1 | OPEN |
-| **#XXX** | **Phase 6 tx-supply 39/96 + 20 drift** | **main** | **T1** | **OPEN** |
+| **#344** | **Phase 6 tx-supply 39/96 + 20 drift** | **main** | **T1** | **OPEN** |
 
 ### 决策登记（5/9 累计 8 项）
 - 77 / 78 / 79 / 80 / 81 / 82 / 83 / 84
@@ -124,6 +124,6 @@ find services -maxdepth 2 -name "conftest.py" | sort  # 决策 83 状态
 | 1-3 | #322 #335 | tx-trade | 42 | ~305 |
 | 4 | #338 | tx-member | 30 | 112 |
 | 5 | #341 | tx-org | 39 | 102 |
-| 6 | #XXX | tx-supply | 39 | 96 |
+| 6 | #344 | tx-supply | 39 | 96 |
 | **累计** | | **4 服务** | **150** | **~615** |
 | 余待清 | | 10 服务 | ~? | ~108（tx-growth 95 / tx-finance 52）|

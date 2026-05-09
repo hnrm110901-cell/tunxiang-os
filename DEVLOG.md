@@ -1,7 +1,7 @@
 ## 2026-05-09 深夜 续 — #298 codemod Phase 6 (tx-supply 39/96) 落地
 
 ### 今日完成（5/9 第 5 PR）
-- **#XXX** Phase 6 tx-supply 全清 — 模板沿用 #335 / #338 / #341，3 commit 原子化（CLAUDE.md §21）
+- **#344** Phase 6 tx-supply 全清 — 模板沿用 #335 / #338 / #341，3 commit 原子化（CLAUDE.md §21）
   - **RED** `dc030d77` — `services/tx-supply/src/tests/test_codemod_phase6_bare_imports_tier1.py` AST 守门 fixture（决策 80）
   - **GREEN** `f7085622` — codemod --apply --service tx-supply：39 文件 / 96 import 全改写
   - **fix** `052232bb` — patch literal 漂移 20 处（test_procurement_prediction.py 7 / test_transfer_routes.py 7 / test_inventory_routes.py 6）；决策 84 from-NS-import-module 形式 0 命中（本轮免）
@@ -27,7 +27,7 @@
 | 1-3 | #322 #335 | tx-trade | 42 | ~305 |
 | 4 | #338 | tx-member | 30 | 112 |
 | 5 | #341 | tx-org | 39 | 102 |
-| **6** | **#XXX**（本 PR）| **tx-supply** | **39** | **96** |
+| **6** | **#344**（本 PR）| **tx-supply** | **39** | **96** |
 | **累计** | | **4 服务** | **150** | **~615** |
 | 余待清 | | 10 服务 | ~? | ~108（tx-growth 95 / tx-finance 52 验证待做）|
 
@@ -1126,8 +1126,8 @@ reviewer 还提了 4 个高优 smell（建议 merge 后 follow-up）：
 - **#251 [S1-08] 硬编码品牌色清理 — 已落地（98.3% 减幅）**
   - **hardcoded-color: 4112 → 69 baseline 锁定**
   - 3 波 codemod：
-    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#XXXXXX'` 字面量 → `txColors.<name>`（~3300 处）
-    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#XXXXXX` → `var(--tx-*)`（49 处）
+    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#344XXX'` 字面量 → `txColors.<name>`（~3300 处）
+    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#344XXX` → `var(--tx-*)`（49 处）
     - `scripts/lint-ui/codemod-color-cssinjs.mjs` — TSX/TS CSS shorthand string `'... #X ...'` → 模板字符串（424 处）
   - lint 豁免规则细化：跳过 inline `//` 注释 + `var(--*, #X)` defensive fallback
   - JSX 属性破损批量修复：`color=txColors.X` → `color={txColors.X}`（162 处，64 文件）
