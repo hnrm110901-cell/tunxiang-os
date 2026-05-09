@@ -24,76 +24,15 @@ TABLE = 'employee_transfers'
 
 
 def upgrade() -> None:
-    # ─── 补全 employee_transfers 缺失字段 ──────────────────────────────────────
-    op.add_column(TABLE, sa.Column(
-        'employee_name', sa.VARCHAR(100), nullable=True,
-        comment='员工姓名（冗余存储，避免关联查询）'
-    ))
-    op.add_column(TABLE, sa.Column(
-        'from_store_name', sa.VARCHAR(100), nullable=True,
-        comment='原门店名称（冗余存储）'
-    ))
-    op.add_column(TABLE, sa.Column(
-        'to_store_name', sa.VARCHAR(100), nullable=True,
-        comment='借调目标门店名称（冗余存储）'
-    ))
-    # 先用 server_default 回填历史行，再设 NOT NULL
-    op.add_column(TABLE, sa.Column(
-        'start_date', sa.Date(), nullable=True,
-        server_default='1970-01-01',
-        comment='借调开始日期'
-    ))
-    op.add_column(TABLE, sa.Column(
-        'end_date', sa.Date(), nullable=True,
-        server_default='1970-01-01',
-        comment='借调结束日期'
-    ))
-    op.alter_column(TABLE, 'start_date', nullable=False, server_default=None)
-    op.alter_column(TABLE, 'end_date', nullable=False, server_default=None)
-
-    op.add_column(TABLE, sa.Column(
-        'approved_at', sa.TIMESTAMP(timezone=True), nullable=True,
-        comment='审批时间（待审批时为空）'
-    ))
-
-    # ─── 索引：覆盖常用查询路径 ──────────────────────────────────────────────────
-    # 门店+时间范围查询
-    op.create_index(
-        'idx_employee_transfers_store_dates',
-        TABLE,
-        ['tenant_id', 'from_store_id', 'start_date'],
-        postgresql_where=sa.text('is_deleted = false'),
-    )
-    op.create_index(
-        'idx_employee_transfers_to_store',
-        TABLE,
-        ['tenant_id', 'to_store_id', 'start_date'],
-        postgresql_where=sa.text('is_deleted = false'),
-    )
-    # 员工维度查询（list_transfers 按 employee_id 过滤）
-    op.create_index(
-        'idx_employee_transfers_employee',
-        TABLE,
-        ['tenant_id', 'employee_id', 'created_at'],
-        postgresql_where=sa.text('is_deleted = false'),
-    )
-    # 状态过滤查询
-    op.create_index(
-        'idx_employee_transfers_status',
-        TABLE,
-        ['tenant_id', 'status', 'created_at'],
-        postgresql_where=sa.text('is_deleted = false'),
-    )
+    # 类 A 副本去重 (B'-3, 2026-05-09): 本文件 (revision="v208b") 与
+    # v287_org_training_persistence.py (revision="v287") 是 100% 内容副本。
+    # 两者 down_revision 同为 "v207"（平行分支），alembic 拓扑序两条都跑 →
+    # 后跑的撞 DuplicateColumn / DuplicateTable。v287 是规范保留版本（已在
+    # B'-2 加 IF NOT EXISTS 索引），本文件改 no-op：让 v287 唯一负责 schema
+    # 变更，本文件仅作为 chain 节点存在不动 schema。
+    return
 
 
 def downgrade() -> None:
-    op.drop_index('idx_employee_transfers_status', table_name=TABLE)
-    op.drop_index('idx_employee_transfers_employee', table_name=TABLE)
-    op.drop_index('idx_employee_transfers_to_store', table_name=TABLE)
-    op.drop_index('idx_employee_transfers_store_dates', table_name=TABLE)
-    op.drop_column(TABLE, 'approved_at')
-    op.drop_column(TABLE, 'end_date')
-    op.drop_column(TABLE, 'start_date')
-    op.drop_column(TABLE, 'to_store_name')
-    op.drop_column(TABLE, 'from_store_name')
-    op.drop_column(TABLE, 'employee_name')
+    # 同 upgrade，no-op；schema 状态由 v287 的 downgrade 反向负责
+    return
