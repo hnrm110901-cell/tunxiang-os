@@ -240,6 +240,15 @@ def upgrade() -> None:
     # ──────────────────────────────────────────────────────────────────
     # approval_instances — 审批实例
     # ──────────────────────────────────────────────────────────────────
+    # B'-6 修：v031 / v059 / v235c 三个 migration 用三种不同 schema 创建
+    # approval_instances（flow_def_id+business_type / template_id+business_id /
+    # application_id+current_node_index）。3 个 services 各按自己模型读表 —
+    # 这是 **预存架构 bug**（tx-org / tx-expense / tx-ops 共用表名但 schema 互
+    # 斥）。本次仅修 chain 让 alembic upgrade head 跑通，选 v235c schema 胜出
+    # （tx-expense 模型对应，最新设计）。
+    # 架构债：tx-org/approval_flow.py 和 tx-org/approval_flow_engine.py 在新
+    # schema 下会 runtime 失败 — 应独立 PR rename / 拆表（B'-7+）。
+    op.execute("DROP TABLE IF EXISTS approval_instances CASCADE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS approval_instances (
             id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -50,6 +50,10 @@ def _enable_rls(table: str) -> None:
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-6, 2026-05-09): v216_delivery_dispatch.py 早建过
+    # delivery_dispatches schema 不含 dispatch_no 列；本文件 IF NOT EXISTS 静默
+    # 跳过 → CREATE INDEX dispatch_no 撞列。先 DROP CASCADE 再 CREATE，同 banquet 群模式。
+    op.execute("DROP TABLE IF EXISTS delivery_dispatches CASCADE")
     # ── 1. delivery_dispatches ───────────────────────────────────────────────
     op.execute("""
         CREATE TABLE IF NOT EXISTS delivery_dispatches (
