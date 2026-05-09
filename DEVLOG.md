@@ -1,3 +1,78 @@
+## 2026-05-09 傍晚 — B'-4 · banquet 双类 A 副本去重（**部分解锁**，仅过 v315）
+
+### 今日完成
+B'-3 后第四批 — 试图清理 banquet_leads + banquet_quotes 双组类 A 副本。**实际只
+成功解锁 v315**（链路前进 1 个 migration），暴露 v316 / v317 / v318 / v319 系列
+更深的多版本同名表撞 schema 问题。
+
+**3 个 commit：**
+
+1. **类 A 第二组 — banquet_leads (v267 / v315 / v331)**
+   - v267: 仅保留 3 个 ENUM 类型创建（v282_banquet_contracts.py 引用），删除
+     banquet_leads CREATE TABLE + 6 索引 + RLS（不匹配生产 ORM）
+   - v331: 100% 副本 of v315，改 no-op
+   - 业务 audit 证据：services/tx-trade/src/models/banquet_lead.py 用 v315 schema
+     (lead_no/status)，v267 schema (lead_id/ENUM) 仅 doc 漂移
+
+2. **类 A 第三组 — banquet_quotes (v316 / v332)**
+   - v332: 100% 副本 of v316，改 no-op
+
+3. **v315 DROP CASCADE — 跨 v004 老 banquet_leads schema**
+   - v004_reservation_banquet.py 早建过"13-stage pipeline" schema，与 v315
+     完全不同，IF NOT EXISTS 让 v004 静默胜出 → v315 后续 CREATE INDEX 撞列
+   - 修法：v315 在 CREATE 前 DROP TABLE IF EXISTS banquet_leads CASCADE
+
+### 数据变化
+- migration 文件改：4（v267 / v315 / v331 / v332）
+- 净 -111 行（多数是 v331/v332 副本删除 + v267 部分删除）
+
+### 验证证据
+- `alembic upgrade head` 在 fresh pgvector PG 上：
+  - 之前 (B'-3): 卡 v315 banquet_leads `column "status" does not exist`
+  - 现在 (B'-4): 跨过 v315（v004 老 schema 被 DROP CASCADE 替换为 v315 schema）
+    → 进入 v316，**仍卡 v316** 的 `banquet_menu_templates` 同问题（多版本撞 schema）
+
+### 卡在 v316（**B'-5 范畴**）
+v316 创建 banquet_menu_templates / banquet_quotes / banquet_quote_items 三表，
+但 banquet_menu_templates 已被某早期迁移以不同 schema 创建过，IF NOT EXISTS
+让旧 schema 胜出 → CREATE INDEX 列 event_type 撞不存在。
+
+**Branch A 还需 4 个 DROP CASCADE 类 A 修复才完整解锁 banquet 全链：**
+| migration | 待 DROP CASCADE 的表 |
+|---|---|
+| v316 | banquet_menu_templates / banquet_quotes / banquet_quote_items |
+| v317 | banquet_venues / banquet_venue_bookings |
+| v318 | banquet_table_groups |
+| v319 | banquets / banquet_status_logs |
+
+每个表都有早期版本（v013_banquet_quotations_proposals / v043_banquet_deposit
+等）以不同 schema 创建过，需要"先 DROP 再 CREATE"模式。
+
+### 链路解锁度（仅前进 1 个 migration）
+- 之前 (B'-3): v001 → v315 (~75%)
+- 现在 (B'-4): v001 → v316 (~76%)
+- B'-5 完成后预期：v001 → v320+（解锁整个 banquet 群）
+
+### 关键决策回顾
+- **v267 partial 删 / 仅留 ENUM**：v282 引用 banquet_type_enum 必须保留；
+  banquet_leads CREATE 块删除避免与 v315 的 canonical schema 撞
+- **v331/v332 no-op**：正确（与 v315/v316 100% 副本，让前者唯一负责）
+- **v315 DROP CASCADE**：正确（必须显式覆盖 v004 老 schema）
+- **scope 严格控制 3 commit**：v316/v317/v318/v319 同模式扩展留 B'-5
+
+### 已知风险
+- **v316/v317/v318/v319 没改** = banquet 全链路在 B'-5 前仍 broken
+- **v004 banquet_leads DROP CASCADE 在生产无影响**（chain 历史断裂未跑过 v004
+  banquet_leads 之后），但若发现已生效 stamp 需手动 stamp 修复
+- **类 A 模式可能比想的更广**：banquet 群的 4 表后还有 banquet_orders /
+  banquet_payments / banquet_deposits 等待 audit
+
+### 明日计划
+- 看 user 决策：B'-5 同模式扩展 4 个 DROP CASCADE，还是先停下等 PR review
+- 类 A 第四组 approval_instances（v031 / v059 / v235c）需独立调研
+
+---
+
 ## 2026-05-09 下午 — B'-3 · alembic upgrade 解锁 v288-v324 段（v236 chain + v288 + v208b 副本）
 
 ### 今日完成

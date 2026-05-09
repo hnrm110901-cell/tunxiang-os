@@ -1,3 +1,46 @@
+## 2026-05-09 傍晚 · B'-4 banquet 双类 A 副本去重（partial — 仅过 v315）
+
+### 完成状态
+- [x] 类 A 第二组 — banquet_leads (v267 / v315 / v331)：v267 仅留 ENUM / v331 no-op / v315 DROP CASCADE
+- [x] 类 A 第三组 — banquet_quotes (v316 / v332)：v332 no-op
+- [x] DEVLOG / progress 同步
+- [x] 真 PG 验证：链路从 v315 推进到 v316（**仅 1 个 migration**）
+- [ ] **v316 / v317 / v318 / v319 也需 DROP CASCADE 才完整解锁** banquet 全链 — 留 B'-5
+- [ ] 类 A 第四组 approval_instances (v031/v059/v235c) — 待 audit
+- [ ] v310 mv_* 性能索引列名拼错
+- [ ] v332 → v406 段（24% 剩余链路）摸排
+
+### 关键决策
+- **B'-4 partial scope**：原计划 banquet_leads + banquet_quotes 双组完整解锁，实际
+  发现 banquet 全链 5 表（leads / quotes / venues / table_groups / banquets）都被
+  早期 v004/v013/v043 等 migration 用不同 schema 提前创建，需逐个 DROP CASCADE。
+  本 PR 仅完整解锁 banquet_leads，其余 4 表留 B'-5 同模式扩展
+- **业务侧 schema 选 v315/v316 系列胜出**：services/tx-trade/src/models/banquet_*.py
+  用本 schema（lead_no / status / event_type CHECK），与早期 v004 / v013 不一致
+- **副本 no-op vs 删 file**：v331/v332 是 100% 副本，no-op 而非删（保留 chain 节点
+  完整性，v398 merge tuple 仍可能 reference）
+- **仅 v315 DROP CASCADE**：scope 严格 — 演示 DROP CASCADE 模式可行后留同模式
+  扩展给 B'-5；避免 PR 创蔓
+- **v267 仅留 ENUM**：v282 必须 reference 这些 ENUM 类型，删 banquet_leads CREATE
+  块保留 ENUM 创建是最小变更
+
+### 下一步
+- B'-5 候选：v316 / v317 / v318 / v319 同模式 DROP CASCADE 4 个 commit
+- approval_instances 类 A 第四组（v031/v059/v235c）— 需 grep 业务代码
+  audit 哪个 schema 实际用（最复杂）
+- v332→v406 摸排起新 session
+
+### 已知风险
+- **B'-4 单独 merge 无法解锁 banquet 链路**：v316 仍 block，仅修 banquet_leads
+  孤立无业务流闭环价值。建议与 B'-5 一起 review
+- **v267 删除 banquet_leads CREATE 后仍声明 ENUM**：若有任何代码 reference
+  v267-defined banquet_leads schema (lead_id PK)，会运行时 NoSuchColumn。
+  已 grep 业务代码无 lead_id 列引用，但 doc / tests 可能有遗漏
+- **v315 DROP CASCADE**：CASCADE 处理 v004 banquet_leads 可能存在的下游 FK
+  （审 v004 + v013 实际无 FK 进入 banquet_leads，CASCADE 安全）
+
+---
+
 ## 2026-05-09 下午 · B'-3 alembic upgrade 解锁 v288-v324 段
 
 ### 完成状态
