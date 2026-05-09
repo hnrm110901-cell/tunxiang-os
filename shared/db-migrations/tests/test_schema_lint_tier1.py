@@ -265,6 +265,11 @@ def test_class_f2_no_insert_policy_using_clause():
 
 # ─── 类 G — 非 IMMUTABLE 函数在 GENERATED / 索引表达式 ─────────────────────
 
+# 严格 STABLE/VOLATILE 函数 — 出现在 GENERATED ALWAYS / 索引表达式中 PG 必拒。
+# 注意：EXTRACT 不在此列 — context-dependent（EXTRACT(EPOCH FROM interval) IMMUTABLE
+# vs EXTRACT(EPOCH FROM timestamptz) STABLE）。规则会漏掉 EXTRACT 滥用 case，但
+# blanket 标 STABLE 会大量 false positive（v377 5 处合法 EXTRACT(EPOCH FROM interval)
+# 减法间隔被误捕）。Trade-off：宁漏不错杀。
 _NON_IMMUTABLE_FUNCS = (
     "now",
     "current_date",
@@ -272,7 +277,6 @@ _NON_IMMUTABLE_FUNCS = (
     "current_timestamp",
     "age",
     "date_trunc",  # STABLE in PG 16+
-    "extract",  # STABLE for some inputs
     "localtime",
     "localtimestamp",
     "random",
@@ -308,7 +312,7 @@ def _scan_class_g():
     return violations
 
 
-_CLASS_G_BASELINE = 6  # PR #346 review 后 regex 收紧（要求 `ON <ident>` 在表达式前）→ false positive 消除，从 40 ratchet 到真实违例数 6。下个 PR 修这 6 处后归零。
+_CLASS_G_BASELINE = 0  # PR #346: regex 进一步去掉 EXTRACT（context-dependent）→ 5 false positive 消除；v378:146 真违例同 PR 修复。归零，linter enforce no new violations。
 
 
 def test_class_g_no_non_immutable_in_generated_or_index():

@@ -143,10 +143,11 @@ def upgrade() -> None:
                                         CHECK (current_stage IN ('rampup', 'mature', 'plateau', 'decline')),
             stage_entered_at        DATE NOT NULL,
 
-            months_since_opening    INT GENERATED ALWAYS AS (
-                (EXTRACT(YEAR FROM age(CURRENT_DATE, opened_date)) * 12
-                 + EXTRACT(MONTH FROM age(CURRENT_DATE, opened_date)))::INT
-            ) STORED,
+            -- 修 (PR #346): 原值由 PG 自动生成（含 STABLE 函数），改普通 INT 列由
+            -- service 层 (services/tx-org/store_lifecycle_service.py) 在 INSERT/UPDATE
+            -- 时显式计算写入。详细修复理由见 PR #346 / docs/migration-schema-lint-rules.md
+            -- 类 G 章节。
+            months_since_opening    INT,
 
             health_baseline         JSONB,
             next_review_date        DATE,
