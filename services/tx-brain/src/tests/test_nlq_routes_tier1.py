@@ -24,21 +24,73 @@ Refs: issue #289
 from __future__ import annotations
 
 import json
+import os
+import sys
+import types
 from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
-from api.nlq_routes import (
+# ─── sys.path 准备（同 test_voice_api 模式让 from src.api 能解析） ────────────
+_TESTS_DIR = os.path.dirname(__file__)
+_SRC_DIR = os.path.join(_TESTS_DIR, "..")
+_ROOT_DIR = os.path.abspath(os.path.join(_TESTS_DIR, "..", "..", "..", ".."))
+for _p in [_SRC_DIR, _ROOT_DIR]:
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+
+def _ensure_pkg(name: str, path: str) -> None:
+    if name not in sys.modules:
+        mod = types.ModuleType(name)
+        mod.__path__ = [path]
+        mod.__package__ = name
+        sys.modules[name] = mod
+
+
+_ensure_pkg("src", _SRC_DIR)
+_ensure_pkg("src.api", os.path.join(_SRC_DIR, "api"))
+_ensure_pkg("src.services", os.path.join(_SRC_DIR, "services"))
+
+
+# ─── stub shared.ontology.src.database（避免本地 Py3.9 vs ontology PEP 604 冲突） ───
+# CI 用 Python 3.11+ 时该 stub 仍生效，因为 _ensure_pkg 已注册 sys.modules，
+# nlq_routes.py 的 `from shared.ontology.src.database import get_db_with_tenant`
+# 拿到的是这里的 stub get_db_with_tenant。
+# 真行为留 PR2.D 真 PG integration test。
+_db_stub = types.ModuleType("shared.ontology.src.database")
+
+
+async def _stub_get_db_with_tenant(tenant_id: str):  # type: ignore[no-untyped-def]
+    """stub：测试通过 dependency_overrides 替换，本函数仅占位。"""
+    yield object()
+
+
+_db_stub.get_db_with_tenant = _stub_get_db_with_tenant  # type: ignore[attr-defined]
+_ensure_pkg("shared", os.path.join(_ROOT_DIR, "shared"))
+_ensure_pkg("shared.ontology", os.path.join(_ROOT_DIR, "shared", "ontology"))
+_ensure_pkg(
+    "shared.ontology.src", os.path.join(_ROOT_DIR, "shared", "ontology", "src")
+)
+sys.modules["shared.ontology.src.database"] = _db_stub
+
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from src.api.nlq_routes import (  # type: ignore[import]  # noqa: E402
     _get_db_with_tenant,
     _get_run_safe_query,
     _get_sql_generator,
     router,
 )
-from services.sql_generator import SqlGenerationError
-from services.sql_sandbox import RowLimitExceeded, SandboxResult, SandboxTimeoutError
+from src.services.sql_generator import SqlGenerationError  # type: ignore[import]  # noqa: E402
+from src.services.sql_sandbox import (  # type: ignore[import]  # noqa: E402
+    RowLimitExceeded,
+    SandboxResult,
+    SandboxTimeoutError,
+)
 
 
 _TENANT = "11111111-1111-1111-1111-111111111111"
@@ -109,15 +161,21 @@ def test_missing_tenant_header_returns_422() -> None:
 # ─── 2. ANTHROPIC_API_KEY 缺失 → 503 ─────────────────────────────────────
 
 
-def test_missing_api_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
-    """工厂抛 ValueError 时端点应映射为 503（service unavailable）。"""
-    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    monkeypatch.setenv("MULTI_PROVIDER_ENABLED", "false")
+def test_factory_value_error_maps_to_503(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """工厂抛 ValueError（如 ANTHROPIC_API_KEY 未设置）时，端点应映射为 503。"""
+    from src.api import nlq_routes as nlq_mod
 
-    # 不 override _get_sql_generator —— 让真 factory 跑（应抛 ValueError）
+    def _raise_value_error(**kwargs: Any) -> Any:
+        raise ValueError("ANTHROPIC_API_KEY 环境变量未设置")
+
+    monkeypatch.setattr(
+        nlq_mod, "create_default_sql_generator", _raise_value_error
+    )
+
     app = FastAPI()
     app.include_router(router)
-    # 仅 override db 避免连真 PG
     async def _stub_db() -> Any:
         return object()
     app.dependency_overrides[_get_db_with_tenant] = _stub_db
@@ -128,8 +186,10 @@ def test_missing_api_key_returns_503(monkeypatch: pytest.MonkeyPatch) -> None:
             json={"nl_query": "..."},
             headers={"X-Tenant-ID": _TENANT},
         )
-    # 503 if ANTHROPIC_API_KEY missing；接受 503 或 500（SDK 缺时也可能 500）
-    assert resp.status_code in (500, 503)
+    assert resp.status_code == 503
+    body = resp.json()
+    # FastAPI HTTPException 默认包装 detail
+    assert "ANTHROPIC_API_KEY" in body.get("detail", "")
 
 
 # ─── 3. 正常路径：SSE 三事件序列 ─────────────────────────────────────────
