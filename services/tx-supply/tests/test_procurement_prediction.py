@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ─── 从服务直接导入，避免 DB 依赖 ───
-from services.procurement_forecast_service import (
+from services.tx_supply.src.services.procurement_forecast_service import (
     IngredientDemandForecast,
     ProcurementForecastService,
     PurchaseOrderDraft,
@@ -171,7 +171,7 @@ class TestForecastIngredientDemand:
             return mock_forecasts.get(ingredient_id, 0.0)
 
         # 模拟阈值列表返回
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -238,7 +238,7 @@ class TestForecastIngredientDemand:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -287,7 +287,7 @@ class TestForecastIngredientDemand:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -453,7 +453,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             # 库存 2kg，明日需求 10kg，严重不足
@@ -518,7 +518,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -556,7 +556,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -650,7 +650,7 @@ class TestEdgeCases:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(

@@ -44,7 +44,7 @@ def _make_mapping(data: dict):
 @pytest.mark.asyncio
 async def test_create_bom_template():
     """create_bom_template 应插入模板和明细, 返回正确结构"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
     # set_config + 1 template insert + 2 item inserts + flush
@@ -73,7 +73,7 @@ async def test_create_bom_template():
 @pytest.mark.asyncio
 async def test_create_bom_template_with_defaults():
     """create_bom_template 使用默认值"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
     session.execute.return_value = MagicMock()
@@ -95,7 +95,7 @@ async def test_create_bom_template_with_defaults():
 @pytest.mark.asyncio
 async def test_get_bom_template_found():
     """get_bom_template 找到模板时返回完整数据"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
     now = datetime.now(timezone.utc)
@@ -166,7 +166,7 @@ async def test_get_bom_template_found():
 @pytest.mark.asyncio
 async def test_get_bom_template_not_found():
     """get_bom_template 找不到模板时返回 None"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
 
@@ -190,7 +190,7 @@ async def test_get_bom_template_not_found():
 @pytest.mark.asyncio
 async def test_delete_bom_template():
     """delete_bom_template 应软删除模板及明细"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
     template_id = str(uuid.uuid4())
@@ -217,7 +217,7 @@ async def test_delete_bom_template():
 @pytest.mark.asyncio
 async def test_delete_bom_template_not_found():
     """delete_bom_template 模板不存在时返回 False"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
 
@@ -239,7 +239,7 @@ async def test_delete_bom_template_not_found():
 @pytest.mark.asyncio
 async def test_activate_version():
     """activate_version 应停用同菜品其他版本, 激活指定版本"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session = _mock_session()
     template_id = str(uuid.uuid4())
@@ -282,7 +282,7 @@ async def test_activate_version():
 @pytest.mark.asyncio
 async def test_calculate_dish_cost_normal():
     """calculate_dish_cost 正常计算: 2个原料, yield_rate=0.9"""
-    from services.cost_calculator import CostCalculator
+    from services.tx_supply.src.services.cost_calculator import CostCalculator
 
     session = _mock_session()
 
@@ -345,7 +345,7 @@ async def test_calculate_dish_cost_normal():
 @pytest.mark.asyncio
 async def test_calculate_dish_cost_no_bom():
     """calculate_dish_cost 无激活BOM时返回零成本"""
-    from services.cost_calculator import CostCalculator
+    from services.tx_supply.src.services.cost_calculator import CostCalculator
 
     session = _mock_session()
 
@@ -368,7 +368,7 @@ async def test_calculate_dish_cost_no_bom():
 @pytest.mark.asyncio
 async def test_calculate_dish_cost_no_price():
     """calculate_dish_cost 原料无价格时该行成本为0"""
-    from services.cost_calculator import CostCalculator
+    from services.tx_supply.src.services.cost_calculator import CostCalculator
 
     session = _mock_session()
 
@@ -419,7 +419,7 @@ async def test_calculate_dish_cost_no_price():
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     """不同 tenant_id 创建的 BOMService 应使用不同的 tenant 上下文"""
-    from services.bom_service import BOMService
+    from services.tx_supply.src.services.bom_service import BOMService
 
     session_a = _mock_session()
     session_b = _mock_session()
@@ -449,7 +449,7 @@ async def test_tenant_isolation():
 @pytest.mark.asyncio
 async def test_calculate_order_cost():
     """calculate_order_cost 应汇总多个菜品的理论成本"""
-    from services.cost_calculator import CostCalculator
+    from services.tx_supply.src.services.cost_calculator import CostCalculator
 
     session = _mock_session()
 

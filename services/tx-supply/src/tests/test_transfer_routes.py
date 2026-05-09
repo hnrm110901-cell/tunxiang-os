@@ -33,7 +33,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # ─── 从 service 模块导入（经由 src/ 路径） ──────────────────────────────────
-from services.transfer_service import (
+from services.tx_supply.src.services.transfer_service import (
     InsufficientStockError,
     cancel_transfer_order,
     create_transfer_order,

@@ -51,7 +51,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # ── dept_issue_routes 不依赖 shared.ontology，直接导入 ────────────────────────
-from api.dept_issue_routes import router as dept_issue_router
+from services.tx_supply.src.api.dept_issue_routes import router as dept_issue_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -84,7 +84,7 @@ sys.modules.setdefault("services.food_safety", _food_safety_svc)
 _pkg_services = types.ModuleType("api")
 sys.modules.setdefault("api", _pkg_services)
 
-from api.food_safety_routes import router as food_safety_router  # noqa: E402
+from services.tx_supply.src.api.food_safety_routes import router as food_safety_router  # noqa: E402
 
 # ── App 组装 ──────────────────────────────────────────────────────────────────
 app = FastAPI()

@@ -26,7 +26,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.ck_recipe_routes import (
+from services.tx_supply.src.api.ck_recipe_routes import (
     router as ck_recipe_router,
 )
 from fastapi import FastAPI

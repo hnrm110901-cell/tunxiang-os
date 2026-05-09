@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import pytest
 
-from services.central_kitchen_service import (
+from services.tx_supply.src.services.central_kitchen_service import (
     CentralKitchenService,
     _clear_store,
     _inject_consumption,

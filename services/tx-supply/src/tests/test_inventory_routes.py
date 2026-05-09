@@ -162,12 +162,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Patch the service attributes the router code resolves at call time
-import api.inventory
-from api.inventory import _get_db as inventory_get_db
+import services.tx_supply.src.api.inventory
+from services.tx_supply.src.api.inventory import _get_db as inventory_get_db
 
 # Import inventory module; because relative imports resolve via src.services stubs
 # we import directly using the api package path
-from api.inventory import router
+from services.tx_supply.src.api.inventory import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

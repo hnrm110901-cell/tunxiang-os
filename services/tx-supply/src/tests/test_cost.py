@@ -5,12 +5,12 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.actual_cost import (
+from services.tx_supply.src.services.actual_cost import (
     calculate_actual_dish_cost,
     compute_actual_cost_from_prices,
     get_ingredient_actual_price,
 )
-from services.theoretical_cost import (
+from services.tx_supply.src.services.theoretical_cost import (
     compute_dish_theoretical_cost_from_bom,
     get_dish_theoretical_cost,
 )

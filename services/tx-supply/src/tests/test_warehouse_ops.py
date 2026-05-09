@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.warehouse_ops import (
+from services.tx_supply.src.services.warehouse_ops import (
     create_bom_split,
     create_split_assembly,
     create_transfer_order,

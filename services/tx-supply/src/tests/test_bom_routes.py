@@ -50,7 +50,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from unittest.mock import AsyncMock, MagicMock
 
-from api.bom_routes import get_db, router
+from services.tx_supply.src.api.bom_routes import get_db, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError

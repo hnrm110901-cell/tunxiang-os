@@ -6,7 +6,7 @@ from datetime import date, datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.food_safety import (
+from services.tx_supply.src.services.food_safety import (
     SAMPLE_RETENTION_HOURS,
     EventSeverity,
     _check_temperature,
