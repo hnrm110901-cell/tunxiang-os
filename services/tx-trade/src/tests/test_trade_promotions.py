@@ -25,6 +25,13 @@ import types
 import uuid
 from unittest.mock import AsyncMock
 
+# ─── RBAC dev_bypass（discount_engine_routes 用 require_role/mfa_audited）──────
+# 与 services/tx-trade/src/security/rbac.py 的 _dev_bypass() 同语义：
+# TX_AUTH_ENABLED=false 时注入 mock UserContext（dev-user-mock / admin），
+# 跳过 JWT + role 校验。本文件测促销/储值业务逻辑，不测 RBAC，故 bypass。
+# 若测 RBAC 行为请用 test_rbac_audit_deny_tier1.py / test_route_mfa_enforcement_tier1.py。
+os.environ.setdefault("TX_AUTH_ENABLED", "false")
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -433,8 +440,11 @@ def test_consume_sufficient_balance():
     results_seq = [
         _FakeMappingsResult(),  # SET LOCAL
         _FakeMappingsResult([account_row]),  # SELECT account
-        _FakeMappingsResult(),  # UPDATE balance
-        _FakeMappingsResult(),  # INSERT transaction
+        # UPDATE balance ... RETURNING balance_before_fen, balance_after_fen
+        _FakeMappingsResult(
+            [{"balance_before_fen": 20_000, "balance_after_fen": 11_200}]
+        ),
+        _FakeMappingsResult(),  # INSERT transaction（无 RETURNING）
     ]
 
     async def _side(stmt, params=None):
@@ -482,6 +492,9 @@ def test_consume_insufficient_balance():
     results_seq = [
         _FakeMappingsResult(),  # SET LOCAL
         _FakeMappingsResult([account_row]),  # SELECT account
+        _FakeMappingsResult(),  # UPDATE balance — 不命中（余额不足），进 insufficient 分支
+        # SELECT 当前 balance/frozen 用于算 insufficient_fen
+        _FakeMappingsResult([{"balance_fen": 1_000, "frozen_fen": 0}]),
     ]
 
     async def _side(stmt, params=None):
