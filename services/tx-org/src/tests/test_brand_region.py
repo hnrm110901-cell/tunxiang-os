@@ -22,8 +22,8 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _make_app() -> FastAPI:
-    from api.brand_management_routes import router as brand_router
-    from api.region_management_routes import router as region_router
+    from services.tx_org.src.api.brand_management_routes import router as brand_router
+    from services.tx_org.src.api.region_management_routes import router as region_router
 
     app = FastAPI()
     app.include_router(brand_router)

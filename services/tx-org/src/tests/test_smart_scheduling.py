@@ -15,7 +15,7 @@ from datetime import date
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from api.smart_scheduling_routes import router
+from services.tx_org.src.api.smart_scheduling_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

@@ -24,7 +24,7 @@ from uuid import uuid4
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.attendance_compliance_service import (
+from services.tx_org.src.services.attendance_compliance_service import (
     COMPLIANCE_RULES,
     AttendanceComplianceLogService,
     _age_on_date,

@@ -79,7 +79,7 @@ ITEM_ID_2 = str(uuid4())
 @pytest.mark.asyncio
 async def test_create_template_success():
     """创建巡检模板，含多个检查项，返回模板ID。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -140,7 +140,7 @@ async def test_create_template_success():
 @pytest.mark.asyncio
 async def test_start_patrol_success():
     """给定模板和门店，创建巡检记录，状态为 in_progress。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -209,7 +209,7 @@ async def test_start_patrol_success():
 @pytest.mark.asyncio
 async def test_start_patrol_template_not_found():
     """模板不存在时，抛出 ValueError。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
     db.execute.return_value = make_rows_result([])  # 空结果
@@ -230,7 +230,7 @@ async def test_start_patrol_template_not_found():
 @pytest.mark.asyncio
 async def test_submit_patrol_calculates_total_score():
     """提交巡检结果，服务自动计算百分制总分。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -305,7 +305,7 @@ async def test_submit_patrol_calculates_total_score():
 @pytest.mark.asyncio
 async def test_submit_patrol_wrong_status():
     """已提交的巡检记录不能重复提交。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -334,7 +334,7 @@ async def test_submit_patrol_wrong_status():
 @pytest.mark.asyncio
 async def test_create_issue_on_low_score():
     """问题项评分低于满分60%时，自动创建整改任务。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -377,7 +377,7 @@ async def test_create_issue_on_low_score():
 @pytest.mark.asyncio
 async def test_create_critical_issue_triggers_approval():
     """severity=critical 时，自动创建紧急审批。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -428,7 +428,7 @@ async def test_create_critical_issue_triggers_approval():
 @pytest.mark.asyncio
 async def test_submit_patrol_auto_creates_issues_below_threshold():
     """提交结果后，得分低于满分60%的项目自动生成整改任务。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -497,7 +497,7 @@ async def test_submit_patrol_auto_creates_issues_below_threshold():
 @pytest.mark.asyncio
 async def test_get_store_patrol_ranking():
     """查询最近30天门店平均分排名，结果按分数降序。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -527,7 +527,7 @@ async def test_get_store_patrol_ranking():
 @pytest.mark.asyncio
 async def test_get_store_patrol_ranking_custom_days():
     """支持自定义时间窗口（如7天、90天）。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
     db.execute.return_value = make_rows_result([])
@@ -552,7 +552,7 @@ async def test_get_store_patrol_ranking_custom_days():
 @pytest.mark.asyncio
 async def test_update_issue_status_to_resolved():
     """将整改任务状态更新为 resolved，记录解决时间和说明。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -586,7 +586,7 @@ async def test_update_issue_status_to_resolved():
 @pytest.mark.asyncio
 async def test_update_issue_invalid_status():
     """不允许的状态流转应抛出 ValueError。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 
@@ -606,7 +606,7 @@ async def test_update_issue_invalid_status():
 @pytest.mark.asyncio
 async def test_create_template_invalid_category():
     """不合法的 category 值应被拒绝。"""
-    from services.patrol_service import PatrolService
+    from services.tx_org.src.services.patrol_service import PatrolService
 
     db = make_db_mock()
 

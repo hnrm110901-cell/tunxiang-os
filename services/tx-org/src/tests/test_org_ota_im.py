@@ -102,8 +102,8 @@ sys.modules["shared.ontology.src.database"] = _db_mod
 # 导入被测路由
 # ──────────────────────────────────────────────────────────────────────────────
 import pytest
-from api.im_sync_routes import router as im_router
-from api.ota_routes import router as ota_router
+from services.tx_org.src.api.im_sync_routes import router as im_router
+from services.tx_org.src.api.ota_routes import router as ota_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

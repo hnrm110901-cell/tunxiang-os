@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from models.approval_flow import (
+from services.tx_org.src.models.approval_flow import (
     ApprovalFlowDefinition,
     ApprovalInstance,
     ApprovalRecord,
@@ -41,7 +41,7 @@ from models.approval_flow import (
     StepCondition,
 )
 
-from services.approval_engine import ApprovalEngine
+from services.tx_org.src.services.approval_engine import ApprovalEngine
 
 # ── 测试夹具 ──────────────────────────────────────────────────────────────────
 

@@ -24,8 +24,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from uuid import uuid4
 
 import pytest
-from services.income_tax import IncomeTaxCalculator
-from services.payroll_engine import (
+from services.tx_org.src.services.income_tax import IncomeTaxCalculator
+from services.tx_org.src.services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
     compute_commission,
@@ -36,15 +36,15 @@ from services.payroll_engine import (
     derive_hourly_rate,
     summarize_payroll,
 )
-from services.payroll_engine_db import (
+from services.tx_org.src.services.payroll_engine_db import (
     PayrollEngine as PayrollEngineDB,
 )
-from services.payroll_engine_db import (
+from services.tx_org.src.services.payroll_engine_db import (
     SIResult,
     SocialInsuranceConfig,
 )
-from services.payroll_engine_v2 import PayrollEngine as PayrollEngineV2
-from services.social_insurance import SocialInsuranceCalculator
+from services.tx_org.src.services.payroll_engine_v2 import PayrollEngine as PayrollEngineV2
+from services.tx_org.src.services.social_insurance import SocialInsuranceCalculator
 
 TENANT_ID = str(uuid4())
 STORE_ID = str(uuid4())

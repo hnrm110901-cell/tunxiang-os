@@ -23,7 +23,7 @@ from uuid import uuid4
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.tax_filing_service import (
+from services.tx_org.src.services.tax_filing_service import (
     TAX_FILING_STATUS,
     _iso_utc,
     _mask_id_card,

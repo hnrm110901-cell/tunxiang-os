@@ -163,8 +163,8 @@ if "structlog" not in sys.modules:
 from uuid import uuid4
 
 import pytest
-from api.franchise_mgmt_routes import router as mgmt_router
-from api.franchise_router import router as franchise_router
+from services.tx_org.src.api.franchise_mgmt_routes import router as mgmt_router
+from services.tx_org.src.api.franchise_router import router as franchise_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

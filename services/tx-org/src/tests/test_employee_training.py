@@ -16,8 +16,8 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _make_app() -> FastAPI:
-    from api.employee_training_routes import router as training_router
-    from api.performance_scoring_routes import router as perf_router
+    from services.tx_org.src.api.employee_training_routes import router as training_router
+    from services.tx_org.src.api.performance_scoring_routes import router as perf_router
 
     app = FastAPI()
     app.include_router(training_router)
@@ -85,7 +85,7 @@ async def test_training_records_list():
 
     # 可能 500（DB mock 无法完整模拟），直接测逻辑层
     # 改为直接调用 service 函数，绕过 HTTP 层
-    from api.employee_training_routes import MOCK_TRAINING_RECORDS
+    from services.tx_org.src.api.employee_training_routes import MOCK_TRAINING_RECORDS
 
     assert len(MOCK_TRAINING_RECORDS) > 0, "MOCK_TRAINING_RECORDS 不应为空"
     for record in MOCK_TRAINING_RECORDS:
@@ -111,7 +111,7 @@ async def test_expiring_certificates():
     MOCK 数据中 certificate_expires_at = "2026-04-25"（测试日 2026-04-06），
     距今 19 天，应在 30 天窗口内。
     """
-    from api.employee_training_routes import MOCK_TRAINING_RECORDS, _cert_status, _days_until
+    from services.tx_org.src.api.employee_training_routes import MOCK_TRAINING_RECORDS, _cert_status, _days_until
 
     today = date.today()
 
@@ -153,7 +153,7 @@ async def test_expiring_certificates():
 @pytest.mark.asyncio
 async def test_performance_evaluation():
     """绩效评分：提交3名员工评分，验证综合分=加权平均，评级正确（≥90→A）。"""
-    from api.performance_scoring_routes import (
+    from services.tx_org.src.api.performance_scoring_routes import (
         KPI_WEIGHTS,
         _compute_grade,
         _compute_weighted_score,
@@ -214,7 +214,7 @@ async def test_performance_evaluation():
 @pytest.mark.asyncio
 async def test_performance_stats():
     """绩效概览：降级 mock 返回的 avg_score / excellent_rate 字段为数值类型。"""
-    from api.performance_scoring_routes import (
+    from services.tx_org.src.api.performance_scoring_routes import (
         MOCK_SCORES,
         _grade_distribution,
     )

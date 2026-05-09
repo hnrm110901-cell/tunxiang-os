@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.salary_anomaly_service import (  # noqa: E402
+from services.tx_org.src.services.salary_anomaly_service import (  # noqa: E402
     CACHE_HIT_TARGET,
     COMMISSION_ABUSE_RATIO,
     LEGAL_OVERTIME_LIMIT_HOURS,
@@ -345,7 +345,7 @@ async def test_fallback_sorts_legal_risk_first():
 
 
 def test_result_critical_and_legal_risk_properties():
-    from services.salary_anomaly_service import SalaryAnomaly
+    from services.tx_org.src.services.salary_anomaly_service import SalaryAnomaly
 
     r = SalaryAnomalyAnalysisResult(
         ranked_anomalies=[

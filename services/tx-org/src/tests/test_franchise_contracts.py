@@ -309,7 +309,7 @@ async def _fake_get_db_with_tenant(tenant_id: str = TENANT_ID):
 # ─── 测试 App ─────────────────────────────────────────────────────────────────
 
 with patch("shared.ontology.src.database.get_db_with_tenant", _fake_get_db_with_tenant):
-    from api.franchise_contract_routes import router as franchise_contract_router
+    from services.tx_org.src.api.franchise_contract_routes import router as franchise_contract_router
 
 app = FastAPI()
 app.include_router(franchise_contract_router)

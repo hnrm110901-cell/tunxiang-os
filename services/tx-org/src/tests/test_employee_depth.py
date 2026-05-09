@@ -84,7 +84,7 @@ class TestEmployeeDepthAPI:
 
 # ── 业务逻辑单元测试 ──────────────────────────────────────────
 
-from services.employee_depth import (
+from services.tx_org.src.services.employee_depth import (
     COMMISSION_BASE_RATE,
     COMMISSION_BOTTLE_FEN,
     COMMISSION_RECOMMEND_RATE,

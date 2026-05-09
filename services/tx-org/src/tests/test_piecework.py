@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # 被测模块
-from api.piecework_routes import _serialize_row, router
+from services.tx_org.src.api.piecework_routes import _serialize_row, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
