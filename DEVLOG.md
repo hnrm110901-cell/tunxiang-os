@@ -1,3 +1,67 @@
+## 2026-05-09 中午 — B'-2 · alembic upgrade 一锅端低危 SQL bug 批量修复
+
+### 今日完成
+B' (PR #337) chain 修通后第二批：5 个低危预存 SQL bug 一锅端，让 alembic upgrade
+head 在 fresh PG 上能跨过 v151b / v232c / v258 / v260 / v263 / v286 / v194 / v287
+共 8 处 bug 阻塞点（v207 → v288 段全绿）。
+
+**5 个 commit（5 类不同根因，按 ROI 排序）：**
+
+1. **类 B 批量 — `server_default="'{}'"` 双引号嵌套 → `sa.text("'{}'::jsonb")`**
+   - 5 文件 × ~20 处：v194_banquet_payment / v258_growth_intel_relay /
+     v260_wine_storage_food_court_quick_cashier / v263_kiosk_voice_count /
+     v286_table_period_configs
+   - Python 双引号包裹单引号字面量传给 SQLAlchemy → PG 端解析 invalid JSON
+
+2. **类 D — v151b `mv_table_turnover` PK COALESCE 表达式**
+   - PG 拒绝函数表达式作 PK 列；改 zone_id NOT NULL DEFAULT '00000000-...'::UUID（哨兵 = 全店汇总）+ 裸列 PK
+
+3. **类 D — v151b `projector_checkpoints` seed INSERT 多处错位**
+   - 列 `last_processed_at` 不存在 / 缺 NOT NULL `tenant_id` / ON CONFLICT 列与真 PK 不匹配
+   - 修法：删整段 INSERT，由投影器首次消费事件时按 `(projector_name, tenant_id)` 自动 INSERT
+
+4. **类 C — v232c `:cfg::jsonb` 命名参数与 PG cast 歧义**
+   - SQLAlchemy text 解析器在 `:cfg::jsonb` 上抛 ArgumentError
+   - 修法：`cast(:cfg AS jsonb)` 显式 cast 函数语法（参数边界明确）
+
+5. **类 E — v287 `op.create_index` 4 处缺 IF NOT EXISTS**
+   - 撞 v140_employee_transfers.py 已建同名 index → DuplicateTable
+   - 修法：4 处改 `op.execute("CREATE INDEX IF NOT EXISTS ...")` 保留 partial WHERE
+
+### 数据变化
+- migration 文件改：7 个（v194 / v232c / v258 / v260 / v263 / v286 / v287 / v301_table_analytics_views.py × 2 commit）
+- 全部 schema/逻辑级修复，无 alembic 链路改动（B' 已完成）
+- 新增测试：0（lint 测试留独立 PR）
+
+### 验证证据
+- `alembic upgrade head` 在 fresh pgvector PG 上：
+  - 之前 (B' 之后): 链路修通但 v151b 立刻失败
+  - 现在 (B'-2): 顺利跨过 v151b → v232c → JSONB 5 文件 → v287，停在 v288
+- 卡点变迁：v310 → v311 → v388 → **v151b** → **v232c** → **v258 系列** → **v287** → **v288** — 8 个阻塞点逐一解锁
+- 7 commit / +43 行 / -53 行 net = -10 行（删除大于新增，因为 v151b INSERT 整段删除）
+
+### 卡在 v288（**非 B'-2 范畴**）
+v288 报 `bind parameter '20' required` — `_seed_system_templates()` 用 `op.execute(sql)`
+插入 50 个行业模板 JSON 中含 `"default":20` / `"default":5`，SQLAlchemy text 解析器
+误判 `:20` / `:5` 为命名参数。
+- 修复方向：`op.get_bind().exec_driver_sql(sql)` 跳过 SQLAlchemy 解析器（~3 行 diff）
+- 单独 PR 跟进，理由：B'-2 scope 锁定 5 个 commit，v288 是同类 C 但本批已含 v232c 代表
+- 后续 v288 → v406 段还有类 A 同名表撞 schema（approval_instances / banquet_leads /
+  banquet_quotes / employee_transfers）等更多债务
+
+### 遗留问题
+- v288 `op.execute` JSON 数字 `:N` 误解析（独立 PR）
+- 类 A 同名表撞 schema 4 组（approval_instances / banquet_leads / banquet_quotes /
+  employee_transfers）— 每组独立 PR，需逐个 audit 业务侧用哪个 schema
+- v310 性能索引整体 mv_* 列名拼错（独立 PR / 或弃用文件并入 v404+）
+- v236 链路依赖错配（`down_revision = "v235b"` 漏 v235c），用 merge migration 补
+- v332 → v406 增量 SQL bug 未摸排（35% 剩余链路）
+
+### 明日计划
+- 看 user 决策：再起一批 B'-3（v288 + 类 A 一组 + v236 chain 修），还是先等 PR #337 / 本 PR review
+
+---
+
 ## 2026-05-09 上午 — B' · alembic chain dangling refs 修复（chain integrity 历史债清零）
 
 ### 今日完成

@@ -1,3 +1,39 @@
+## 2026-05-09 中午 · B'-2 alembic upgrade 一锅端低危 SQL bug 批量修复
+
+### 完成状态
+- [x] 类 B 批量：5 文件 ~20 处 server_default JSONB 双引号嵌套 → sa.text(...)
+- [x] 类 D：v151b PK COALESCE 表达式 → 哨兵 UUID + 裸列 PK
+- [x] 类 D：v151b projector_checkpoints seed INSERT 多处错位 → 删整段
+- [x] 类 C：v232c sa.text 命名参数与 PG cast 歧义 → cast(:cfg AS jsonb)
+- [x] 类 E：v287 employee_transfers 4 处索引创建加 IF NOT EXISTS
+- [x] DEVLOG / progress 同步
+- [x] 真 PG 验证 — 链路从 v151b 推进到 v288（8 个阻塞点解锁）
+- [ ] v288 op.execute JSON `:N` 数字误解析（独立 PR）
+- [ ] 类 A 同名表撞 schema 4 组（每组独立 PR）
+- [ ] v310 mv_* 性能索引列名拼错（独立 PR）
+- [ ] v236 chain dependency 漏 v235c（合 merge migration）
+- [ ] v332 → v406 段未摸排
+
+### 关键决策
+- **零依赖于 PR #337 merge**：本 PR 分支 off PR #337 HEAD，PR #337 一旦 merge 本 PR 自动 rebase 干净（不动 chain，只动 schema/SQL）
+- **不改 alembic 链路**：所有 5 个修复都是 `def upgrade()` 内部的 SQL 修复，不改 revision/down_revision，不撞 PJ.5 KNOWN_BROKEN
+- **类 D v151b INSERT 改"删除"而非"修正"**：seed 即使列名修对也违反 RLS（无 tenant 上下文）；投影器自己 init checkpoint 行更正确
+- **类 E v287 接受 v140 索引版本胜出**：IF NOT EXISTS 跳过仅按 NAME 比较，v140 与 v287 的索引列定义相同（Operations 已对比），无功能差异
+- **scope 严格锁 5 commit**：v288 同属类 C 但留独立 PR，避免 scope 创蔓影响 review
+- **v151b PK 用哨兵 UUID 而非 UNIQUE INDEX**：投影器写入路径无须改，PK 性能更好（裸列 vs 函数索引）
+
+### 下一步
+- 看 user 决策再做 B'-3（v288 + v236 chain + 一组类 A）
+- v332 → v406 摸排起新 session（避免长 context）
+- dev-plan-60d 5/7 重写
+
+### 已知风险
+- **v151b PK 改 NOT NULL DEFAULT 哨兵 UUID**：若投影器代码内部对 zone_id 用 `IS NULL` 判断"全店汇总"，需配套改判断条件（投影器代码暂未审）
+- **类 E v287 索引版本胜出 v140**：列定义相同但 partial WHERE 子句若 v140 与 v287 不一致，最终行为按 v140 走（待 audit v140 文件）
+- **v288 仍 block** 链路：本 PR 后 alembic upgrade head 卡在 v288，A 任务（docker-compose-pg fixture）仍然 blocked
+
+---
+
 ## 2026-05-09 上午 · B' alembic chain dangling refs 修复
 
 ### 完成状态
