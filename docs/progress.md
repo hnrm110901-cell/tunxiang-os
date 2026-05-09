@@ -1,3 +1,35 @@
+## 2026-05-09 17:30 · #298 codemod Phase 3 — tx-trade 22 文件 / 57 import 全清 (#335)
+
+### 完成状态
+- [x] PR #335 OPEN：3 commit (RED `c413735a` / GREEN `4854a3bd` / fix `a4f3e333`) [Tier1]
+- [x] AST 守门 fixture 落地：`test_codemod_phase3_bare_imports_tier1.py`（决策 80）
+- [x] codemod `--apply --service tx-trade`：22 文件 / 57 处 import 改写
+- [x] patch path 漂移修：11 处（test_trade_extended 7 / test_trade_webhook 3 / test_digital_menu_board_router 1）+ test_tv_menu typo 1
+- [x] 22 文件 pytest：31→20 fail，287→315 pass，**0 codemod-introduced regression**
+- [x] 决策 78 ✅ 本地 pytest 实跑（不靠 codex 守门）— 暴露 codex 完全没标的 patch drift 11 处
+
+### 关键决策
+（无新决策 — 续 #318/#320/#322 chain，决策 77/78/80 全部应用）
+
+### 下一步
+- PR #335 等 codex/CI/admin merge
+- #298 Phase 4：tx_member 31 文件 / 112 裸（次大头跨服务，可独立从 main 起 PR）
+- 决策 79 Phase 2：scan_order + ontology ch_scan_order（需创始人确认 §18）
+- 决策 79 残留 7 RBAC（test_trade_promotions）+ shared.security 包缺失（test_trade_webhook/extended）独立 follow-up
+- 决策 77 提醒：撤 #287 band-aid 仍阻塞（production 端 short-path 未清）
+
+### 已知风险
+- test_trade_promotions 7 RBAC 失败：codemod 修了 collection error 后暴露的 pre-existing test setup 缺口（main 上原 collection-blocked），独立 PR 处理
+- test_retail_mall.py / test_sprint4_reconcile.py collection error pre-existing main 同款
+
+### 数据快照
+- baseline (`/tmp/baseline.md` 5/9 17:00 跑)：tx_trade 57 裸 / 22 文件 / 0 混用
+- 改后：tx_trade 0 裸 / 全路径
+- 累计 #298 chain：top-20 (#322) + 22 (#335) = 42 文件 / ~305 处 import 全路径化
+- 余 14 服务（gateway 16 / tx_agent 37 / tx_analytics 34 / tx_brain 2 / tx_finance 62 / tx_growth 70 / tx_intel 12 / tx_member 112 / tx_menu 48 / tx_ops 10 / tx_org 102 / tx_predict 10 / tx_supply 96）共 ~611 裸待清
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态

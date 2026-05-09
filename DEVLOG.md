@@ -1,3 +1,37 @@
+## 2026-05-09 傍晚 续 · #298 codemod Phase 3 — tx-trade 22 文件 / 57 import 全清 (#335)
+
+### 今日完成
+- **#335 OPEN**（3 commit）— `[Tier1] chore(test): #298 codemod Phase 3 — tx-trade 22 文件 / 57 import 改写`
+  - RED `c413735a`：AST 守门 fixture `test_codemod_phase3_bare_imports_tier1.py`（决策 80）
+  - GREEN `4854a3bd`：`scripts/codemod/test_import_style_rewrite.py --apply --service tx-trade` 机械应用 22 文件 / 57 处
+  - fix `a4f3e333`：patch path 漂移 11 处（3 文件）+ test_tv_menu typo 1 处（既存 BUG，codemod 暴露）
+- baseline：tx_trade 57 裸 / 22 文件（含 1 既存 typo `test_tv_menu.py:4` `tx_trade_src_services` 非模块）→ 0 裸
+- 22 文件 pytest：31→20 fail，287→315 pass（+28），**0 codemod-introduced regression**
+- 决策 78 ✅ 暴露 codex 完全没标的 patch drift 11 处（test_trade_extended 7 / test_trade_webhook 3 / test_digital_menu_board_router 1）
+- progress / DEVLOG / handoff 更新
+
+### 关键决策
+（无新决策 — 续 #318/#320/#322 chain，决策 77/78/80 全部应用）
+
+### 数据变化
+- 累计 #298 chain：top-20 (#322) + 22 (#335) = 42 文件 / ~305 处 import 全路径化
+- tx_trade 内裸 import 清零；可推 Phase 4 (tx_member) 独立从 main 起 PR
+- 决策 77 仍生效：production 端 short-path 未覆盖前不能撤 #287 band-aid
+
+### 遗留问题
+- **新发现**：codemod 暴露 7 RBAC test setup 缺口（test_trade_promotions），main 原 collection-blocked 隐藏，需独立 PR
+- **新发现**：`shared.security` 包缺失（test_trade_webhook 6 / test_trade_extended 10 失败根因，main 同款）
+- 决策 79 Phase 2：scan_order + ontology ch_scan_order（需创始人 §18）
+- 决策 79 Phase 3：v500 drop sales_channel 列（独立 sprint）
+- #298 Phase 4：tx_member 31 文件 / 112 裸（次大头跨服务）
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 OPEN
+
+### 下次 session 起手
+见 `docs/session-handoff-2026-05-09-evening.md`
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成
