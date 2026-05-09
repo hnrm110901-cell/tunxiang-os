@@ -1,3 +1,44 @@
+## 2026-05-09 深夜 续 · #298 codemod Phase 5 — tx-org 39 文件 / 102 import (#341)
+
+### 今日完成
+
+- **#341 OPEN**（base main，3 commit / +178/-126）— `[Tier1] chore(test): #298 codemod Phase 5 — tx-org 39 文件 / 102 import`
+  - RED `bcbe6a91`：AST 守门 fixture
+  - GREEN `ab37a4c6`：codemod 应用 39 文件 / 102 处
+  - fix `8eda3ad1`：24 处 drift（23 patch literal + 1 from-NS-import-module）
+- 数据：91 fail / 4 error / 676 pass / 5 codemod-introduced "regressions"
+- **5 余"regression"全 pre-existing surfaced**（test_org_core 3 / test_attendance_leave 1 / test_patrol_module 1，决策 79 follow-up）
+- 决策 78 + 84 ✅ 暴露 codex 漏抓 24 处 drift（23 patch literal + 1 from-NS-import-module）
+- 决策 83 ✅ services/tx-org/conftest.py 已存在（前置免）
+
+### 关键决策
+
+（无新决策 — 决策 77/78/80/83/84 全部应用）
+
+### 数据变化（5/9 累计 4 PR / 1 stacked follow-up）
+
+- 累计 #298 chain：
+  - Phase 1-3 (tx-trade #322 #335)：42 文件 / ~305 处
+  - Phase 4 (tx-member #338)：30 文件 / 112 处
+  - Phase 5 (tx-org #341)：39 文件 / 102 处
+  - **总计 111 文件 / ~519 处**（chain ~78%）
+- 决策 77 仍生效：production 端 short-path 未覆盖前不能撤 #287 band-aid
+- 余 11 服务 ~149 裸待清（tx_supply 96 / tx_growth 70 / tx_finance 62 / tx_menu 48 / tx_agent 37 / tx_analytics 34 / gateway 16 / tx_intel 12 / tx_predict 10 / tx_ops 10 / tx_brain 2）
+
+### 遗留问题
+- **5 暴露 follow-up（决策 79）**：tx_org test_org_core 3（shared.security 缺失） + test_attendance_leave 1 / test_patrol_module 1
+- **#338 暴露 follow-up**：test_members_routes 4 / test_stamp_card_routes 5 / test_gdpr 1 / 11 collection error 文件
+- **#335 暴露 follow-up 已闭环 #336**
+- shared.security / shared.events 包缺失诊断（影响多服务）
+- 决策 79 Phase 2 scan_order ontology（需创始人 §18）
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 OPEN
+
+### 下次 session 起手
+见 `docs/session-handoff-2026-05-09-late.md`
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

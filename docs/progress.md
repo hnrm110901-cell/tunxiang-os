@@ -1,3 +1,38 @@
+## 2026-05-09 21:00 · #298 codemod Phase 5 — tx-org 39 文件 / 102 import (#341)
+
+### 完成状态
+- [x] PR #341 OPEN（base main，T1，3 commit）：tx-org 39 文件 / 102 处 + 24 drift fix
+- [x] 守门 PASS：test_codemod_phase5_bare_imports_tier1
+- [x] 决策 83 已满足：services/tx-org/conftest.py 已存在（前置免）
+- [x] 5 codemod-introduced "regression" 全 pre-existing surfaced（决策 79 follow-up）
+- [x] DEVLOG / progress / handoff 更新
+
+### 关键决策
+（无新决策 — 决策 77/78/80/83/84 全部应用）
+
+### 数据快照（#298 chain 累计）
+| Phase | PR | 服务 | 文件 | import |
+|---|---|---|---|---|
+| 1-3 | #322 #335 | tx-trade | 42 | ~305 |
+| 4 | #338 | tx-member | 30 | 112 |
+| 5 | #341 | tx-org | 39 | 102 |
+| **总计** | | **3 服务** | **111** | **~519** |
+
+chain ~78%。余 11 服务 ~149 裸：tx_supply 96 / tx_growth 70 / tx_finance 62 / tx_menu 48 / tx_agent 37 / tx_analytics 34 / gateway 16 / tx_intel 12 / tx_predict 10 / tx_ops 10 / tx_brain 2
+
+### 下一步
+- 等 #335 / #336 / #338 / #341 admin merge
+- #298 Phase 6 候选：**tx_supply 96 裸（次大头）** — conftest 已存在，可直接起
+- pre-existing follow-up（决策 79）：本 PR 暴露 5 + #338 暴露 24（test_members 4 / test_stamp_card 5 / test_gdpr 1 + 14 collection error）
+- shared.security / shared.events 包缺失诊断（多服务影响）
+- 决策 79 Phase 2 scan_order + ontology（需 §18）
+
+### 已知风险
+- 5 PR OPEN 等 admin merge（#335/#336/#338/#341 + 我侧）。任何 rebase 冲突按 #335 经验处理（DEVLOG/progress 简单合并）
+- Phase 6 候选 tx_supply 已有 conftest，可直接起；其他 11 服务大多无 conftest（决策 83 强制建）
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
