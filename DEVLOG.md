@@ -1,3 +1,61 @@
+## 2026-05-09 上午 · 6 OPEN PR 全清 wave + codemod chain 落地 + 8 处 patch path drift 修复
+
+### 今日完成
+
+**接力 5/9 凌晨续，6 OPEN PR 全 admin merged**（5/9 上午时段）：
+| PR | 内容 | T | merge commit |
+|----|------|---|------|
+| #310 | tx-trade scan_decimal 启发式收紧（_km/_rate/margin 三档豁免）r3 | T1 | `b8af4bb8` |
+| #305 | docs/channel 命名漂移收尾 — pinjin → pinzhi_pos | T3 | `6d74c1b3` |
+| #307 | cleanup pinjin → pinzhi_pos 残余（web-devforge mock + ui-ux 计划） | T3 | `4ac952aa` |
+| #318 | #298 codemod Phase 1 — test import 风格扫描器 + baseline 报告 | T1 | `50af4929` |
+| #320 | #298 Phase 2 batch 1 — 2 真凶混用文件改写 + 撤 #287 band-aid 之 revert | T1 | `4c5cf55b` |
+| #322 | #298 Phase 2 batch 2 — tx_trade top-20 文件 248 处 import 改写 + 8 处 patch path drift 修复 | T1 | `789c31a5` |
+
+**两个关键 BUG 拦截（codemod chain 暴露）**：
+
+1. **#320 撤 #287 extend_existing band-aid 早产** — Tier 1 CI 暴露 `Table 'tables' is already defined for this MetaData instance`。codemod batch 1 改 test 用 long-path import，但 production code 仍用 short-path import → 同一 `models/tables.py` 在两个 namespace 各注册一次 Table('tables') → SQLAlchemy 冲突。**revert 撤回 band-aid 移除 commit**，本 PR 仅交付 codemod 工具 + 2 真凶 test 改写；band-aid 必须等 codemod 也覆盖 production 短路径 import 才能撤（→ 决策 77）。
+
+2. **#322 patch path drift 8 处全找出** — codex auto-review 找 3 处 P1（kds_call_service / kitchen_monitor / template_editor 主块），本地 pytest 暴露另 5 处同款（kds_call_service:order_push_config / kitchen_monitor:cooking_timeout / kds_persistence / kds_rush_sla / scan_order）。**全部 patch 字符串字面量加 `services.tx_trade.src.` 前缀**，与 from-import 路径一致。pytest 6 文件 113/114 通过（1 fail = `Order(sales_channel)` 列缺失，origin/main 同 test 同样炸 ImportError，预存 prod BUG 不属本 PR 范畴 → 决策 79）。
+
+**5 worktree prune（11 → 7）**：p0-8-decimal-scan / chore-channel-drift / cleanup-pinjin-residue / codemod-import-style / codemod-batch1 / codemod-batch2，全 force-delete（squash merge 后 branch 已 origin 删除）。
+
+**main 一上午推进**：6d651462 → 789c31a5（5 commits，含我的 6 PR squash + 并发 session 推的 #316/#317/#319/#321/#323）
+
+### 数据变化
+- 新增 main commits（我的）：6 PR squash
+- worktree：11 → 7（删 5 my，剩 main + 2 P0 阻塞 + s4-02-pr2a 并发 + tunxiang-os-v4 + 2 locked agent）
+- 测试：6 PR 各自带 Tier 1 守门测试 / 我新增 8 处 patch fix 由 pytest 113/114 验证
+
+### 关键决策
+
+- **决策 77：codemod 撤 #287 band-aid 必须等 production 端覆盖** — extend_existing band-aid 不能在 codemod 仅覆盖 test 时撤；必须等 codemod 也覆盖 production 端 short-path import 才能撤。
+  Why: #320 first version 撤 band-aid 即触 Tier 1 CI Table conflict — 同 models 文件被 long+short 两路径分别 register。
+  How to apply: codemod chain 推进 — 先 test 全覆盖并验证；再 production 全覆盖并验证；最后撤 band-aid（独立 PR）。
+
+- **决策 78：codex review 漏抓 patch 多行字符串** — codex 用 PR diff 顶部上下文，会漏抓 patch() 多行字符串单独行，靠 codex 标 P0/P1 不够。
+  Why: #322 codex 标 3 处 P1 patch drift，本地 pytest 暴露另 5 处同款，全在 codex 没标的文件。
+  How to apply: Tier 1 codemod PR 必须本地 pytest 实跑被改动文件；不能只靠 codex/coderabbit 的 P0/P1 标记当门禁。
+
+- **决策 79：scan_order_service.py:153 `Order(sales_channel=...)` 是真预存 prod BUG** — Order 实体已重命名 sales_channel → sales_channel_id（shared/ontology/src/entities.py:356），scan_order_service.py 未跟进；origin/main 上 test_create_new_order 同样 ImportError。**flag 为单独 P1 PR，不混入 #322**（守约 21：原子化提交）。
+
+### 遗留问题
+- 决策 79 的预存 prod BUG（scan_order sales_channel）需单独 PR 修
+- #298 codemod Phase 3：tx_trade 余 21 文件 / 51 裸 import（最后一批 tx_trade）
+- #298 codemod Phase 4：跨服务 — tx_member 31 文件 / 107 裸（次大头），可独立从 main 起 PR
+- #318 P1 follow-up：scanner 漏 `import xxx` 形式（only `from-import`），baseline 报告偏小
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 仍 OPEN
+- 并发 session 起 worktree `s4-02-pr2a` — 我未参与
+
+### 明日（5/10 或下一会话）计划
+- 优先：决策 79 prod BUG 修（独立 PR，~30min）
+- 看 #298 chain 续推（按 ROI 优先级 — tx_trade Phase 3 最轻 → tx_member Phase 4 最大头）
+- 等 #271 DBA staging
+- 看是否有更多并发 session 推 wave
+
+---
+
 ## 2026-05-09 凌晨 续 · 并发 7 P1 PR merge wave + 7 worktree prune（worktree 9 个，最干净状态）
 
 ### 今日完成

@@ -1,3 +1,29 @@
+## 2026-05-09 11:00 · 6 OPEN PR 全清 wave + codemod chain 落地 + 8 处 patch path drift 修复
+
+### 完成状态
+- [x] 6 OPEN PR 全 admin merged：#310 (T1) / #305 (T3) / #307 (T3) / #318 (T1 codemod tool) / #320 (T1 codemod batch1, with revert) / #322 (T1 codemod batch2, with 8-patch fix)
+- [x] main `6d651462` → `789c31a5`（5 my squashes + 并发 5 commits）
+- [x] worktree prune 11 → 7（删 my 5）
+- [x] DEVLOG.md 顶部新增 5/9 上午 wave 总结
+
+### 关键决策
+- **决策 77：codemod 撤 #287 band-aid 必须等 production 端覆盖** — extend_existing band-aid 不能在 codemod 仅覆盖 test 时撤；必须等 codemod 也覆盖 production 端 short-path import 才能撤。Why：#320 first version 撤 band-aid 即触 Tier 1 CI `Table 'tables' is already defined` 冲突。How：codemod chain 推 test 全覆盖 → 验证 → production 全覆盖 → 验证 → 最后撤 band-aid（独立 PR）。
+- **决策 78：codex review 不能当 codemod PR 唯一门禁** — codex 多行 patch 字符串漏抓概率高，必须配本地 pytest 实跑被改动文件；#322 codex 找 3 处 P1，本地 pytest 暴露另 5 处同款全在 codex 没标的文件。
+- **决策 79：scan_order_service.py:153 `Order(sales_channel=...)` 预存 prod BUG** — Order 实体已重命名 sales_channel → sales_channel_id；origin/main 同 test 同样 ImportError；flag 为单独 P1 PR，不混入 #322。
+
+### 下一步
+- 决策 79 预存 prod BUG 修（独立 P1 PR，~30min）
+- #298 codemod Phase 3：tx_trade 余 21 文件 / 51 裸 import（最后一批 tx_trade）
+- #298 codemod Phase 4：tx_member 31 文件 / 107 裸（次大头），可独立从 main 起 PR
+- #318 P1 follow-up：scanner 抓 `import xxx`（baseline 偏小）
+- 等 #271 DBA staging
+
+### 已知风险
+- 决策 79 prod BUG 在生产线不会被现有 Tier 1 Gate 拦截（test 文件无 tier1 后缀 → workflow 不触发），下游真用 scan_order create flow 会炸
+- codemod chain 推进时序敏感 — 决策 77 必须严格执行，否则 main 上 Tier 1 反复挂 Table conflict
+
+---
+
 ## 2026-05-09 01:00 · 并发 7 P1 PR merge wave + 7 worktree prune（worktree 9 个）
 
 ### 完成状态
