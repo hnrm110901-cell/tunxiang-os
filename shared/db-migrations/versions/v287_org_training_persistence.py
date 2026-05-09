@@ -47,33 +47,25 @@ def upgrade() -> None:
         TABLE, sa.Column("approved_at", sa.TIMESTAMP(timezone=True), nullable=True, comment="审批时间（待审批时为空）")
     )
 
-    # ─── 索引：覆盖常用查询路径 ──────────────────────────────────────────────────
+    # ─── 索引：覆盖常用查询路径（IF NOT EXISTS 防 v140 已建同名索引撞名）──────────
     # 门店+时间范围查询
-    op.create_index(
-        "idx_employee_transfers_store_dates",
-        TABLE,
-        ["tenant_id", "from_store_id", "start_date"],
-        postgresql_where=sa.text("is_deleted = false"),
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_employee_transfers_store_dates "
+        "ON employee_transfers (tenant_id, from_store_id, start_date) WHERE is_deleted = false"
     )
-    op.create_index(
-        "idx_employee_transfers_to_store",
-        TABLE,
-        ["tenant_id", "to_store_id", "start_date"],
-        postgresql_where=sa.text("is_deleted = false"),
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_employee_transfers_to_store "
+        "ON employee_transfers (tenant_id, to_store_id, start_date) WHERE is_deleted = false"
     )
     # 员工维度查询（list_transfers 按 employee_id 过滤）
-    op.create_index(
-        "idx_employee_transfers_employee",
-        TABLE,
-        ["tenant_id", "employee_id", "created_at"],
-        postgresql_where=sa.text("is_deleted = false"),
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_employee_transfers_employee "
+        "ON employee_transfers (tenant_id, employee_id, created_at) WHERE is_deleted = false"
     )
     # 状态过滤查询
-    op.create_index(
-        "idx_employee_transfers_status",
-        TABLE,
-        ["tenant_id", "status", "created_at"],
-        postgresql_where=sa.text("is_deleted = false"),
+    op.execute(
+        "CREATE INDEX IF NOT EXISTS idx_employee_transfers_status "
+        "ON employee_transfers (tenant_id, status, created_at) WHERE is_deleted = false"
     )
 
 
