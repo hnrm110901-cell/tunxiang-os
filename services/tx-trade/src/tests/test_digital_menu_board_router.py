@@ -415,7 +415,7 @@ async def test_update_board_announcement_success():
     client = TestClient(app)
 
     with patch(
-        "api.digital_menu_board_router._publish_to_redis",
+        "services.tx_trade.src.api.digital_menu_board_router._publish_to_redis",
         AsyncMock(return_value=True),
     ):
         resp = client.post(

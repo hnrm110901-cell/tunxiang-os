@@ -415,7 +415,7 @@ def test_wechat_prepay_success():
         }
     )
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -451,7 +451,7 @@ def test_wechat_callback_verify_fail():
     mock_svc = MagicMock()
     mock_svc.verify_callback = AsyncMock(side_effect=ValueError("微信回调签名无效"))
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -484,7 +484,7 @@ def test_wechat_query_order_success():
         }
     )
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 
