@@ -17,6 +17,16 @@ depends_on = None
 
 def upgrade() -> None:
     # ── banquet_leads 宴会线索 ──
+    # 类 A 副本去重 (B'-4, 2026-05-09): v004_reservation_banquet.py 早期用
+    # `op.create_table` 创建过 banquet_leads 的"13-stage pipeline" schema
+    # （estimated_per_table_fen / special_requirements 等列），与本文件期望
+    # 的 schema (lead_no / status / event_type CHECK) 完全不同。`IF NOT EXISTS`
+    # 让 v004 schema 静默胜出，本文件后续 CREATE INDEX status 列 → 撞不存在。
+    # 生产 ORM model (services/tx-trade/src/models/banquet_lead.py) 用本
+    # schema 的 lead_no/status，所以本文件是 canonical。
+    # 修法：先 DROP CASCADE 老 schema 再 CREATE 新 schema。无生产数据丢失风险
+    # 因为 chain 历史断裂，v004 banquet_leads 表从未被任何环境真应用。
+    op.execute("DROP TABLE IF EXISTS banquet_leads CASCADE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_leads (
             id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
