@@ -1,3 +1,34 @@
+## 2026-05-09 中午 续 · 决策 79 Phase 1 — Order(sales_channel=) 5 处 Tier 1 修复 (#327)
+
+### 今日完成
+- **#327 admin merged** at `ccfb8b9e` — `[Tier1] fix(tx-trade): Order(sales_channel=) 5 处修` (cashier_engine 4 + order_service 1)
+- architect 报告（Opus read-only）深扒决策 79，纠正主 session 误报：delivery_*.py 4 处是 DeliveryOrder 自有字段不是 Order，不能碰
+- TDD 双 commit 留痕：RED commit (`6b142e37`，AST 静态扫 cashier_engine 失败) → GREEN commit (`ad248964`，4 处 fix + AST 扫扩到 order_service)
+- 回归数据：test_cashier_e2e 13/15 → 15/15 / test_cashier_engine 42/53 → 49/53（修 7 残 4 全 pre-existing 非 sales_channel）
+- worktree prune sales-channel-cashier；DEVLOG/progress/handoff 更新
+
+### 关键决策
+- **决策 80：Tier 1 修复用 AST 静态扫做守门，比 DB-mock 更稳** — Test 直接 `ast.parse()` cashier_engine.py + order_service.py，扫 `Order(sales_channel=)` kwarg 与 `.sales_channel` 属性读，参数化覆盖多文件。AST 失败 = 生产真崩，不需要复杂 DB mock fixture。Why：mock 容易 false green，AST 反映真实源码状态。How：所有 Tier 1 守门类（防回归）首选 AST。
+
+- **决策 81：architect agent 是误报快速纠正机制** — 主 session 看 grep 结果误以为 delivery_*.py 4 处也炸，architect read-only Opus 50min 深扒后给的报告纠正了，省了 ~40min 错误修复。Why：grep 不分模型类，AST 才精确。How：跨多文件 BUG 范围判定先 architect 一下。
+
+- **决策 82：context >80% 主动拆 session 不要死撑** — 本 session 7 PR 全 merged（#310/#305/#307/#318/#320/#322/#327）+ 多次"继续"+ architect 报告，context ~85%。下次 session 接力 Phase 2。Why：context 累积 → 后期决策质量下降。How：保留 starter prompt + 把当前 todo 写在 docs/session-handoff-XXX.md。
+
+### 遗留问题
+- **决策 79 Phase 2** — scan_order_service 3 处 + scan_order_routes 字面量 + ontology 加 ch_scan_order；触 §18 Ontology 冻结需创始人确认
+- **决策 79 Phase 3** — v500 migration drop 物理 sales_channel 列；前置：tx-analytics + tx-finance 读 SQL 切到 sales_channel_id（PR4a）
+- **决策 79 残留 prod BUG**: cashier_engine 4 个 pre-existing 测试失败（payment_methods_config / shouqianba_*_format / route_methods）— 与 sales_channel 无关，独立调查
+- #298 codemod Phase 3：tx_trade 余 21 文件 / 51 裸 import
+- #298 codemod Phase 4：tx_member 31 文件 / 107 裸（次大头）
+- #318 P1 follow-up：scanner 抓 `import xxx`（baseline 偏小）
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 OPEN
+
+### 下次 session 起手
+见 `docs/session-handoff-2026-05-09-pm.md`
+
+---
+
 ## 2026-05-09 上午 · 6 OPEN PR 全清 wave + codemod chain 落地 + 8 处 patch path drift 修复
 
 ### 今日完成

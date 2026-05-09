@@ -1,3 +1,31 @@
+## 2026-05-09 13:00 · 决策 79 Phase 1 Order(sales_channel=) 5 处修 (#327)
+
+### 完成状态
+- [x] PR #327 admin merged at `ccfb8b9e`：cashier_engine.py 4 处 + order_service.py 1 处 + AST 守门 test [Tier1]
+- [x] architect Opus read-only 报告：纠正主 session 误报（delivery_*.py 4 处不是 Order）
+- [x] TDD 双 commit 留痕：RED `6b142e37` → GREEN `ad248964`
+- [x] Tier 1 Gate 全 13 sub-check GREEN
+- [x] 回归：test_cashier_e2e 13/15 → 15/15；test_cashier_engine 42/53 → 49/53
+- [x] DEVLOG/progress 更新 + handoff 写
+
+### 关键决策
+- **决策 80**：Tier 1 修复用 AST 静态扫做守门（比 DB-mock 更稳）— 所有防回归类 Tier 1 测试首选 AST
+- **决策 81**：architect agent 是 BUG 范围误报快速纠正机制 — 跨多文件 BUG 先 architect 一下
+- **决策 82**：context >80% 主动拆 session — 本 session 7 PR 后 context ~85%，下次 session 接力 Phase 2
+
+### 下一步（下次 session）
+- **决策 79 Phase 2**：scan_order 3 处 + ontology 加 ch_scan_order（需创始人确认）
+- **决策 79 Phase 3**：v500 migration drop sales_channel 列（独立 sprint，前置 PR4a）
+- #298 codemod Phase 3：tx_trade 余 21 文件
+- #298 codemod Phase 4：tx_member 31 文件
+- #318 follow-up：scanner 抓 `import xxx`
+
+### 已知风险
+- cashier_engine 4 个残留失败（payment_methods_config / shouqianba_*_format / route_methods）main 同款 pre-existing — 不属决策 79 范畴，需独立调查
+- 决策 79 Phase 2 的 ontology 改动必须等创始人 → 时序敏感，scan_order 路径仍炸
+
+---
+
 ## 2026-05-09 11:00 · 6 OPEN PR 全清 wave + codemod chain 落地 + 8 处 patch path drift 修复
 
 ### 完成状态
