@@ -130,13 +130,13 @@ class TestCreateTransferOrder:
         """正常创建：调用 db.add 和 db.flush，返回 order_id + status=draft。"""
         db = _make_db()
 
-        with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
+        with patch("services.tx_supply.src.services.transfer_service._set_tenant", new_callable=AsyncMock):
             # TransferOrder.__init__ 不能 mock，改 patch db.flush 使流程通过
             mock_order = _make_mock_order("draft")
 
             with (
-                patch("services.transfer_service.TransferOrder", return_value=mock_order),
-                patch("services.transfer_service.TransferOrderItem", return_value=MagicMock()),
+                patch("services.tx_supply.src.services.transfer_service.TransferOrder", return_value=mock_order),
+                patch("services.tx_supply.src.services.transfer_service.TransferOrderItem", return_value=MagicMock()),
             ):
                 result = await create_transfer_order(
                     tenant_id=TENANT_ID,
@@ -190,7 +190,7 @@ class TestListTransferOrders:
 
         db.execute.side_effect = _execute
 
-        with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
+        with patch("services.tx_supply.src.services.transfer_service._set_tenant", new_callable=AsyncMock):
             result = await list_transfer_orders(
                 tenant_id=TENANT_ID,
                 db=db,
@@ -228,7 +228,7 @@ class TestCancelTransferOrder:
 
         db.execute.side_effect = _execute
 
-        with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
+        with patch("services.tx_supply.src.services.transfer_service._set_tenant", new_callable=AsyncMock):
             result = await cancel_transfer_order(
                 order_id=order_id,
                 tenant_id=TENANT_ID,
@@ -256,7 +256,7 @@ class TestCancelTransferOrder:
 
         db.execute.side_effect = _execute
 
-        with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
+        with patch("services.tx_supply.src.services.transfer_service._set_tenant", new_callable=AsyncMock):
             with pytest.raises(ValueError, match="不能取消"):
                 await cancel_transfer_order(
                     order_id=order_id,
@@ -278,7 +278,7 @@ class TestCancelTransferOrder:
 
         db.execute.side_effect = _execute
 
-        with patch("services.transfer_service._set_tenant", new_callable=AsyncMock):
+        with patch("services.tx_supply.src.services.transfer_service._set_tenant", new_callable=AsyncMock):
             with pytest.raises(ValueError, match="不存在"):
                 await cancel_transfer_order(
                     order_id=order_id,
