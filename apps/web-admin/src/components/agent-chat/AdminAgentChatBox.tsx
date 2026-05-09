@@ -21,12 +21,15 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 're
 import { A2UIRenderer } from '../a2ui';
 import type { A2UIDeclaration } from '../a2ui/types';
 import { mockNlqStream } from './mockSSE';
+import { createPin } from '../../api/pinnedDashboard';
 
 interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   text: string;
   surface?: A2UIDeclaration;
+  /** 用户问题（assistant 消息附带，Pin 时作为 source_natural_query 持久化）*/
+  sourceQuery?: string;
 }
 
 export function AdminAgentChatBox() {
@@ -86,7 +89,13 @@ export function AdminAgentChatBox() {
       }
       setMessages((prev) => [
         ...prev,
-        { id: `msg-${Date.now()}-a`, role: 'assistant', text: accumulated, surface },
+        {
+          id: `msg-${Date.now()}-a`,
+          role: 'assistant',
+          text: accumulated,
+          surface,
+          sourceQuery: question,
+        },
       ]);
     } catch (e) {
       setError(e instanceof Error ? e.message : '请求失败');
@@ -241,6 +250,25 @@ export function AdminAgentChatBox() {
 
 function ChatBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
+  const canPin = !isUser && Boolean(message.surface);
+  const [pinState, setPinState] = useState<'idle' | 'pinning' | 'pinned' | 'error'>(
+    'idle',
+  );
+
+  const handlePin = useCallback(async () => {
+    if (!message.surface || pinState !== 'idle') return;
+    setPinState('pinning');
+    try {
+      await createPin(
+        message.surface as unknown as Record<string, unknown>,
+        message.sourceQuery,
+      );
+      setPinState('pinned');
+    } catch {
+      setPinState('error');
+    }
+  }, [message.surface, message.sourceQuery, pinState]);
+
   return (
     <div
       style={{
@@ -272,6 +300,34 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         <div style={{ marginTop: 8, alignSelf: 'stretch' }}>
           <A2UIRenderer declaration={message.surface} />
         </div>
+      )}
+      {canPin && (
+        <button
+          onClick={() => void handlePin()}
+          disabled={pinState !== 'idle'}
+          style={{
+            marginTop: 6,
+            alignSelf: 'flex-end',
+            background: 'transparent',
+            border: '1px solid var(--bg-2)',
+            color:
+              pinState === 'pinned'
+                ? 'var(--green)'
+                : pinState === 'error'
+                  ? 'var(--red)'
+                  : 'var(--text-3)',
+            fontSize: 11,
+            padding: '3px 8px',
+            borderRadius: 6,
+            cursor: pinState === 'idle' ? 'pointer' : 'default',
+          }}
+          title="保存到驾驶舱"
+        >
+          {pinState === 'idle' && '📌 Pin 到驾驶舱'}
+          {pinState === 'pinning' && '保存中…'}
+          {pinState === 'pinned' && '✓ 已 Pin'}
+          {pinState === 'error' && '⚠️ Pin 失败，重试'}
+        </button>
       )}
     </div>
   );
