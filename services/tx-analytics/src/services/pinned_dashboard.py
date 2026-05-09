@@ -1,61 +1,33 @@
-"""驾驶舱 Pin 洞察 service 层 — S4-04 Issue #291 / Tier 3。
+"""驾驶舱 Pin 洞察 service 层 — S4-04 Issue #291 / Tier 3（RLS 路径全局 Tier 1）。
 
-职责（PR1 范围）：
-  - PinnedItem 数据结构（A2UI surface_snapshot + 元数据）
-  - add_pin / list_pins / remove_pin 三个核心操作
-  - tenant 隔离（in-memory store 按 tenant_id 分区）
-  - FIFO 淘汰（每 tenant 上限 20，超出从最旧开始淘汰）
+PR2.B：把 PR1 in-memory `_PINNED_STORE` dict 持久化到 PG（v403 dashboard_pinned 表）。
 
-不在 PR1 范围（留 PR2）：
-  - DB 持久化（迁移 v230+ 加 dashboard_pinned 表 + RLS policy）
-  - HTTP 路由 + tx-analytics main.py 注册
-  - 真 RLS 反测（PR1 in-memory tenant 隔离仅靠 dict key，PR2 上 RLS 后真验）
+调用约定（路由层负责）：
+  - 用 `get_db_with_tenant(tenant_id)` 注入 `app.tenant_id`（RLS 强制）
+  - 服务层假设 session 已开启事务 + 已注入 tenant
+  - SELECT/UPDATE 走 RLS USING 自动 tenant 过滤；INSERT 显式带 tenant_id（WITH CHECK 校验）
+
+PR2 后续：
+  - PR2.C：HTTP 路由 + main.py 注册（POST /append / GET /list / DELETE /{pin_id}）
+  - PR2.D：web-admin AgentConsole Pin 按钮 + 驾驶舱 Feed
+  - PR2.B-2：integration test 真 PG fixture（验证 FIFO 行为 + RLS 跨租户隔离）
+
+本 PR2.B 单测是 mock-session SQL-shape 验证 — 不连真 DB；
+真行为校验（FIFO 21 条第一条挤掉、tenant=A pin 不出现在 tenant=B）留 PR2.B-2。
 """
 
 from __future__ import annotations
 
-import os
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+import json
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Mapping, Optional
 
-# Pin 数量上限（每 tenant），超出 FIFO 淘汰最旧项
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# Pin 数量上限（每 tenant），超出 FIFO 软删最旧项
 PIN_LIMIT_PER_TENANT = 20
-
-# 显式 acknowledge in-memory store 在生产 / 预发的风险
-_ACK_MODE = "in_memory_acknowledged"
-_PROD_LIKE_ENVS = ("production", "staging")
-
-
-def _assert_pin_store_mode_safe(env: Optional[Mapping[str, str]] = None) -> None:
-    """生产 / 预发启动 fail-fast — 多 worker 部署 _PINNED_STORE 数据分裂保护。
-
-    PR1 仅 in-memory store，N worker 部署时每 worker 持有独立 dict，pin add 在
-    worker-A 但下次请求路由到 worker-B 看不到 → 静默数据分裂。PR2 接 DB 持久化
-    （issue #291，迁移 v230+ dashboard_pinned 表 + RLS）解决。
-
-    在此之前生产 / 预发部署必须显式 acknowledge：
-      TUNXIANG_ENV ∈ {production, staging} 且 TX_PIN_STORE_MODE != in_memory_acknowledged
-      → module 加载抛 RuntimeError，让 ImagePullPolicy 把启动失败写入 K8s event。
-
-    Args:
-        env: 测试注入用 env 字典，None 时读 os.environ。
-    """
-    e = env if env is not None else os.environ
-    tx_env = (e.get("TUNXIANG_ENV") or "").strip().lower()
-    mode = (e.get("TX_PIN_STORE_MODE") or "").strip().lower()
-    if tx_env in _PROD_LIKE_ENVS and mode != _ACK_MODE:
-        raise RuntimeError(
-            f"tx-analytics pinned_dashboard PR1 仅 in-memory store，"
-            f"TUNXIANG_ENV={tx_env!r} 部署多 worker 会数据分裂。等 PR2 DB 持久化 "
-            f"（issue #291）；如需单 worker 提前试用，设 "
-            f"TX_PIN_STORE_MODE={_ACK_MODE} 显式承认风险。"
-        )
-
-
-# Module-load 一次校验：让 K8s pod 启动失败优于静默错乱
-_assert_pin_store_mode_safe()
 
 
 @dataclass
@@ -64,7 +36,7 @@ class PinnedItem:
     tenant_id: str
     pinner_user_id: str
     pinned_at: datetime
-    surface_snapshot: dict[str, Any]  # A2UI JSON declaration
+    surface_snapshot: dict[str, Any]  # A2UI v0.8 declaration
     source_query_id: Optional[str] = None
     source_natural_query: Optional[str] = None
 
@@ -80,11 +52,21 @@ class PinnedItem:
         }
 
 
-# In-memory store: tenant_id -> list[PinnedItem]，最新在 list[0]（PR2 接 DB 后此 store 删除）
-_PINNED_STORE: dict[str, list[PinnedItem]] = {}
+def _row_to_item(row: Mapping[str, Any]) -> PinnedItem:
+    """SQLAlchemy mapping 行 → PinnedItem（UUID/JSONB 类型转换）。"""
+    return PinnedItem(
+        pin_id=str(row["pin_id"]),
+        tenant_id=str(row["tenant_id"]),
+        pinner_user_id=str(row["pinner_user_id"]),
+        pinned_at=row["pinned_at"],
+        surface_snapshot=row["surface_snapshot"],
+        source_query_id=row["source_query_id"],
+        source_natural_query=row["source_natural_query"],
+    )
 
 
-def add_pin(
+async def add_pin(
+    session: AsyncSession,
     *,
     tenant_id: str,
     pinner_user_id: str,
@@ -92,51 +74,122 @@ def add_pin(
     source_query_id: Optional[str] = None,
     source_natural_query: Optional[str] = None,
 ) -> PinnedItem:
-    """新增 Pin。最新插在列表头；超出 PIN_LIMIT_PER_TENANT 时尾部 FIFO 淘汰。
+    """新增 Pin。INSERT 后跑 FIFO 软删 SQL，把 tenant 上限外的最旧记录置 is_deleted=TRUE。
 
-    tenant_id 必填非空 — 防止 RLS 绕过（PR2 接 DB 后由 RLS policy 强制）。
+    tenant_id 必填非空 — service 层早拒减少 DB roundtrip（v403 RLS WITH CHECK 也会拒）。
+    pinner_user_id 必填 — §9 Agent 决策留痕强制。
+    surface_snapshot 序列化为 JSON 字符串再 ::jsonb cast（asyncpg 不直传 dict 给 text()）。
+
+    Returns:
+        新插入的 PinnedItem（pin_id / pinned_at 由 DB 默认值生成）。
+
+    Raises:
+        ValueError: tenant_id / pinner_user_id 为空
+        sqlalchemy.exc.IntegrityError: WITH CHECK 失败（tenant_id != app.tenant_id）
     """
     if not tenant_id or not tenant_id.strip():
         raise ValueError("tenant_id 必填非空（防 RLS 绕过）")
     if not pinner_user_id or not pinner_user_id.strip():
         raise ValueError("pinner_user_id 必填非空（决策留痕）")
 
-    item = PinnedItem(
-        pin_id=str(uuid.uuid4()),
-        tenant_id=tenant_id,
-        pinner_user_id=pinner_user_id,
-        pinned_at=datetime.now(timezone.utc),
-        surface_snapshot=surface_snapshot,
-        source_query_id=source_query_id,
-        source_natural_query=source_natural_query,
+    # 1. INSERT — pin_id / pinned_at / created_at / updated_at 走 v403 DB 默认
+    insert_result = await session.execute(
+        text(
+            """
+            INSERT INTO dashboard_pinned (
+                tenant_id, pinner_user_id, surface_snapshot,
+                source_query_id, source_natural_query
+            )
+            VALUES (
+                :tenant_id::uuid, :pinner_user_id::uuid, :surface_snapshot::jsonb,
+                :source_query_id, :source_natural_query
+            )
+            RETURNING pin_id, tenant_id, pinner_user_id, pinned_at,
+                      surface_snapshot, source_query_id, source_natural_query
+            """
+        ),
+        {
+            "tenant_id": tenant_id,
+            "pinner_user_id": pinner_user_id,
+            "surface_snapshot": json.dumps(surface_snapshot, ensure_ascii=False),
+            "source_query_id": source_query_id,
+            "source_natural_query": source_natural_query,
+        },
     )
-    bucket = _PINNED_STORE.setdefault(tenant_id, [])
-    bucket.insert(0, item)  # 最新在头
-    # FIFO 淘汰：超出 PIN_LIMIT_PER_TENANT 时砍掉尾部
-    if len(bucket) > PIN_LIMIT_PER_TENANT:
-        del bucket[PIN_LIMIT_PER_TENANT:]
-    return item
+    new_row = insert_result.mappings().one()
+
+    # 2. FIFO 软删 — 超 PIN_LIMIT_PER_TENANT 的最旧记录置 is_deleted=TRUE
+    # RLS USING 已 implicit 把 tenant 过滤加上（current_setting('app.tenant_id')），
+    # 因此此处无需显式 WHERE tenant_id = X
+    await session.execute(
+        text(
+            """
+            UPDATE dashboard_pinned
+            SET is_deleted = TRUE, updated_at = NOW()
+            WHERE pin_id NOT IN (
+                SELECT pin_id FROM dashboard_pinned
+                WHERE is_deleted = FALSE
+                ORDER BY pinned_at DESC
+                LIMIT :limit
+            )
+            AND is_deleted = FALSE
+            """
+        ),
+        {"limit": PIN_LIMIT_PER_TENANT},
+    )
+
+    return _row_to_item(new_row)
 
 
-def list_pins(tenant_id: str) -> list[PinnedItem]:
-    """列出 tenant 的所有 pinned items（最新在前）。"""
+async def list_pins(session: AsyncSession, tenant_id: str) -> list[PinnedItem]:
+    """列出当前 tenant 的 active pinned items（最新在前，软删行不返）。
+
+    RLS USING 自动 tenant 过滤；tenant_id 参数仅做 NULL 校验 + 调用方契约清晰。
+    """
     if not tenant_id or not tenant_id.strip():
         raise ValueError("tenant_id 必填非空（防 RLS 绕过）")
-    return list(_PINNED_STORE.get(tenant_id, []))
+
+    result = await session.execute(
+        text(
+            """
+            SELECT pin_id, tenant_id, pinner_user_id, pinned_at,
+                   surface_snapshot, source_query_id, source_natural_query
+            FROM dashboard_pinned
+            WHERE is_deleted = FALSE
+            ORDER BY pinned_at DESC
+            LIMIT :limit
+            """
+        ),
+        {"limit": PIN_LIMIT_PER_TENANT},
+    )
+    return [_row_to_item(row) for row in result.mappings()]
 
 
-def remove_pin(*, tenant_id: str, pin_id: str) -> bool:
-    """删除 Pin。返回 True 表示找到并删，False 表示该 tenant 下无此 pin_id。"""
+async def remove_pin(
+    session: AsyncSession,
+    *,
+    tenant_id: str,
+    pin_id: str,
+) -> bool:
+    """软删 Pin。返回 True 表示找到并删，False 表示无此 pin_id（含跨 tenant 情况）。
+
+    跨 tenant remove：RLS USING 阻挡可见性 → UPDATE 影响 0 行 → False（不抛异常）。
+    is_deleted=TRUE 的行重复 remove：影响 0 行 → False（幂等）。
+    """
     if not tenant_id or not tenant_id.strip():
         raise ValueError("tenant_id 必填非空（防 RLS 绕过）")
-    bucket = _PINNED_STORE.get(tenant_id, [])
-    for i, item in enumerate(bucket):
-        if item.pin_id == pin_id:
-            del bucket[i]
-            return True
-    return False
+    if not pin_id or not pin_id.strip():
+        raise ValueError("pin_id 必填非空")
 
-
-def _clear_for_test() -> None:
-    """测试 fixture 用：清空 in-memory store。生产代码不调用。"""
-    _PINNED_STORE.clear()
+    result = await session.execute(
+        text(
+            """
+            UPDATE dashboard_pinned
+            SET is_deleted = TRUE, updated_at = NOW()
+            WHERE pin_id = :pin_id::uuid
+              AND is_deleted = FALSE
+            """
+        ),
+        {"pin_id": pin_id},
+    )
+    return (result.rowcount or 0) > 0
