@@ -108,7 +108,7 @@ class TestCreateApproval:
         """POST /api/v1/menu/approvals 发起价格变更审批返回 201"""
         mock_item = _mock_approval_item("price_change", "pending")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.create_publish_request = AsyncMock(return_value=mock_item)
 
@@ -148,7 +148,7 @@ class TestCreateApproval:
         """POST new_dish 类型审批发起成功"""
         mock_item = _mock_approval_item("new_dish", "pending")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.create_publish_request = AsyncMock(return_value=mock_item)
 
@@ -175,7 +175,7 @@ class TestListApprovals:
         """GET /api/v1/menu/approvals 返回 200 和分页结构"""
         mock_item = _mock_approval_item("price_change", "pending")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.get_requests = AsyncMock(return_value=([mock_item], 1))
 
@@ -189,7 +189,7 @@ class TestListApprovals:
 
     def test_list_approvals_with_status_filter(self, client):
         """GET /api/v1/menu/approvals?status=pending 状态筛选有效"""
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.get_requests = AsyncMock(return_value=([], 0))
 
@@ -206,7 +206,7 @@ class TestListApprovals:
         """GET /api/v1/menu/approvals?approval_type=price_change 类型筛选有效"""
         mock_item = _mock_approval_item("price_change", "pending")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.get_requests = AsyncMock(return_value=([mock_item], 1))
 
@@ -227,7 +227,7 @@ class TestGetApproval:
         """GET /api/v1/menu/approvals/{id} 存在时返回 200"""
         mock_item = _mock_approval_item("soldout", "pending")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.get_request_by_id = AsyncMock(return_value=mock_item)
 
@@ -242,7 +242,7 @@ class TestGetApproval:
 
     def test_get_approval_not_found_returns_404(self, client):
         """GET /api/v1/menu/approvals/{id} 不存在时返回 404"""
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.get_request_by_id = AsyncMock(return_value=None)
 
@@ -262,7 +262,7 @@ class TestApproveApproval:
         """POST /api/v1/menu/approvals/{id}/approve 价格变更审批通过，自动执行更新"""
         mock_approved = _mock_approval_item("price_change", "approved")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.approve_request = AsyncMock(return_value=mock_approved)
 
@@ -280,7 +280,7 @@ class TestApproveApproval:
 
     def test_approve_already_processed_returns_400(self, client):
         """POST approve 已处理的审批返回 400"""
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.approve_request = AsyncMock(side_effect=ValueError("审批申请已处理，无法重复操作"))
 
@@ -301,7 +301,7 @@ class TestRejectApproval:
         """POST /api/v1/menu/approvals/{id}/reject 拒绝审批返回 200"""
         mock_rejected = _mock_approval_item("price_change", "rejected")
 
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.reject_request = AsyncMock(return_value=mock_rejected)
 
@@ -327,7 +327,7 @@ class TestRejectApproval:
 
     def test_reject_already_processed_returns_400(self, client):
         """POST reject 已处理的审批返回 400"""
-        with patch("api.menu_approval_routes.MenuApprovalService") as MockSvc:
+        with patch("services.tx_menu.src.api.menu_approval_routes.MenuApprovalService") as MockSvc:
             instance = MockSvc.return_value
             instance.reject_request = AsyncMock(side_effect=ValueError("审批申请状态不是 pending，无法拒绝"))
 

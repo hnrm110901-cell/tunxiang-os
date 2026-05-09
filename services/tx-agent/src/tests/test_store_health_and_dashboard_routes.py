@@ -167,7 +167,7 @@ def store_health_client():
 @pytest.mark.asyncio
 async def test_overview_no_stores(store_health_client):
     """When _fetch_all_stores returns [], summary has total_stores=0."""
-    with patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=[])):
+    with patch("services.tx_agent.src.api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=[])):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/overview", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -201,8 +201,8 @@ async def test_overview_with_stores(store_health_client):
         return fake_item
 
     with (
-        patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=fake_stores)),
-        patch("api.store_health_routes._build_store_health_item", side_effect=fake_build_item),
+        patch("services.tx_agent.src.api.store_health_routes._fetch_all_stores", new=AsyncMock(return_value=fake_stores)),
+        patch("services.tx_agent.src.api.store_health_routes._build_store_health_item", side_effect=fake_build_item),
     ):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/overview", headers={"X-Tenant-ID": "t1"})
@@ -217,7 +217,7 @@ async def test_overview_db_error_returns_empty(store_health_client):
     """When _fetch_all_stores raises SQLAlchemyError, return empty summary gracefully."""
     from sqlalchemy.exc import SQLAlchemyError
 
-    with patch("api.store_health_routes._fetch_all_stores", new=AsyncMock(side_effect=SQLAlchemyError("db err"))):
+    with patch("services.tx_agent.src.api.store_health_routes._fetch_all_stores", new=AsyncMock(side_effect=SQLAlchemyError("db err"))):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/overview", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -239,7 +239,7 @@ async def test_detail_store_not_found(store_health_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    with patch("api.store_health_routes._get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.store_health_routes._get_db_with_tenant", return_value=mock_db):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/nonexistent-id", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 404
@@ -272,8 +272,8 @@ async def test_detail_happy_path(store_health_client):
         "alerts": [],
     }
     with (
-        patch("api.store_health_routes._get_db_with_tenant", return_value=mock_db),
-        patch("api.store_health_routes._build_store_health_item", new=AsyncMock(return_value=fake_item)),
+        patch("services.tx_agent.src.api.store_health_routes._get_db_with_tenant", return_value=mock_db),
+        patch("services.tx_agent.src.api.store_health_routes._build_store_health_item", new=AsyncMock(return_value=fake_item)),
     ):
         async with store_health_client as c:
             resp = await c.get("/api/v1/store-health/s1", headers={"X-Tenant-ID": "t1"})
@@ -319,9 +319,9 @@ def _make_fetch_kpi_mock(revenue_fen=50000, order_count=30, avg_order_fen=1666, 
 async def test_dashboard_summary_happy_path(dashboard_client):
     """Happy path: kpi + stores + decisions all returned."""
     with (
-        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
-        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
-        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
     ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})
@@ -339,9 +339,9 @@ async def test_dashboard_summary_with_store_data(dashboard_client):
         {"store_id": "s1", "store_name": "店A", "today_revenue_fen": 30000, "today_orders": 20, "status": "online"},
     ]
     with (
-        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
-        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=fake_stores)),
-        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=fake_stores)),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=[])),
     ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})
@@ -366,9 +366,9 @@ async def test_dashboard_summary_decisions_included(dashboard_client):
         },
     ]
     with (
-        patch("api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
-        patch("api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
-        patch("api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=fake_decisions)),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_today_kpi", side_effect=_make_fetch_kpi_mock()),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_store_health", new=AsyncMock(return_value=[])),
+        patch("services.tx_agent.src.api.dashboard_routes._fetch_recent_decisions", new=AsyncMock(return_value=fake_decisions)),
     ):
         async with dashboard_client as c:
             resp = await c.get("/api/v1/dashboard/summary", headers={"X-Tenant-ID": "t1"})

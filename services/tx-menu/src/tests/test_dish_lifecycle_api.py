@@ -100,7 +100,7 @@ class TestHealthScores:
         mock_score.total_score = 75.0
         mock_score.to_dict.return_value = {"dish_id": DISH_ID, "total_score": 75.0}
 
-        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
+        with patch("services.tx_menu.src.api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_all_dishes = AsyncMock(return_value=[mock_score])
 
@@ -134,7 +134,7 @@ class TestHealthScores:
             "review_score": 15.0,
         }
 
-        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
+        with patch("services.tx_menu.src.api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_dish = AsyncMock(return_value=mock_score)
 
@@ -151,7 +151,7 @@ class TestHealthScores:
 
     def test_get_single_health_score_not_found(self, client):
         """GET /dish-lifecycle/health-scores/{dish_id} 菜品不存在时返回 ok=False"""
-        with patch("api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
+        with patch("services.tx_menu.src.api.dish_lifecycle_routes.DishHealthScoreEngine") as MockEngine:
             instance = MockEngine.return_value
             instance.score_dish = AsyncMock(return_value=None)
 
@@ -180,7 +180,7 @@ class TestSelloutWarnings:
             "warning_level": "critical",
         }
 
-        with patch("api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
+        with patch("services.tx_menu.src.api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
             instance = MockSvc.return_value
             instance.check_sellout_warnings = AsyncMock(return_value=[mock_warning])
 
@@ -197,7 +197,7 @@ class TestSelloutWarnings:
 
     def test_sellout_warnings_empty_list(self, client):
         """无预警时返回空列表"""
-        with patch("api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
+        with patch("services.tx_menu.src.api.dish_lifecycle_routes.DishLifecycleService") as MockSvc:
             instance = MockSvc.return_value
             instance.check_sellout_warnings = AsyncMock(return_value=[])
 

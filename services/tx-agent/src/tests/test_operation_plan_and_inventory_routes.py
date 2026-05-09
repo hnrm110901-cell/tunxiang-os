@@ -127,7 +127,7 @@ async def test_submit_operation_no_plan_needed(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.submit = AsyncMock(return_value=None)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans",
@@ -147,7 +147,7 @@ async def test_submit_operation_plan_triggered(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.submit = AsyncMock(return_value=fake_plan)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans",
@@ -189,7 +189,7 @@ async def test_list_pending_plans_empty(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_pending_plans = AsyncMock(return_value=[])
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.get("/api/v1/operation-plans/pending", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -206,7 +206,7 @@ async def test_list_pending_plans_with_results(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_pending_plans = AsyncMock(return_value=fake_plans)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.get("/api/v1/operation-plans/pending", headers={"X-Tenant-ID": "t1"})
     body = resp.json()
@@ -226,7 +226,7 @@ async def test_get_plan_not_found(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_plan = AsyncMock(return_value=None)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.get("/api/v1/operation-plans/no-such-plan", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 404
@@ -239,7 +239,7 @@ async def test_get_plan_tenant_mismatch(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_plan = AsyncMock(return_value=fake_plan)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.get("/api/v1/operation-plans/plan-001", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 403
@@ -252,7 +252,7 @@ async def test_get_plan_happy_path(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_plan = AsyncMock(return_value=fake_plan)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.get("/api/v1/operation-plans/plan-001", headers={"X-Tenant-ID": "t1"})
     assert resp.status_code == 200
@@ -275,7 +275,7 @@ async def test_confirm_plan_success(op_plan_client):
     mock_planner.get_plan = AsyncMock(side_effect=[fake_plan, confirmed_plan])
     mock_planner.confirm = AsyncMock(return_value=True)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans/plan-001/confirm",
@@ -296,7 +296,7 @@ async def test_confirm_plan_already_expired(op_plan_client):
     mock_planner.get_plan = AsyncMock(return_value=fake_plan)
     mock_planner.confirm = AsyncMock(return_value=False)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans/plan-001/confirm",
@@ -315,7 +315,7 @@ async def test_confirm_plan_not_found(op_plan_client):
     mock_planner = MagicMock()
     mock_planner.get_plan = AsyncMock(return_value=None)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans/ghost-plan/confirm",
@@ -339,7 +339,7 @@ async def test_cancel_plan_success(op_plan_client):
     mock_planner.get_plan = AsyncMock(side_effect=[fake_plan, cancelled_plan])
     mock_planner.cancel = AsyncMock(return_value=True)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans/plan-001/cancel",
@@ -360,7 +360,7 @@ async def test_cancel_plan_already_executed(op_plan_client):
     mock_planner.get_plan = AsyncMock(return_value=fake_plan)
     mock_planner.cancel = AsyncMock(return_value=False)
 
-    with patch("api.operation_plan_routes._get_planner", return_value=mock_planner):
+    with patch("services.tx_agent.src.api.operation_plan_routes._get_planner", return_value=mock_planner):
         async with op_plan_client as c:
             resp = await c.post(
                 "/api/v1/operation-plans/plan-001/cancel",
@@ -418,7 +418,7 @@ async def test_inventory_dashboard_happy_path(inventory_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(side_effect=[summary_result, low_result])
 
-    with patch("api.inventory_routes.get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.inventory_routes.get_db_with_tenant", return_value=mock_db):
         async with inventory_client as c:
             resp = await c.get(
                 "/api/v1/inventory/dashboard?store_id=s1",
@@ -465,7 +465,7 @@ async def test_inventory_dashboard_with_low_items(inventory_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(side_effect=[summary_result, low_result])
 
-    with patch("api.inventory_routes.get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.inventory_routes.get_db_with_tenant", return_value=mock_db):
         async with inventory_client as c:
             resp = await c.get(
                 "/api/v1/inventory/dashboard?store_id=s1",
@@ -485,7 +485,7 @@ async def test_inventory_dashboard_db_error_graceful(inventory_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(side_effect=Exception("db connection failed"))
 
-    with patch("api.inventory_routes.get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.inventory_routes.get_db_with_tenant", return_value=mock_db):
         async with inventory_client as c:
             resp = await c.get(
                 "/api/v1/inventory/dashboard?store_id=s1",
@@ -523,9 +523,9 @@ async def test_generate_restock_plan_happy_path(inventory_client):
     mock_master.register = MagicMock()
 
     with (
-        patch("api.inventory_routes.MasterAgent", return_value=mock_master),
-        patch("api.inventory_routes.ALL_SKILL_AGENTS", []),
-        patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
+        patch("services.tx_agent.src.api.inventory_routes.MasterAgent", return_value=mock_master),
+        patch("services.tx_agent.src.api.inventory_routes.ALL_SKILL_AGENTS", []),
+        patch("services.tx_agent.src.api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
     ):
         async with inventory_client as c:
             resp = await c.post(
@@ -547,9 +547,9 @@ async def test_generate_restock_plan_agent_error(inventory_client):
     mock_master.register = MagicMock()
 
     with (
-        patch("api.inventory_routes.MasterAgent", return_value=mock_master),
-        patch("api.inventory_routes.ALL_SKILL_AGENTS", []),
-        patch("api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
+        patch("services.tx_agent.src.api.inventory_routes.MasterAgent", return_value=mock_master),
+        patch("services.tx_agent.src.api.inventory_routes.ALL_SKILL_AGENTS", []),
+        patch("services.tx_agent.src.api.inventory_routes.ModelRouter", side_effect=ValueError("no key")),
     ):
         async with inventory_client as c:
             resp = await c.post(
@@ -582,7 +582,7 @@ async def test_get_latest_restock_plan_found(inventory_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    with patch("api.inventory_routes.get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.inventory_routes.get_db_with_tenant", return_value=mock_db):
         async with inventory_client as c:
             resp = await c.get(
                 "/api/v1/inventory/restock-plan?store_id=s1",
@@ -603,7 +603,7 @@ async def test_get_latest_restock_plan_not_found(inventory_client):
     mock_db = MagicMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    with patch("api.inventory_routes.get_db_with_tenant", return_value=mock_db):
+    with patch("services.tx_agent.src.api.inventory_routes.get_db_with_tenant", return_value=mock_db):
         async with inventory_client as c:
             resp = await c.get(
                 "/api/v1/inventory/restock-plan?store_id=s1",

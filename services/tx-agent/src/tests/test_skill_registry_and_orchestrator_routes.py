@@ -135,7 +135,7 @@ def skill_client(skill_app):
 async def test_list_skills_returns_all(skill_client):
     """GET / returns ok=True with skill list."""
     mock_registry = _make_mock_registry()
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/")
     assert resp.status_code == 200
@@ -149,7 +149,7 @@ async def test_list_skills_returns_all(skill_client):
 async def test_list_skills_empty_registry(skill_client):
     """GET / with no skills registered returns total=0."""
     mock_registry = _make_mock_registry(skills=[])
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/")
     body = resp.json()
@@ -167,7 +167,7 @@ async def test_list_skills_empty_registry(skill_client):
 async def test_skill_health_all_healthy(skill_client):
     """GET /health lists every skill as healthy."""
     mock_registry = _make_mock_registry()
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/health")
     assert resp.status_code == 200
@@ -192,8 +192,8 @@ async def test_ontology_report_structure(skill_client):
     mock_onto = _make_mock_ontology(mock_registry)
 
     with (
-        patch("api.skill_registry_routes._get_registry", return_value=mock_registry),
-        patch("api.skill_registry_routes.OntologyRegistry", return_value=mock_onto),
+        patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry),
+        patch("services.tx_agent.src.api.skill_registry_routes.OntologyRegistry", return_value=mock_onto),
     ):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/ontology/report")
@@ -219,7 +219,7 @@ async def test_ontology_report_structure(skill_client):
 async def test_route_event_returns_matched_skills(skill_client):
     """GET /route/{event_type} lists skills that handle the event."""
     mock_registry = _make_mock_registry()
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/route/test.event")
     assert resp.status_code == 200
@@ -242,7 +242,7 @@ async def test_route_event_returns_matched_skills(skill_client):
 async def test_get_skill_found(skill_client):
     """GET /{skill_name} returns full skill details when skill exists."""
     mock_registry = _make_mock_registry()
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/skill-a")
     assert resp.status_code == 200
@@ -259,7 +259,7 @@ async def test_get_skill_found(skill_client):
 async def test_get_skill_not_found(skill_client):
     """GET /{skill_name} returns HTTP 404 for unknown skill."""
     mock_registry = _make_mock_registry()
-    with patch("api.skill_registry_routes._get_registry", return_value=mock_registry):
+    with patch("services.tx_agent.src.api.skill_registry_routes._get_registry", return_value=mock_registry):
         async with skill_client as c:
             resp = await c.get("/api/v1/skills/does-not-exist")
     assert resp.status_code == 404
@@ -332,9 +332,9 @@ async def test_orchestrate_with_intent_returns_plan(orchestrator_client):
     mock_log_service.log_orchestrator_result = AsyncMock()
 
     with (
-        patch("api.orchestrator_routes.MasterAgent", return_value=mock_master),
-        patch("api.orchestrator_routes.DecisionLogService", mock_log_service),
-        patch("api.orchestrator_routes.AgentEvent", MagicMock()),
+        patch("services.tx_agent.src.api.orchestrator_routes.MasterAgent", return_value=mock_master),
+        patch("services.tx_agent.src.api.orchestrator_routes.DecisionLogService", mock_log_service),
+        patch("services.tx_agent.src.api.orchestrator_routes.AgentEvent", MagicMock()),
     ):
         payload = {
             "intent": "分析门店整体运营状态",
@@ -378,9 +378,9 @@ async def test_orchestrate_with_trigger_event(orchestrator_client):
     mock_log_service.log_orchestrator_result = AsyncMock()
 
     with (
-        patch("api.orchestrator_routes.MasterAgent", return_value=mock_master),
-        patch("api.orchestrator_routes.DecisionLogService", mock_log_service),
-        patch("api.orchestrator_routes.AgentEvent", MagicMock()) as MockEvent,
+        patch("services.tx_agent.src.api.orchestrator_routes.MasterAgent", return_value=mock_master),
+        patch("services.tx_agent.src.api.orchestrator_routes.DecisionLogService", mock_log_service),
+        patch("services.tx_agent.src.api.orchestrator_routes.AgentEvent", MagicMock()) as MockEvent,
     ):
         payload = {
             "trigger_event": {
@@ -414,7 +414,7 @@ async def test_orchestrate_with_trigger_event(orchestrator_client):
 async def test_skill_summary_returns_total(orchestrator_client):
     """GET /skill-summary returns ok=True with total_skills."""
     mock_summary = {"total_skills": 5, "skills": []}
-    with patch("api.orchestrator_routes.SkillAwareOrchestrator") as MockOrch:
+    with patch("services.tx_agent.src.api.orchestrator_routes.SkillAwareOrchestrator") as MockOrch:
         MockOrch.get_ontology_summary.return_value = mock_summary
         async with orchestrator_client as c:
             resp = await c.get("/api/v1/orchestrate/skill-summary")

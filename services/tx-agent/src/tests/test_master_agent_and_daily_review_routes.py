@@ -113,7 +113,7 @@ async def test_execute_async_mode_returns_pending(master_client):
         "instruction": "分析折扣风险",
         "async_mode": True,
     }
-    with patch("api.master_agent_routes._call_brain_agent", new=AsyncMock()):
+    with patch("services.tx_agent.src.api.master_agent_routes._call_brain_agent", new=AsyncMock()):
         async with master_client as c:
             resp = await c.post("/api/v1/agent/execute", json=payload)
 
@@ -208,7 +208,7 @@ async def test_agent_health_when_brain_reachable(master_client):
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(return_value=mock_resp)
 
-    with patch("api.master_agent_routes.httpx.AsyncClient", return_value=mock_client):
+    with patch("services.tx_agent.src.api.master_agent_routes.httpx.AsyncClient", return_value=mock_client):
         async with master_client as c:
             resp = await c.get("/api/v1/agent/health")
 
@@ -230,7 +230,7 @@ async def test_agent_health_when_brain_unreachable(master_client):
     mock_client.__aexit__ = AsyncMock(return_value=False)
     mock_client.get = AsyncMock(side_effect=httpx.RequestError("connection refused"))
 
-    with patch("api.master_agent_routes.httpx.AsyncClient", return_value=mock_client):
+    with patch("services.tx_agent.src.api.master_agent_routes.httpx.AsyncClient", return_value=mock_client):
         async with master_client as c:
             resp = await c.get("/api/v1/agent/health")
 
