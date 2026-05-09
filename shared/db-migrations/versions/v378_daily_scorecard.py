@@ -31,11 +31,12 @@ def _enable_rls(table: str) -> None:
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         policy = f"rls_{table}_{action.lower()}"
+        clause = "WITH CHECK" if action == "INSERT" else "USING"
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table}")
         op.execute(
             f"CREATE POLICY {policy} ON {table} "
             f"AS PERMISSIVE FOR {action} TO PUBLIC "
-            f"USING (tenant_id = {_RLS_EXPR})"
+            f"{clause} (tenant_id = {_RLS_EXPR})"
         )
 
 

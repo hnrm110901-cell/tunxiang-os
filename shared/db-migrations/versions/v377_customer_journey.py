@@ -25,17 +25,24 @@ _RLS_EXPR = "NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
 
 def _enable_rls(table: str) -> None:
-    """为指定表创建完整 RLS（4条 PERMISSIVE + FORCE）。"""
+    """为指定表创建完整 RLS（4条 PERMISSIVE + FORCE）。
+
+    PG 语义：USING 适用 SELECT/UPDATE/DELETE（行可见性过滤）；INSERT 仅接受
+    WITH CHECK（新行校验）；UPDATE 同时接受两者。本函数为每个 action 选对子句。
+    （B'-5 修：原版本所有 action 都用 USING，INSERT 撞 PG syntax error
+    "only WITH CHECK expression allowed for INSERT"。）
+    """
     op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
 
     for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
         policy = f"rls_{table}_{action.lower()}"
+        clause = "WITH CHECK" if action == "INSERT" else "USING"
         op.execute(f"DROP POLICY IF EXISTS {policy} ON {table}")
         op.execute(
             f"CREATE POLICY {policy} ON {table} "
             f"AS PERMISSIVE FOR {action} TO PUBLIC "
-            f"USING (tenant_id = {_RLS_EXPR})"
+            f"{clause} (tenant_id = {_RLS_EXPR})"
         )
 
 
