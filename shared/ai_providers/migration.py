@@ -98,6 +98,10 @@ class MigrationRouter:
             "cost_analysis": "claude-sonnet-4-6",
             "patrol_report": "claude-haiku-4-5-20251001",
             "dashboard_brief": "claude-sonnet-4-6",
+            # S4-02 PR2.B.2 — NLQ SQL 生成（issue #289）
+            # sonnet 合理：schema 约束理解 + JSON 输出格式 + reports.* 白名单遵守
+            # 后续若 hallucination 严重可升 opus；若简单查询为主可降 haiku
+            "nlq_sql_generation": "claude-sonnet-4-6",
             "default": "claude-sonnet-4-6",
         }
         self._downgrade_model = "claude-haiku-4-5-20251001"

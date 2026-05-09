@@ -1,4 +1,4 @@
-"""NLQ SQL Generator — S4-02 PR2.B.1 Tier 1 后端 LLM SQL 生成器骨架。
+"""NLQ SQL Generator — S4-02 PR2.B Tier 1 后端 LLM SQL 生成器。
 
 职责：
   1. 接受用户自然语言问题 + tenant_id，调 LLM（ModelRouterLike）输出 SQL
@@ -11,8 +11,8 @@
   - ModelRouterLike Protocol（与 sonnet_narrator 一致，最小依赖面）
   - LLM 输出 JSON 单字段 `{"sql": "..."}`，便于强校验
   - prompt 列出全部 reports.* 视图（防漂移：迁移加视图 → REPORTS_VIEW_NAMES 同步 → prompt 自动更新）
+  - create_default_sql_generator() 工厂 wire MigrationRouter（PR2.B.2）
 
-后续 PR2.B.2：接真 ModelRouter（task_router/router.py）+ 实战 prompt 调优
 后续 PR2.C：POST /nlq/query SSE 端点 + sql_sandbox.execute 串联
 
 CLAUDE.md §17 Tier 1：read-only + RLS 不可绕 + 防火墙 + 白名单
@@ -272,3 +272,41 @@ class SqlGenerator:
         _assert_reports_only(sql)
 
         return sql
+
+
+# ─── 工厂函数（PR2.B.2 接真 ModelRouter） ────────────────────────────────
+
+
+def create_default_sql_generator(
+    *,
+    max_tokens: int = 800,
+    timeout_s: int = 25,
+) -> "SqlGenerator":
+    """从 ANTHROPIC_API_KEY 环境变量构造 SqlGenerator。
+
+    用法（FastAPI Depends）：
+        from .services.sql_generator import create_default_sql_generator
+        @router.post("/nlq/query")
+        async def nlq(...):
+            try:
+                gen = create_default_sql_generator()
+            except ValueError:
+                raise HTTPException(503, "LLM service unavailable: check ANTHROPIC_API_KEY")
+            sql = await gen.generate(...)
+
+    Raises:
+        ValueError: ANTHROPIC_API_KEY 未设置（透传 MigrationRouter 的错误）。
+        ImportError: anthropic SDK 未安装（应在 requirements.txt 装好）。
+
+    Notes:
+        - 用 MigrationRouter 而非直接 ModelRouterCompat —— 走 MULTI_PROVIDER_ENABLED 开关
+        - 不缓存 router 实例（生产可改 lru_cache 或 dependency injection）
+    """
+    from shared.ai_providers.migration import MigrationRouter
+
+    router = MigrationRouter()
+    return SqlGenerator(
+        model_router=router,  # type: ignore[arg-type]
+        max_tokens=max_tokens,
+        timeout_s=timeout_s,
+    )
