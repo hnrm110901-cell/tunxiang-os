@@ -1,13 +1,7 @@
 # Decimal 金额违规扫描报告
 
 **扫描根目录：** `services`  
-**违规总数：** 27  
-
-## tx-expense (1 处)
-
-| 文件 | 行 | 字段名 | 类型 | 严重度 |
-|------|-----|--------|------|--------|
-| `travel.py` | 117 | `total_mileage_km` | `Numeric(10, 2)` | **high** |
+**违规总数：** 24  
 
 ## tx-finance (8 处)
 
@@ -37,12 +31,10 @@
 | `stored_value_account.py` | 174 | `gift_balance_before` | `Numeric(10, 2)` | **high** |
 | `stored_value_account.py` | 180 | `gift_balance_after` | `Numeric(10, 2)` | **high** |
 
-## tx-trade (8 处)
+## tx-trade (6 处)
 
 | 文件 | 行 | 字段名 | 类型 | 严重度 |
 |------|-----|--------|------|--------|
-| `banquet_ai.py` | 90 | `food_cost_rate` | `Numeric(5, 2)` | **high** |
-| `banquet_contract.py` | 39 | `deposit_ratio` | `Numeric(5, 2)` | **high** |
 | `chef_performance_daily.py` | 22 | `dish_amount` | `Numeric(12, 2)` | **high** |
 | `discount_audit_log.py` | 43 | `original_amount` | `Numeric(12, 2)` | **high** |
 | `discount_audit_log.py` | 44 | `final_amount` | `Numeric(12, 2)` | **high** |
@@ -59,4 +51,8 @@
 - `high`：`Numeric(M, 2)` — 明显的人民币元/角格式，必须修为 `Integer`
 - `warning`：`Numeric(M, N≠2)` — 疑似金额但 scale 异常，需人工核查
 
-**白名单（不报警）：** 字段名含 `rate` 且 scale ≤ 4 的百分比字段（如 `tax_rate Numeric(5,4)`）。
+**白名单（不报警）：**
+
+- 物理单位后缀：`_km` / `_kg` / `_count` / `_qty` / `_pieces` / `_seconds` / `_minutes` / `_hours` / `_days` / `_ms`
+- 比率后缀：`_rate` / `_ratio` / `_pct` / `_percent`（严格 end-of-name）
+- 毛利率/利润率 token：`margin` 词（含 `_margin` / `_margin_before` / `_margin_after` 等变体）
