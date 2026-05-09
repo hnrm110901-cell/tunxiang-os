@@ -1,3 +1,67 @@
+## 2026-05-09 深夜 续 #3 — #298 codemod Phase 8 (tx-finance 23/62) + conftest 新建（决策 83 第 3 次）
+
+### 今日完成（5/9 第 8 PR — chain 收尾大头）
+- **#XXX** Phase 8 tx-finance 全清 — 模板沿用 #335 / #338 / #341 / #344 / #348
+  - **RED** `3adade4c` — services/tx-finance/conftest.py 新建（决策 83 第 3 次）+ test_codemod_phase8_bare_imports_tier1.py AST 守门
+  - **GREEN** `58b0fda7` — codemod --apply --service tx-finance：23 文件 / 62 import
+  - **fix** `a8a8c206` — patch literal 漂移 18 处（test_vat_ledger 7 / test_split_payment 6 / test_agreement_units 5）
+
+### 数据变化
+- 改写文件：23（含 src/tests + tests/）
+- 改写 import：62
+- 新建 conftest：1（services/tx-finance/conftest.py，决策 83 第 3 次新建）
+- 修补 patch literal：18 处
+- 新增测试：1（守门 fixture，Tier 1）
+
+### 本地 pytest 实测对比（决策 78）— 无 ignore-glob
+| | pre-codemod | post-codemod | delta |
+|---|---|---|---|
+| pass | 418 | 512 | **+94** |
+| fail | 91 | 83 | **-8（codemod 修复 8 fail）**|
+| collection error | 18 | 15 | **-3** |
+
+**全方位正向**：+94 pass / -8 fail / -3 errors。tx-finance 是含金量最高
+服务（全电发票 + 金税四期，CLAUDE.md §17 Tier 1）。
+
+### 累计 #298 chain 数据快照 — chain ~95% 完成
+| Phase | PR | 服务 | 文件 | import |
+|---|---|---|---|---|
+| 1-3 | #322 #335 | tx-trade | 42 | ~305 |
+| 4 | #338 | tx-member | 30 | 112 |
+| 5 | #341 | tx-org | 39 | 102 |
+| 6 | #344 | tx-supply | 39 | 96 |
+| 7 | #348 | tx-growth | 20 | 70 |
+| **8** | **#XXX** | **tx-finance** | **23** | **62** |
+| **累计** | | **6 服务** | **193** | **~747** |
+| 余待清 | | 8 服务 | ~? | ~107（gateway 16 / tx-agent 37 / tx-analytics 34 等小规模）|
+
+### conftest 状态（决策 83）
+| ✓ 已有 | tx-trade / tx-member（#338）/ tx-org / tx-pay / tx-supply / tx-growth（#348）/ **tx-finance（本 PR 新建）** |
+| ✗ 待建 | 其余 8 服务 |
+
+### 5/9 一日成绩 = 8 PR
+| PR | 内容 |
+|---|---|
+| #335 | Phase 3 tx-trade 22/57 |
+| #336 | RBAC follow-up（stacked on #335）|
+| #338 | Phase 4 tx-member 30/112 + conftest 新建 |
+| #341 | Phase 5 tx-org 39/102 |
+| #344 | Phase 6 tx-supply 39/96 |
+| #347 | conftest shared/shared.adapters namespace fix |
+| #348 | Phase 7 tx-growth 20/70 + conftest 新建 |
+| **#XXX** | **Phase 8 tx-finance 23/62 + conftest 新建（chain 大头收尾）** |
+
+### 遗留问题
+- 决策 79 follow-up：tx-finance 仍 83 fail（多为 pre-existing latent bugs）
+- 决策 84 scanner 仍未抓 from-NS-import-module 形式（本轮未触发）
+- 余 8 服务规模分散（gateway 16 / tx-agent 37 / tx-analytics 34），可一波清
+
+### 明日计划
+- Phase 9（chain 收官）：余 8 服务一波清（gateway / tx-agent / tx-analytics 等）
+- 决策 79 follow-up：tx-finance 83 surfaced failures 调查
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

@@ -1,3 +1,31 @@
+## 2026-05-09 深夜 续 #3 · #298 codemod Phase 8 — tx-finance 23/62 + conftest 新建
+
+### 完成状态
+- [x] **RED** `3adade4c` — services/tx-finance/conftest.py（决策 83 第 3 次）+ AST 守门 fixture
+- [x] **GREEN** `58b0fda7` — codemod 应用 23 文件 / 62 处 import 改写
+- [x] **fix** `a8a8c206` — 18 处 patch literal 漂移修补
+- [x] 本地 pytest 实测：pass 418→512（+94），fail 91→83（-8），collection error 18→15（-3）— 全方位正向
+- [x] DEVLOG / progress 同步（本 commit）
+- [ ] 仍待 admin override merge（Tier 1 强制 review）
+
+### 关键决策
+- **决策 83 第 3 次应用 — tx-finance 新建 conftest**：直接复用 tx-supply / tx-growth 模板，0 改动；决策 83 模板已 3 PR 验证收敛
+- **决策 84 本轮 0 命中**：scanner 漏抓 from-NS-import-module 形式 — tx-finance test 未触发
+- **决策 78 真门禁验证**：本地 pytest 实测全方位正向（+94 pass / -8 fail / -3 errors）；codemod 在 tx-finance 是无副作用净提升
+- **CLAUDE.md §17 Tier 1 路径触及**：本服务含全电发票 / 金税四期 / 发票申请；codemod 改的是 import 形式，业务 mock 用例隔离不受影响（前 5 PR 同模板已验证）
+- 累计 chain：6 服务 / 193 文件 / ~747 imports（~95%）
+
+### 下一步
+- Phase 9（chain 收官）：余 8 服务一波清（gateway 16 / tx-agent 37 / tx-analytics 34 / tx-brain / tx-civic / tx-intel / tx-menu / tx-ops）
+- 决策 79 follow-up：tx-finance 83 surfaced failures 调查
+
+### 已知风险
+- **决策 77 band-aid 仍在**：PR #287 extend_existing 兜底未撤；本 PR 完成 chain ~95%，撤 band-aid 还需余 8 服务全清 + production 端 short-path 跟进
+- **alembic chain integrity 仍断裂**（v310 dangling）— 与本 PR 无关
+- **Tier 1 真门禁绿**（AST 守门 fixture 通过 = tx-finance test 路径上 0 裸 import）；CI 噪音（Ruff / python-lint-test (*) / frontend-build）按 ci_gates 规则忽略
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
