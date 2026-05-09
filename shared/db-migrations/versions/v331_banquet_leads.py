@@ -16,6 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-4, 2026-05-09): 本文件 (revision="v331_banquet_leads")
+    # 与 v315_banquet_leads.py (revision="v315_banquet_leads") 是 100% 内容副本
+    # （diff 仅 docstring + revision/down_revision 元数据）。v315 是 canonical
+    # 持有者；本文件改 no-op，让 v315 唯一负责 schema。
+    return
     # ── banquet_leads 宴会线索 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_leads (
@@ -144,6 +149,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS banquet_lead_transfers CASCADE")
-    op.execute("DROP TABLE IF EXISTS banquet_lead_follow_ups CASCADE")
-    op.execute("DROP TABLE IF EXISTS banquet_leads CASCADE")
+    # B'-4 (2026-05-09): no-op；副本回滚由 v315 downgrade 负责
+    return

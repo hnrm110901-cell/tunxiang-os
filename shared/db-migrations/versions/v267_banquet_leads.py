@@ -85,126 +85,22 @@ def upgrade() -> None:
     )
 
     # ─────────────────────────────────────────────────────────────────
-    # 2. banquet_leads 主表
+    # 2. banquet_leads 主表 — 类 A 副本去重 (B'-4, 2026-05-09)
+    #
+    # 原 v267 设计的 schema (lead_id PK + ENUM 列 + customer_id FK) 与生产
+    # ORM model (services/tx-trade/src/models/banquet_lead.py) **不匹配**。
+    # 生产用 v315_banquet_leads.py 的 schema (id PK + lead_no + status
+    # VARCHAR + 22 列含 customer_name / phone / event_type 等)。
+    #
+    # 仅保留本文件的 3 个 ENUM 类型创建（被 v282_banquet_contracts.py
+    # references），删除 banquet_leads 表创建块 + 索引 + RLS + COMMENT。
+    # 真表创建走 v315_banquet_leads（canonical）。
     # ─────────────────────────────────────────────────────────────────
-    op.execute(
-        """
-        CREATE TABLE IF NOT EXISTS banquet_leads (
-            lead_id                 UUID                            NOT NULL DEFAULT gen_random_uuid(),
-            tenant_id               UUID                            NOT NULL,
-            store_id                UUID,
-            customer_id             UUID                            NOT NULL,
-            sales_employee_id       UUID,
-            banquet_type            banquet_type_enum               NOT NULL,
-            source_channel          banquet_source_channel_enum     NOT NULL DEFAULT 'booking_desk',
-            stage                   banquet_lead_stage_enum         NOT NULL DEFAULT 'all',
-            estimated_amount_fen    BIGINT                          NOT NULL DEFAULT 0,
-            estimated_tables        INTEGER                         NOT NULL DEFAULT 0,
-            scheduled_date          DATE,
-            stage_changed_at        TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
-            previous_stage          banquet_lead_stage_enum,
-            invalidation_reason     VARCHAR(200),
-            converted_reservation_id UUID,
-            metadata                JSONB                           NOT NULL DEFAULT '{}',
-            created_by              UUID,
-            created_at              TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
-            updated_at              TIMESTAMPTZ                     NOT NULL DEFAULT NOW(),
-            CONSTRAINT banquet_leads_pkey PRIMARY KEY (lead_id),
-            CONSTRAINT banquet_leads_amount_chk CHECK (estimated_amount_fen >= 0),
-            CONSTRAINT banquet_leads_tables_chk CHECK (estimated_tables >= 0),
-            CONSTRAINT banquet_leads_invalid_chk
-                CHECK (
-                    stage <> 'invalid' OR invalidation_reason IS NOT NULL
-                )
-        )
-        """
-    )
-
-    # 核心索引：按 (tenant_id, stage, sales_employee_id) 查漏斗
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_stage_sales
-            ON banquet_leads (tenant_id, stage, sales_employee_id)
-        """
-    )
-    # 索引：按客户维度查历史商机
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_customer
-            ON banquet_leads (tenant_id, customer_id)
-        """
-    )
-    # 索引：按渠道做 source_attribution
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_source
-            ON banquet_leads (tenant_id, source_channel, stage)
-        """
-    )
-    # 索引：按预定日期做档期视图
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_scheduled
-            ON banquet_leads (tenant_id, scheduled_date)
-            WHERE scheduled_date IS NOT NULL
-        """
-    )
-    # 索引：按 stage_changed_at 做漏斗时长分析
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_stage_changed
-            ON banquet_leads (tenant_id, stage_changed_at DESC)
-        """
-    )
-    # GIN 索引：metadata 查询
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_banquet_leads_metadata_gin
-            ON banquet_leads USING GIN (metadata)
-        """
-    )
-
-    # ─────────────────────────────────────────────────────────────────
-    # 3. RLS 多租户隔离
-    # ─────────────────────────────────────────────────────────────────
-    op.execute("ALTER TABLE banquet_leads ENABLE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE banquet_leads FORCE ROW LEVEL SECURITY")
-    op.execute("DROP POLICY IF EXISTS banquet_leads_tenant ON banquet_leads")
-    op.execute(
-        """
-        CREATE POLICY banquet_leads_tenant ON banquet_leads
-            USING (tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID)
-            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID)
-        """
-    )
-
-    # ─────────────────────────────────────────────────────────────────
-    # 4. 注释
-    # ─────────────────────────────────────────────────────────────────
-    op.execute(
-        "COMMENT ON TABLE banquet_leads IS "
-        "'宴会商机漏斗 — 全部商机→商机→订单→失效（R1 新增，对标食尚订）'"
-    )
-    op.execute(
-        "COMMENT ON COLUMN banquet_leads.stage IS "
-        "'漏斗阶段：all/opportunity/order/invalid'"
-    )
-    op.execute(
-        "COMMENT ON COLUMN banquet_leads.source_channel IS "
-        "'渠道归因：booking_desk/referral/hunliji/dianping/internal/meituan/gaode/baidu'"
-    )
-    op.execute(
-        "COMMENT ON COLUMN banquet_leads.estimated_amount_fen IS "
-        "'预估金额（分/整数，对齐金额公约）'"
-    )
-    op.execute(
-        "COMMENT ON COLUMN banquet_leads.converted_reservation_id IS "
-        "'转正式预订后指向 reservations.id（stage=order 时写入）'"
-    )
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS banquet_leads CASCADE")
+    # banquet_leads 表的 DROP 由 v315 downgrade 负责（canonical 持有者）
+    # 仅 DROP 本文件 upgrade() 中创建的 3 个 ENUM 类型
     op.execute("DROP TYPE IF EXISTS banquet_lead_stage_enum")
     op.execute("DROP TYPE IF EXISTS banquet_source_channel_enum")
     op.execute("DROP TYPE IF EXISTS banquet_type_enum")
