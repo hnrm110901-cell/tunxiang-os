@@ -221,7 +221,9 @@ def _seed_system_templates() -> None:
     """插入50个系统预置行业报表模板，覆盖天财商龙报表中心全部核心报表"""
 
     # 使用 ON CONFLICT DO NOTHING 幂等插入
-    op.execute("""
+    # 用 exec_driver_sql 直接走 psycopg2 不经 SQLAlchemy text 解析器 — JSON 值含 `:20` /
+    # `:5` 等冒号数字（如 `"default":20`）会被 sa.text 误判为命名参数 → ArgumentError
+    op.get_bind().exec_driver_sql("""
         INSERT INTO report_templates (
             tenant_id, template_code, template_name, category, description,
             data_source, dimensions, measures, filters, default_sort,
