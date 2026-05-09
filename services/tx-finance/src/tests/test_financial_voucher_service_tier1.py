@@ -34,8 +34,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
     VoucherCreateInput,
     VoucherLineInput,
@@ -424,7 +424,7 @@ class TestTenantContextAssertion:
     @pytest.mark.asyncio
     async def test_mismatch_raises_tenant_context_error(self):
         """payload.tenant_id != session → TenantContextMismatchError."""
-        from services.financial_voucher_service import (  # type: ignore
+        from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore
             TenantContextMismatchError,
         )
 

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
+from services.tx_finance.src.services.voucher_service import format_for_kingdee, generate_voucher_from_settlement
 
 
 class TestVoucherGeneration:

@@ -74,9 +74,9 @@ class TestInvoiceGoldenTaxPhase4:
           - invoiceDetailList: 商品明细列表（至少1行）
         """
         sys.path.insert(0, FINANCE_SRC)
-        from models.invoice import Invoice
+        from services.tx_finance.src.models.invoice import Invoice
 
-        from services.invoice_service import InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceService
 
         mock_invoice = MagicMock(spec=Invoice)
         mock_invoice.id = uuid.uuid4()
@@ -132,7 +132,7 @@ class TestInvoiceGoldenTaxPhase4:
           10 = 全电普通发票（全电发票）
           11 = 全电专用发票（全电发票）
         """
-        from services.invoice_service import _invoice_kind
+        from services.tx_finance.src.services.invoice_service import _invoice_kind
 
         # 以 invoice_service.py 实际映射为准（诺诺平台编码）
         # "electronic" → "3"（全电发票/电子普票）
@@ -176,7 +176,7 @@ class TestInvoiceIdempotencyTier1:
         TODO: 接入真实 InvoiceService 后验证此行为。
         参考 tx-finance/tests/test_invoice.py 中的 test_request_invoice_* 测试。
         """
-        from models.invoice import Invoice
+        from services.tx_finance.src.models.invoice import Invoice
 
         # 模拟数据库中已存在该订单的发票
         existing_invoice = MagicMock(spec=Invoice)
@@ -292,7 +292,7 @@ class TestInvoiceValidationTier1:
         """
         from decimal import Decimal
 
-        from services.invoice_service import InvoiceAmountMismatchError, InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceAmountMismatchError, InvoiceService
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
 
@@ -339,9 +339,9 @@ class TestInvoiceValidationTier1:
 
         场景：发票作废后，客人误操作点击重打，系统应拒绝。
         """
-        from models.invoice import Invoice
+        from services.tx_finance.src.models.invoice import Invoice
 
-        from services.invoice_service import InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceService
 
         svc = InvoiceService(nuonuo_client=_make_mock_nuonuo_client())
 

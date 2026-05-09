@@ -7,7 +7,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from api.vat_ledger_routes import router
+from services.tx_finance.src.api.vat_ledger_routes import router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

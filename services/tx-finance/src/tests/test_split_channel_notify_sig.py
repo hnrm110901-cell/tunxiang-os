@@ -9,7 +9,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.split_notify_security import verify_split_channel_notify_signature
+from services.tx_finance.src.services.split_notify_security import verify_split_channel_notify_signature
 
 
 def test_verify_skips_when_no_secret(monkeypatch: pytest.MonkeyPatch) -> None:

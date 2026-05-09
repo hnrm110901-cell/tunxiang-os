@@ -29,7 +29,7 @@ import pytest
 # sys.path: 加入 services/tx-finance/src/ 以匹配同目录其他测试的 import 风格
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
 
 # ─── 真实场景 #1: 门店日结销售凭证 ──────────────────────────────────
 

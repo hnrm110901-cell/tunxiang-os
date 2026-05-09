@@ -63,7 +63,7 @@ from fastapi.testclient import TestClient
 app = FastAPI()
 
 # 延迟 import（依赖已 mock）
-from api.agreement_unit_routes import router  # noqa: E402
+from services.tx_finance.src.api.agreement_unit_routes import router  # noqa: E402
 
 app.include_router(router)
 

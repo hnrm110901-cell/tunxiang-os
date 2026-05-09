@@ -31,10 +31,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 # shared.adapters.erp 走 repo root sys.path
 sys.path.insert(0, "/Users/lichun/Documents/GitHub/zhilian-os")
 
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
 )
-from services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.voucher_generator import VoucherGenerator  # type: ignore  # noqa: E402
 
 from shared.adapters.erp.src.base import (  # type: ignore  # noqa: E402
     ERPPushResult,
@@ -87,22 +87,22 @@ class TestVoucherTypeMapping:
     """_VOUCHER_TYPE_ERP_TO_DB: 中文 ERP → 英文 DB."""
 
     def test_receipt_maps_to_receipt(self):
-        from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+        from services.tx_finance.src.services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
 
         assert _VOUCHER_TYPE_ERP_TO_DB["收"] == "receipt"
 
     def test_payment_maps_to_payment(self):
-        from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+        from services.tx_finance.src.services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
 
         assert _VOUCHER_TYPE_ERP_TO_DB["付"] == "payment"
 
     def test_memo_maps_to_cost(self):
-        from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+        from services.tx_finance.src.services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
 
         assert _VOUCHER_TYPE_ERP_TO_DB["记"] == "cost"
 
     def test_transfer_maps_to_cost(self):
-        from services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
+        from services.tx_finance.src.services.voucher_generator import _VOUCHER_TYPE_ERP_TO_DB
 
         assert _VOUCHER_TYPE_ERP_TO_DB["转"] == "cost"
 
@@ -201,7 +201,7 @@ class TestPersistToDb:
     @pytest.mark.asyncio
     async def test_persist_to_db_idempotency_with_event_id(self):
         """同 event_id 二次调用 → 返回同一凭证 (走 FinancialVoucherService 幂等)."""
-        from models.voucher import FinancialVoucher  # type: ignore
+        from services.tx_finance.src.models.voucher import FinancialVoucher  # type: ignore
 
         gen = VoucherGenerator()
         voucher_svc = FinancialVoucherService()
@@ -281,7 +281,7 @@ class TestRecordPushResultNoCommit:
         import inspect as _inspect
         import re as _re
 
-        from services.voucher_generator import VoucherGenerator as _VG  # type: ignore
+        from services.tx_finance.src.services.voucher_generator import VoucherGenerator as _VG  # type: ignore
 
         source = _inspect.getsource(_VG._record_push_result)
         # 去掉 # 开头的注释行 (Python 行注释)
@@ -429,8 +429,8 @@ class TestPersistRespectsPeriodCheck:
         """注入 period_service, closed 月 → persist 拒."""
         from unittest.mock import AsyncMock as AM
 
-        from models.accounting_period import STATUS_CLOSED, AccountingPeriod
-        from services.accounting_period_service import AccountingPeriodService
+        from services.tx_finance.src.models.accounting_period import STATUS_CLOSED, AccountingPeriod
+        from services.tx_finance.src.services.accounting_period_service import AccountingPeriodService
 
         period_svc = AM(spec=AccountingPeriodService)
         period_svc.is_date_writable = AM(return_value=False)

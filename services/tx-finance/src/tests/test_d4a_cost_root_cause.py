@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.cost_root_cause_service import (  # noqa: E402
+from services.tx_finance.src.services.cost_root_cause_service import (  # noqa: E402
     CACHE_HIT_TARGET,
     COST_OVERRUN_TRIGGER_PCT,
     SONNET_CACHED_MODEL,
