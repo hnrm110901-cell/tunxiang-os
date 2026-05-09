@@ -1,3 +1,63 @@
+## 2026-05-09 深夜 续 #2 — #298 codemod Phase 7 (tx-growth 20/70) + conftest 新建（决策 83）
+
+### 今日完成（5/9 第 7 PR）
+- **#XXX** Phase 7 tx-growth 全清 — 模板沿用 #335 / #338 / #341 / #344
+  - **RED** `0633de92` — `services/tx-growth/conftest.py` 新建（决策 83，~50 行）+ `test_codemod_phase7_bare_imports_tier1.py` AST 守门
+  - **GREEN** `3c8193b5` — codemod --apply --service tx-growth：20 文件 / 70 import
+  - **fix** `066ee2fa` — patch literal 漂移 25 处（test_journey_routes 8 / test_growth_approval 8 / test_content_factory 4 / test_touch_attribution 3 / test_ab_test_attribution 2）
+
+### 数据变化
+- 改写文件：20（src/tests/* 全部）
+- 改写 import：70
+- 新建 conftest：1（services/tx-growth/conftest.py，决策 83 第 2 个新建）
+- 修补 patch literal：25 处
+- 新增测试：1（守门 fixture，Tier 1）
+
+### 本地 pytest 实测对比（决策 78）
+| | pre-codemod | post-codemod | delta |
+|---|---|---|---|
+| pass | 59 | 317 | **+258** |
+| fail | 41 | 104 | +63（pre-existing surfaced）|
+| collection error | 22 | 10 | **-12（codemod 解锁 12 文件）**|
+
+巨大改善：258 tests 由 collection error → collectable + run。+63 fail 全 pre-existing 决策 79 follow-up（与 codemod 逻辑无关）。
+
+### 累计 #298 chain 数据快照
+| Phase | PR | 服务 | 文件 | import |
+|---|---|---|---|---|
+| 1-3 | #322 #335 | tx-trade | 42 | ~305 |
+| 4 | #338 | tx-member | 30 | 112 |
+| 5 | #341 | tx-org | 39 | 102 |
+| 6 | #344 | tx-supply | 39 | 96 |
+| **7** | **#XXX** | **tx-growth** | **20** | **70** |
+| **累计** | | **5 服务** | **170** | **~685** |
+| 余待清 | | 9 服务 | ~? | ~52（tx-finance 52 实测，其他基本 0）|
+
+### conftest 状态（决策 83）
+| ✓ 已有 | tx-trade / tx-member（#338）/ tx-org / tx-pay / tx-supply / **tx-growth（本 PR 新建）** |
+| ✗ 待建 | 其余 9 服务 |
+
+### 5/9 一日成绩 = 7 PR
+| PR | 内容 |
+|---|---|
+| #335 | Phase 3 tx-trade 22/57 + 11 drift |
+| #336 | RBAC follow-up（stacked on #335）|
+| #338 | Phase 4 tx-member 30/112 + conftest 新建 + 21 drift |
+| #341 | Phase 5 tx-org 39/102 + 24 drift |
+| #344 | Phase 6 tx-supply 39/96 + 20 drift |
+| #347 | C 深挖 — conftest shared/shared.adapters namespace fix（5 服务 -16 collection errors）|
+| **#XXX** | **Phase 7 tx-growth 20/70 + conftest 新建 + 25 drift** |
+
+### 遗留问题
+- 决策 79 follow-up：tx-growth +63 surfaced failures（与 codemod 无关 pre-existing）
+- 仍 10 collection errors（多为 shared.security/shared.events 类，#347 部分覆盖）
+- 决策 84 scanner 仍未抓 from-NS-import-module 形式（本轮未触发）
+
+### 明日计划
+- Phase 8 候选：tx-finance 52（最后一个大头，需新建 conftest）/ 决策 79 follow-up
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

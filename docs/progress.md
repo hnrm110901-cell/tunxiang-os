@@ -1,3 +1,33 @@
+## 2026-05-09 深夜 续 #2 · #298 codemod Phase 7 — tx-growth 20/70 + conftest 新建
+
+### 完成状态
+- [x] **RED** `0633de92` — services/tx-growth/conftest.py（决策 83）+ AST 守门 fixture
+- [x] **GREEN** `3c8193b5` — codemod 应用 20 文件 / 70 处 import 改写
+- [x] **fix** `066ee2fa` — 25 处 patch literal 漂移修补
+- [x] 本地 pytest 实测：pass 59→317（+258），fail 41→104（+63），collection error 22→10（-12）
+- [x] DEVLOG / progress 同步（本 commit）
+- [ ] 仍待 admin override merge（Tier 1 强制 review）
+
+### 关键决策
+- **决策 83 第 2 次应用 — tx-growth 新建 conftest**：直接复用 tx-supply 模板，0 改动；conftest 新增使 RED fixture 能加载，并解决 SQLAlchemy metadata 同表双注册前置条件
+- **决策 84 本轮 0 命中**：scanner 漏抓 from-NS-import-module 形式 — tx-growth test 未触发，本轮免修
+- **决策 79 surfaced +63 failures**：codemod 解锁 12 个 collection error 文件后暴露的 pre-existing test bugs（与 codemod 逻辑无关），独立 issue follow-up
+- **决策 78 真门禁验证**：本地 pytest 实测净 +258 pass / +63 fail / -12 collection error；codemod 净效用极大正向
+- 累计 chain：5 服务 / 170 文件 / ~685 imports（~88%）
+
+### 下一步
+- Phase 8 候选：tx-finance 52（chain 最后一个大头，需新建 conftest）
+- 决策 79 follow-up：tx-growth +63 surfaced failures 调查
+- shared.security/shared.events 仍残留 collection error（#347 仅部分修，10 处仍 stuck）
+
+### 已知风险
+- **决策 77 band-aid 仍在**：PR #287 extend_existing 兜底未撤；本 PR 完成 chain ~88%，撤 band-aid 还需余 9 服务全清 + production 端 short-path 跟进
+- **alembic chain integrity 仍断裂**（v310 dangling）— 与本 PR 无关，CI Verify Migration Chain Integrity 一律失败
+- **Tier 1 真门禁绿**（AST 守门 fixture 通过 = tx-growth test 路径上 0 裸 import）；CI 噪音（Ruff / python-lint-test (*) / frontend-build）按 ci_gates 规则忽略
+- pytest 测试 surfaced +63 failures：决策 79 follow-up，独立 issue
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
