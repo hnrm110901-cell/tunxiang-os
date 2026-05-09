@@ -39,7 +39,8 @@ def upgrade() -> None:
             tenant_id           UUID        NOT NULL,
             store_id            UUID        NOT NULL,
             stat_date           DATE        NOT NULL,
-            zone_id             UUID,                       -- NULL = 全店汇总
+            -- 哨兵 UUID = 全店汇总（避开 PG 不允许 PK 含 COALESCE 表达式）
+            zone_id             UUID        NOT NULL DEFAULT '00000000-0000-0000-0000-000000000000'::UUID,
             zone_name           VARCHAR(50),
             meal_period         VARCHAR(20) NOT NULL DEFAULT 'all',
             -- meal_period: breakfast/lunch/dinner/late_night/all
@@ -71,7 +72,7 @@ def upgrade() -> None:
             event_cursor        BIGINT      NOT NULL DEFAULT 0,
 
             CONSTRAINT pk_mv_table_turnover
-                PRIMARY KEY (tenant_id, store_id, stat_date, meal_period, COALESCE(zone_id, '00000000-0000-0000-0000-000000000000'::UUID))
+                PRIMARY KEY (tenant_id, store_id, stat_date, meal_period, zone_id)
         )
     """)
     op.execute("CREATE INDEX IF NOT EXISTS idx_mv_tt_store_date ON mv_table_turnover (store_id, stat_date DESC)")
