@@ -22,6 +22,7 @@ import { Line } from '@ant-design/charts';
 import { txFetchData, getTokenPayload } from '../api/client';
 import { formatPrice } from '@tx-ds/utils';
 import { txColors } from '@tx/tokens';
+import { PinnedInsightsFeed } from '../components/dashboard/PinnedInsightsFeed';
 
 const { Text, Paragraph } = Typography;
 
@@ -527,6 +528,13 @@ export function DashboardPage() {
               ),
             }}
           />
+        </Col>
+      </Row>
+
+      {/* ── 已 Pin 洞察 Feed（S4-04 PR2.D / issue #291） ── */}
+      <Row gutter={16} style={{ marginBottom: 16 }}>
+        <Col span={24}>
+          <PinnedInsightsFeed />
         </Col>
       </Row>
 
