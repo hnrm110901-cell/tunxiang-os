@@ -53,7 +53,7 @@ async def test_training_records_list():
     app = _make_app()
 
     # DB 故障时降级 mock 数据
-    with patch("api.employee_training_routes.get_db") as mock_get_db:
+    with patch("services.tx_org.src.api.employee_training_routes.get_db") as mock_get_db:
         mock_db = _make_mock_db()
         # 令第一次 execute（RLS）正常，后续 execute 抛出 RuntimeError 触发 fallback
         call_count = 0

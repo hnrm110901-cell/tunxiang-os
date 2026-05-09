@@ -99,7 +99,7 @@ class TestSuggestionBasic:
 
         mock_db.execute = AsyncMock(side_effect=side_effect)
 
-        with patch("api.smart_scheduling_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.smart_scheduling_routes.get_db", return_value=mock_db):
             app.dependency_overrides[router.dependencies] = lambda: mock_db
             from shared.ontology.src.database import get_db
 

@@ -37,7 +37,7 @@ from services.tx_org.src.services.tax_filing_service import (
     submit_to_tax_bureau,
 )
 
-from services import tax_filing_service as tfs
+from services.tx_org.src.services import tax_filing_service as tfs
 
 TENANT_ID = str(uuid4())
 STORE_ID = str(uuid4())
