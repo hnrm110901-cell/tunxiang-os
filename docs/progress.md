@@ -1,3 +1,24 @@
+## 2026-05-09 14:00 · #318 follow-up scanner 抓 import xxx 形式 (#329)
+
+### 完成状态
+- [x] PR #329 admin merged at `977a954d`：scanner + apply 加 ast.Import 支持 + baseline 校准 [T2]
+- [x] TDD 双 commit 留痕（RED 5/10 fail → GREEN 10/10）
+- [x] baseline 数据校准：1088→1122 (+34) / bare 891→666 / full 197→456 / 混用 2→0
+- [x] DEVLOG / progress 更新
+
+### 关键决策
+（无新决策 — 清 #318 P1 follow-up 债）
+
+### 下一步
+- 决策 79 Phase 2：scan_order + ontology ch_scan_order（需创始人）
+- #298 codemod Phase 3 / Phase 4（baseline 准了可定 ROI）
+- #298 撤 #287 band-aid 仍阻塞（决策 77 — production 端未覆盖）
+
+### 已知风险
+- 同前 session
+
+---
+
 ## 2026-05-09 13:00 · 决策 79 Phase 1 Order(sales_channel=) 5 处修 (#327)
 
 ### 完成状态

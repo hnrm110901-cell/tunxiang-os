@@ -1,3 +1,26 @@
+## 2026-05-09 下午 续 · #318 follow-up scanner 抓 import xxx 形式 (#329)
+
+### 今日完成
+- **#329 admin merged** at `977a954d` — `[T2] feat(codemod): scanner + apply 加 import xxx 形式支持`
+- TDD 双 commit：RED (5/10 fail) → GREEN (10/10) — fixture 含 4 种 import 组合
+- baseline 数据校准：1088 → 1122 站点（+34 是 import 形式补抓）；bare 891 → 666 / full 197 → 456（#320/#322 已落实缩减）；混用 2 → 0 ✅
+- worktree prune scanner-fix
+- DEVLOG / progress 更新
+
+### 关键决策
+（无新决策 — 仅清 #318 P1 follow-up 债）
+
+### 遗留问题
+- 决策 77 仍有效：band-aid 不能撤（production 端 short-path import 未覆盖）
+- 决策 79 Phase 2：scan_order + ontology ch_scan_order（需创始人确认）
+- 决策 79 Phase 3：v500 drop sales_channel 列（独立 sprint）
+- #298 codemod Phase 3：tx_trade 余 21 文件 / 51 裸（数据准确后可决定 ROI）
+- #298 codemod Phase 4：tx_member 31 文件 / 107 裸
+- #271/#272 仍阻塞 DBA staging
+- v4 长链 #240 OPEN
+
+---
+
 ## 2026-05-09 中午 续 · 决策 79 Phase 1 — Order(sales_channel=) 5 处 Tier 1 修复 (#327)
 
 ### 今日完成
