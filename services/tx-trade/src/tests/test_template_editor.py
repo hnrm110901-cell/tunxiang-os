@@ -716,7 +716,7 @@ class TestCRUDEndpoints:
         fake_id = uuid.uuid4()
         # mock DB 返回 None（模板不存在）
         with patch(
-            "api.template_editor_routes.async_session_factory",
+            "services.tx_trade.src.api.template_editor_routes.async_session_factory",
             _mock_session_ctx(rows=[]),
         ):
             resp = client.get(
@@ -742,7 +742,7 @@ class TestCRUDEndpoints:
         """更新不存在的模板应返回 404。"""
         fake_id = uuid.uuid4()
         with patch(
-            "api.template_editor_routes.async_session_factory",
+            "services.tx_trade.src.api.template_editor_routes.async_session_factory",
             _mock_session_ctx(rows=[]),
         ):
             resp = client.put(
@@ -756,7 +756,7 @@ class TestCRUDEndpoints:
         """删除不存在的模板应返回 404。"""
         fake_id = uuid.uuid4()
         with patch(
-            "api.template_editor_routes.async_session_factory",
+            "services.tx_trade.src.api.template_editor_routes.async_session_factory",
             _mock_session_ctx(rows=[]),
         ):
             resp = client.delete(
@@ -769,7 +769,7 @@ class TestCRUDEndpoints:
         """对不存在的模板调用 set-default 应返回 404。"""
         fake_id = uuid.uuid4()
         with patch(
-            "api.template_editor_routes.async_session_factory",
+            "services.tx_trade.src.api.template_editor_routes.async_session_factory",
             _mock_session_ctx(rows=[]),
         ):
             resp = client.post(
@@ -782,7 +782,7 @@ class TestCRUDEndpoints:
         """复制不存在的模板应返回 404。"""
         fake_id = uuid.uuid4()
         with patch(
-            "api.template_editor_routes.async_session_factory",
+            "services.tx_trade.src.api.template_editor_routes.async_session_factory",
             _mock_session_ctx(rows=[]),
         ):
             resp = client.post(

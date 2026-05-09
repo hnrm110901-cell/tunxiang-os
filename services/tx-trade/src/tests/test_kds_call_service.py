@@ -96,7 +96,7 @@ async def test_mark_calling_from_cooking_succeeds():
     db = _fake_db()
     db.execute = AsyncMock(return_value=FakeResult(scalar=task))
 
-    with patch("services.kds_call_service._broadcast", new=AsyncMock()):
+    with patch("services.tx_trade.src.services.kds_call_service._broadcast", new=AsyncMock()):
         result = await KdsCallService.mark_calling(task_id, TENANT_ID, db)
 
     assert result.status == "calling"
@@ -137,7 +137,7 @@ async def test_confirm_served_from_calling_succeeds():
     db = _fake_db()
     db.execute = AsyncMock(return_value=FakeResult(scalar=task))
 
-    with patch("services.kds_call_service._broadcast", new=AsyncMock()):
+    with patch("services.tx_trade.src.services.kds_call_service._broadcast", new=AsyncMock()):
         result = await KdsCallService.confirm_served(task_id, TENANT_ID, db)
 
     assert result.status == "done"
@@ -267,7 +267,7 @@ async def test_post_payment_mode_no_push_then_deferred():
 
     with (
         patch(
-            "services.order_push_config.OrderPushConfigService.get_store_mode",
+            "services.tx_trade.src.services.order_push_config.OrderPushConfigService.get_store_mode",
             new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT),
         ),
         patch("httpx.AsyncClient") as mock_client_cls,
