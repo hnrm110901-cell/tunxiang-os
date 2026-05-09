@@ -12,6 +12,18 @@ jobs:
   label-and-analyze:
     name: Analyze Changes & Label
     runs-on: ubuntu-latest
+    outputs:
+      # 把 step `changes` 的 GITHUB_OUTPUT 写入暴露成 job 级 outputs，
+      # 否则下游 `needs.label-and-analyze.outputs.*` 永远拿到空串，
+      # `test-changed-services` / `test-changed-apps` 等下游 job 一律 skip。
+      has_backend: ${{ steps.changes.outputs.has_backend }}
+      has_frontend: ${{ steps.changes.outputs.has_frontend }}
+      has_migration: ${{ steps.changes.outputs.has_migration }}
+      has_infra: ${{ steps.changes.outputs.has_infra }}
+      has_edge: ${{ steps.changes.outputs.has_edge }}
+      has_docs: ${{ steps.changes.outputs.has_docs }}
+      changed_services: ${{ steps.changes.outputs.changed_services }}
+      changed_apps: ${{ steps.changes.outputs.changed_apps }}
     steps:
       - uses: actions/checkout@v6
         with:
