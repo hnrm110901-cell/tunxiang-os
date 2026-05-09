@@ -191,16 +191,11 @@ def upgrade() -> None:
     """)
 
     # ─────────────────────────────────────────────────────────────────
-    # 4. 在 projector_checkpoints 注册新的投影器游标
+    # 4. projector_checkpoints 投影器游标 — 由投影器首次消费事件时按 (projector_name, tenant_id)
+    #    自动 INSERT，无需 migration 阶段 seed。原 seed INSERT 多处错（列名 last_processed_at
+    #    不存在 / 缺 NOT NULL tenant_id / ON CONFLICT 列与真 PK 不匹配），且 RLS 启用后
+    #    没有 tenant 上下文的 INSERT 必失败。
     # ─────────────────────────────────────────────────────────────────
-    op.execute("""
-        INSERT INTO projector_checkpoints (projector_name, last_event_id, last_processed_at)
-        VALUES
-            ('TableTurnoverProjector',   NULL, NOW()),
-            ('SessionAnalyticsProjector', NULL, NOW()),
-            ('WaiterPerformanceProjector', NULL, NOW())
-        ON CONFLICT (projector_name) DO NOTHING
-    """)
 
 
 def downgrade() -> None:
