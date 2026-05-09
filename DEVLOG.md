@@ -1,7 +1,7 @@
 ## 2026-05-09 深夜 续 #3 — #298 codemod Phase 8 (tx-finance 23/62) + conftest 新建（决策 83 第 3 次）
 
 ### 今日完成（5/9 第 8 PR — chain 收尾大头）
-- **#XXX** Phase 8 tx-finance 全清 — 模板沿用 #335 / #338 / #341 / #344 / #348
+- **#349** Phase 8 tx-finance 全清 — 模板沿用 #335 / #338 / #341 / #344 / #348
   - **RED** `3adade4c` — services/tx-finance/conftest.py 新建（决策 83 第 3 次）+ test_codemod_phase8_bare_imports_tier1.py AST 守门
   - **GREEN** `58b0fda7` — codemod --apply --service tx-finance：23 文件 / 62 import
   - **fix** `a8a8c206` — patch literal 漂移 18 处（test_vat_ledger 7 / test_split_payment 6 / test_agreement_units 5）
@@ -31,7 +31,7 @@
 | 5 | #341 | tx-org | 39 | 102 |
 | 6 | #344 | tx-supply | 39 | 96 |
 | 7 | #348 | tx-growth | 20 | 70 |
-| **8** | **#XXX** | **tx-finance** | **23** | **62** |
+| **8** | **#349** | **tx-finance** | **23** | **62** |
 | **累计** | | **6 服务** | **193** | **~747** |
 | 余待清 | | 8 服务 | ~? | ~107（gateway 16 / tx-agent 37 / tx-analytics 34 等小规模）|
 
@@ -49,7 +49,7 @@
 | #344 | Phase 6 tx-supply 39/96 |
 | #347 | conftest shared/shared.adapters namespace fix |
 | #348 | Phase 7 tx-growth 20/70 + conftest 新建 |
-| **#XXX** | **Phase 8 tx-finance 23/62 + conftest 新建（chain 大头收尾）** |
+| **#349** | **Phase 8 tx-finance 23/62 + conftest 新建（chain 大头收尾）** |
 
 ### 遗留问题
 - 决策 79 follow-up：tx-finance 仍 83 fail（多为 pre-existing latent bugs）
@@ -1143,8 +1143,8 @@ reviewer 还提了 4 个高优 smell（建议 merge 后 follow-up）：
 - **#251 [S1-08] 硬编码品牌色清理 — 已落地（98.3% 减幅）**
   - **hardcoded-color: 4112 → 69 baseline 锁定**
   - 3 波 codemod：
-    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#XXXXXX'` 字面量 → `txColors.<name>`（~3300 处）
-    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#XXXXXX` → `var(--tx-*)`（49 处）
+    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#349XXX'` 字面量 → `txColors.<name>`（~3300 处）
+    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#349XXX` → `var(--tx-*)`（49 处）
     - `scripts/lint-ui/codemod-color-cssinjs.mjs` — TSX/TS CSS shorthand string `'... #X ...'` → 模板字符串（424 处）
   - lint 豁免规则细化：跳过 inline `//` 注释 + `var(--*, #X)` defensive fallback
   - JSX 属性破损批量修复：`color=txColors.X` → `color={txColors.X}`（162 处，64 文件）
