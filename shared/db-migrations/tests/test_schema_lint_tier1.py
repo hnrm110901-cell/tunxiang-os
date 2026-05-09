@@ -57,8 +57,9 @@ def _format_violations(name: str, violations: list[tuple[str, int, str]]) -> str
 
 # ─── 类 A — 同名表多 schema 撞名 ─────────────────────────────────────────────
 
+# 支持 schema-qualified `public.orders` — 非捕获组吞 schema 前缀，仅捕获表名
 _CREATE_TABLE_RE = re.compile(
-    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_]*)\s*\(",
+    r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:[a-z_][a-z0-9_]*\.)?([a-z_][a-z0-9_]*)\s*\(",
     re.IGNORECASE,
 )
 
@@ -285,8 +286,10 @@ _CLASS_G_GEN_RE = re.compile(
     rf"GENERATED\s+ALWAYS\s+AS\s*\([^)]*?\b({_FUNC_PATTERN})\s*\(",
     re.IGNORECASE | re.DOTALL,
 )
+# 必须先匹配 `ON <ident>` 才能继续，防止 `[^;]*?` 跨多 op.execute 跨行误捕
+# `op.execute("CREATE INDEX ... ON tbl(col)")` 后面的 `sa.text("NOW()")` 列默认值。
 _CLASS_G_IDX_RE = re.compile(
-    rf"CREATE\s+(?:UNIQUE\s+)?INDEX[^;]*?\([^)]*?\b({_FUNC_PATTERN})\s*\(",
+    rf"CREATE\s+(?:UNIQUE\s+)?INDEX\s+\S+\s+ON\s+\S+\s*\([^)]*?\b({_FUNC_PATTERN})\s*\(",
     re.IGNORECASE | re.DOTALL,
 )
 
@@ -305,7 +308,7 @@ def _scan_class_g():
     return violations
 
 
-_CLASS_G_BASELINE = 40  # PR #345 修后下降；main 起点 40 处（含正则 false positive — `op.execute` 多语句间 `[^;]*?` 跨行匹配 `NOW()` 在 sa.text DEFAULT 列定义）。下个 PR 应收紧 regex 减少假阳，再 ratchet down。
+_CLASS_G_BASELINE = 6  # PR #346 review 后 regex 收紧（要求 `ON <ident>` 在表达式前）→ false positive 消除，从 40 ratchet 到真实违例数 6。下个 PR 修这 6 处后归零。
 
 
 def test_class_g_no_non_immutable_in_generated_or_index():

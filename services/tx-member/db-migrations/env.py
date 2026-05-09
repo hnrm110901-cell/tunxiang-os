@@ -26,7 +26,14 @@ if db_url.startswith("postgresql+asyncpg://"):
     db_url = db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
 
 # 关键：从 alembic.ini 读 version_table；service-specific
-version_table = config.get_main_option("version_table", "alembic_version")
+# 必须显式声明 version_table — 无 fallback 避免静默回落到 alembic 全局默认表
+# 与其他 service 或老 mono-repo 共享 PG 时撞 stamp
+version_table = config.get_main_option('version_table')
+if not version_table:
+    raise RuntimeError(
+        'alembic.ini 缺少 version_table 配置。per-service alembic 必须显式声明 '
+        'version_table 防止多 alembic 共享 PG 时 stamp 冲突。'
+    )
 
 
 def run_migrations_offline() -> None:
