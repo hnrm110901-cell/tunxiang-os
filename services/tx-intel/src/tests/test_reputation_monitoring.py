@@ -12,7 +12,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from services.reputation_monitor import ReputationMonitor
+from services.tx_intel.src.services.reputation_monitor import ReputationMonitor
 
 # ═══════════════════════════════════════
 # ReputationMonitor 测试

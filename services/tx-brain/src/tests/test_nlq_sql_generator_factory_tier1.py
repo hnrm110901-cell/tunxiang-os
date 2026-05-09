@@ -21,7 +21,7 @@ pytest.importorskip(
     reason="anthropic SDK 未安装；tx-brain CI 必装，本地 skip",
 )
 
-from services.sql_generator import (  # noqa: E402
+from services.tx_brain.src.services.sql_generator import (  # noqa: E402
     SqlGenerator,
     create_default_sql_generator,
 )

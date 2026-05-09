@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.agent_dispatch_bridge import (
+from services.tx_ops.src.services.agent_dispatch_bridge import (
     DISPATCHABLE_EVENTS,
     EVENT_SEVERITY_MAP,
     EVENT_TO_ALERT_TYPE,

@@ -24,7 +24,7 @@ import pytest
 # 将 src 目录加入 path，以便无 package 安装时也能导入
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.model_router import (
+from services.tx_agent.src.services.model_router import (
     CircuitBreaker,
     CircuitOpenError,
     CircuitState,

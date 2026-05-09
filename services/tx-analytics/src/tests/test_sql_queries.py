@@ -20,7 +20,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.sql_queries import (
+from services.tx_analytics.src.services.sql_queries import (
     query_alerts_today,
     query_daily_revenue,
     query_dish_sales,

@@ -36,7 +36,7 @@ from agents.skills.rfm_outreach import (  # noqa: E402
     TargetSegmentOutput,
 )
 from prompts.rfm_outreach import build_cached_system_blocks  # noqa: E402
-from services.model_router import ModelSelectionStrategy  # noqa: E402
+from services.tx_agent.src.services.model_router import ModelSelectionStrategy  # noqa: E402
 
 TENANT_ID = "11111111-1111-1111-1111-111111111111"
 STORE_ID = "22222222-2222-2222-2222-222222222222"

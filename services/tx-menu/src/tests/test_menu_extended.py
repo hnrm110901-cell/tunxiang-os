@@ -72,8 +72,8 @@ if not callable(get_db):
         yield None
 
 
-from api.brand_publish_routes import router as bp_router  # noqa: E402
-from api.channel_mapping_routes import router as cm_router  # noqa: E402
+from services.tx_menu.src.api.brand_publish_routes import router as bp_router  # noqa: E402
+from services.tx_menu.src.api.channel_mapping_routes import router as cm_router  # noqa: E402
 
 # ─── 构建测试 App ──────────────────────────────────────────────────────────────
 

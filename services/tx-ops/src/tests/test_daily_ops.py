@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.daily_ops_service import (
+from services.tx_ops.src.services.daily_ops_service import (
     NODE_DEFINITIONS,
     compute_flow_progress,
     compute_node_check_result,

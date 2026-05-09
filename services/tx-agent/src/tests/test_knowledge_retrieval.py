@@ -25,7 +25,7 @@ sys.path.insert(0, _SRC_DIR)
 sys.path.insert(0, _ROOT_DIR)
 
 # knowledge_retrieval位于 src/services/ 下，_SRC_DIR已加入sys.path
-from services.knowledge_retrieval import KnowledgeRetrievalService
+from services.tx_agent.src.services.knowledge_retrieval import KnowledgeRetrievalService
 
 from shared.vector_store.client import QdrantClient
 from shared.vector_store.embeddings import EmbeddingService

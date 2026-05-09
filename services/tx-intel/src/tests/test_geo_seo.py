@@ -5,7 +5,7 @@
 - CitationMonitorWorker: 查询执行、引用检测
 """
 
-from services.geo_seo_service import GeoSEOService
+from services.tx_intel.src.services.geo_seo_service import GeoSEOService
 
 # ═══════════════════════════════════════
 # SEO评分计算测试

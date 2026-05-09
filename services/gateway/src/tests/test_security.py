@@ -37,7 +37,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "shared"))
 
-from services.audit_log_service import (
+from services.gateway.src.services.audit_log_service import (
     AuditAction,
     AuditEntry,
     AuditLogService,
@@ -532,7 +532,7 @@ class TestComplianceCheck:
     @pytest.mark.asyncio
     async def test_expired_token_detected(self):
         """当存在超过90天未吊销的 token 时，has_expired_tokens = True。"""
-        from services.security_report_service import SecurityReportService
+        from services.gateway.src.services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 
@@ -563,7 +563,7 @@ class TestComplianceCheck:
     @pytest.mark.asyncio
     async def test_unused_app_detected(self):
         """当存在超30天未使用的 api_app 时，has_unused_apps = True。"""
-        from services.security_report_service import SecurityReportService
+        from services.gateway.src.services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 
@@ -595,7 +595,7 @@ class TestComplianceCheck:
     @pytest.mark.asyncio
     async def test_compliance_score_perfect_when_all_clean(self):
         """所有检查项正常时，overall_score 应为 100。"""
-        from services.security_report_service import SecurityReportService
+        from services.gateway.src.services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 
@@ -624,7 +624,7 @@ class TestWeeklyReport:
         """周报必须包含所有规定字段。"""
         from datetime import date
 
-        from services.security_report_service import SecurityReportService
+        from services.gateway.src.services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 
@@ -666,7 +666,7 @@ class TestWeeklyReport:
         """week_end 应为 week_start + 7天。"""
         from datetime import date
 
-        from services.security_report_service import SecurityReportService
+        from services.gateway.src.services.security_report_service import SecurityReportService
 
         svc = SecurityReportService()
 

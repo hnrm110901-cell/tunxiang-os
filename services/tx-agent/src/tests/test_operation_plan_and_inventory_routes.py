@@ -102,7 +102,7 @@ def _make_fake_plan(
 
 
 def _build_op_plan_app():
-    from api.operation_plan_routes import router
+    from services.tx_agent.src.api.operation_plan_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -379,7 +379,7 @@ async def test_cancel_plan_already_executed(op_plan_client):
 
 
 def _build_inventory_app():
-    from api.inventory_routes import router
+    from services.tx_agent.src.api.inventory_routes import router
 
     app = FastAPI()
     app.include_router(router)

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.store_health_service import (
+from services.tx_analytics.src.services.store_health_service import (
     classify_health,
     compute_health_score,
     find_weakest_dimension,

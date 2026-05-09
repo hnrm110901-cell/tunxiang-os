@@ -38,7 +38,7 @@ def _make_mapping(data: dict):
 @pytest.mark.asyncio
 async def test_detect_peak_is_peak():
     """detect_peak: 上座率>=80% 应判定为高峰"""
-    from services.peak_management import detect_peak
+    from services.tx_ops.src.services.peak_management import detect_peak
 
     session = _mock_session()
 
@@ -79,7 +79,7 @@ async def test_detect_peak_is_peak():
 @pytest.mark.asyncio
 async def test_detect_peak_not_peak():
     """detect_peak: 上座率低+等位少应判定为非高峰"""
-    from services.peak_management import detect_peak
+    from services.tx_ops.src.services.peak_management import detect_peak
 
     session = _mock_session()
 
@@ -117,7 +117,7 @@ async def test_detect_peak_not_peak():
 @pytest.mark.asyncio
 async def test_get_dept_load_monitor():
     """get_dept_load_monitor: 返回各档口负载率"""
-    from services.peak_management import get_dept_load_monitor
+    from services.tx_ops.src.services.peak_management import get_dept_load_monitor
 
     session = _mock_session()
 
@@ -161,7 +161,7 @@ async def test_get_dept_load_monitor():
 @pytest.mark.asyncio
 async def test_get_queue_pressure():
     """get_queue_pressure: 按桌型汇总等位"""
-    from services.peak_management import get_queue_pressure
+    from services.tx_ops.src.services.peak_management import get_queue_pressure
 
     session = _mock_session()
 
@@ -221,7 +221,7 @@ async def test_get_queue_pressure():
 @pytest.mark.asyncio
 async def test_handle_peak_event_express_mode():
     """handle_peak_event: express_mode 应记录事件并开启快速出餐"""
-    from services.peak_management import handle_peak_event
+    from services.tx_ops.src.services.peak_management import handle_peak_event
 
     session = _mock_session()
     session.execute.return_value = MagicMock()

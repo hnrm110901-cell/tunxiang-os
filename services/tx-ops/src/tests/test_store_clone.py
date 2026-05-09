@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.store_clone import execute_clone
+from services.tx_ops.src.api.store_clone import execute_clone
 
 
 class TestExecuteClone:

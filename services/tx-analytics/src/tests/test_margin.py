@@ -6,18 +6,18 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.cost_variance import (
+from services.tx_analytics.src.services.cost_variance import (
     build_variance_report,
     classify_variance_cause,
     compute_dish_variance,
     generate_actions,
 )
-from services.dish_margin import (
+from services.tx_analytics.src.services.dish_margin import (
     compute_margin,
     compute_margin_ranking,
     filter_low_margin,
 )
-from services.store_margin_report import (
+from services.tx_analytics.src.services.store_margin_report import (
     build_daily_report,
     compute_cost_variance,
     compute_margin_rate,

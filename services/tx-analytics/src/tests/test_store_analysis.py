@@ -13,7 +13,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.store_analysis import (
+from services.tx_analytics.src.services.store_analysis import (
     _date_range_to_timestamps,
     _determine_meal_period,
     _pct,
@@ -106,7 +106,7 @@ class TestDateRangeToTimestamps:
 # ─── API 路由辅助函数测试 ───
 
 
-from api.store_analysis_routes import _parse_date_range, _parse_store_id, _require_tenant
+from services.tx_analytics.src.api.store_analysis_routes import _parse_date_range, _parse_store_id, _require_tenant
 from fastapi import HTTPException
 
 
@@ -179,7 +179,7 @@ class TestComparisonMetricsValidation:
 
     @pytest.mark.asyncio
     async def test_invalid_metric_raises(self):
-        from services.store_analysis import store_comparison
+        from services.tx_analytics.src.services.store_analysis import store_comparison
 
         with pytest.raises(ValueError, match="invalid metric"):
             await store_comparison(
@@ -193,7 +193,7 @@ class TestComparisonMetricsValidation:
     @pytest.mark.asyncio
     async def test_valid_metrics_accepted(self):
         """合法指标列表不应在校验阶段抛 ValueError（会在 db 阶段失败）"""
-        from services.store_analysis import store_comparison
+        from services.tx_analytics.src.services.store_analysis import store_comparison
 
         # db=None 会在执行 SQL 时失败，但不应在 metrics 校验阶段失败
         with pytest.raises(AttributeError):

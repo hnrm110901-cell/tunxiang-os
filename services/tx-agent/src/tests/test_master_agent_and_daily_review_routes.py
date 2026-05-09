@@ -44,7 +44,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _build_master_app():
-    from api.master_agent_routes import _task_store, router
+    from services.tx_agent.src.api.master_agent_routes import _task_store, router
 
     app = FastAPI()
     app.include_router(router)
@@ -165,7 +165,7 @@ async def test_get_task_status_not_found(master_client):
 @pytest.mark.asyncio
 async def test_get_task_status_found():
     """Existing task_id returns ok=True with task data."""
-    from api.master_agent_routes import _task_store, router
+    from services.tx_agent.src.api.master_agent_routes import _task_store, router
 
     # Pre-populate the task store
     _task_store["test-task-99"] = {
@@ -314,7 +314,7 @@ async def test_chat_brain_fallback_returns_error_message(master_client):
 
 @pytest.fixture
 def daily_review_client():
-    from api.daily_review_routes import router
+    from services.tx_agent.src.api.daily_review_routes import router
 
     app = FastAPI()
     app.include_router(router)

@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.report_engine import (
+from services.tx_analytics.src.services.report_engine import (
     DimensionDef,
     FilterDef,
     MetricDef,
@@ -36,7 +36,7 @@ from services.report_engine import (
     ReportResult,
     ReportScheduler,
 )
-from services.report_registry import ReportRegistry, create_default_registry
+from services.tx_analytics.src.services.report_registry import ReportRegistry, create_default_registry
 
 # ─── Mock 工具 ───
 

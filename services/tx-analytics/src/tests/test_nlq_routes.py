@@ -55,7 +55,7 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
-import api.nlq_routes as _nlq_mod
+import services.tx_analytics.src.api.nlq_routes as _nlq_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

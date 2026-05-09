@@ -22,7 +22,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from api.menu_approval_routes import router
+from services.tx_menu.src.api.menu_approval_routes import router
 
 from shared.ontology.src.database import get_db
 

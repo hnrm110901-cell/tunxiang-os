@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.regional_management import (
+from services.tx_ops.src.services.regional_management import (
     _score_to_color,
     cross_store_benchmark,
     dispatch_rectification,

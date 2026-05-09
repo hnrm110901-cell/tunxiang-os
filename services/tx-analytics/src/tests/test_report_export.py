@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.report_export import to_csv, to_excel
+from services.tx_analytics.src.services.report_export import to_csv, to_excel
 
 SAMPLE_DATA = [
     {"store_name": "长沙店", "revenue_fen": 1500000, "order_count": 120},

@@ -12,7 +12,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.discount_guard_enhanced_routes import router
+from services.tx_agent.src.api.discount_guard_enhanced_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.dish_intelligence import (
+from services.tx_menu.src.services.dish_intelligence import (
     DishAction,
     DishLifecycle,
     DishStatus,

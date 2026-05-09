@@ -28,8 +28,8 @@ from httpx import ASGITransport, AsyncClient
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from api.flags_routes import _CACHE  # noqa: E402
-from api.flags_routes import router as flags_router  # noqa: E402
+from services.gateway.src.api.flags_routes import _CACHE  # noqa: E402
+from services.gateway.src.api.flags_routes import router as flags_router  # noqa: E402
 
 TENANT_A = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 TENANT_B = "b1b2c3d4-e5f6-7890-abcd-ef1234567890"

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.menu_ranker import (
+from services.tx_menu.src.services.menu_ranker import (
     DishScore,
     calc_low_refund_score,
     calc_margin_score,

@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.dish_service import (
+from services.tx_menu.src.services.dish_service import (
     _clear_store,
     create_dish,
     delete_dish,
@@ -24,17 +24,17 @@ from services.dish_service import (
     list_dishes_by_status,
     update_dish,
 )
-from services.menu_template import (
+from services.tx_menu.src.services.menu_template import (
     create_banquet_package,
     create_template,
     set_channel_price,
     set_room_menu,
     set_seasonal_menu,
 )
-from services.stockout_sync import (
+from services.tx_menu.src.services.stockout_sync import (
     _clear_all as _clear_stockout,
 )
-from services.stockout_sync import (
+from services.tx_menu.src.services.stockout_sync import (
     auto_check_stockout,
     get_sold_out_list,
     mark_sold_out,

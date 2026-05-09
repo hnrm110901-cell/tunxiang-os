@@ -52,7 +52,7 @@ def app_with_mock_db():
     全量 Mock get_db 依赖，避免真实数据库连接。
     返回 (app, mock_db) 元组供测试使用。
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -78,51 +78,51 @@ class TestWeightUnitConversion:
 
     def test_weight_unit_conversion_jin_to_grams(self):
         """斤→克：1斤=500克"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         assert _to_grams(1.0, "jin") == 500
 
     def test_weight_unit_conversion_liang_to_grams(self):
         """两→克：1两=50克"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         assert _to_grams(1.0, "liang") == 50
 
     def test_weight_unit_conversion_kg_to_grams(self):
         """千克→克：1kg=1000克"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         assert _to_grams(1.0, "kg") == 1000
 
     def test_weight_unit_conversion_g_to_grams(self):
         """克→克：1:1"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         assert _to_grams(500.0, "g") == 500
 
     def test_weight_unit_conversion_decimal_jin(self):
         """小数斤换算：1.35斤 = 675克（取整）"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         assert _to_grams(1.35, "jin") == 675
 
     def test_format_price_display_int_yuan(self):
         """整数元价格展示：18800分 → '188元/斤'"""
-        from api.live_seafood_routes import _format_price_display
+        from services.tx_menu.src.api.live_seafood_routes import _format_price_display
 
         result = _format_price_display("weight", 18800, "斤")
         assert result == "188元/斤"
 
     def test_format_price_display_float_yuan(self):
         """小数元价格展示：8850分 → '88.5元/条'"""
-        from api.live_seafood_routes import _format_price_display
+        from services.tx_menu.src.api.live_seafood_routes import _format_price_display
 
         result = _format_price_display("count", 8850, "条")
         assert result == "88.5元/条"
 
     def test_unit_display_mapping(self):
         """单位展示名映射完整"""
-        from api.live_seafood_routes import _unit_display
+        from services.tx_menu.src.api.live_seafood_routes import _unit_display
 
         assert _unit_display("jin") == "斤"
         assert _unit_display("liang") == "两"
@@ -138,7 +138,7 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weigh_quantity_negative(self):
         """负数重量应被 Pydantic gt=0 校验拒绝（本地验证，不走HTTP）"""
-        from api.live_seafood_routes import WeighRecordReq
+        from services.tx_menu.src.api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
@@ -154,7 +154,7 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weigh_quantity_zero(self):
         """零重量也应被拒绝（gt=0）"""
-        from api.live_seafood_routes import WeighRecordReq
+        from services.tx_menu.src.api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
@@ -168,7 +168,7 @@ class TestWeighRecordReqValidation:
 
     def test_invalid_weight_unit_enum(self):
         """不在枚举内的重量单位应被拒绝"""
-        from api.live_seafood_routes import WeighRecordReq
+        from services.tx_menu.src.api.live_seafood_routes import WeighRecordReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
@@ -182,7 +182,7 @@ class TestWeighRecordReqValidation:
 
     def test_update_live_seafood_weight_method_requires_unit(self):
         """pricing_method=weight 时 weight_unit 为必填"""
-        from api.live_seafood_routes import UpdateLiveSeafoodReq
+        from services.tx_menu.src.api.live_seafood_routes import UpdateLiveSeafoodReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError) as exc_info:
@@ -249,7 +249,7 @@ class TestWeighAmountCalculation:
 
     def test_stock_deduction_weight_in_grams(self):
         """确认称重后库存扣减量（按克计）：1.5斤 = 750克"""
-        from api.live_seafood_routes import _to_grams
+        from services.tx_menu.src.api.live_seafood_routes import _to_grams
 
         weight_g = _to_grams(1.5, "jin")
         assert weight_g == 750
@@ -264,7 +264,7 @@ async def test_create_weigh_record_weight_mode():
 
     场景：0.5斤 × 18800分/斤，期望 amount_fen=9400，amount_display='¥94.00'
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -332,7 +332,7 @@ async def test_create_weigh_record_count_mode():
 
     场景：3条 × 8800分/条，期望 amount_fen=26400，amount_display='¥264.00'
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -383,7 +383,7 @@ async def test_confirm_weigh_deducts_stock():
     1. 返回 status='confirmed'
     2. 调用了两次 UPDATE（称重记录 + 菜品库存）
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -452,7 +452,7 @@ async def test_confirm_weigh_updates_order():
 
     验证响应数据中 order_id 和 final_amount_fen 字段正确。
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -504,7 +504,7 @@ async def test_weigh_pending_list():
 
     验证响应结构和 total 字段。
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -574,7 +574,7 @@ async def test_weigh_cancel_restores_stock():
     这是一个设计级验证：创建称重记录时不扣库存，取消时无需恢复。
     """
     # 验证 create_weigh_record 只做 INSERT，不做库存扣减
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -636,7 +636,7 @@ async def test_invalid_weigh_quantity_http_422():
 
     FastAPI 的 Pydantic 验证失败应返回 422 Unprocessable Entity。
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -668,7 +668,7 @@ async def test_invalid_weigh_quantity_http_422():
 @pytest.mark.asyncio
 async def test_weigh_nonexistent_dish_returns_404():
     """POST /api/v1/menu/live-seafood/weigh：菜品不存在时返回 404（DB 校验）"""
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -715,7 +715,7 @@ async def test_weigh_confirm_already_confirmed():
 
     源码第107行：rec[7] != 'pending' 时 raise HTTPException(400)
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -764,7 +764,7 @@ async def test_missing_tenant_id_header_returns_400():
 
     源码 _tenant() 函数：tid 为空时 raise HTTPException(400)
     """
-    from api.live_seafood_routes import router
+    from services.tx_menu.src.api.live_seafood_routes import router
 
     from shared.ontology.src.database import get_db
 

@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.dish_dynamic_pricing_service import (  # noqa: E402
+from services.tx_menu.src.services.dish_dynamic_pricing_service import (  # noqa: E402
     DEFAULT_PRIOR_ELASTICITY,
     MARGIN_FLOOR,
     MAX_PRICE_CHANGE_PCT,
@@ -341,7 +341,7 @@ async def test_sonnet_validate_failure_falls_back_to_rules():
 
 def test_parse_sonnet_risk_level_variants():
     """risk_level 解析对大小写/空格不敏感"""
-    from services.dish_dynamic_pricing_service import (
+    from services.tx_menu.src.services.dish_dynamic_pricing_service import (
         DishDynamicPricingService,
         ElasticityEstimate,
         PricingSuggestion,

@@ -36,8 +36,8 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from middleware.rate_limiter import RateLimiter
-from services.oauth2_service import OAuth2Service
-from services.webhook_dispatcher import WebhookDispatcher
+from services.gateway.src.services.oauth2_service import OAuth2Service
+from services.gateway.src.services.webhook_dispatcher import WebhookDispatcher
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  Helpers

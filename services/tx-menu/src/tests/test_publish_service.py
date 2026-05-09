@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.publish_service import (
+from services.tx_menu.src.services.publish_service import (
     create_price_adjustment,
     create_publish_plan,
     execute_publish,

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.narrative_engine import (
+from services.tx_analytics.src.services.narrative_engine import (
     BRIEF_MAX_CHARS,
     build_action,
     build_overview,

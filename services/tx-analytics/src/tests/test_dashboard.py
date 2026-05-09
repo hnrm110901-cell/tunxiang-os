@@ -10,19 +10,19 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.alert_summary import (
+from services.tx_analytics.src.services.alert_summary import (
     aggregate_alert_stats,
     get_alert_stats,
     get_today_alerts,
     sort_alerts_by_severity,
 )
-from services.store_ranking import (
+from services.tx_analytics.src.services.store_ranking import (
     calc_vs_avg_pct,
     determine_trend,
     get_store_comparison,
     get_store_ranking,
 )
-from services.today_overview import (
+from services.tx_analytics.src.services.today_overview import (
     calc_pct_change,
     find_peak_hour,
     get_multi_store_overview,

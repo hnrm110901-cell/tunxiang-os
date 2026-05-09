@@ -94,8 +94,8 @@ sys.modules["reports.p0_reports"] = _p0_mod
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-import api.reports_router as _rr_module  # noqa: E402
-from api.reports_router import router  # noqa: E402
+import services.tx_analytics.src.api.reports_router as _rr_module  # noqa: E402
+from services.tx_analytics.src.api.reports_router import router  # noqa: E402
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 

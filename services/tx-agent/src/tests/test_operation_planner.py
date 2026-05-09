@@ -22,7 +22,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.operation_planner import (
+from services.tx_agent.src.services.operation_planner import (
     PLAN_MODE_RULES,
     OperationPlan,
     OperationPlanner,

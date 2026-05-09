@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.decision_push import (
+from services.tx_agent.src.services.decision_push import (
     MAX_DESC_CHARS,
     format_evening_recap,
     format_morning_card,

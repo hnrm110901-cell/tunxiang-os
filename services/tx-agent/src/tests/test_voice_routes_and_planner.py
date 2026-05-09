@@ -97,7 +97,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _build_voice_app():
-    from api.voice_routes import router
+    from services.tx_agent.src.api.voice_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -105,7 +105,7 @@ def _build_voice_app():
 
 
 def _build_planner_app():
-    from api.planner import router
+    from services.tx_agent.src.api.planner import router
 
     app = FastAPI()
     app.include_router(router)

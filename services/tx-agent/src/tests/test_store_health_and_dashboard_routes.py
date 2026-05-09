@@ -78,7 +78,7 @@ def _stub_daily_review_service(completion_rate: float = 0.8):
 
 
 def test_calc_health_score_perfect():
-    from api.store_health_routes import _calc_health_score
+    from services.tx_agent.src.api.store_health_routes import _calc_health_score
 
     score = _calc_health_score(revenue_rate=1.0, cost_rate=0.20, daily_review_rate=1.0)
     # revenue_score=100*0.4=40, cost_score=100*0.3=30, review_score=100*0.3=30 → 100
@@ -86,7 +86,7 @@ def test_calc_health_score_perfect():
 
 
 def test_calc_health_score_poor():
-    from api.store_health_routes import _calc_health_score
+    from services.tx_agent.src.api.store_health_routes import _calc_health_score
 
     # revenue_rate=0.0 → revenue_score=0; cost_rate=0.60 → cost_score=0; review=0.0
     score = _calc_health_score(revenue_rate=0.0, cost_rate=0.60, daily_review_rate=0.0)
@@ -94,7 +94,7 @@ def test_calc_health_score_poor():
 
 
 def test_health_grade_mapping():
-    from api.store_health_routes import _health_grade
+    from services.tx_agent.src.api.store_health_routes import _health_grade
 
     assert _health_grade(100) == "A"
     assert _health_grade(80) == "A"
@@ -106,14 +106,14 @@ def test_health_grade_mapping():
 
 
 def test_build_alerts_offline_store():
-    from api.store_health_routes import _build_alerts
+    from services.tx_agent.src.api.store_health_routes import _build_alerts
 
     alerts = _build_alerts(revenue_rate=1.0, cost_rate=0.25, daily_review_rate=1.0, store_status="offline")
     assert "门店离线" in alerts
 
 
 def test_build_alerts_high_cost_and_low_revenue():
-    from api.store_health_routes import _build_alerts
+    from services.tx_agent.src.api.store_health_routes import _build_alerts
 
     alerts = _build_alerts(revenue_rate=0.5, cost_rate=0.55, daily_review_rate=0.8, store_status="online")
     assert any("成本率过高" in a for a in alerts)
@@ -121,7 +121,7 @@ def test_build_alerts_high_cost_and_low_revenue():
 
 
 def test_calc_summary_basic():
-    from api.store_health_routes import _calc_summary
+    from services.tx_agent.src.api.store_health_routes import _calc_summary
 
     items = [
         {"status": "online", "health_score": 80, "today_revenue_fen": 10000},
@@ -136,7 +136,7 @@ def test_calc_summary_basic():
 
 
 def test_degraded_item_structure():
-    from api.store_health_routes import _degraded_item
+    from services.tx_agent.src.api.store_health_routes import _degraded_item
 
     item = _degraded_item({"store_id": "s1", "store_name": "测试店"})
     assert item["health_score"] == -1
@@ -150,7 +150,7 @@ def test_degraded_item_structure():
 
 
 def _build_store_health_app():
-    from api.store_health_routes import router
+    from services.tx_agent.src.api.store_health_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -289,7 +289,7 @@ async def test_detail_happy_path(store_health_client):
 
 
 def _build_dashboard_app():
-    from api.dashboard_routes import router
+    from services.tx_agent.src.api.dashboard_routes import router
 
     app = FastAPI()
     app.include_router(router)

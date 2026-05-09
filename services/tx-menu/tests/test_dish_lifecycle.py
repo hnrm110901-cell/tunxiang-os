@@ -18,13 +18,13 @@ from datetime import datetime, timedelta, timezone
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../src"))
 
 import pytest
-from services.dish_health_score import (
+from services.tx_menu.src.services.dish_health_score import (
     DishHealthScoreEngine,
     ScoreWeights,
     _clear_score_store,
     inject_dish_score_data,
 )
-from services.dish_lifecycle import (
+from services.tx_menu.src.services.dish_lifecycle import (
     LOW_SALES_THRESHOLD,
     REMOVAL_LOW_HEALTH_DAYS,
     DishLifecycleService,

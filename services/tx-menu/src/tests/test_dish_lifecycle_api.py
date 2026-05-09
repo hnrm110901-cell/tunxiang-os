@@ -31,7 +31,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 
-from api.dish_lifecycle_routes import lifecycle_router, router
+from services.tx_menu.src.api.dish_lifecycle_routes import lifecycle_router, router
 
 from shared.ontology.src.database import get_db
 

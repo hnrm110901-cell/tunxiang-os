@@ -52,7 +52,7 @@ HEADERS = {
 
 def _build_app_with_mock(mock_db: AsyncMock) -> FastAPI:
     """构建带 Mock DB 的测试应用"""
-    from api.combo_routes import router
+    from services.tx_menu.src.api.combo_routes import router
 
     from shared.ontology.src.database import get_db
 
@@ -329,7 +329,7 @@ async def test_extra_price_calculation():
     mock_db = AsyncMock()
 
     # 验证 AddGroupItemReq 的 extra_price_fen 字段 Pydantic 校验
-    from api.combo_routes import AddGroupItemReq
+    from services.tx_menu.src.api.combo_routes import AddGroupItemReq
 
     req = AddGroupItemReq(
         dish_id=str(uuid.uuid4()),
@@ -556,7 +556,7 @@ class TestComboGroupRequestValidation:
         源码：max_select < min_select 的校验在端点函数中（非 validator），
         所以 Pydantic 不报错，422 由 HTTPException 422 抛出。
         """
-        from api.combo_routes import CreateGroupReq
+        from services.tx_menu.src.api.combo_routes import CreateGroupReq
 
         # Pydantic 层不校验 max >= min，此对象可以创建
         req = CreateGroupReq(group_name="测试分组", min_select=3, max_select=1)
@@ -565,7 +565,7 @@ class TestComboGroupRequestValidation:
 
     def test_add_group_item_negative_extra_price_rejected(self):
         """AddGroupItemReq：extra_price_fen 不能为负数（ge=0）"""
-        from api.combo_routes import AddGroupItemReq
+        from services.tx_menu.src.api.combo_routes import AddGroupItemReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
@@ -578,7 +578,7 @@ class TestComboGroupRequestValidation:
 
     def test_add_group_item_zero_quantity_rejected(self):
         """AddGroupItemReq：quantity 必须 >= 1"""
-        from api.combo_routes import AddGroupItemReq
+        from services.tx_menu.src.api.combo_routes import AddGroupItemReq
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError):
@@ -591,7 +591,7 @@ class TestComboGroupRequestValidation:
 
     def test_selection_group_req_requires_item_ids(self):
         """SelectionGroupReq：item_ids 为必填字段"""
-        from api.combo_routes import SelectionGroupReq
+        from services.tx_menu.src.api.combo_routes import SelectionGroupReq
         from pydantic import ValidationError
 
         # 缺少 item_ids → ValidationError
@@ -600,7 +600,7 @@ class TestComboGroupRequestValidation:
 
     def test_validate_selection_req_allows_empty_selections(self):
         """ValidateSelectionReq：selections 可以为空列表"""
-        from api.combo_routes import ValidateSelectionReq
+        from services.tx_menu.src.api.combo_routes import ValidateSelectionReq
 
         req = ValidateSelectionReq(selections=[])
         assert req.selections == []

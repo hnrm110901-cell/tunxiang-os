@@ -35,12 +35,12 @@ import pytest
 
 # ── Agent 相关 ────────────────────────────────────────────────
 from agents.skills.discount_guard import DiscountGuardAgent
-from services.agent_live_service import (
+from services.tx_agent.src.services.agent_live_service import (
     AgentLiveService,
 )
 
 # ── 离职结算相关 ──────────────────────────────────────────────
-from services.separation_settlement import (
+from services.tx_agent.src.services.separation_settlement import (
     CHANGSHA_AVG_MONTHLY_SALARY_YUAN,
     SeparationSettlementService,
     _compute_compensation_tax_fen,
@@ -48,7 +48,7 @@ from services.separation_settlement import (
 )
 
 # ── P&L 相关 ─────────────────────────────────────────────────
-from services.store_pnl import StorePnLService
+from services.tx_agent.src.services.store_pnl import StorePnLService
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  FIXTURES

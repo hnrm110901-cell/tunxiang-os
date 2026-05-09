@@ -86,7 +86,7 @@ def client(app):
 
 def _make_token(role="tenant_owner", tenant_id="a0000000-0000-0000-0000-000000000001", mfa=False):
     """签发测试用 access token"""
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     return JWTService().create_access_token(
         user_id="u-test",
@@ -240,7 +240,7 @@ def test_t5_mfa_required_paths_blocked_without_mfa(client, mfa_path, role):
 
 def test_t6_refresh_token_used_as_access_blocked():
     """refresh token 不能当作 access token 使用"""
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     svc = JWTService()
     refresh_token, _ = svc.create_refresh_token("u-test")
@@ -255,7 +255,7 @@ def test_t6_jwt_wrong_issuer_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     svc = JWTService()
 
@@ -281,7 +281,7 @@ def test_t6_jwt_wrong_audience_rejected():
     from datetime import datetime, timedelta, timezone
 
     import jwt as pyjwt
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     svc = JWTService()
 
@@ -310,7 +310,7 @@ def test_t7_prod_without_jwt_secret_raises(monkeypatch):
     monkeypatch.setenv("TX_ENV", "production")
     monkeypatch.delenv("TX_JWT_SECRET_KEY", raising=False)
 
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     with pytest.raises(RuntimeError, match="TX_JWT_SECRET_KEY is required"):
         JWTService()
@@ -321,7 +321,7 @@ def test_t7_dev_without_jwt_secret_uses_fallback(monkeypatch):
     monkeypatch.setenv("TX_ENV", "development")
     monkeypatch.delenv("TX_JWT_SECRET_KEY", raising=False)
 
-    from services.jwt_service import JWTService
+    from services.gateway.src.services.jwt_service import JWTService
 
     svc = JWTService()
     assert svc._secret is not None

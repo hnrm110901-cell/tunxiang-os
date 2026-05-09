@@ -119,8 +119,8 @@ with patch.dict(
         "services.knowledge_graph": _fake_knowledge_graph_mod,
     },
 ):
-    import api.dashboard_routes as _dashboard_mod
-    import api.knowledge_query as _knowledge_mod
+    import services.tx_analytics.src.api.dashboard_routes as _dashboard_mod
+    import services.tx_analytics.src.api.knowledge_query as _knowledge_mod
 
 _app_dashboard = FastAPI()
 _app_dashboard.include_router(_dashboard_mod.router)

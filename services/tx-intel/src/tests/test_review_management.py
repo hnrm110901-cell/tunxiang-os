@@ -11,13 +11,13 @@ from collections import Counter
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from services.improvement_recommender import (
+from services.tx_intel.src.services.improvement_recommender import (
     _RECOMMENDATION_TEMPLATES,
     _THEME_KEYWORDS,
     ImprovementRecommender,
 )
-from services.nps_service import NPSService, _extract_tags
-from services.review_replier import _REPLY_PROMPT_TEMPLATE, ReviewReplier
+from services.tx_intel.src.services.nps_service import NPSService, _extract_tags
+from services.tx_intel.src.services.review_replier import _REPLY_PROMPT_TEMPLATE, ReviewReplier
 
 # ═══════════════════════════════════════
 # ReviewReplier 测试

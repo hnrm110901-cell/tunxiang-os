@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
-from services.group_dashboard_service import (
+from services.tx_analytics.src.services.group_dashboard_service import (
     BrandPerformance,
     GroupDashboardService,
     GroupKPISnapshot,

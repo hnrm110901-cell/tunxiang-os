@@ -113,7 +113,7 @@ def _make_mock_ontology(registry):
 
 @pytest.fixture
 def skill_app():
-    from api.skill_registry_routes import router
+    from services.tx_agent.src.api.skill_registry_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -272,7 +272,7 @@ async def test_get_skill_not_found(skill_client):
 
 @pytest.fixture
 def orchestrator_app():
-    from api.orchestrator_routes import _get_db_with_tenant, router
+    from services.tx_agent.src.api.orchestrator_routes import _get_db_with_tenant, router
 
     app = FastAPI()
     # Override the DB dependency so no real DB is needed

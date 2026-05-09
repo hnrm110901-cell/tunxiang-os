@@ -42,7 +42,7 @@ def _make_mapping(data: dict):
 @pytest.mark.asyncio
 async def test_inventory_turnover_normal():
     """inventory_turnover: 有消耗时计算正确的周转天数"""
-    from services.inventory_analysis import inventory_turnover
+    from services.tx_analytics.src.services.inventory_analysis import inventory_turnover
 
     session = _mock_session()
 
@@ -85,7 +85,7 @@ async def test_inventory_turnover_normal():
 @pytest.mark.asyncio
 async def test_inventory_turnover_no_consumption():
     """inventory_turnover: 无消耗时 turnover_days 为 None"""
-    from services.inventory_analysis import inventory_turnover
+    from services.tx_analytics.src.services.inventory_analysis import inventory_turnover
 
     session = _mock_session()
 
@@ -121,7 +121,7 @@ async def test_inventory_turnover_no_consumption():
 @pytest.mark.asyncio
 async def test_waste_ranking():
     """waste_ranking: 返回按金额排序的损耗列表"""
-    from services.inventory_analysis import waste_ranking
+    from services.tx_analytics.src.services.inventory_analysis import waste_ranking
 
     session = _mock_session()
 
@@ -173,7 +173,7 @@ async def test_waste_ranking():
 @pytest.mark.asyncio
 async def test_stocktake_variance_analysis():
     """stocktake_variance_analysis: 正确汇总盘盈盘亏"""
-    from services.inventory_analysis import stocktake_variance_analysis
+    from services.tx_analytics.src.services.inventory_analysis import stocktake_variance_analysis
 
     session = _mock_session()
 
@@ -229,7 +229,7 @@ async def test_stocktake_variance_analysis():
 @pytest.mark.asyncio
 async def test_procurement_variance():
     """procurement_variance: 正确计算计划vs实际偏差"""
-    from services.inventory_analysis import procurement_variance
+    from services.tx_analytics.src.services.inventory_analysis import procurement_variance
 
     session = _mock_session()
 
@@ -272,7 +272,7 @@ async def test_procurement_variance():
 @pytest.mark.asyncio
 async def test_seafood_waste_analysis():
     """seafood_waste_analysis: 按 death/quality_downgrade/alive_loss 三分类"""
-    from services.inventory_analysis import seafood_waste_analysis
+    from services.tx_analytics.src.services.inventory_analysis import seafood_waste_analysis
 
     session = _mock_session()
 
@@ -327,7 +327,7 @@ async def test_seafood_waste_analysis():
 @pytest.mark.asyncio
 async def test_food_safety_risk_graph():
     """food_safety_risk_graph: 汇总临期/过期/温度异常/高风险原料"""
-    from services.inventory_analysis import food_safety_risk_graph
+    from services.tx_analytics.src.services.inventory_analysis import food_safety_risk_graph
 
     session = _mock_session()
     now = datetime.now(timezone.utc)

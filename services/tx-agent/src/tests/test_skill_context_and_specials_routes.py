@@ -169,7 +169,7 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _build_skill_context_app():
-    from api.skill_context_routes import router
+    from services.tx_agent.src.api.skill_context_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -177,7 +177,7 @@ def _build_skill_context_app():
 
 
 def _build_specials_app():
-    from api.specials_routes import router
+    from services.tx_agent.src.api.specials_routes import router
 
     app = FastAPI()
     app.include_router(router)

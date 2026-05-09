@@ -26,7 +26,7 @@ if _src not in sys.path:
 import httpx
 import pytest
 import respx
-from services.edge_inference_client import EdgeInferenceClient
+from services.tx_agent.src.services.edge_inference_client import EdgeInferenceClient
 
 BRIDGE_URL = "http://localhost:8100"
 

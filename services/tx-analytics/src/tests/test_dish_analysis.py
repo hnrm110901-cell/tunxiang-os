@@ -6,7 +6,7 @@ from decimal import Decimal
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.dish_analysis import (
+from services.tx_analytics.src.services.dish_analysis import (
     classify_quadrant,
     compute_return_rate,
     compute_sales_ranking,

@@ -12,13 +12,13 @@
 """
 
 import pytest
-from services.competitor_monitor import CompetitorMonitorService
-from services.consumer_insight import ConsumerInsightService
-from services.intel_report_engine import IntelReportEngine
-from services.new_product_radar import NewProductRadar
-from services.pilot_suggestion import PilotSuggestionService
-from services.pricing_insight import PricingInsightService
-from services.review_topic_engine import ReviewTopicEngine
+from services.tx_intel.src.services.competitor_monitor import CompetitorMonitorService
+from services.tx_intel.src.services.consumer_insight import ConsumerInsightService
+from services.tx_intel.src.services.intel_report_engine import IntelReportEngine
+from services.tx_intel.src.services.new_product_radar import NewProductRadar
+from services.tx_intel.src.services.pilot_suggestion import PilotSuggestionService
+from services.tx_intel.src.services.pricing_insight import PricingInsightService
+from services.tx_intel.src.services.review_topic_engine import ReviewTopicEngine
 
 # ═══════════════════════════════════════
 # 竞对监测测试

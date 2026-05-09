@@ -28,7 +28,7 @@ from uuid import UUID
 
 import pytest
 
-from services.sql_generator import (
+from services.tx_brain.src.services.sql_generator import (
     REPORTS_VIEW_NAMES,
     SqlGenerationError,
     SqlGenerator,

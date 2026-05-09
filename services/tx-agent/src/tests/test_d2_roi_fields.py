@@ -69,7 +69,7 @@ def test_agent_result_roi_fields_independent_per_instance():
 async def test_decision_log_service_extracts_roi_fields():
     """log_skill_result 应把 AgentResult.ROI 字段写入 AgentDecisionLog"""
     try:
-        from services.decision_log_service import DecisionLogService
+        from services.tx_agent.src.services.decision_log_service import DecisionLogService
     except ImportError:
         pytest.skip("decision_log_service 无法导入（测试环境可能缺依赖）")
 
@@ -109,7 +109,7 @@ async def test_decision_log_service_extracts_roi_fields():
 async def test_decision_log_service_defaults_roi_to_zero_when_missing():
     """向后兼容：旧代码返回的 AgentResult 不带 ROI → 降级 0/{} 不报错"""
     try:
-        from services.decision_log_service import DecisionLogService
+        from services.tx_agent.src.services.decision_log_service import DecisionLogService
     except ImportError:
         pytest.skip("decision_log_service 无法导入")
 
@@ -143,7 +143,7 @@ async def test_decision_log_service_defaults_roi_to_zero_when_missing():
 async def test_decision_log_service_degrades_non_dict_kpi():
     """improved_kpi 被错误填成 list/string → 降级为 {}（不 crash）"""
     try:
-        from services.decision_log_service import DecisionLogService
+        from services.tx_agent.src.services.decision_log_service import DecisionLogService
     except ImportError:
         pytest.skip("decision_log_service 无法导入")
 

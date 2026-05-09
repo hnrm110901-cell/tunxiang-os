@@ -81,8 +81,8 @@ _svc_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if _svc_root not in sys.path:
     sys.path.insert(0, _svc_root)
 
-import api.daily_report_routes as _daily_mod
-import api.realtime_routes as _realtime_mod
+import services.tx_analytics.src.api.daily_report_routes as _daily_mod
+import services.tx_analytics.src.api.realtime_routes as _realtime_mod
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

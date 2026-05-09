@@ -15,7 +15,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from api.observability import router
+from services.tx_agent.src.api.observability import router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
