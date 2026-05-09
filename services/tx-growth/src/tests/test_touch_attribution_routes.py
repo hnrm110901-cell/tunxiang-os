@@ -123,7 +123,7 @@ def test_track_click_ok():
     mock_db = _make_async_ctx([])
     _fake_session_factory.return_value = mock_db
 
-    with patch("api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=None)):
+    with patch("services.tx_growth.src.api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=None)):
         resp = client.post(f"/api/v1/growth/attribution/track-click/{_TOUCH_ID}")
 
     assert resp.status_code == 200
@@ -140,7 +140,7 @@ def test_track_click_not_found():
     mock_db = _make_async_ctx([])
     _fake_session_factory.return_value = mock_db
 
-    with patch("api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=None)):
+    with patch("services.tx_growth.src.api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=None)):
         resp = client.post(f"/api/v1/growth/attribution/track-click/{_TOUCH_ID}")
 
     assert resp.status_code == 200
@@ -154,7 +154,7 @@ def test_track_click_redis_dedup():
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(return_value=False)  # already exists
 
-    with patch("api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=mock_redis)):
+    with patch("services.tx_growth.src.api.touch_attribution_routes._get_redis", new=AsyncMock(return_value=mock_redis)):
         resp = client.post(f"/api/v1/growth/attribution/track-click/{_TOUCH_ID}")
 
     assert resp.status_code == 200

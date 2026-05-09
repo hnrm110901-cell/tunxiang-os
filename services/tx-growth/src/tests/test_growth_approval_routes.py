@@ -395,7 +395,7 @@ def test_seed_default_workflows_ok():
     _mock_db_holder["db"] = mock_db
 
     # patch 路由模块中的 _svc 实例方法
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.seed_default_workflows = AsyncMock(return_value={"inserted": 2})
 
         resp = client.post("/api/v1/growth/approvals/workflows/seed", headers=HEADERS)
@@ -495,7 +495,7 @@ def test_approve_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.approve = AsyncMock(
             return_value={"ok": True, "status": "approved", "approved_at": "2026-04-06T10:00:00+00:00"}
         )
@@ -524,7 +524,7 @@ def test_approve_request_not_found():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.approve = AsyncMock(side_effect=ValueError("审批单不存在"))
 
         resp = client.post(
@@ -547,7 +547,7 @@ def test_reject_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.reject = AsyncMock(return_value={"ok": True, "status": "rejected", "reason": "折扣过高"})
 
         resp = client.post(
@@ -589,7 +589,7 @@ def test_cancel_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.cancel = AsyncMock(return_value={"ok": True, "status": "cancelled"})
 
         resp = client.post(
@@ -616,7 +616,7 @@ def test_cancel_request_not_allowed():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.cancel = AsyncMock(return_value={"ok": False, "reason": "只有申请人可撤销审批单"})
 
         resp = client.post(
@@ -641,7 +641,7 @@ def test_batch_approve_ok():
 
     ids = [str(uuid.uuid4()) for _ in range(3)]
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.batch_approve = AsyncMock(
             return_value={
                 "total": 3,
@@ -722,7 +722,7 @@ def test_batch_approve_partial_failure():
     id1 = str(uuid.uuid4())
     id2 = str(uuid.uuid4())
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.batch_approve = AsyncMock(
             return_value={
                 "total": 2,
