@@ -16,6 +16,14 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): 早期 migration（v013_banquet_quotations_proposals
+    # / v043_banquet_deposit 等）以不同 schema 创建过 banquet_menu_templates /
+    # banquet_quotes / banquet_quote_items；本文件 IF NOT EXISTS 静默跳过 → 后续
+    # CREATE INDEX 列 event_type 撞不存在。本文件是生产 ORM canonical（services/
+    # tx-trade/src/models/banquet_quote.py），需先 DROP CASCADE 再 CREATE。
+    op.execute("DROP TABLE IF EXISTS banquet_quote_items CASCADE")  # FK 依赖顺序
+    op.execute("DROP TABLE IF EXISTS banquet_quotes CASCADE")
+    op.execute("DROP TABLE IF EXISTS banquet_menu_templates CASCADE")
     # ── banquet_menu_templates 套餐模板 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_menu_templates (

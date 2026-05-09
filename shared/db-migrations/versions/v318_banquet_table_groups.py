@@ -16,6 +16,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): 早期 migration 可能以不同 schema 创建过
+    # banquet_table_groups。本文件是生产 ORM canonical，先 DROP CASCADE 再 CREATE。
+    # 同 B'-4 v315 模式。
+    op.execute("DROP TABLE IF EXISTS banquet_table_groups CASCADE")
     # ── banquet_table_groups 宴会桌组 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_table_groups (

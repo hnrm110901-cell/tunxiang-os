@@ -16,6 +16,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): 早期 migration 用不同 schema 创建过
+    # banquet_venues / banquet_venue_bookings；本文件 IF NOT EXISTS 静默跳过 →
+    # 后续 CREATE INDEX 列撞不存在。本文件是生产 ORM canonical，先 DROP CASCADE
+    # 再 CREATE。同 B'-4 v315 模式。
+    op.execute("DROP TABLE IF EXISTS banquet_venue_bookings CASCADE")  # FK 依赖顺序
+    op.execute("DROP TABLE IF EXISTS banquet_venues CASCADE")
     # ── banquet_venues 宴会厅/场地 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_venues (

@@ -17,6 +17,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): 早期 migration（v004_reservation_banquet
+    # 等）以不同 schema 创建过 banquets。本文件是生产 ORM canonical
+    # （services/tx-trade/src/models/banquet.py），先 DROP CASCADE 再 CREATE。
+    # 同 B'-4 v315 模式。
+    op.execute("DROP TABLE IF EXISTS banquet_status_logs CASCADE")  # FK 依赖顺序
+    op.execute("DROP TABLE IF EXISTS banquets CASCADE")
     # ── banquets 宴会主单 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquets (
