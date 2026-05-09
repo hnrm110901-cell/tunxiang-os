@@ -98,7 +98,7 @@ class TestRecharge:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "recharge"
@@ -167,7 +167,7 @@ class TestConsume:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "consume"
@@ -259,7 +259,7 @@ class TestConcurrencySafety:
         db.execute = mock_execute
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "consume"
@@ -320,7 +320,7 @@ class TestConcurrencySafety:
         db.add = MagicMock()
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "transfer_out"
@@ -377,7 +377,7 @@ class TestExpiryProcessing:
         db.execute = AsyncMock(return_value=result_mock)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction"):
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction"):
             result = await svc.process_expiry_batch(db=db, tenant_id=TENANT_A)
 
         assert result["frozen_count"] == 1
@@ -456,7 +456,7 @@ class TestTransfer:
         db.add = MagicMock()
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "transfer_out"
@@ -555,7 +555,7 @@ class TestRefund:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "refund"
@@ -599,7 +599,7 @@ class TestRefund:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "refund"
@@ -649,7 +649,7 @@ class TestRechargeGift:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction") as MockTxn:
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction") as MockTxn:
             mock_txn = MagicMock()
             mock_txn.id = uuid.uuid4()
             mock_txn.txn_type = "recharge"
@@ -792,7 +792,7 @@ class TestFreezeUnfreezeById:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction"):
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction"):
             result = await svc.freeze_by_id(
                 db=db,
                 card_id=CARD_ID_1,
@@ -828,7 +828,7 @@ class TestFreezeUnfreezeById:
         db = _make_async_session(card=card)
 
         svc = StoredValueService()
-        with patch("services.stored_value_service.StoredValueTransaction"):
+        with patch("services.tx_member.src.services.stored_value_service.StoredValueTransaction"):
             result = await svc.unfreeze_by_id(
                 db=db,
                 card_id=CARD_ID_1,

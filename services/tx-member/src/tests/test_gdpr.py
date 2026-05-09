@@ -90,7 +90,7 @@ class TestSubmitDeletionRequest:
     def test_submit_deletion_request(self, gdpr_client: TestClient):
         """POST /requests — erasure 类型"""
         with patch(
-            "api.gdpr_routes.GDPRService.create_request",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.create_request",
             new_callable=AsyncMock,
             return_value=_mock_request(req_type="erasure", status="pending"),
         ):
@@ -132,7 +132,7 @@ class TestSubmitExportRequest:
         """POST /requests — portability 类型"""
         export_req = _mock_request(req_type="portability", status="pending")
         with patch(
-            "api.gdpr_routes.GDPRService.create_request",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.create_request",
             new_callable=AsyncMock,
             return_value=export_req,
         ):
@@ -153,7 +153,7 @@ class TestSubmitExportRequest:
     def test_duplicate_request_returns_400(self, gdpr_client: TestClient):
         """重复提交同类型请求应返回 400"""
         with patch(
-            "api.gdpr_routes.GDPRService.create_request",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.create_request",
             new_callable=AsyncMock,
             side_effect=ValueError("该客户已有进行中的 portability 申请，请等待处理完成"),
         ):
@@ -180,7 +180,7 @@ class TestListRequests:
             _mock_request(req_id=str(uuid.uuid4()), req_type="portability"),
         ]
         with patch(
-            "api.gdpr_routes.GDPRService.list_requests",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.list_requests",
             new_callable=AsyncMock,
             return_value=mock_items,
         ):
@@ -198,7 +198,7 @@ class TestListRequests:
     def test_list_requests_with_status_filter(self, gdpr_client: TestClient):
         """GET /requests?status=pending — 仅返回 pending"""
         with patch(
-            "api.gdpr_routes.GDPRService.list_requests",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.list_requests",
             new_callable=AsyncMock,
             return_value=[_mock_request()],
         ):
@@ -218,7 +218,7 @@ class TestProcessRequestApprove:
         """POST /requests/{id}/process — action=approve"""
         approved_req = _mock_request(status="reviewing")
         with patch(
-            "api.gdpr_routes.GDPRService.review_request",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.review_request",
             new_callable=AsyncMock,
             return_value=approved_req,
         ):
@@ -241,7 +241,7 @@ class TestProcessRequestApprove:
         """POST /requests/{id}/process — action=reject"""
         rejected_req = _mock_request(status="rejected")
         with patch(
-            "api.gdpr_routes.GDPRService.review_request",
+            "services.tx_member.src.api.gdpr_routes.GDPRService.review_request",
             new_callable=AsyncMock,
             return_value=rejected_req,
         ):
