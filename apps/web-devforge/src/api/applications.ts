@@ -55,11 +55,11 @@ const MOCK_APPS: Application[] = [
   {
     id: 'mock-4',
     tenant_id: 'demo-tenant',
-    code: 'adapter-pinjin',
+    code: 'adapter-pinzhi-pos',
     name: '品智 POS 适配器',
     resource_type: 'adapter',
     owner: '集成组',
-    repo_path: 'shared/adapters/pinjin',
+    repo_path: 'shared/adapters/pinzhi_pos',
     tech_stack: 'python',
     description: '尝在一起首批客户',
     metadata_json: {},

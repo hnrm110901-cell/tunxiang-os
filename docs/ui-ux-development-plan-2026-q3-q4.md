@@ -33,7 +33,7 @@
 
 | 客户 | 验收时间 | 关键能力依赖 |
 |------|---------|-------------|
-| **尝在一起**（品智POS） | M1 末 | 主收银流程 + adapters/pinjin + Tier 1 全绿 |
+| **尝在一起**（品智POS） | M1 末 | 主收银流程 + adapters/pinzhi_pos + Tier 1 全绿 |
 | **最黔线** | M2 中 | 多门店 Admin + 报表中心 + 离线优先 |
 | **尚宫厨** | M2 末 | KDS 完整 + Crew 服务员 PWA + Agent 推送 |
 | **徐记海鲜 DEMO**（标杆） | M3 中（Week 8） | 全部 Tier 1 + AI Agent + A2UI + 替换 23 系统场景演示 |
@@ -87,7 +87,7 @@
 | S2-04 | [#256](https://github.com/hnrm110901-cell/tunxiang-os/issues/256) | 焦点环 `:focus-visible` 全终端样式 | tx-touch + admin | 2 | T3 | #253 | 视觉验证 |
 | S2-05 | [#257](https://github.com/hnrm110901-cell/tunxiang-os/issues/257) | 占位 Agent 补全 P0：voice_order Agent | tx-agent | 3 | T1 | — | 真实 Claude API 调用 + 语音意图解析 + AgentDecisionLog 写入 |
 | S2-06 | [#258](https://github.com/hnrm110901-cell/tunxiang-os/issues/258) | 占位 Agent 补全 P0：attendance_compliance Agent | tx-agent | 3 | T2 | — | 同上 |
-| S2-07 | [#259](https://github.com/hnrm110901-cell/tunxiang-os/issues/259) | 尝在一起：adapters/pinjin POS 数据写入 Tier 1 测试覆盖 | tx-trade/adapters | 4 | T1 | — | test_pinjin_tier1.py 覆盖 200 桌并发 / RLS / 离线 4h |
+| S2-07 | [#259](https://github.com/hnrm110901-cell/tunxiang-os/issues/259) | 尝在一起：adapters/pinzhi_pos POS 数据写入 Tier 1 测试覆盖 | tx-trade/adapters | 4 | T1 | — | test_pinzhi_pos_tier1.py 覆盖 200 桌并发 / RLS / 离线 4h |
 | S2-08 | [#260](https://github.com/hnrm110901-cell/tunxiang-os/issues/260) | 尝在一起：主收银流程现场联调 | web-pos + tx-trade | 4 | T1 | #259 | 商米 T2 上跑通点单→结算→打印→出餐全流程 |
 | S2-09 | [#261](https://github.com/hnrm110901-cell/tunxiang-os/issues/261) | DEVLOG.md / progress.md 更新规范脚本 | scripts | 1 | T3 | — | scripts/update-devlog.sh 一键追加格式化记录 |
 | S2-10 | [#262](https://github.com/hnrm110901-cell/tunxiang-os/issues/262) | M1 闸门评审材料 | docs | 1 | T3 | 全部 | 报告 + 演示视频 |
