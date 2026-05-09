@@ -1,3 +1,50 @@
+## 2026-05-09 深夜 续 — #298 codemod Phase 6 (tx-supply 39/96) 落地
+
+### 今日完成（5/9 第 5 PR）
+- **#XXX** Phase 6 tx-supply 全清 — 模板沿用 #335 / #338 / #341，3 commit 原子化（CLAUDE.md §21）
+  - **RED** `dc030d77` — `services/tx-supply/src/tests/test_codemod_phase6_bare_imports_tier1.py` AST 守门 fixture（决策 80）
+  - **GREEN** `f7085622` — codemod --apply --service tx-supply：39 文件 / 96 import 全改写
+  - **fix** `052232bb` — patch literal 漂移 20 处（test_procurement_prediction.py 7 / test_transfer_routes.py 7 / test_inventory_routes.py 6）；决策 84 from-NS-import-module 形式 0 命中（本轮免）
+
+### 数据变化
+- 改写文件：39（src/tests/* 32 + tests/* 7）
+- 改写 import：96
+- 修补 patch literal：20 处
+- 新增测试：1（守门 fixture，Tier 1）
+
+### 本地 pytest 实测对比（决策 78）— ignore-glob 排除 22 个 shared.security/shared.events/Header collection 错误后
+| | 5/9 main pre-codemod | post-codemod | delta |
+|---|---|---|---|
+| pass | 361 | 360 | -1 |
+| fail | 23 | 25 | +2 |
+| collection error | 35 | 34 | -1（codemod 反向修复 1）|
+
+### 本轮决策 79 surfaced 2 处 — `test_warehouse_and_trace_routes::TestIngredientGraph` + `TestTraceReport`：单独跑 PASS，批跑 FAIL = pytest 测试隔离污染（sys.modules 跨用例残留），与 codemod 逻辑无关，独立 issue
+
+### 累计 #298 chain 数据快照
+| Phase | PR | 服务 | 文件 | import |
+|---|---|---|---|---|
+| 1-3 | #322 #335 | tx-trade | 42 | ~305 |
+| 4 | #338 | tx-member | 30 | 112 |
+| 5 | #341 | tx-org | 39 | 102 |
+| **6** | **#XXX**（本 PR）| **tx-supply** | **39** | **96** |
+| **累计** | | **4 服务** | **150** | **~615** |
+| 余待清 | | 10 服务 | ~? | ~108（tx-growth 95 / tx-finance 52 验证待做）|
+
+### conftest 状态（决策 83）
+| ✓ 已有 | tx-trade / tx-member（#338 新建）/ tx-org / tx-pay / **tx-supply（本 PR 直用）** |
+| ✗ 待建 | 其余 10 服务 |
+
+### 遗留问题
+- pytest 测试隔离污染（test_warehouse_and_trace 2 处单跑通批跑挂）— 决策 79 follow-up
+- shared.security / shared.events / Header 大批 collection 错误（22 文件）— 跨服务根因，决策 79 follow-up
+- 决策 84 scanner 仍未抓 from-NS-import-module 形式（本轮未触发，未来服务可能再现）
+
+### 明日计划
+- Phase 7 候选：tx-growth 95（需新建 conftest）/ tx-finance 52（需新建 conftest）/ shared.security 诊断
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

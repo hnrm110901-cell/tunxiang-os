@@ -1,3 +1,33 @@
+## 2026-05-09 深夜 续 · #298 codemod Phase 6 — tx-supply 39/96 落地
+
+### 完成状态
+- [x] **RED** `dc030d77` — Tier 1 AST 守门 fixture（services/tx-supply/src/tests/test_codemod_phase6_bare_imports_tier1.py）
+- [x] **GREEN** `f7085622` — codemod 应用 39 文件 / 96 处 import 改写
+- [x] **fix** `052232bb` — patch literal 漂移 20 处修补
+- [x] 本地 pytest 实测对比（决策 78）：post 25 fail / 360 pass / 34 collection error vs pre 23 fail / 361 pass / 35 collection error
+- [x] DEVLOG / progress 同步更新（本 commit）
+- [ ] 仍待 admin override merge（Tier 1 强制 review）
+
+### 关键决策
+- **决策 83 复用 — tx-supply conftest 已存在直起**：本 PR 未需新建 conftest（tx-supply / tx-trade / tx-org / tx-pay 在 main 上原生有 conftest，本 PR 全照用）
+- **决策 84 本轮 0 命中**：scanner 漏抓 `from <NS> import <X>` 形式，但 tx-supply test 文件未触发（生产代码 services/tx-supply/src/services/waste_guard_v2.py:17 存在 from-NS 形式，决策 77 production 端不动）
+- **决策 79 surfaced 2 处 pytest 测试隔离污染**：test_warehouse_and_trace_routes 单跑通批跑挂 — 与 codemod 无关，sys.modules 跨用例污染，独立 issue follow-up
+- **决策 78 真门禁验证**：本地 pytest 净 +2 fail / -1 pass / -1 collection error；其中 +2 fail 全部 pytest 隔离污染，0 codemod 逻辑 BUG
+- **collection error 22 处全部 shared.security / shared.events / Header 包未注册**：与本 PR 无关，跨服务根因 follow-up（决策 79）
+
+### 下一步
+- Phase 7 候选：tx-growth 95（需新建 conftest，决策 83）/ tx-finance 52（需新建 conftest，决策 83）
+- shared.security / shared.events 包缺失诊断 — 跨服务根因（多 PR surfaced）
+- 决策 79 follow-up：test_warehouse_and_trace pytest 隔离污染独立 issue
+
+### 已知风险
+- **决策 77 band-aid 仍在**：PR #287 extend_existing 兜底未撤；本 PR 完成 chain ~80%，撤 band-aid 还需余 10 服务全清 + production 端 short-path 跟进
+- **alembic chain integrity 仍断裂**（v310 dangling）— 与本 PR 无关，但 CI Verify Migration Chain Integrity 一律失败
+- **Tier 1 真门禁绿**（AST 守门 fixture 通过 = tx-supply test 路径上 0 裸 import）；CI 噪音（Ruff / python-lint-test (*) / frontend-build）按 ci_gates 规则忽略
+- pytest 测试隔离污染：仅在批跑暴露，CI/admin 看是否 flaky；决策 79 follow-up
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
