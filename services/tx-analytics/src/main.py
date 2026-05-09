@@ -47,6 +47,7 @@ from .api.monthly_brief_routes import router as monthly_brief_router  # W2 4/13 
 from .api.narrative_enhanced_routes import router as narrative_enhanced_router  # P3-02
 from .api.nlq_routes import router as nlq_router
 from .api.olap_routes import router as olap_router  # BI-1.1: OLAP多维分析引擎（5端点）
+from .api.pinned_dashboard_routes import router as pinned_dashboard_router  # S4-04 PR2.C: 驾驶舱 Pin
 from .api.private_domain_routes import router as private_domain_router
 from .api.report_builder_routes import router as report_builder_router  # S5: 报表配置化引擎（12端点）
 from .api.report_config_routes import router as report_config_router
@@ -131,6 +132,7 @@ app.include_router(olap_router)  # BI-1.1: OLAP多维分析引擎：5端点
 app.include_router(self_service_router)  # BI-1.2: 自助取数（8端点）
 app.include_router(alert_router)  # BI-2.2: 预警闭环引擎（8端点）
 app.include_router(demo_monitor_router)  # May W2: C-04 演示环境监控面板
+app.include_router(pinned_dashboard_router)  # S4-04 PR2.C 驾驶舱 Pin（issue #291）
 
 
 @app.get("/health")
