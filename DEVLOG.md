@@ -1,3 +1,65 @@
+## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
+
+### 今日完成
+跨 5/8 → 5/9 单 session 通宵交付 issue #289 NLQ 自然语言查询从 0 到 demo 闭环（我侧 7 PR 全 merged）：
+
+**S4-02 PR2.A — reports schema 暴露层（mv_* 8 表全暴露）：**
+- #325 `v404` thin slice — `reports` schema + `tx_nlq_readonly` NOLOGIN role + `daily_revenue` / `member_clv` 视图（`security_invoker=on` + `REVOKE public`）
+- #326 `v405` 续补 — `store_pnl` / `channel_margin`
+- #328 `v406` 收尾 — `discount_health` / `inventory_bom` / `safety_compliance` / `energy_efficiency` + 敏感字段脱敏（`top_operators` / `expiry_alerts` / `overdue_certificates` / `off_hours_anomalies`）
+
+**S4-02 PR2.B — sql_generator：**
+- #330 骨架（`ModelRouterLike` Protocol + LLM JSON 输出 + 防火墙 + `reports.*` 白名单 + `REPORTS_VIEW_NAMES` 防漂移自检），22 mock 单测
+- #331 接真 ModelRouter（`MigrationRouter` wiring + `_task_model_map` 显式 `nlq_sql_generation→sonnet-4-6`）
+
+**S4-02 PR2.C — SSE 端点：**
+- #332 `POST /api/v1/brain/nlq/query` 串联 `sql_generator → run_safe_query → SSE 流`，事件协议 `sql / result / done / error(kind)`，422/503 错误映射，`json.dumps` 防破帧，8 SSE 单测覆盖错误路径全集
+
+**S4-02 PR2.D — 真 PG 反测（opt-in）：**
+- #333 沿 #323 模式 `INTEGRATION_PG_DSN` opt-in，4 组反测：`security_invoker` 跨租户隔离 / WHERE 过滤真生效 / 敏感字段 runtime 不暴露 / `tx_nlq_readonly` role 权限边界（拒查 `mv_*` + 拒写 view + 准查 view）
+
+### 数据变化
+- 迁移版本：v403 → v404 → v405 → v406（3 个 NLQ 视图迁移，均 Tier 1）
+- 新增视图：`reports.daily_revenue` / `member_clv` / `store_pnl` / `channel_margin` / `discount_health` / `inventory_bom` / `safety_compliance` / `energy_efficiency`（8 个，全部 `security_invoker=on`）
+- 新增 role：`tx_nlq_readonly NOLOGIN`（cluster-level，仅 `GRANT SELECT ON reports.*` + `REVOKE ALL ON SCHEMA public`）
+- 新增 API 模块：1（`services/tx-brain/src/api/nlq_routes.py`）
+- 新增 Service 模块：1（`services/tx-brain/src/services/sql_generator.py`）
+- shared 改动：`shared/ai_providers/migration.py` `_task_model_map` 加 `nlq_sql_generation`
+- 新增测试：5 文件 / 101 用例（v404 静态 20 + v405 静态 14 + v406 静态 27 + sql_generator mock 22 + factory 3 + SSE 8 + 真 PG 反测 7）
+
+### 端到端调用链（demo 可跑）
+```
+POST /api/v1/brain/nlq/query + X-Tenant-ID
+  → Depends(_get_db_with_tenant) 注入 RLS app.tenant_id
+  → SqlGenerator.generate() → MigrationRouter.complete() → Claude Sonnet 4.6
+    → JSON {"sql": "..."} → 防火墙 → reports.* 白名单 → 校验通过的 SQL
+  → run_safe_query(db, sql) → assert_safe_sql + SET LOCAL statement_timeout
+    + WITH ... LIMIT N+1 → SandboxResult
+  → SSE 流 event: sql / result / done（错误：error(kind)）
+```
+
+### 关键决策
+- **NLQ 沙箱第二层 DB 防御** = `reports` schema + `tx_nlq_readonly` role + `security_invoker=on`：Python 层防火墙 + 白名单是第一层，DB 层 `REVOKE public` 是兜底（即使 LLM/防火墙双失守，DB 也拒查原表）
+- **JSONB 明细字段一律不暴露**（`expiry_alerts` / `overdue_certificates` / `off_hours_anomalies` / `top_operators`）：含批次号 / 证件号 / 设备 ID / 操作员 PII 风险，聚合数字已够 NLQ 使用
+- **SSE 错误协议** = 端点 200 + `event: error data: {kind, message}`：generator/sandbox 内部错不返 5xx（前端可基于 kind 决定是否重试 / 用户提示）
+- **PR2.D opt-in 真 PG 反测**：仓库无 docker-compose-pg fixture，沿 #323 模式 `pytest.skipif(not INTEGRATION_PG_DSN)` —— CI 自动跳过，本地有库的 dev 可手跑
+- **task_type 显式映射** `nlq_sql_generation→sonnet-4-6`：不靠 default fallback，让模型选择策略可见可改
+
+### 遗留问题
+- **PR2.A.4 选做**：`orders.*` 脱敏视图（去支付明细 / phone / address）— demo 闭环不必需
+- **LLM 端到端真测**：成本预算 + 非确定性管理（独立 issue，不阻塞 demo）
+- **仓库级 docker-compose-pg fixture**：让 PR2.D + #323 在 CI 自动跑（独立 issue）
+- **alembic chain integrity**：v310 dangling 自 PR #128 未修，所有 migration PR 的 `Verify Migration Chain Integrity` 一律失败被 admin override
+- **dev-plan-60d 5/7 计划**：被 26 commit + #318/#329 推翻，需重写
+- **CI 噪音**（一直在）：`Ruff` / `python-lint-test (*)` / `frontend-build` 全 PR 失败的预存漂移；本批 PR 全部 admin override 合入
+
+### 明日计划
+- 评估 PR2.A.4 `orders.*` 脱敏视图是否纳入 demo 范围
+- 仓库级 docker-compose-pg fixture（独立 PR / issue）
+- dev-plan-60d 5/7 重写
+
+---
+
 ## 2026-05-09 下午 续 · #318 follow-up scanner 抓 import xxx 形式 (#329)
 
 ### 今日完成
