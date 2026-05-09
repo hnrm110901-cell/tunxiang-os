@@ -77,7 +77,7 @@ def _mock_db(*execute_results):
 @pytest.mark.asyncio
 async def test_multi_table_same_dish_merged():
     """A3/B7/C1 三桌各点1份烤鸭，应合并为 total_qty=3"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     # 三行任务数据，同一个 dish_id，不同桌台
     task_rows = [
@@ -113,7 +113,7 @@ async def test_multi_table_same_dish_merged():
 @pytest.mark.asyncio
 async def test_batch_count_and_remainder():
     """烤鸭×8，base_quantity=3 → batch_count=2，remainder=2"""
-    from services.batch_group_service import BatchGroup
+    from services.tx_trade.src.services.batch_group_service import BatchGroup
 
     task_rows = [
         FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_DUCK, dish_name="烤鸭", quantity=8, table_no="A1"),
@@ -143,7 +143,7 @@ async def test_batch_count_and_remainder():
 @pytest.mark.asyncio
 async def test_exact_division_no_remainder():
     """烤鸭×6，base_quantity=2 → batch_count=3，remainder=0"""
-    from services.batch_group_service import BatchGroup
+    from services.tx_trade.src.services.batch_group_service import BatchGroup
 
     g = BatchGroup(
         dish_id=DISH_DUCK,
@@ -165,7 +165,7 @@ async def test_exact_division_no_remainder():
 @pytest.mark.asyncio
 async def test_base_qty_one_each_is_one_batch():
     """base_quantity=1：5份 → batch_count=5，remainder=0（标准视图行为）"""
-    from services.batch_group_service import BatchGroup
+    from services.tx_trade.src.services.batch_group_service import BatchGroup
 
     g = BatchGroup(
         dish_id=DISH_FISH,
@@ -187,7 +187,7 @@ async def test_base_qty_one_each_is_one_batch():
 @pytest.mark.asyncio
 async def test_set_and_get_base_quantity():
     """设置 base_quantity=4，然后能读取回来"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     # 测试 set_base_quantity（UPDATE 影响1行）
     mock_result = MagicMock()
@@ -229,7 +229,7 @@ async def test_set_and_get_base_quantity():
 @pytest.mark.asyncio
 async def test_set_base_quantity_invalid_raises():
     """quantity < 1 应抛出 ValueError"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     db = AsyncMock()
     with pytest.raises(ValueError, match="base_quantity must be >= 1"):
@@ -248,7 +248,7 @@ async def test_set_base_quantity_invalid_raises():
 @pytest.mark.asyncio
 async def test_different_depts_independent():
     """DEPT_A 有烤鸭×3，DEPT_B 有米饭×10，互不影响"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     # DEPT_A 查询
     dept_a_rows = [
@@ -292,7 +292,7 @@ async def test_different_depts_independent():
 @pytest.mark.asyncio
 async def test_empty_dept_returns_empty_list():
     """档口无 pending 任务时返回空列表"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     db = _mock_db(FakeResult(rows=[]))  # 主查询返回空
 
@@ -312,7 +312,7 @@ async def test_empty_dept_returns_empty_list():
 @pytest.mark.asyncio
 async def test_sorted_by_total_qty_desc():
     """多菜品时，总份数多的排在前面"""
-    from services.batch_group_service import BatchGroupService
+    from services.tx_trade.src.services.batch_group_service import BatchGroupService
 
     task_rows = [
         FakeRow(task_id=_uid(), order_item_id=_uid(), dish_id=DISH_FISH, dish_name="鱼头", quantity=2, table_no="A1"),

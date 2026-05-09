@@ -66,7 +66,7 @@ class TestTaskCreation:
     @pytest.mark.asyncio
     async def test_start_cooking_writes_db(self):
         """开始制作时同步写入kds_tasks表"""
-        from services.kds_actions import start_cooking
+        from services.tx_trade.src.services.kds_actions import start_cooking
 
         task_id = _uid()
         operator_id = _uid()
@@ -90,7 +90,7 @@ class TestTaskCreation:
     @pytest.mark.asyncio
     async def test_finish_cooking_updates_db(self):
         """完成出品时更新DB记录状态为done"""
-        from services.kds_actions import finish_cooking
+        from services.tx_trade.src.services.kds_actions import finish_cooking
 
         task_id = _uid()
         operator_id = _uid()
@@ -112,7 +112,7 @@ class TestTaskCreation:
     @pytest.mark.asyncio
     async def test_task_not_found_returns_error(self):
         """任务不存在时返回明确错误"""
-        from services.kds_actions import start_cooking
+        from services.tx_trade.src.services.kds_actions import start_cooking
 
         task_id = _uid()
         db = _fake_db()
@@ -131,7 +131,7 @@ class TestStateTransition:
     @pytest.mark.asyncio
     async def test_invalid_transition_rejected(self):
         """非法状态流转被拒绝（done -> cooking）"""
-        from services.kds_actions import start_cooking
+        from services.tx_trade.src.services.kds_actions import start_cooking
 
         task_id = _uid()
         db = _fake_db()
@@ -151,7 +151,7 @@ class TestStateTransition:
         """完成出品时记录制作耗时"""
         from datetime import timedelta
 
-        from services.kds_actions import finish_cooking
+        from services.tx_trade.src.services.kds_actions import finish_cooking
 
         task_id = _uid()
         db = _fake_db()
@@ -179,7 +179,7 @@ class TestRecoveryOnRestart:
     @pytest.mark.asyncio
     async def test_recover_active_tasks_from_db(self):
         """从DB恢复pending/cooking任务（模拟重启后内存为空）"""
-        from services.kds_actions import recover_active_tasks
+        from services.tx_trade.src.services.kds_actions import recover_active_tasks
 
         db = _fake_db()
         tenant_id = TENANT_A
@@ -214,7 +214,7 @@ class TestRecoveryOnRestart:
     @pytest.mark.asyncio
     async def test_recovery_excludes_done_tasks(self):
         """恢复时不加载已完成/取消的任务"""
-        from services.kds_actions import recover_active_tasks
+        from services.tx_trade.src.services.kds_actions import recover_active_tasks
 
         db = _fake_db()
         # DB只返回active任务（SQL WHERE status IN (pending, cooking)）
@@ -233,7 +233,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_tenant_a_cannot_access_tenant_b_task(self):
         """租户A无法访问租户B的任务"""
-        from services.kds_actions import start_cooking
+        from services.tx_trade.src.services.kds_actions import start_cooking
 
         task_id_b = _uid()
         db = _fake_db()
@@ -249,7 +249,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_query_includes_tenant_filter(self):
         """DB查询必须包含tenant_id过滤条件"""
-        from services.kds_actions import start_cooking
+        from services.tx_trade.src.services.kds_actions import start_cooking
 
         task_id = _uid()
         db = _fake_db()

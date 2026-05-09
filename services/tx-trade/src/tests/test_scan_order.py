@@ -95,7 +95,7 @@ class FakeDB:
 class TestGenerateTableQrcode:
     def test_qrcode_format(self):
         """桌码格式正确: TX-{简码}-{桌号}"""
-        from services.scan_order_service import generate_table_qrcode
+        from services.tx_trade.src.services.scan_order_service import generate_table_qrcode
 
         result = generate_table_qrcode(
             store_id=STORE_ID,
@@ -111,7 +111,7 @@ class TestGenerateTableQrcode:
 
     def test_qrcode_contains_short_code(self):
         """桌码包含门店简码"""
-        from services.scan_order_service import _store_short_code, generate_table_qrcode
+        from services.tx_trade.src.services.scan_order_service import _store_short_code, generate_table_qrcode
 
         result = generate_table_qrcode(
             store_id=STORE_ID,
@@ -125,7 +125,7 @@ class TestGenerateTableQrcode:
 
     def test_miniapp_path_correct(self):
         """小程序跳转路径正确"""
-        from services.scan_order_service import generate_table_qrcode
+        from services.tx_trade.src.services.scan_order_service import generate_table_qrcode
 
         result = generate_table_qrcode(
             store_id=STORE_ID,
@@ -145,7 +145,7 @@ class TestGenerateTableQrcode:
 class TestParseQrcode:
     def test_parse_valid_code(self):
         """正常解析桌码"""
-        from services.scan_order_service import parse_qrcode
+        from services.tx_trade.src.services.scan_order_service import parse_qrcode
 
         result = parse_qrcode("TX-ABC123-A01")
 
@@ -155,21 +155,21 @@ class TestParseQrcode:
 
     def test_parse_invalid_prefix(self):
         """无效前缀抛出异常"""
-        from services.scan_order_service import parse_qrcode
+        from services.tx_trade.src.services.scan_order_service import parse_qrcode
 
         with pytest.raises(ValueError, match="无效桌码格式"):
             parse_qrcode("QR-ABC-01")
 
     def test_parse_empty_code(self):
         """空桌码抛出异常"""
-        from services.scan_order_service import parse_qrcode
+        from services.tx_trade.src.services.scan_order_service import parse_qrcode
 
         with pytest.raises(ValueError, match="无效桌码格式"):
             parse_qrcode("")
 
     def test_parse_incomplete_code(self):
         """不完整桌码抛出异常"""
-        from services.scan_order_service import parse_qrcode
+        from services.tx_trade.src.services.scan_order_service import parse_qrcode
 
         with pytest.raises(ValueError, match="桌码格式错误"):
             parse_qrcode("TX-ONLY")
@@ -182,7 +182,7 @@ class TestCreateScanOrder:
     @pytest.mark.asyncio
     async def test_create_new_order(self):
         """新建扫码订单"""
-        from services.scan_order_service import create_scan_order
+        from services.tx_trade.src.services.scan_order_service import create_scan_order
 
         db = FakeDB()
 
@@ -243,7 +243,7 @@ class TestAddItemsToOrder:
     @pytest.mark.asyncio
     async def test_add_items_success(self):
         """同桌追加菜品"""
-        from services.scan_order_service import add_items_to_order
+        from services.tx_trade.src.services.scan_order_service import add_items_to_order
 
         order_id = _uid()
         db = FakeDB()
@@ -292,7 +292,7 @@ class TestAddItemsToOrder:
     @pytest.mark.asyncio
     async def test_add_items_order_completed_raises(self):
         """已完成订单不可加菜"""
-        from services.scan_order_service import add_items_to_order
+        from services.tx_trade.src.services.scan_order_service import add_items_to_order
 
         order_id = _uid()
         db = FakeDB()
@@ -322,7 +322,7 @@ class TestRequestCheckout:
     @pytest.mark.asyncio
     async def test_checkout_success(self):
         """请求结账成功"""
-        from services.scan_order_service import request_checkout
+        from services.tx_trade.src.services.scan_order_service import request_checkout
 
         order_id = _uid()
         db = FakeDB()
@@ -353,7 +353,7 @@ class TestRequestCheckout:
     @pytest.mark.asyncio
     async def test_checkout_completed_order_raises(self):
         """已完成订单不可结账"""
-        from services.scan_order_service import request_checkout
+        from services.tx_trade.src.services.scan_order_service import request_checkout
 
         order_id = _uid()
         db = FakeDB()
@@ -381,7 +381,7 @@ class TestRequestCheckout:
 class TestQrcodeRoundtrip:
     def test_generate_then_parse(self):
         """生成桌码后能正确解析回原始信息"""
-        from services.scan_order_service import generate_table_qrcode, parse_qrcode
+        from services.tx_trade.src.services.scan_order_service import generate_table_qrcode, parse_qrcode
 
         gen_result = generate_table_qrcode(
             store_id=STORE_ID,

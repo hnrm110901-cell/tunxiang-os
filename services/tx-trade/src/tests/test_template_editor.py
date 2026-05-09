@@ -21,7 +21,7 @@ from fastapi.testclient import TestClient
 # 路径修正（在 tests/ 目录下直接运行 pytest）
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.printer_driver import (
+from services.tx_trade.src.services.printer_driver import (
     ESC_BOLD_ON,
     ESC_FEED,
     ESC_INIT,
@@ -29,7 +29,7 @@ from services.printer_driver import (
     GS_SIZE_DOUBLE_HEIGHT,
     LF,
 )
-from services.template_renderer import TemplateRenderer, _apply_template_vars, _yuan_str
+from services.tx_trade.src.services.template_renderer import TemplateRenderer, _apply_template_vars, _yuan_str
 
 # ─── 共用示例数据 ───
 
@@ -303,7 +303,7 @@ class TestTemplateRenderer:
 
 def _make_app():
     """创建测试用 FastAPI app，屏蔽真实 DB。"""
-    from api.template_editor_routes import router
+    from services.tx_trade.src.api.template_editor_routes import router
     from fastapi import FastAPI
 
     app = FastAPI()
@@ -558,7 +558,7 @@ class TestPreviewNewElementTypes:
 
     @pytest.fixture
     def client(self):
-        from api.template_editor_routes import router
+        from services.tx_trade.src.api.template_editor_routes import router
         from fastapi import FastAPI
 
         app = FastAPI()
@@ -626,34 +626,34 @@ class TestElementSizeValidation:
     """ElementDef.size 类型与 element type 必须匹配（防 silent fallback）。"""
 
     def test_text_element_with_int_size_rejected(self):
-        from api.template_editor_routes import ElementDef
+        from services.tx_trade.src.api.template_editor_routes import ElementDef
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError, match="size"):
             ElementDef(id="e1", type="store_name", size=6)
 
     def test_qrcode_with_str_size_rejected(self):
-        from api.template_editor_routes import ElementDef
+        from services.tx_trade.src.api.template_editor_routes import ElementDef
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError, match="size"):
             ElementDef(id="e1", type="qrcode", size="double_height")
 
     def test_qrcode_int_in_range_accepted(self):
-        from api.template_editor_routes import ElementDef
+        from services.tx_trade.src.api.template_editor_routes import ElementDef
 
         ed = ElementDef(id="e1", type="qrcode", size=6)
         assert ed.size == 6
 
     def test_qrcode_int_out_of_range_rejected(self):
-        from api.template_editor_routes import ElementDef
+        from services.tx_trade.src.api.template_editor_routes import ElementDef
         from pydantic import ValidationError
 
         with pytest.raises(ValidationError, match="size"):
             ElementDef(id="e1", type="qrcode", size=99)
 
     def test_text_element_with_str_size_accepted(self):
-        from api.template_editor_routes import ElementDef
+        from services.tx_trade.src.api.template_editor_routes import ElementDef
 
         ed = ElementDef(id="e1", type="store_name", size="double_height")
         assert ed.size == "double_height"

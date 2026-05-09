@@ -34,7 +34,7 @@ TENANT_ID = _uid()
 
 @pytest.fixture(autouse=True)
 def _clear_stores():
-    from services.payment_direct import _payments, _risk_records
+    from services.tx_trade.src.services.payment_direct import _payments, _risk_records
 
     _payments.clear()
     _risk_records.clear()
@@ -43,7 +43,7 @@ def _clear_stores():
 @pytest.mark.asyncio
 async def test_wechat_payment():
     """微信支付下单"""
-    from services.payment_direct import create_wechat_payment
+    from services.tx_trade.src.services.payment_direct import create_wechat_payment
 
     result = await create_wechat_payment(
         order_id=_uid(),
@@ -60,7 +60,7 @@ async def test_wechat_payment():
 @pytest.mark.asyncio
 async def test_alipay_payment():
     """支付宝支付下单"""
-    from services.payment_direct import create_alipay_payment
+    from services.tx_trade.src.services.payment_direct import create_alipay_payment
 
     result = await create_alipay_payment(
         order_id=_uid(),
@@ -76,7 +76,7 @@ async def test_alipay_payment():
 @pytest.mark.asyncio
 async def test_unionpay_payment():
     """银联支付下单"""
-    from services.payment_direct import create_unionpay_payment
+    from services.tx_trade.src.services.payment_direct import create_unionpay_payment
 
     result = await create_unionpay_payment(
         order_id=_uid(),
@@ -91,7 +91,7 @@ async def test_unionpay_payment():
 @pytest.mark.asyncio
 async def test_query_payment_status():
     """查询支付状态"""
-    from services.payment_direct import create_wechat_payment, query_payment_status
+    from services.tx_trade.src.services.payment_direct import create_wechat_payment, query_payment_status
 
     pay = await create_wechat_payment(
         order_id=_uid(),
@@ -106,7 +106,7 @@ async def test_query_payment_status():
 @pytest.mark.asyncio
 async def test_query_payment_not_found():
     """查询不存在的支付"""
-    from services.payment_direct import query_payment_status
+    from services.tx_trade.src.services.payment_direct import query_payment_status
 
     with pytest.raises(ValueError, match="Payment not found"):
         await query_payment_status("nonexistent", TENANT_ID)
@@ -115,7 +115,7 @@ async def test_query_payment_not_found():
 @pytest.mark.asyncio
 async def test_full_refund():
     """全额退款"""
-    from services.payment_direct import create_wechat_payment, process_refund, query_payment_status
+    from services.tx_trade.src.services.payment_direct import create_wechat_payment, process_refund, query_payment_status
 
     pay = await create_wechat_payment(
         order_id=_uid(),
@@ -133,7 +133,7 @@ async def test_full_refund():
 @pytest.mark.asyncio
 async def test_partial_refund():
     """部分退款"""
-    from services.payment_direct import create_alipay_payment, process_refund, query_payment_status
+    from services.tx_trade.src.services.payment_direct import create_alipay_payment, process_refund, query_payment_status
 
     pay = await create_alipay_payment(
         order_id=_uid(),
@@ -150,7 +150,7 @@ async def test_partial_refund():
 @pytest.mark.asyncio
 async def test_refund_exceeds_amount():
     """退款金额超出"""
-    from services.payment_direct import create_wechat_payment, process_refund
+    from services.tx_trade.src.services.payment_direct import create_wechat_payment, process_refund
 
     pay = await create_wechat_payment(
         order_id=_uid(),
@@ -164,7 +164,7 @@ async def test_refund_exceeds_amount():
 @pytest.mark.asyncio
 async def test_concurrent_payment():
     """并发支付（多渠道）"""
-    from services.payment_direct import handle_concurrent_payment
+    from services.tx_trade.src.services.payment_direct import handle_concurrent_payment
 
     result = await handle_concurrent_payment(
         order_id=_uid(),
@@ -183,7 +183,7 @@ async def test_concurrent_payment():
 @pytest.mark.asyncio
 async def test_risk_check_normal():
     """风控检查 — 正常"""
-    from services.payment_direct import get_payment_risk_check
+    from services.tx_trade.src.services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
         order_id=_uid(),
@@ -199,7 +199,7 @@ async def test_risk_check_normal():
 @pytest.mark.asyncio
 async def test_risk_check_large_amount():
     """风控检查 — 大额预警"""
-    from services.payment_direct import get_payment_risk_check
+    from services.tx_trade.src.services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
         order_id=_uid(),
@@ -214,7 +214,7 @@ async def test_risk_check_large_amount():
 @pytest.mark.asyncio
 async def test_risk_check_zero_amount():
     """风控检查 — 零金额拒绝"""
-    from services.payment_direct import get_payment_risk_check
+    from services.tx_trade.src.services.payment_direct import get_payment_risk_check
 
     result = await get_payment_risk_check(
         order_id=_uid(),

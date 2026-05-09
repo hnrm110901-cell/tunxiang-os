@@ -46,7 +46,7 @@ STORE_ID = _uid()
 @pytest.mark.asyncio
 async def test_sync_meituan_orders_empty():
     """验证美团无新订单时返回空列表"""
-    from services.takeaway_manager import _meituan_client, sync_meituan_orders
+    from services.tx_trade.src.services.takeaway_manager import _meituan_client, sync_meituan_orders
 
     original = _meituan_client.pull_new_orders
     _meituan_client.pull_new_orders = AsyncMock(return_value=[])
@@ -68,7 +68,7 @@ async def test_sync_meituan_orders_empty():
 @pytest.mark.asyncio
 async def test_sync_eleme_orders_empty():
     """验证饿了么无新订单时返回空列表"""
-    from services.takeaway_manager import _eleme_client, sync_eleme_orders
+    from services.tx_trade.src.services.takeaway_manager import _eleme_client, sync_eleme_orders
 
     original = _eleme_client.pull_new_orders
     _eleme_client.pull_new_orders = AsyncMock(return_value=[])
@@ -90,7 +90,7 @@ async def test_sync_eleme_orders_empty():
 @pytest.mark.asyncio
 async def test_sync_meituan_orders_with_data():
     """验证美团有新订单时正确转换状态和字段"""
-    from services.takeaway_manager import _meituan_client, sync_meituan_orders
+    from services.tx_trade.src.services.takeaway_manager import _meituan_client, sync_meituan_orders
 
     mock_orders = [
         {
@@ -108,7 +108,7 @@ async def test_sync_meituan_orders_with_data():
     _meituan_client.pull_new_orders = AsyncMock(return_value=mock_orders)
 
     # 确保不自动接单
-    from services.takeaway_manager import _auto_accept_rules
+    from services.tx_trade.src.services.takeaway_manager import _auto_accept_rules
 
     _auto_accept_rules.clear()
 
@@ -134,7 +134,7 @@ async def test_sync_meituan_orders_with_data():
 @pytest.mark.asyncio
 async def test_accept_order_meituan():
     """验证美团接单调用成功"""
-    from services.takeaway_manager import _meituan_client, accept_order
+    from services.tx_trade.src.services.takeaway_manager import _meituan_client, accept_order
 
     original = _meituan_client.confirm_order
     _meituan_client.confirm_order = AsyncMock(return_value={"code": "ok", "order_id": "MT001"})
@@ -159,7 +159,7 @@ async def test_accept_order_meituan():
 @pytest.mark.asyncio
 async def test_accept_order_invalid_platform():
     """验证不支持的平台报 ValueError"""
-    from services.takeaway_manager import accept_order
+    from services.tx_trade.src.services.takeaway_manager import accept_order
 
     with pytest.raises(ValueError, match="不支持的平台"):
         await accept_order(
@@ -175,7 +175,7 @@ async def test_accept_order_invalid_platform():
 @pytest.mark.asyncio
 async def test_reject_order_eleme():
     """验证饿了么拒单调用成功"""
-    from services.takeaway_manager import _eleme_client, reject_order
+    from services.tx_trade.src.services.takeaway_manager import _eleme_client, reject_order
 
     original = _eleme_client.cancel_order
     _eleme_client.cancel_order = AsyncMock(return_value={"code": "ok", "order_id": "EL001"})
@@ -201,7 +201,7 @@ async def test_reject_order_eleme():
 @pytest.mark.asyncio
 async def test_sync_stockout_to_both_platforms():
     """验证沽清同步到美团+饿了么"""
-    from services.takeaway_manager import (
+    from services.tx_trade.src.services.takeaway_manager import (
         _eleme_client,
         _meituan_client,
         sync_stockout_to_platforms,
@@ -233,7 +233,7 @@ async def test_sync_stockout_to_both_platforms():
 @pytest.mark.asyncio
 async def test_update_delivery_status_ok():
     """验证配送状态正常流转"""
-    from services.takeaway_manager import update_delivery_status
+    from services.tx_trade.src.services.takeaway_manager import update_delivery_status
 
     result = await update_delivery_status(
         order_id=_uid(),
@@ -250,7 +250,7 @@ async def test_update_delivery_status_ok():
 @pytest.mark.asyncio
 async def test_update_delivery_status_invalid():
     """验证无效状态报 ValueError"""
-    from services.takeaway_manager import update_delivery_status
+    from services.tx_trade.src.services.takeaway_manager import update_delivery_status
 
     with pytest.raises(ValueError, match="无效状态"):
         await update_delivery_status(
@@ -266,7 +266,7 @@ async def test_update_delivery_status_invalid():
 @pytest.mark.asyncio
 async def test_takeaway_dashboard():
     """验证仪表盘分类统计正确"""
-    from services.takeaway_manager import (
+    from services.tx_trade.src.services.takeaway_manager import (
         _orders_store,
         _save_order,
         get_takeaway_dashboard,
@@ -301,7 +301,7 @@ async def test_takeaway_dashboard():
 @pytest.mark.asyncio
 async def test_platform_reconciliation():
     """验证平台对账正常返回"""
-    from services.takeaway_manager import (
+    from services.tx_trade.src.services.takeaway_manager import (
         _meituan_client,
         get_platform_reconciliation,
     )
@@ -337,7 +337,7 @@ async def test_platform_reconciliation():
 @pytest.mark.asyncio
 async def test_manage_menu_on_sale():
     """验证美团菜品上架成功"""
-    from services.takeaway_manager import _meituan_client, manage_online_menu
+    from services.tx_trade.src.services.takeaway_manager import _meituan_client, manage_online_menu
 
     original = _meituan_client.on_sale_food
     _meituan_client.on_sale_food = AsyncMock(return_value={"code": "ok"})
@@ -361,7 +361,7 @@ async def test_manage_menu_on_sale():
 @pytest.mark.asyncio
 async def test_manage_menu_invalid_action():
     """验证无效操作被标记为 failed"""
-    from services.takeaway_manager import manage_online_menu
+    from services.tx_trade.src.services.takeaway_manager import manage_online_menu
 
     result = await manage_online_menu(
         store_id=STORE_ID,
@@ -379,7 +379,7 @@ async def test_manage_menu_invalid_action():
 @pytest.mark.asyncio
 async def test_set_auto_accept_rules_all():
     """验证设置全自动接单模式"""
-    from services.takeaway_manager import _auto_accept_rules, set_auto_accept_rules
+    from services.tx_trade.src.services.takeaway_manager import _auto_accept_rules, set_auto_accept_rules
 
     _auto_accept_rules.clear()
 
@@ -398,7 +398,7 @@ async def test_set_auto_accept_rules_all():
 @pytest.mark.asyncio
 async def test_set_auto_accept_rules_invalid_mode():
     """验证无效模式报 ValueError"""
-    from services.takeaway_manager import set_auto_accept_rules
+    from services.tx_trade.src.services.takeaway_manager import set_auto_accept_rules
 
     with pytest.raises(ValueError, match="无效的自动接单模式"):
         await set_auto_accept_rules(
@@ -414,7 +414,7 @@ async def test_set_auto_accept_rules_invalid_mode():
 @pytest.mark.asyncio
 async def test_auto_accept_all_mode():
     """验证全自动模式下订单自动接单"""
-    from services.takeaway_manager import (
+    from services.tx_trade.src.services.takeaway_manager import (
         _auto_accept_rules,
         _meituan_client,
         set_auto_accept_rules,

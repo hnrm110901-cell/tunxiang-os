@@ -70,7 +70,7 @@ class FakeSession:
 @pytest.mark.asyncio
 async def test_identify_member_not_found():
     """会员识别 — 手机号不存在"""
-    from services.coupon_service import identify_member
+    from services.tx_trade.src.services.coupon_service import identify_member
 
     db = FakeSession()
     db._execute_results = [FakeResult(scalar=None)]
@@ -85,7 +85,7 @@ async def test_identify_member_not_found():
 @pytest.mark.asyncio
 async def test_create_stored_value_card():
     """储值卡开卡"""
-    from services.coupon_service import _StoredValueStore, create_stored_value_card
+    from services.tx_trade.src.services.coupon_service import _StoredValueStore, create_stored_value_card
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -104,7 +104,7 @@ async def test_create_stored_value_card():
 @pytest.mark.asyncio
 async def test_recharge():
     """储值充值"""
-    from services.coupon_service import _StoredValueStore, create_stored_value_card, recharge
+    from services.tx_trade.src.services.coupon_service import _StoredValueStore, create_stored_value_card, recharge
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -117,7 +117,7 @@ async def test_recharge():
 @pytest.mark.asyncio
 async def test_deduct_stored_value_success():
     """储值消费 — 余额充足"""
-    from services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
+    from services.tx_trade.src.services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -131,7 +131,7 @@ async def test_deduct_stored_value_success():
 @pytest.mark.asyncio
 async def test_deduct_stored_value_insufficient():
     """储值消费 — 余额不足"""
-    from services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
+    from services.tx_trade.src.services.coupon_service import _StoredValueStore, create_stored_value_card, deduct_stored_value
 
     _StoredValueStore._cards.clear()
     db = FakeSession()
@@ -147,7 +147,7 @@ async def test_deduct_stored_value_insufficient():
 @pytest.mark.asyncio
 async def test_verify_coupon_not_found():
     """券验证 — 券不存在"""
-    from services.coupon_service import verify_coupon
+    from services.tx_trade.src.services.coupon_service import verify_coupon
 
     db = FakeSession()
     result = await verify_coupon("INVALID_CODE", _uid(), TENANT_ID, db)
@@ -158,7 +158,7 @@ async def test_verify_coupon_not_found():
 @pytest.mark.asyncio
 async def test_verify_and_redeem_coupon():
     """券验证 + 核销流程"""
-    from services.coupon_service import _CouponStore, redeem_coupon, verify_coupon
+    from services.tx_trade.src.services.coupon_service import _CouponStore, redeem_coupon, verify_coupon
 
     _CouponStore._coupons.clear()
 
@@ -200,7 +200,7 @@ async def test_verify_and_redeem_coupon():
 @pytest.mark.asyncio
 async def test_benefit_conflict_same_type():
     """同类型权益不叠加"""
-    from services.coupon_service import check_benefit_conflict
+    from services.tx_trade.src.services.coupon_service import check_benefit_conflict
 
     db = FakeSession()
     benefits = [
@@ -216,7 +216,7 @@ async def test_benefit_conflict_same_type():
 @pytest.mark.asyncio
 async def test_benefit_conflict_different_types():
     """不同类型权益可叠加"""
-    from services.coupon_service import check_benefit_conflict
+    from services.tx_trade.src.services.coupon_service import check_benefit_conflict
 
     db = FakeSession()
     benefits = [
@@ -238,7 +238,7 @@ async def test_benefit_conflict_different_types():
 @pytest.mark.asyncio
 async def test_member_price_s1_vip():
     """S1 VIP 会员价 — 8.5折"""
-    from services.coupon_service import calculate_member_price
+    from services.tx_trade.src.services.coupon_service import calculate_member_price
 
     db = FakeSession()
     result = await calculate_member_price(_uid(), "S1", TENANT_ID, db)
@@ -249,7 +249,7 @@ async def test_member_price_s1_vip():
 @pytest.mark.asyncio
 async def test_member_price_s5_no_discount():
     """S5 普通会员 — 无折扣"""
-    from services.coupon_service import calculate_member_price
+    from services.tx_trade.src.services.coupon_service import calculate_member_price
 
     db = FakeSession()
     result = await calculate_member_price(_uid(), "S5", TENANT_ID, db)
@@ -263,7 +263,7 @@ async def test_member_price_s5_no_discount():
 @pytest.mark.asyncio
 async def test_coupon_audit_empty():
     """券核销审计 — 无记录"""
-    from services.coupon_service import _CouponStore, get_coupon_audit
+    from services.tx_trade.src.services.coupon_service import _CouponStore, get_coupon_audit
 
     _CouponStore._coupons.clear()
     db = FakeSession()

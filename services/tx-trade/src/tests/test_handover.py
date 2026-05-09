@@ -111,7 +111,7 @@ class TestShiftHandoverService:
             ]
         )
 
-        from services.shift_handover_service import ShiftHandoverService
+        from services.tx_trade.src.services.shift_handover_service import ShiftHandoverService
 
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.start_handover(CASHIER_ID, STORE_ID)
@@ -150,7 +150,7 @@ class TestShiftHandoverService:
             ]
         )
 
-        from services.shift_handover_service import ShiftHandoverService
+        from services.tx_trade.src.services.shift_handover_service import ShiftHandoverService
 
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.record_cash_count(
@@ -189,7 +189,7 @@ class TestShiftHandoverService:
         )
         db.set_results([FakeResult(scalar=fake_handover)])
 
-        from services.shift_handover_service import ShiftHandoverService
+        from services.tx_trade.src.services.shift_handover_service import ShiftHandoverService
 
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.finalize_handover(handover_id)
@@ -223,7 +223,7 @@ class TestShiftHandoverService:
         )
         db.set_results([FakeResult(scalar=fake_handover)])
 
-        from services.shift_handover_service import ShiftHandoverService
+        from services.tx_trade.src.services.shift_handover_service import ShiftHandoverService
 
         svc = ShiftHandoverService(db, TENANT_ID)
         result = await svc.finalize_handover(handover_id)
@@ -287,7 +287,7 @@ class TestShiftReconciliation:
             ]
         )
 
-        from services.shift_reconciliation import ShiftReconciliationService
+        from services.tx_trade.src.services.shift_reconciliation import ShiftReconciliationService
 
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.reconcile_shift(handover_id)
@@ -349,7 +349,7 @@ class TestShiftReconciliation:
             ]
         )
 
-        from services.shift_reconciliation import ShiftReconciliationService
+        from services.tx_trade.src.services.shift_reconciliation import ShiftReconciliationService
 
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.flag_suspicious_transactions(handover_id)
@@ -387,7 +387,7 @@ class TestChannelVerify:
             ]
         )
 
-        from services.channel_verify import ChannelVerifyService
+        from services.tx_trade.src.services.channel_verify import ChannelVerifyService
 
         svc = ChannelVerifyService(db, TENANT_ID)
         result = await svc.verify_wechat_payments(STORE_ID, "2026-03-27")
@@ -409,7 +409,7 @@ class TestChannelVerify:
             db._execute_results.append(FakeResult(rows=[]))  # no orders
             db._execute_results.append(FakeResult(rows=[]))  # no payments
 
-        from services.channel_verify import ChannelVerifyService
+        from services.tx_trade.src.services.channel_verify import ChannelVerifyService
 
         svc = ChannelVerifyService(db, TENANT_ID)
         result = await svc.generate_channel_report(STORE_ID, "2026-03-27")
@@ -459,7 +459,7 @@ class TestCashVarianceDetail:
         )
         db.set_results([FakeResult(scalar=fake_handover)])
 
-        from services.shift_reconciliation import ShiftReconciliationService
+        from services.tx_trade.src.services.shift_reconciliation import ShiftReconciliationService
 
         svc = ShiftReconciliationService(db, TENANT_ID)
         result = await svc.get_cash_variance_detail(handover_id)
