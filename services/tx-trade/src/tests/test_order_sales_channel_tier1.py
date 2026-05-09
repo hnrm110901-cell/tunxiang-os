@@ -23,9 +23,10 @@ import pytest
 from shared.ontology.src.entities import Order
 from shared.ontology.src.sales_channel import DEFAULT_CHANNELS
 
-CASHIER_ENGINE_PATH = (
-    Path(__file__).resolve().parents[1] / "services" / "cashier_engine.py"
-)
+_SERVICES_DIR = Path(__file__).resolve().parents[1] / "services"
+CASHIER_ENGINE_PATH = _SERVICES_DIR / "cashier_engine.py"
+ORDER_SERVICE_PATH = _SERVICES_DIR / "order_service.py"
+GUARDED_FILES = [CASHIER_ENGINE_PATH, ORDER_SERVICE_PATH]
 
 
 # ─── 1. Order 实体契约 ────────────────────────────────────────────────
@@ -47,9 +48,9 @@ class TestOrderEntityContract:
 # ─── 2. cashier_engine.py 源码 AST 静态扫 ───────────────────────────
 
 
-def _parse_cashier_engine() -> ast.Module:
-    src = CASHIER_ENGINE_PATH.read_text(encoding="utf-8")
-    return ast.parse(src, filename=str(CASHIER_ENGINE_PATH))
+def _parse(path: Path) -> ast.Module:
+    src = path.read_text(encoding="utf-8")
+    return ast.parse(src, filename=str(path))
 
 
 def _find_order_constructor_kwargs(tree: ast.Module) -> list[tuple[int, list[str]]]:
@@ -75,26 +76,30 @@ def _find_dot_sales_channel_reads(tree: ast.Module) -> list[int]:
     return lines
 
 
-class TestCashierEngineSourceClean:
-    def test_no_sales_channel_kwarg_in_order_constructor(self) -> None:
-        """cashier_engine.py 任何 Order(...) 调用都不能含 sales_channel= kwarg。"""
-        tree = _parse_cashier_engine()
+class TestOrderInstantiationSourceClean:
+    """守门 cashier_engine.py + order_service.py — 不能用旧 sales_channel= kwarg / 属性读。"""
+
+    @pytest.mark.parametrize("path", GUARDED_FILES, ids=lambda p: p.name)
+    def test_no_sales_channel_kwarg_in_order_constructor(self, path: Path) -> None:
+        """守门文件任何 Order(...) 调用都不能含 sales_channel= kwarg。"""
+        tree = _parse(path)
         offenders = [
             (lineno, kwargs)
             for lineno, kwargs in _find_order_constructor_kwargs(tree)
             if "sales_channel" in kwargs
         ]
         assert not offenders, (
-            f"cashier_engine.py 仍有 Order(sales_channel=...) 调用，runtime TypeError "
-            f"(收银/零售/预订单全炸): {offenders}"
+            f"{path.name} 仍有 Order(sales_channel=...) 调用，runtime TypeError "
+            f"(收银/零售/预订单/创建订单全炸): {offenders}"
         )
 
-    def test_no_legacy_sales_channel_attribute_read(self) -> None:
-        """cashier_engine.py 不能读 .sales_channel — 必须用 .sales_channel_id。"""
-        tree = _parse_cashier_engine()
+    @pytest.mark.parametrize("path", GUARDED_FILES, ids=lambda p: p.name)
+    def test_no_legacy_sales_channel_attribute_read(self, path: Path) -> None:
+        """守门文件不能读 .sales_channel — 必须用 .sales_channel_id。"""
+        tree = _parse(path)
         offenders = _find_dot_sales_channel_reads(tree)
         assert not offenders, (
-            f"cashier_engine.py 仍有 .sales_channel 属性读取（前端会拿到 None / "
+            f"{path.name} 仍有 .sales_channel 属性读取（前端会拿到 None / "
             f"AttributeError），行号: {offenders}"
         )
 
