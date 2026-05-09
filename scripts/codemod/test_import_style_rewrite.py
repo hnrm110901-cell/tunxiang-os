@@ -7,10 +7,13 @@ Detect (and in Phase 2 rewrite) test-file import styles to unify on full-path fo
 
 测试文件以两种风格混用 import 同一磁盘模块：
 
-  - 裸：     from services.cashier_engine import ...
-            from api.routes import ...
-            from models.tables import ...
-  - 全路径： from services.tx_trade.src.services.cashier_engine import ...
+  - 裸 from-import： from services.cashier_engine import ...
+                    from api.routes import ...
+                    from models.tables import ...
+  - 裸 import：     import api.cashier_routes as _cashier_mod   (#318 follow-up 补抓)
+                    import services.payment_service
+  - 全路径：        from services.tx_trade.src.services.cashier_engine import ...
+                    import services.tx_trade.src.api.foo as _full
 
 两种都通过 conftest.py 的 namespace package 魔法 resolve 到同一 .py 文件，但 sys.modules
 key 不同 → SQLAlchemy 共享 metadata 时 "Table 'X' is already defined" → PR #287 加
@@ -126,7 +129,12 @@ def propose_rewrite(module: str, namespace: str, service: str) -> str:
 
 
 def scan_file(path: Path, repo_root: Path, service: str) -> list[ImportSite]:
-    """扫描单个 .py 文件，返回 (file, line, style, ns, module, proposed) 列表。"""
+    """扫描单个 .py 文件，返回 (file, line, style, ns, module, proposed) 列表。
+
+    抓两种 import 形式：
+      - `from <ns>.<x> import y`        → ast.ImportFrom
+      - `import <ns>.<x> [as foo]`      → ast.Import (#318 follow-up)
+    """
     try:
         source = path.read_text(encoding="utf-8")
         tree = ast.parse(source, filename=str(path))
@@ -135,26 +143,44 @@ def scan_file(path: Path, repo_root: Path, service: str) -> list[ImportSite]:
     rel = str(path.relative_to(repo_root))
     sites: list[ImportSite] = []
     for node in ast.walk(tree):
-        if not isinstance(node, ast.ImportFrom):
-            continue
-        if node.module is None or node.level != 0:
-            continue  # 相对 import 跳过（from ..X import）
-        style, ns = classify_module(node.module)
-        if style == "other":
-            continue
-        proposed = node.module if style == "full-path" else propose_rewrite(
-            node.module, ns, service
-        )
-        sites.append(
-            ImportSite(
-                rel_path=rel,
-                line=node.lineno,
-                style=style,
-                namespace=ns,
-                module=node.module,
-                proposed=proposed,
+        if isinstance(node, ast.ImportFrom):
+            if node.module is None or node.level != 0:
+                continue  # 相对 import 跳过（from ..X import）
+            style, ns = classify_module(node.module)
+            if style == "other":
+                continue
+            proposed = node.module if style == "full-path" else propose_rewrite(
+                node.module, ns, service
             )
-        )
+            sites.append(
+                ImportSite(
+                    rel_path=rel,
+                    line=node.lineno,
+                    style=style,
+                    namespace=ns,
+                    module=node.module,
+                    proposed=proposed,
+                )
+            )
+        elif isinstance(node, ast.Import):
+            # `import a.b.c [as foo]` — 每 alias 独立
+            for alias in node.names:
+                style, ns = classify_module(alias.name)
+                if style == "other":
+                    continue
+                proposed = alias.name if style == "full-path" else propose_rewrite(
+                    alias.name, ns, service
+                )
+                sites.append(
+                    ImportSite(
+                        rel_path=rel,
+                        line=node.lineno,
+                        style=style,
+                        namespace=ns,
+                        module=alias.name,
+                        proposed=proposed,
+                    )
+                )
     return sites
 
 
@@ -308,6 +334,10 @@ def filter_sites(
 def apply_rewrites_to_file(path: Path, sites_in_file: list[ImportSite]) -> int:
     """对单个文件做字符串级 import 改写（保留注释/空行/缩进）。
 
+    支持两种形式（#318 follow-up）：
+      - `from <module> import ...`     → `from <proposed> import ...`
+      - `import <module> [as foo]`     → `import <proposed> [as foo]`
+
     只处理 bare 站点。返回 changed line 数。
     """
     bare_sites = [s for s in sites_in_file if s.style == "bare"]
@@ -319,11 +349,26 @@ def apply_rewrites_to_file(path: Path, sites_in_file: list[ImportSite]) -> int:
         idx = s.line - 1
         if not (0 <= idx < len(lines)):
             continue
-        old = f"from {s.module} import"
-        new = f"from {s.proposed} import"
-        if old in lines[idx]:
-            lines[idx] = lines[idx].replace(old, new, 1)
+        # from-import 形式优先（更高熵的 token "from "）
+        from_old = f"from {s.module} import"
+        from_new = f"from {s.proposed} import"
+        if from_old in lines[idx]:
+            lines[idx] = lines[idx].replace(from_old, from_new, 1)
             changed += 1
+            continue
+        # import 形式 — `import X` 后必须跟空白或 `as`/EOL 防止误匹配
+        # （e.g. `import api.foo` 不能匹配到 `import api.foo_bar`）
+        import_old_prefix = f"import {s.module}"
+        line_text = lines[idx]
+        ix = line_text.find(import_old_prefix)
+        if ix >= 0:
+            after_idx = ix + len(import_old_prefix)
+            after_char = line_text[after_idx : after_idx + 1]
+            if after_char in ("", " ", "\t", "\n", ";"):
+                lines[idx] = (
+                    line_text[:ix] + f"import {s.proposed}" + line_text[after_idx:]
+                )
+                changed += 1
     if changed > 0:
         path.write_text("".join(lines), encoding="utf-8")
     return changed

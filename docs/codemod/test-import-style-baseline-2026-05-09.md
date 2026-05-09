@@ -4,27 +4,22 @@
 
 ## 全局统计
 
-- 总扫描 import 站点：**1088**
-- 裸 import（待改）：**891**
-- 全路径 import（已对齐）：**197**
+- 总扫描 import 站点：**1122**
+- 裸 import（待改）：**666**
+- 全路径 import（已对齐）：**456**
 
 ### 裸 import 顶层 NS 分布
 
 | NS | 站点 |
 |----|------|
-| `services` | 652 |
-| `api` | 213 |
-| `models` | 24 |
+| `services` | 423 |
+| `api` | 218 |
+| `models` | 23 |
 | `repositories` | 2 |
 
 ## 混用文件（高危 — SQLAlchemy 双重注册真凶）
 
-**2 文件**同时含裸 + 全路径 import，是 PR #287 `extend_existing=True` band-aid 的触发点。Phase 2 stacked PR **优先改这几个文件**。
-
-| 文件 | 裸/全路径 站点数 |
-|------|------------------|
-| `services/tx-trade/src/tests/test_order_transition_guard_tier1.py` | 3 裸 / 2 全路径 |
-| `services/tx-trade/tests/test_dispatch_rule_engine.py` | 1 裸 / 14 全路径 |
+✅ 当前无混用文件（band-aid 移除后无回归风险）
 
 ## `gateway` — 16 裸 / 2 全路径 / 5 文件（0 混用）
 
@@ -49,10 +44,11 @@
 | `test_open_api.py` | 39 | bare/services | `services.oauth2_service` | `services.gateway.src.services.oauth2_service` |
 | `test_open_api.py` | 40 | bare/services | `services.webhook_dispatcher` | `services.gateway.src.services.webhook_dispatcher` |
 
-## `tx_agent` — 36 裸 / 0 全路径 / 18 文件（0 混用）
+## `tx_agent` — 37 裸 / 0 全路径 / 19 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
+| `test_agent_hub_routes.py` | 67 | bare/api | `api.agent_hub_routes` | `services.tx_agent.src.api.agent_hub_routes` |
 | `test_d2_roi_fields.py` | 72 | bare/services | `services.decision_log_service` | `services.tx_agent.src.services.decision_log_service` |
 | `test_d2_roi_fields.py` | 112 | bare/services | `services.decision_log_service` | `services.tx_agent.src.services.decision_log_service` |
 | `test_d2_roi_fields.py` | 146 | bare/services | `services.decision_log_service` | `services.tx_agent.src.services.decision_log_service` |
@@ -90,11 +86,13 @@
 | `test_voice_routes_and_planner.py` | 100 | bare/api | `api.voice_routes` | `services.tx_agent.src.api.voice_routes` |
 | `test_voice_routes_and_planner.py` | 108 | bare/api | `api.planner` | `services.tx_agent.src.api.planner` |
 
-## `tx_analytics` — 27 裸 / 0 全路径 / 13 文件（0 混用）
+## `tx_analytics` — 34 裸 / 0 全路径 / 17 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
+| `test_analytics_core.py` | 97 | bare/api | `api.reports_router` | `services.tx_analytics.src.api.reports_router` |
 | `test_analytics_core.py` | 98 | bare/api | `api.reports_router` | `services.tx_analytics.src.api.reports_router` |
+| `test_anomaly_routes.py` | 79 | bare/api | `api.anomaly_routes` | `services.tx_analytics.src.api.anomaly_routes` |
 | `test_dashboard.py` | 13 | bare/services | `services.alert_summary` | `services.tx_analytics.src.services.alert_summary` |
 | `test_dashboard.py` | 19 | bare/services | `services.store_ranking` | `services.tx_analytics.src.services.store_ranking` |
 | `test_dashboard.py` | 25 | bare/services | `services.today_overview` | `services.tx_analytics.src.services.today_overview` |
@@ -110,10 +108,15 @@
 | `test_margin.py` | 15 | bare/services | `services.dish_margin` | `services.tx_analytics.src.services.dish_margin` |
 | `test_margin.py` | 20 | bare/services | `services.store_margin_report` | `services.tx_analytics.src.services.store_margin_report` |
 | `test_narrative_engine.py` | 8 | bare/services | `services.narrative_engine` | `services.tx_analytics.src.services.narrative_engine` |
+| `test_nlq_routes.py` | 58 | bare/api | `api.nlq_routes` | `services.tx_analytics.src.api.nlq_routes` |
 | `test_report_engine.py` | 25 | bare/services | `services.report_engine` | `services.tx_analytics.src.services.report_engine` |
 | `test_report_engine.py` | 39 | bare/services | `services.report_registry` | `services.tx_analytics.src.services.report_registry` |
 | `test_report_export.py` | 19 | bare/services | `services.report_export` | `services.tx_analytics.src.services.report_export` |
 | `test_repository.py` | 7 | bare/services | `services.repository` | `services.tx_analytics.src.services.repository` |
+| `test_routes_dashboard_knowledge.py` | 122 | bare/api | `api.dashboard_routes` | `services.tx_analytics.src.api.dashboard_routes` |
+| `test_routes_dashboard_knowledge.py` | 123 | bare/api | `api.knowledge_query` | `services.tx_analytics.src.api.knowledge_query` |
+| `test_routes_realtime_daily.py` | 84 | bare/api | `api.daily_report_routes` | `services.tx_analytics.src.api.daily_report_routes` |
+| `test_routes_realtime_daily.py` | 85 | bare/api | `api.realtime_routes` | `services.tx_analytics.src.api.realtime_routes` |
 | `test_sql_queries.py` | 23 | bare/services | `services.sql_queries` | `services.tx_analytics.src.services.sql_queries` |
 | `test_store_analysis.py` | 16 | bare/services | `services.store_analysis` | `services.tx_analytics.src.services.store_analysis` |
 | `test_store_analysis.py` | 109 | bare/api | `api.store_analysis_routes` | `services.tx_analytics.src.api.store_analysis_routes` |
@@ -129,7 +132,7 @@
 | `test_agents_a3_a5.py` | 32 | full | `services.tx_expense.src.agents.a3_standard_compliance` | _(已对齐)_ |
 | `test_agents_a3_a5.py` | 38 | full | `services.tx_expense.src.agents.a5_travel_assistant` | _(已对齐)_ |
 
-## `tx_finance` — 62 裸 / 5 全路径 / 28 文件（0 混用）
+## `tx_finance` — 62 裸 / 9 全路径 / 30 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -143,6 +146,8 @@
 | `test_finance_analytics.py` | 132 | bare/services | `services.finance_analytics` | `services.tx_finance.src.services.finance_analytics` |
 | `test_finance_analytics.py` | 138 | bare/services | `services.finance_analytics` | `services.tx_finance.src.services.finance_analytics` |
 | `test_finance_analytics.py` | 145 | bare/services | `services.finance_analytics` | `services.tx_finance.src.services.finance_analytics` |
+| `test_finance_cost_pl_routes.py` | 100 | full | `services.tx_finance.src.api.finance_cost_routes` | _(已对齐)_ |
+| `test_finance_cost_pl_routes.py` | 326 | full | `services.tx_finance.src.api.finance_pl_routes` | _(已对齐)_ |
 | `test_financial_voucher_lines_tier1.py` | 38 | bare/models | `models.voucher` | `services.tx_finance.src.models.voucher` |
 | `test_financial_voucher_service_tier1.py` | 37 | bare/models | `models.voucher` | `services.tx_finance.src.models.voucher` |
 | `test_financial_voucher_service_tier1.py` | 38 | bare/services | `services.financial_voucher_service` | `services.tx_finance.src.services.financial_voucher_service` |
@@ -162,6 +167,8 @@
 | `test_prior_period_adjustment_tier1.py` | 237 | bare/services | `services.voucher_generator` | `services.tx_finance.src.services.voucher_generator` |
 | `test_red_flush_tier1.py` | 36 | bare/models | `models.voucher` | `services.tx_finance.src.models.voucher` |
 | `test_red_flush_tier1.py` | 37 | bare/services | `services.financial_voucher_service` | `services.tx_finance.src.services.financial_voucher_service` |
+| `test_seafood_loss_budget_v2_routes.py` | 81 | full | `services.tx_finance.src.api.seafood_loss_routes` | _(已对齐)_ |
+| `test_seafood_loss_budget_v2_routes.py` | 370 | full | `services.tx_finance.src.api.budget_v2_routes` | _(已对齐)_ |
 | `test_split_channel_notify_sig.py` | 12 | bare/services | `services.split_notify_security` | `services.tx_finance.src.services.split_notify_security` |
 | `test_split_payment.py` | 11 | bare/api | `api.split_payment_routes` | `services.tx_finance.src.api.split_payment_routes` |
 | `test_vat_ledger.py` | 10 | bare/api | `api.vat_ledger_routes` | `services.tx_finance.src.api.vat_ledger_routes` |
@@ -293,7 +300,7 @@
 | `test_review_management.py` | 19 | bare/services | `services.nps_service` | `services.tx_intel.src.services.nps_service` |
 | `test_review_management.py` | 20 | bare/services | `services.review_replier` | `services.tx_intel.src.services.review_replier` |
 
-## `tx_member` — 107 裸 / 1 全路径 / 31 文件（0 混用）
+## `tx_member` — 112 裸 / 1 全路径 / 31 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -326,6 +333,11 @@
 | `test_member_analytics.py` | 118 | bare/services | `services.member_analytics` | `services.tx_member.src.services.member_analytics` |
 | `test_member_analytics.py` | 125 | bare/services | `services.member_analytics` | `services.tx_member.src.services.member_analytics` |
 | `test_member_extended.py` | 112 | bare/api | `api.group_routes` | `services.tx_member.src.api.group_routes` |
+| `test_member_extended.py` | 191 | bare/api | `api.group_routes` | `services.tx_member.src.api.group_routes` |
+| `test_member_extended.py` | 532 | bare/api | `api.gdpr_routes` | `services.tx_member.src.api.gdpr_routes` |
+| `test_member_extended.py` | 599 | bare/api | `api.gdpr_routes` | `services.tx_member.src.api.gdpr_routes` |
+| `test_member_extended.py` | 634 | bare/api | `api.gdpr_routes` | `services.tx_member.src.api.gdpr_routes` |
+| `test_member_extended.py` | 665 | bare/api | `api.gdpr_routes` | `services.tx_member.src.api.gdpr_routes` |
 | `test_member_level_routes.py` | 65 | bare/api | `api.member_level_routes` | `services.tx_member.src.api.member_level_routes` |
 | `test_members_routes.py` | 31 | bare/api | `api.members` | `services.tx_member.src.api.members` |
 | `test_points_engine.py` | 13 | bare/api | `api.points_routes` | `services.tx_member.src.api.points_routes` |
@@ -472,7 +484,7 @@
 | `test_live_seafood_weigh.py` | 718 | bare/api | `api.live_seafood_routes` | `services.tx_menu.src.api.live_seafood_routes` |
 | `test_live_seafood_weigh.py` | 767 | bare/api | `api.live_seafood_routes` | `services.tx_menu.src.api.live_seafood_routes` |
 
-## `tx_ops` — 10 裸 / 16 全路径 / 7 文件（0 混用）
+## `tx_ops` — 10 裸 / 17 全路径 / 8 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -494,6 +506,7 @@
 | `test_daily_ops_full.py` | 373 | full | `services.tx_ops.src.services.daily_review` | _(已对齐)_ |
 | `test_daily_ops_full.py` | 396 | full | `services.tx_ops.src.services.daily_review` | _(已对齐)_ |
 | `test_daily_ops_full.py` | 425 | full | `services.tx_ops.src.services.daily_review` | _(已对齐)_ |
+| `test_energy_budget_routes.py` | 23 | full | `services.tx_ops.src.api.energy_routes` | _(已对齐)_ |
 | `test_peak.py` | 41 | bare/services | `services.peak_management` | `services.tx_ops.src.services.peak_management` |
 | `test_peak.py` | 82 | bare/services | `services.peak_management` | `services.tx_ops.src.services.peak_management` |
 | `test_peak.py` | 120 | bare/services | `services.peak_management` | `services.tx_ops.src.services.peak_management` |
@@ -503,7 +516,7 @@
 | `test_store_clone.py` | 8 | bare/api | `api.store_clone` | `services.tx_ops.src.api.store_clone` |
 | `test_workflow_engine.py` | 8 | bare/services | `services.workflow_engine` | `services.tx_ops.src.services.workflow_engine` |
 
-## `tx_org` — 98 裸 / 26 全路径 / 44 文件（0 混用）
+## `tx_org` — 102 裸 / 26 全路径 / 44 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -545,6 +558,7 @@
 | `test_franchise_v4.py` | 25 | bare/api | `api.franchise_v4_routes` | `services.tx_org.src.api.franchise_v4_routes` |
 | `test_labor_efficiency.py` | 17 | bare/services | `services.labor_efficiency_service` | `services.tx_org.src.services.labor_efficiency_service` |
 | `test_leave_service.py` | 8 | bare/services | `services.leave_service` | `services.tx_org.src.services.leave_service` |
+| `test_org_compliance_revenue.py` | 189 | bare/api | `api.compliance_alert_routes` | `services.tx_org.src.api.compliance_alert_routes` |
 | `test_org_compliance_revenue.py` | 191 | bare/api | `api.compliance_alert_routes` | `services.tx_org.src.api.compliance_alert_routes` |
 | `test_org_core.py` | 166 | bare/api | `api.franchise_mgmt_routes` | `services.tx_org.src.api.franchise_mgmt_routes` |
 | `test_org_core.py` | 167 | bare/api | `api.franchise_router` | `services.tx_org.src.api.franchise_router` |
@@ -579,11 +593,14 @@
 | `test_store_clone.py` | 38 | bare/services | `services.store_clone` | `services.tx_org.src.services.store_clone` |
 | `test_store_clone.py` | 253 | bare/services | `services.store_clone` | `services.tx_org.src.services.store_clone` |
 | `test_store_clone.py` | 265 | bare/services | `services.store_clone` | `services.tx_org.src.services.store_clone` |
+| `test_store_clone.py` | 411 | bare/services | `services.store_clone` | `services.tx_org.src.services.store_clone` |
 | `test_store_clone.py` | 533 | bare/api | `api.store_clone_routes` | `services.tx_org.src.api.store_clone_routes` |
 | `test_store_transfer.py` | 6 | bare/services | `services.store_transfer_service` | `services.tx_org.src.services.store_transfer_service` |
 | `test_task_engine_tier1.py` | 51 | bare/repositories | `repositories.task_repo` | `services.tx_org.src.repositories.task_repo` |
 | `test_task_engine_tier1.py` | 52 | bare/services | `services.task_dispatch_service` | `services.tx_org.src.services.task_dispatch_service` |
+| `test_task_engine_tier1.py` | 81 | bare/services | `services.task_dispatch_service` | `services.tx_org.src.services.task_dispatch_service` |
 | `test_tax_filing.py` | 26 | bare/services | `services.tax_filing_service` | `services.tx_org.src.services.tax_filing_service` |
+| `test_transfers_api.py` | 21 | bare/api | `api.transfers` | `services.tx_org.src.api.transfers` |
 | `test_transfers_api.py` | 23 | bare/api | `api.transfers` | `services.tx_org.src.api.transfers` |
 | `test_approval_engine.py` | 34 | bare/models | `models.approval_flow` | `services.tx_org.src.models.approval_flow` |
 | `test_approval_engine.py` | 44 | bare/services | `services.approval_engine` | `services.tx_org.src.services.approval_engine` |
@@ -653,7 +670,7 @@
 | `test_churn_scorer.py` | 82 | bare/services | `services.churn_scorer` | `services.tx_predict.src.services.churn_scorer` |
 | `test_churn_scorer.py` | 91 | bare/services | `services.churn_scorer` | `services.tx_predict.src.services.churn_scorer` |
 
-## `tx_supply` — 92 裸 / 24 全路径 / 51 文件（0 混用）
+## `tx_supply` — 96 裸 / 26 全路径 / 53 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -703,6 +720,7 @@
 | `test_distribution.py` | 8 | bare/services | `services.distribution` | `services.tx_supply.src.services.distribution` |
 | `test_food_safety.py` | 9 | bare/services | `services.food_safety` | `services.tx_supply.src.services.food_safety` |
 | `test_inventory_io.py` | 12 | full | `services.tx_supply.src.services` | _(已对齐)_ |
+| `test_inventory_routes.py` | 165 | bare/api | `api.inventory` | `services.tx_supply.src.api.inventory` |
 | `test_inventory_routes.py` | 166 | bare/api | `api.inventory` | `services.tx_supply.src.api.inventory` |
 | `test_inventory_routes.py` | 170 | bare/api | `api.inventory` | `services.tx_supply.src.api.inventory` |
 | `test_kingdee_bridge.py` | 24 | bare/services | `services.kingdee_bridge` | `services.tx_supply.src.services.kingdee_bridge` |
@@ -716,8 +734,10 @@
 | `test_repository.py` | 8 | bare/services | `services.repository` | `services.tx_supply.src.services.repository` |
 | `test_requisition.py` | 9 | bare/services | `services.requisition` | `services.tx_supply.src.services.requisition` |
 | `test_requisition_routes.py` | 41 | bare/api | `api.requisition_routes` | `services.tx_supply.src.api.requisition_routes` |
+| `test_seafood_and_supplier_portal_routes.py` | 128 | bare/api | `api.seafood_routes` | `services.tx_supply.src.api.seafood_routes` |
 | `test_seafood_and_supplier_portal_routes.py` | 129 | bare/api | `api.seafood_routes` | `services.tx_supply.src.api.seafood_routes` |
 | `test_seafood_and_supplier_portal_routes.py` | 130 | bare/api | `api.seafood_routes` | `services.tx_supply.src.api.seafood_routes` |
+| `test_seafood_and_supplier_portal_routes.py` | 455 | bare/api | `api.supplier_portal_routes` | `services.tx_supply.src.api.supplier_portal_routes` |
 | `test_seafood_and_supplier_portal_routes.py` | 456 | bare/api | `api.supplier_portal_routes` | `services.tx_supply.src.api.supplier_portal_routes` |
 | `test_seafood_and_supplier_portal_routes.py` | 457 | bare/api | `api.supplier_portal_routes` | `services.tx_supply.src.api.supplier_portal_routes` |
 | `test_smart_procurement.py` | 18 | bare/api | `api.smart_procurement_routes` | `services.tx_supply.src.api.smart_procurement_routes` |
@@ -733,6 +753,7 @@
 | `test_traceability.py` | 8 | bare/services | `services.traceability` | `services.tx_supply.src.services.traceability` |
 | `test_transfer.py` | 32 | full | `services.tx_supply.src.services.transfer_service` | _(已对齐)_ |
 | `test_transfer_routes.py` | 36 | bare/services | `services.transfer_service` | `services.tx_supply.src.services.transfer_service` |
+| `test_warehouse_and_trace_routes.py` | 45 | bare/services | `services.warehouse_ops` | `services.tx_supply.src.services.warehouse_ops` |
 | `test_warehouse_and_trace_routes.py` | 46 | bare/services | `services.warehouse_ops` | `services.tx_supply.src.services.warehouse_ops` |
 | `test_warehouse_and_trace_routes.py` | 233 | bare/api | `api.trace_routes` | `services.tx_supply.src.api.trace_routes` |
 | `test_warehouse_ops.py` | 9 | bare/services | `services.warehouse_ops` | `services.tx_supply.src.services.warehouse_ops` |
@@ -755,6 +776,7 @@
 | `test_event_emission.py` | 301 | full | `services.tx_supply.src.services.receiving_service` | _(已对齐)_ |
 | `test_event_emission.py` | 323 | full | `services.tx_supply.src.services.bom_service` | _(已对齐)_ |
 | `test_food_safety_routes.py` | 28 | full | `services.tx_supply.src.api.food_safety_routes` | _(已对齐)_ |
+| `test_price_ledger.py` | 26 | full | `services.tx_supply.src.services.price_ledger_service` | _(已对齐)_ |
 | `test_procurement_prediction.py` | 25 | bare/services | `services.procurement_forecast_service` | `services.tx_supply.src.services.procurement_forecast_service` |
 | `test_procurement_prediction.py` | 174 | bare/services | `services.smart_replenishment` | `services.tx_supply.src.services.smart_replenishment` |
 | `test_procurement_prediction.py` | 241 | bare/services | `services.smart_replenishment` | `services.tx_supply.src.services.smart_replenishment` |
@@ -764,6 +786,7 @@
 | `test_procurement_prediction.py` | 559 | bare/services | `services.smart_replenishment` | `services.tx_supply.src.services.smart_replenishment` |
 | `test_procurement_prediction.py` | 653 | bare/services | `services.smart_replenishment` | `services.tx_supply.src.services.smart_replenishment` |
 | `test_seafood_routes.py` | 29 | full | `services.tx_supply.src.api.seafood_routes` | _(已对齐)_ |
+| `test_stocktake_db.py` | 21 | full | `services.tx_supply.src.services.stocktake_service` | _(已对齐)_ |
 | `test_stocktake_loss.py` | 33 | bare/models | `models.stocktake_loss` | `services.tx_supply.src.models.stocktake_loss` |
 | `test_stocktake_loss.py` | 41 | bare/services | `services.stocktake_loss_service` | `services.tx_supply.src.services.stocktake_loss_service` |
 | `test_stocktake_loss.py` | 548 | bare/services | `services.stocktake_loss_service` | `services.tx_supply.src.services.stocktake_loss_service` |
@@ -774,7 +797,7 @@
 | `test_warehouse_location.py` | 37 | full | `services.tx_supply.src.services` | _(已对齐)_ |
 | `test_warehouse_location.py` | 38 | full | `services.tx_supply.src.services.warehouse_location_service` | _(已对齐)_ |
 
-## `tx_trade` — 303 裸 / 107 全路径 / 56 文件（2 混用）
+## `tx_trade` — 57 裸 / 359 全路径 / 57 文件（0 混用）
 
 | 文件 | 行 | 风格 | 当前 | 提议改写 |
 |------|-----|------|------|---------|
@@ -786,45 +809,45 @@
 | `test_barcode_scan.py` | 380 | bare/services | `services.barcode_generator` | `services.tx_trade.src.services.barcode_generator` |
 | `test_barcode_scan.py` | 387 | bare/services | `services.barcode_generator` | `services.tx_trade.src.services.barcode_generator` |
 | `test_barcode_scan.py` | 395 | bare/services | `services.barcode_generator` | `services.tx_trade.src.services.barcode_generator` |
-| `test_batch_group.py` | 80 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 116 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 146 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 168 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 190 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 232 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 251 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 295 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_batch_group.py` | 315 | bare/services | `services.batch_group_service` | `services.tx_trade.src.services.batch_group_service` |
-| `test_cashier_engine.py` | 99 | bare/services | `services.cashier_engine` | `services.tx_trade.src.services.cashier_engine` |
-| `test_cashier_engine.py` | 107 | bare/services | `services.cashier_engine` | `services.tx_trade.src.services.cashier_engine` |
-| `test_cashier_engine.py` | 123 | bare/services | `services.payment_gateway` | `services.tx_trade.src.services.payment_gateway` |
-| `test_cashier_engine.py` | 155 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 167 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 467 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 483 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 489 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 495 | bare/services | `services.daily_settlement` | `services.tx_trade.src.services.daily_settlement` |
-| `test_cashier_engine.py` | 527 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_cashier_engine.py` | 558 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_cashier_engine.py` | 567 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_cashier_engine.py` | 574 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_cashier_engine.py` | 581 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_cashier_engine.py` | 674 | bare/services | `services.payment_gateway` | `services.tx_trade.src.services.payment_gateway` |
-| `test_cashier_engine.py` | 683 | bare/services | `services.payment_gateway` | `services.tx_trade.src.services.payment_gateway` |
-| `test_cashier_engine.py` | 746 | bare/api | `api.cashier_api` | `services.tx_trade.src.api.cashier_api` |
-| `test_cashier_engine.py` | 764 | bare/api | `api.cashier_api` | `services.tx_trade.src.api.cashier_api` |
-| `test_coupon.py` | 73 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 88 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 107 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 120 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 134 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 150 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 161 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 203 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 219 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 241 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 252 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
-| `test_coupon.py` | 266 | bare/services | `services.coupon_service` | `services.tx_trade.src.services.coupon_service` |
+| `test_batch_group.py` | 80 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 116 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 146 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 168 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 190 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 232 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 251 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 295 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_batch_group.py` | 315 | full | `services.tx_trade.src.services.batch_group_service` | _(已对齐)_ |
+| `test_cashier_engine.py` | 99 | full | `services.tx_trade.src.services.cashier_engine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 107 | full | `services.tx_trade.src.services.cashier_engine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 123 | full | `services.tx_trade.src.services.payment_gateway` | _(已对齐)_ |
+| `test_cashier_engine.py` | 155 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 167 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 467 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 483 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 489 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 495 | full | `services.tx_trade.src.services.daily_settlement` | _(已对齐)_ |
+| `test_cashier_engine.py` | 527 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 558 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 567 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 574 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 581 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_cashier_engine.py` | 674 | full | `services.tx_trade.src.services.payment_gateway` | _(已对齐)_ |
+| `test_cashier_engine.py` | 683 | full | `services.tx_trade.src.services.payment_gateway` | _(已对齐)_ |
+| `test_cashier_engine.py` | 746 | full | `services.tx_trade.src.api.cashier_api` | _(已对齐)_ |
+| `test_cashier_engine.py` | 764 | full | `services.tx_trade.src.api.cashier_api` | _(已对齐)_ |
+| `test_coupon.py` | 73 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 88 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 107 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 120 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 134 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 150 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 161 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 203 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 219 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 241 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 252 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
+| `test_coupon.py` | 266 | full | `services.tx_trade.src.services.coupon_service` | _(已对齐)_ |
 | `test_crew_stats_routes.py` | 79 | bare/api | `api.crew_stats_routes` | `services.tx_trade.src.api.crew_stats_routes` |
 | `test_crew_stats_routes.py` | 336 | bare/api | `api.crew_stats_routes` | `services.tx_trade.src.api.crew_stats_routes` |
 | `test_crew_stats_routes.py` | 384 | bare/api | `api.crew_stats_routes` | `services.tx_trade.src.api.crew_stats_routes` |
@@ -846,137 +869,137 @@
 | `test_delivery_panel.py` | 565 | full | `services.tx_trade.src.services.delivery_panel_service` | _(已对齐)_ |
 | `test_delivery_panel.py` | 615 | full | `services.tx_trade.src.services.delivery_panel_service` | _(已对齐)_ |
 | `test_digital_menu_board_router.py` | 96 | bare/api | `api.digital_menu_board_router` | `services.tx_trade.src.api.digital_menu_board_router` |
-| `test_dish_ranking.py` | 65 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 104 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 138 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 173 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 203 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 229 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 257 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dish_ranking.py` | 307 | bare/services | `services.dish_ranking_service` | `services.tx_trade.src.services.dish_ranking_service` |
-| `test_dispatch_code.py` | 38 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 51 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 76 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 101 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 144 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 182 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 203 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 247 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 286 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 323 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
-| `test_dispatch_code.py` | 341 | bare/services | `services.dispatch_code_service` | `services.tx_trade.src.services.dispatch_code_service` |
+| `test_dish_ranking.py` | 65 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 104 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 138 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 173 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 203 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 229 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 257 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dish_ranking.py` | 307 | full | `services.tx_trade.src.services.dish_ranking_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 38 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 51 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 76 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 101 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 144 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 182 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 203 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 247 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 286 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 323 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
+| `test_dispatch_code.py` | 341 | full | `services.tx_trade.src.services.dispatch_code_service` | _(已对齐)_ |
 | `test_dormancy.py` | 10 | bare/services | `services.dormancy_service` | `services.tx_trade.src.services.dormancy_service` |
 | `test_douyin_voucher.py` | 25 | full | `services.tx_trade.src.api.douyin_voucher_routes` | _(已对齐)_ |
 | `test_e4_disputes.py` | 32 | bare/services | `services.dispute_response_templates` | `services.tx_trade.src.services.dispute_response_templates` |
 | `test_e4_disputes.py` | 40 | bare/services | `services.dispute_service` | `services.tx_trade.src.services.dispute_service` |
-| `test_enterprise.py` | 65 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 66 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 87 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 109 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 125 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 143 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 174 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 190 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 205 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 231 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 252 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 272 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 288 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 315 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 334 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 356 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 357 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 391 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 392 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 418 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 419 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 441 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 459 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 460 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 501 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 502 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 535 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 536 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 561 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 562 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 606 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 607 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 652 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 663 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 676 | bare/services | `services.enterprise_account` | `services.tx_trade.src.services.enterprise_account` |
-| `test_enterprise.py` | 677 | bare/services | `services.enterprise_billing` | `services.tx_trade.src.services.enterprise_billing` |
-| `test_enterprise.py` | 712 | bare/api | `api.enterprise_routes` | `services.tx_trade.src.api.enterprise_routes` |
-| `test_enterprise.py` | 728 | bare/api | `api.enterprise_routes` | `services.tx_trade.src.api.enterprise_routes` |
+| `test_enterprise.py` | 65 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 66 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 87 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 109 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 125 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 143 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 174 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 190 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 205 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 231 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 252 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 272 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 288 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 315 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 334 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 356 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 357 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 391 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 392 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 418 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 419 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 441 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 459 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 460 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 501 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 502 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 535 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 536 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 561 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 562 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 606 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 607 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 652 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 663 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 676 | full | `services.tx_trade.src.services.enterprise_account` | _(已对齐)_ |
+| `test_enterprise.py` | 677 | full | `services.tx_trade.src.services.enterprise_billing` | _(已对齐)_ |
+| `test_enterprise.py` | 712 | full | `services.tx_trade.src.api.enterprise_routes` | _(已对齐)_ |
+| `test_enterprise.py` | 728 | full | `services.tx_trade.src.api.enterprise_routes` | _(已对齐)_ |
 | `test_food_court.py` | 21 | full | `services.tx_trade.src.main` | _(已对齐)_ |
 | `test_food_court.py` | 35 | full | `services.tx_trade.src.main` | _(已对齐)_ |
 | `test_food_court.py` | 42 | full | `services.tx_trade.src.main` | _(已对齐)_ |
-| `test_handover.py` | 114 | bare/services | `services.shift_handover_service` | `services.tx_trade.src.services.shift_handover_service` |
-| `test_handover.py` | 153 | bare/services | `services.shift_handover_service` | `services.tx_trade.src.services.shift_handover_service` |
-| `test_handover.py` | 192 | bare/services | `services.shift_handover_service` | `services.tx_trade.src.services.shift_handover_service` |
-| `test_handover.py` | 226 | bare/services | `services.shift_handover_service` | `services.tx_trade.src.services.shift_handover_service` |
-| `test_handover.py` | 290 | bare/services | `services.shift_reconciliation` | `services.tx_trade.src.services.shift_reconciliation` |
-| `test_handover.py` | 352 | bare/services | `services.shift_reconciliation` | `services.tx_trade.src.services.shift_reconciliation` |
-| `test_handover.py` | 390 | bare/services | `services.channel_verify` | `services.tx_trade.src.services.channel_verify` |
-| `test_handover.py` | 412 | bare/services | `services.channel_verify` | `services.tx_trade.src.services.channel_verify` |
-| `test_handover.py` | 462 | bare/services | `services.shift_reconciliation` | `services.tx_trade.src.services.shift_reconciliation` |
-| `test_invoice_service.py` | 34 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 43 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 61 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 83 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 97 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 115 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 132 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 149 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 158 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_invoice_service.py` | 174 | bare/services | `services.invoice_service` | `services.tx_trade.src.services.invoice_service` |
-| `test_kds.py` | 82 | bare/services | `services.kds_dispatch` | `services.tx_trade.src.services.kds_dispatch` |
-| `test_kds.py` | 117 | bare/services | `services.kds_dispatch` | `services.tx_trade.src.services.kds_dispatch` |
-| `test_kds.py` | 136 | bare/services | `services.cooking_scheduler` | `services.tx_trade.src.services.cooking_scheduler` |
-| `test_kds.py` | 165 | bare/services | `services.cooking_scheduler` | `services.tx_trade.src.services.cooking_scheduler` |
-| `test_kds.py` | 194 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds.py` | 220 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds.py` | 247 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds.py` | 272 | bare/services | `services.cooking_timeout` | `services.tx_trade.src.services.cooking_timeout` |
-| `test_kds.py` | 290 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds.py` | 317 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_call_service.py` | 91 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 113 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 131 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 154 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 172 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 193 | bare/services | `services.kds_call_service` | `services.tx_trade.src.services.kds_call_service` |
-| `test_kds_call_service.py` | 214 | bare/services | `services.order_push_config` | `services.tx_trade.src.services.order_push_config` |
-| `test_kds_call_service.py` | 237 | bare/services | `services.order_push_config` | `services.tx_trade.src.services.order_push_config` |
-| `test_kds_persistence.py` | 69 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 93 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 115 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 134 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 154 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 182 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 217 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 236 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_persistence.py` | 252 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 82 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 101 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 117 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 134 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 161 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 183 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 216 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 245 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 274 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 309 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 343 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
-| `test_kds_rush_sla.py` | 368 | bare/services | `services.kds_actions` | `services.tx_trade.src.services.kds_actions` |
+| `test_handover.py` | 114 | full | `services.tx_trade.src.services.shift_handover_service` | _(已对齐)_ |
+| `test_handover.py` | 153 | full | `services.tx_trade.src.services.shift_handover_service` | _(已对齐)_ |
+| `test_handover.py` | 192 | full | `services.tx_trade.src.services.shift_handover_service` | _(已对齐)_ |
+| `test_handover.py` | 226 | full | `services.tx_trade.src.services.shift_handover_service` | _(已对齐)_ |
+| `test_handover.py` | 290 | full | `services.tx_trade.src.services.shift_reconciliation` | _(已对齐)_ |
+| `test_handover.py` | 352 | full | `services.tx_trade.src.services.shift_reconciliation` | _(已对齐)_ |
+| `test_handover.py` | 390 | full | `services.tx_trade.src.services.channel_verify` | _(已对齐)_ |
+| `test_handover.py` | 412 | full | `services.tx_trade.src.services.channel_verify` | _(已对齐)_ |
+| `test_handover.py` | 462 | full | `services.tx_trade.src.services.shift_reconciliation` | _(已对齐)_ |
+| `test_invoice_service.py` | 34 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 43 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 61 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 83 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 97 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 115 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 132 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 149 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 158 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_invoice_service.py` | 174 | full | `services.tx_trade.src.services.invoice_service` | _(已对齐)_ |
+| `test_kds.py` | 82 | full | `services.tx_trade.src.services.kds_dispatch` | _(已对齐)_ |
+| `test_kds.py` | 117 | full | `services.tx_trade.src.services.kds_dispatch` | _(已对齐)_ |
+| `test_kds.py` | 136 | full | `services.tx_trade.src.services.cooking_scheduler` | _(已对齐)_ |
+| `test_kds.py` | 165 | full | `services.tx_trade.src.services.cooking_scheduler` | _(已对齐)_ |
+| `test_kds.py` | 194 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds.py` | 220 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds.py` | 247 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds.py` | 272 | full | `services.tx_trade.src.services.cooking_timeout` | _(已对齐)_ |
+| `test_kds.py` | 290 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds.py` | 317 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_call_service.py` | 91 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 113 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 131 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 154 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 172 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 193 | full | `services.tx_trade.src.services.kds_call_service` | _(已对齐)_ |
+| `test_kds_call_service.py` | 214 | full | `services.tx_trade.src.services.order_push_config` | _(已对齐)_ |
+| `test_kds_call_service.py` | 237 | full | `services.tx_trade.src.services.order_push_config` | _(已对齐)_ |
+| `test_kds_persistence.py` | 69 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 93 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 115 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 134 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 154 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 182 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 217 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 236 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_persistence.py` | 252 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 82 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 101 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 117 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 134 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 161 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 183 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 216 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 245 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 274 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 309 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 343 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
+| `test_kds_rush_sla.py` | 368 | full | `services.tx_trade.src.services.kds_actions` | _(已对齐)_ |
 | `test_kds_shortage_link.py` | 12 | full | `services.tx_trade.src.services` | _(已对齐)_ |
-| `test_kitchen_monitor.py` | 62 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 112 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 145 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 234 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 257 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 288 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 324 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
-| `test_kitchen_monitor.py` | 407 | bare/api | `api.kitchen_monitor_routes` | `services.tx_trade.src.api.kitchen_monitor_routes` |
+| `test_kitchen_monitor.py` | 62 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 112 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 145 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 234 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 257 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 288 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 324 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
+| `test_kitchen_monitor.py` | 407 | full | `services.tx_trade.src.api.kitchen_monitor_routes` | _(已对齐)_ |
 | `test_order_ext.py` | 128 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
 | `test_order_ext.py` | 153 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
 | `test_order_ext.py` | 171 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
@@ -984,37 +1007,37 @@
 | `test_order_ext.py` | 208 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
 | `test_order_ext.py` | 222 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
 | `test_order_ext.py` | 258 | bare/services | `services.order_extensions` | `services.tx_trade.src.services.order_extensions` |
-| `test_order_transition_guard_tier1.py` | 23 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
+| `test_order_transition_guard_tier1.py` | 23 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
 | `test_order_transition_guard_tier1.py` | 151 | full | `services.tx_trade.src.services.order_service` | _(已对齐)_ |
 | `test_order_transition_guard_tier1.py` | 184 | full | `services.tx_trade.src.services.order_service` | _(已对齐)_ |
-| `test_order_transition_guard_tier1.py` | 253 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_order_transition_guard_tier1.py` | 262 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_payment_direct.py` | 37 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 46 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 63 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 79 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 94 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 109 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 118 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 136 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 153 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 167 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 186 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 202 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
-| `test_payment_direct.py` | 217 | bare/services | `services.payment_direct` | `services.tx_trade.src.services.payment_direct` |
+| `test_order_transition_guard_tier1.py` | 253 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_order_transition_guard_tier1.py` | 262 | full | `services.tx_trade.src.services.state_machine` | _(已对齐)_ |
+| `test_payment_direct.py` | 37 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 46 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 63 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 79 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 94 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 109 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 118 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 136 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 153 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 167 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 186 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 202 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
+| `test_payment_direct.py` | 217 | full | `services.tx_trade.src.services.payment_direct` | _(已对齐)_ |
 | `test_payment_saga.py` | 167 | bare/services | `services.payment_saga_service` | `services.tx_trade.src.services.payment_saga_service` |
-| `test_platform_coupon.py` | 60 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 67 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 74 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 81 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 88 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 101 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 118 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 135 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 160 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 172 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 197 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
-| `test_platform_coupon.py` | 239 | bare/services | `services.coupon_platform_service` | `services.tx_trade.src.services.coupon_platform_service` |
+| `test_platform_coupon.py` | 60 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 67 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 74 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 81 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 88 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 101 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 118 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 135 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 160 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 172 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 197 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
+| `test_platform_coupon.py` | 239 | full | `services.tx_trade.src.services.coupon_platform_service` | _(已对齐)_ |
 | `test_printer.py` | 13 | bare/services | `services.print_manager` | `services.tx_trade.src.services.print_manager` |
 | `test_printer.py` | 14 | bare/services | `services.print_template` | `services.tx_trade.src.services.print_template` |
 | `test_printer.py` | 15 | bare/services | `services.printer_driver` | `services.tx_trade.src.services.printer_driver` |
@@ -1029,83 +1052,89 @@
 | `test_retail_mall.py` | 224 | bare/services | `services.retail_mall` | `services.tx_trade.src.services.retail_mall` |
 | `test_retail_mall.py` | 235 | bare/services | `services.retail_mall` | `services.tx_trade.src.services.retail_mall` |
 | `test_retail_mall.py` | 250 | bare/services | `services.retail_mall` | `services.tx_trade.src.services.retail_mall` |
-| `test_scan_order.py` | 98 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 114 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 128 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 148 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 158 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 165 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 172 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 185 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 246 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 295 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 325 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 356 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
-| `test_scan_order.py` | 384 | bare/services | `services.scan_order_service` | `services.tx_trade.src.services.scan_order_service` |
+| `test_scan_order.py` | 98 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 114 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 128 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 148 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 158 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 165 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 172 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 185 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 246 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 295 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 325 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 356 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
+| `test_scan_order.py` | 384 | full | `services.tx_trade.src.services.scan_order_service` | _(已对齐)_ |
 | `test_self_order_engine.py` | 21 | bare/services | `services.self_order_engine` | `services.tx_trade.src.services.self_order_engine` |
-| `test_service_charge.py` | 35 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 45 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 72 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 98 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 127 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 154 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 169 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 183 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 198 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
-| `test_service_charge.py` | 218 | bare/services | `services.service_charge` | `services.tx_trade.src.services.service_charge` |
+| `test_service_charge.py` | 35 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 45 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 72 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 98 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 127 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 154 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 169 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 183 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 198 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
+| `test_service_charge.py` | 218 | full | `services.tx_trade.src.services.service_charge` | _(已对齐)_ |
 | `test_sprint4_reconcile.py` | 24 | bare/services | `services.delivery_adapter` | `services.tx_trade.src.services.delivery_adapter` |
 | `test_sprint4_reconcile.py` | 25 | bare/services | `services.member_golden_id` | `services.tx_trade.src.services.member_golden_id` |
 | `test_sprint4_reconcile.py` | 26 | bare/services | `services.reconciliation` | `services.tx_trade.src.services.reconciliation` |
 | `test_state_machine.py` | 8 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
 | `test_state_machine.py` | 86 | bare/services | `services.state_machine` | `services.tx_trade.src.services.state_machine` |
-| `test_tables.py` | 81 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 98 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 111 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 129 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 146 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 162 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 176 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 192 | bare/services | `services.table_operations` | `services.tx_trade.src.services.table_operations` |
-| `test_tables.py` | 211 | bare/services | `services.room_rules` | `services.tx_trade.src.services.room_rules` |
-| `test_tables.py` | 229 | bare/services | `services.room_rules` | `services.tx_trade.src.services.room_rules` |
-| `test_tables.py` | 248 | bare/services | `services.room_rules` | `services.tx_trade.src.services.room_rules` |
-| `test_tables.py` | 269 | bare/services | `services.room_rules` | `services.tx_trade.src.services.room_rules` |
-| `test_takeaway.py` | 49 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 71 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 93 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 111 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 137 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 162 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 178 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 204 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 236 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 253 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 269 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 304 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 340 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 364 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 382 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 401 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_takeaway.py` | 417 | bare/services | `services.takeaway_manager` | `services.tx_trade.src.services.takeaway_manager` |
-| `test_template_editor.py` | 24 | bare/services | `services.printer_driver` | `services.tx_trade.src.services.printer_driver` |
-| `test_template_editor.py` | 32 | bare/services | `services.template_renderer` | `services.tx_trade.src.services.template_renderer` |
-| `test_template_editor.py` | 306 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 561 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 629 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 636 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 643 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 649 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
-| `test_template_editor.py` | 656 | bare/api | `api.template_editor_routes` | `services.tx_trade.src.api.template_editor_routes` |
+| `test_tables.py` | 81 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 98 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 111 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 129 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 146 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 162 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 176 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 192 | full | `services.tx_trade.src.services.table_operations` | _(已对齐)_ |
+| `test_tables.py` | 211 | full | `services.tx_trade.src.services.room_rules` | _(已对齐)_ |
+| `test_tables.py` | 229 | full | `services.tx_trade.src.services.room_rules` | _(已对齐)_ |
+| `test_tables.py` | 248 | full | `services.tx_trade.src.services.room_rules` | _(已对齐)_ |
+| `test_tables.py` | 269 | full | `services.tx_trade.src.services.room_rules` | _(已对齐)_ |
+| `test_takeaway.py` | 49 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 71 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 93 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 111 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 137 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 162 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 178 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 204 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 236 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 253 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 269 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 304 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 340 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 364 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 382 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 401 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_takeaway.py` | 417 | full | `services.tx_trade.src.services.takeaway_manager` | _(已对齐)_ |
+| `test_template_editor.py` | 24 | full | `services.tx_trade.src.services.printer_driver` | _(已对齐)_ |
+| `test_template_editor.py` | 32 | full | `services.tx_trade.src.services.template_renderer` | _(已对齐)_ |
+| `test_template_editor.py` | 306 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 561 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 629 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 636 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 643 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 649 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_template_editor.py` | 656 | full | `services.tx_trade.src.api.template_editor_routes` | _(已对齐)_ |
+| `test_trade_extended.py` | 103 | bare/api | `api.booking_api` | `services.tx_trade.src.api.booking_api` |
+| `test_trade_extended.py` | 301 | bare/api | `api.mobile_ops_routes` | `services.tx_trade.src.api.mobile_ops_routes` |
 | `test_trade_promotions.py` | 66 | bare/api | `api.discount_engine_routes` | `services.tx_trade.src.api.discount_engine_routes` |
 | `test_trade_promotions.py` | 67 | bare/api | `api.stored_value_routes` | `services.tx_trade.src.api.stored_value_routes` |
 | `test_trade_webhook.py` | 115 | bare/api | `api.webhook_routes` | `services.tx_trade.src.api.webhook_routes` |
 | `test_trade_webhook.py` | 124 | bare/api | `api.wechat_pay_routes` | `services.tx_trade.src.api.wechat_pay_routes` |
+| `test_trade_webhook.py` | 189 | bare/api | `api.webhook_routes` | `services.tx_trade.src.api.webhook_routes` |
+| `test_trade_webhook.py` | 247 | bare/api | `api.webhook_routes` | `services.tx_trade.src.api.webhook_routes` |
+| `test_trade_webhook.py` | 284 | bare/api | `api.webhook_routes` | `services.tx_trade.src.api.webhook_routes` |
+| `test_trade_webhook.py` | 347 | bare/api | `api.webhook_routes` | `services.tx_trade.src.api.webhook_routes` |
 | `test_tv_menu.py` | 4 | bare/services | `services.tx_trade_src_services` | `services.tx_trade.src.services.tx_trade_src_services` |
 | `test_tv_menu_routes.py` | 11 | full | `services.tx_trade.src.main` | _(已对齐)_ |
 | `test_unified_order_hub_filters.py` | 9 | bare/services | `services.unified_order_hub` | `services.tx_trade.src.services.unified_order_hub` |
 | `test_xhs_routes.py` | 23 | bare/api | `api.xhs_routes` | `services.tx_trade.src.api.xhs_routes` |
 | `test_cook_time_stats.py` | 16 | full | `services.tx_trade.src.services.cook_time_stats` | _(已对齐)_ |
-| `test_dispatch_rule_engine.py` | 66 | bare/models | `models.dispatch_rule` | `services.tx_trade.src.models.dispatch_rule` |
+| `test_dispatch_rule_engine.py` | 66 | full | `services.tx_trade.src.models.dispatch_rule` | _(已对齐)_ |
 | `test_dispatch_rule_engine.py` | 130 | full | `services.tx_trade.src.services.dispatch_rule_engine` | _(已对齐)_ |
 | `test_dispatch_rule_engine.py` | 174 | full | `services.tx_trade.src.services.dispatch_rule_engine` | _(已对齐)_ |
 | `test_dispatch_rule_engine.py` | 208 | full | `services.tx_trade.src.services.dispatch_rule_engine` | _(已对齐)_ |
