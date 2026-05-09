@@ -54,15 +54,18 @@ TABLES = [
 ]
 
 RLS_POLICY_SQL = """
-    CREATE POLICY IF NOT EXISTS {table}_tenant_isolation
+    CREATE POLICY {table}_tenant_isolation
     ON {table}
     USING (tenant_id = (current_setting('app.tenant_id'))::UUID)
 """
 
 
 def upgrade():
+    # B'-6 修：原用 `CREATE POLICY IF NOT EXISTS` (PG 不支持该子句) → SyntaxError。
+    # 改 `DROP POLICY IF EXISTS ...` + `CREATE POLICY ...` 实现幂等。
     for table in TABLES:
         op.execute(f"ALTER TABLE IF EXISTS {table} ENABLE ROW LEVEL SECURITY")
+        op.execute(f"DROP POLICY IF EXISTS {table}_tenant_isolation ON {table}")
         op.execute(
             RLS_POLICY_SQL.format(table=table).strip()
         )

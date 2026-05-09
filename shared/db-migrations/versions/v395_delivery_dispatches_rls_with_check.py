@@ -87,12 +87,29 @@ def upgrade() -> None:
             op.execute(f"DROP POLICY IF EXISTS {old_policy} ON {table};")
             op.execute(f"DROP POLICY IF EXISTS {new_policy} ON {table};")
 
-            op.execute(
-                f"CREATE POLICY {new_policy} ON {table} "
-                f"AS PERMISSIVE FOR {action} TO PUBLIC "
-                f"USING (tenant_id = {_RLS_EXPR}) "
-                f"WITH CHECK (tenant_id = {_RLS_EXPR});"
-            )
+            # B'-6 修：PG 语义按 action 选子句（原全用 USING+WITH CHECK 双子句撞两类报错）：
+            #   INSERT — 只 WITH CHECK（"only WITH CHECK ... allowed for INSERT"）
+            #   UPDATE — USING + WITH CHECK 双子句（标准）
+            #   DELETE — 只 USING（"WITH CHECK cannot be applied to SELECT or DELETE"）
+            if action == "INSERT":
+                op.execute(
+                    f"CREATE POLICY {new_policy} ON {table} "
+                    f"AS PERMISSIVE FOR {action} TO PUBLIC "
+                    f"WITH CHECK (tenant_id = {_RLS_EXPR});"
+                )
+            elif action == "DELETE":
+                op.execute(
+                    f"CREATE POLICY {new_policy} ON {table} "
+                    f"AS PERMISSIVE FOR {action} TO PUBLIC "
+                    f"USING (tenant_id = {_RLS_EXPR});"
+                )
+            else:  # UPDATE
+                op.execute(
+                    f"CREATE POLICY {new_policy} ON {table} "
+                    f"AS PERMISSIVE FOR {action} TO PUBLIC "
+                    f"USING (tenant_id = {_RLS_EXPR}) "
+                    f"WITH CHECK (tenant_id = {_RLS_EXPR});"
+                )
 
         # 2. 确保 RLS 仍启用 + FORCE（v391 已开启；防御幂等）
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;")
@@ -108,7 +125,9 @@ def downgrade() -> None:
         if table not in existing_tables:
             continue
 
-        # 反向：DROP 新策略，重建 v391 仅 USING 的旧策略形态（保持 down 等价回滚）
+        # 反向：DROP 新策略，重建 v391 旧策略形态
+        # B'-6 修：原 v391 旧形态对 INSERT 用 USING 是 PG syntax error；downgrade
+        # 切回旧形态时需用 WITH CHECK 才合法（与 upgrade 同模式）
         for action in _WRITE_ACTIONS:
             old_policy = f"rls_{table}_{action.lower()}"
             new_policy = f"rls_{table}_{action.lower()}_with_check"
@@ -116,8 +135,9 @@ def downgrade() -> None:
             op.execute(f"DROP POLICY IF EXISTS {new_policy} ON {table};")
             op.execute(f"DROP POLICY IF EXISTS {old_policy} ON {table};")
 
+            clause = "WITH CHECK" if action == "INSERT" else "USING"
             op.execute(
                 f"CREATE POLICY {old_policy} ON {table} "
                 f"AS PERMISSIVE FOR {action} TO PUBLIC "
-                f"USING (tenant_id = {_RLS_EXPR});"
+                f"{clause} (tenant_id = {_RLS_EXPR});"
             )
