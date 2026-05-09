@@ -144,57 +144,174 @@ production code 和 migrations 不强制对齐。v315 schema (`lead_no/status`) 
 - 新 PR 引入这些模式之一 → linter fail
 - 整合到 `python -m pytest shared/db-migrations/tests/` 默认跑
 
-### Phase 4: 架构去耦（**founder 决策**）
+### Phase 4: 架构去耦 — **路线 a 选定（2026-05-10）**
 
-14 services 共享 `shared/db-migrations/` 但缺所有权治理是根因 #1。两种解法：
+> founder 决策：**选 a — Per-service migrations**。
 
-#### 路线 a — Per-service migrations
+#### 路线 a 子阶段
 
-每个 service 一套 alembic：
+##### Phase 4a-1: Table ownership audit（**已完成**，本 PR）
+
+`docs/migration-architecture-route-a-ownership-audit.md`：471 张表 grep `services/*/src/` 推断 owner。
+
+| Confidence | 数量 | 处理 |
+|---|---|---|
+| `clear`（单 service ≥3 文件命中）| 126 | 自动入册 |
+| `weak`（单 service 1-2 文件命中）| 298 | 人工抽查 |
+| `ambiguous`（多 service 同等命中）| 26 | **founder 决策** |
+| `shared`（无 service 命中）| 21 | 入 `shared/db-migrations-core/` |
+| `multi-creator`（类 A 撞名）| 25 | **founder 决策保留哪个** |
+
+候选 owner 列表：13 个 service + `gateway` + `shared/core` + 数个 composite（待 disambiguate）。
+
+##### Phase 4a-2: Founder review + ambiguity 决策
+
+founder 必须在 Phase 4a-3 起手前 review audit 文档：
+1. 26 个 ambiguous 表逐一选 owner
+2. 25 个 multi-creator 撞名表选保留 schema
+3. 298 个 weak 表抽查 ~30 个验证 owner 准确性
+4. 21 个 shared 表确认是否真共享
+
+**输出**：`docs/migration-architecture-route-a-ownership-audit.md` 增 founder 决策标注（每行加 ✓/重新 owner/拆表 etc.）
+
+时间：1-2 day（founder 工作）
+
+##### Phase 4a-3: Per-service alembic 骨架
+
+为每个 service + shared/core 建独立 alembic 配置：
+
+```
+services/tx-trade/db-migrations/
+  alembic.ini           # version_table_name = tx_trade_alembic_version
+  env.py
+  versions/             # 起始空
+  tests/
+services/tx-org/db-migrations/
+  ...
+[14 services × 1 alembic each]
+
+shared/db-migrations-core/  # 跨 service 共享（tenants / RLS / ENUMs）
+  alembic.ini           # version_table_name = core_alembic_version
+  env.py
+  versions/
+```
+
+每个 alembic 用独立 `version_table` 隔离 stamp。
+
+时间：2-4 hr
+
+##### Phase 4a-4: Per-service baseline schema
+
+founder 提供 production `pg_dump --schema-only`（决策点 2）。
+按 ownership audit 拆 dump 为 14 个服务 baseline + 1 core baseline：
 
 ```
 services/tx-trade/db-migrations/versions/
-services/tx-org/db-migrations/versions/
-...
+  v_001_baseline.py      # 跑 v_001_baseline.sql，里面是 tx-trade 拥有的表
+  v_001_baseline.sql
+shared/db-migrations-core/versions/
+  c_001_baseline.py      # tenants / brand_groups / RLS infra / ENUMs
+  c_001_baseline.sql
 ```
 
-- service 独立演进 schema，互不干扰
-- 跨 service 的表（e.g. `tenants`）放 `shared/db-migrations-core/`
-- ORM model 必须在自己 service 的 migrations 中定义对应 CREATE TABLE
-- 部署时分服务跑 alembic upgrade
+时间：4-8 hr
 
-**优点**：service 独立，schema 责任清晰，未来多 PG 部署灵活
-**缺点**：14 套 alembic 配置，跨服务 join/FK 需明确规约
-**工作量**：~2 周
+##### Phase 4a-5: 部署 / fixture / CI orchestration
 
-#### 路线 b — Shared DB + 强治理
+Fresh DB 启动顺序：
+1. `shared/db-migrations-core` upgrade（infra）
+2. 14 services 并发 upgrade（独立）
 
-保留 mono-repo，但加治理层：
+```bash
+# scripts/db-migrate-all.sh
+alembic -c shared/db-migrations-core/alembic.ini upgrade head
+for svc in tx-trade tx-org tx-expense ...; do
+  alembic -c services/$svc/db-migrations/alembic.ini upgrade head &
+done
+wait
+```
 
-- `shared/db-migrations/OWNERS.yml` 文件，每张表声明所属 service：
-  ```yaml
-  approval_instances: tx-expense  # 仅 tx-expense 可改其 schema
-  banquet_leads: tx-trade
-  ...
-  ```
-- CI 检查每个 migration PR：
-  - 如果改动了非自己 owner 的表 → fail（除非该 PR 同时含 `chore: rename-owner` 元数据）
-- alembic 标准 merge migration 用法 enforce：禁止 copy-paste 副本
+更新：
+- `infra/compose/base.yml` migrate 命令改并发
+- `.github/workflows/migration-ci.yml` 14 services 各跑 upgrade head
+- `scripts/db-bootstrap.sh` fresh PG 一键启动
 
-**优点**：改动小，符合现状（14 services 共用 PG）
-**缺点**：仍是单 alembic chain，复杂度依然高
-**工作量**：~1 周
+时间：4-8 hr
 
-**我的倾向**：**路线 b**（小改动 / 维持现状 / Week 8 demo 不阻塞）；路线 a 适合 Q4+ 真做 multi-PG 部署时切。
+##### Phase 4a-6: Production cutover
+
+production DB 已含旧 `alembic_version` (v406 stamp)：
+1. 创建新 `<svc>_alembic_version` 表（每 service）
+2. stamp 各 service 的 `v_001_baseline`（不真跑 SQL，只 stamp）
+3. 旧 `alembic_version` 标 deprecated（保留 reference 防回滚）
+4. 后续 service migrations 从 `v_002+` 起
+
+时间：2-4 hr（含 dry-run on staging）
+
+##### Phase 4a-7: 旧 mono-repo migration archive
+
+```
+shared/db-migrations/_archive/v001_to_v406/
+```
+
+archive 后该目录不被任何 alembic 配置扫描；保留 git history 作为 reference。
+
+时间：30 min
+
+#### 路线 a 总时间表
+
+| 子阶段 | 时间 | 触发 |
+|---|---|---|
+| 4a-1 audit | 已完成 | — |
+| 4a-2 founder review | 1-2 day | founder 工作 |
+| 4a-3 alembic 骨架 | 2-4 hr | 4a-2 完成 |
+| 4a-4 baseline schema | 4-8 hr | 决策点 2 + production pg_dump |
+| 4a-5 部署 orchestration | 4-8 hr | 4a-4 完成 |
+| 4a-6 production cutover | 2-4 hr（+staging dry-run） | 4a-5 完成 |
+| 4a-7 archive | 30 min | 4a-6 完成 |
+
+**总计**：~3-4 天工程时间 + 1-2 天 founder review = ~1 周
+
+#### 路线 a 风险
+
+- **跨 service 表 owner 误判**：导致 service 自启时找不到自己依赖的表 → service crash。缓解：staging 全套 service smoke test，audit 文档严格 review
+- **service 间 schema 不可见性**：tx-trade 改 orders 表，tx-analytics 不知 → ORM 漂移。缓解：定期 schema diff CI（独立 PR）
+- **跨 service join 仍存在**：service A 的 ORM model 引用 service B 的表（虽然不该）。缓解：grep audit + 拆 service 边界（独立 PR）
+- **Production cutover 风险**：stamp 错版本 → migration 重跑或漏跑。缓解：staging dry-run 全程，PITR snapshot 兜底
+- **cross-cutting 表（如 RLS Policy）**：放 shared/core 但需各 service 在自己 baseline 中 ENABLE RLS — 边界需明确
+
+#### 路线 a 不在范围
+
+以下问题**route a 不解**，需独立 issue 跟进：
+
+- `approval_instances` 三 schema 撞名 — Phase 4a-2 audit 决策保留哪个（实际意味着另两 service runtime 失败 → 重 schema 或 rename）
+- ORM models 与 migrations 漂移检测 — 独立 PR (类似 alembic check 但 ORM-aware)
+- Cross-service event bus / 事件源（CLAUDE.md §15）— 与 schema ownership 正交
 
 ---
 
-## 三、决策点登记（待 founder 决策）
+### 路线 b — Shared DB + 强治理（**未选**，作 reference 保留）
 
-### 决策点 1：架构路线 a vs b（Phase 4）
+保留 mono-repo，加 OWNERS.yml 治理：
 
-a) Per-service migrations — 长期正确，工作量 2 周
-b) Shared + OWNERS 治理 — 现状友好，工作量 1 周（**我倾向**）
+- `shared/db-migrations/OWNERS.yml` 文件，每张表声明所属 service
+- CI 检查每个 migration PR：改动非自己 owner 的表 → fail
+- alembic 标准 merge migration 用法 enforce：禁止 copy-paste 副本
+
+**优点**：改动小，符合现状
+**缺点**：仍是单 alembic chain，复杂度依然高；service 独立部署/演进受限
+**工作量**：~1 周
+
+**未选原因**：founder 选 a — 长期正确（service 独立演进 / 多 PG 部署灵活）。Q3 投资 ~1 周架构治理换 Q4+ 多月 velocity。
+
+---
+
+## 三、决策点登记
+
+### 决策点 1：架构路线 a vs b（Phase 4）— ✅ **founder 选 a (2026-05-10)**
+
+a) **Per-service migrations** ✓ — 长期正确，14 services 各自独立 alembic
+b) Shared + OWNERS 治理 — 未选（仍是单 chain 复杂度高）
 
 ### 决策点 2：Phase 1 baseline 来源
 
