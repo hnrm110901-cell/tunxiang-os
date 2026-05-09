@@ -15,6 +15,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): 早期 migration 用不同 schema 创建过
+    # banquet_feedbacks / banquet_referrals。本文件是 canonical，先 DROP CASCADE
+    # 再 CREATE。同 banquet 群其他文件（v315/v316/v317/v318/v319/v336）模式。
+    op.execute("DROP TABLE IF EXISTS banquet_referrals CASCADE")
+    op.execute("DROP TABLE IF EXISTS banquet_feedbacks CASCADE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_feedbacks (
             id                      UUID            NOT NULL DEFAULT gen_random_uuid(),

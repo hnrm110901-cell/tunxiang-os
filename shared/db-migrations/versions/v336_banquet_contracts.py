@@ -16,6 +16,11 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-5, 2026-05-09): v282_banquet_contracts.py 早期用 contract_id
+    # PK schema 创建过 banquet_contracts，与本文件 (id PK + banquet_id) 不匹配。
+    # IF NOT EXISTS 让 v282 schema 静默胜出 → CREATE INDEX 列 banquet_id 撞不存在。
+    op.execute("DROP TABLE IF EXISTS banquet_contract_amendments CASCADE")  # FK 依赖顺序
+    op.execute("DROP TABLE IF EXISTS banquet_contracts CASCADE")
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_contracts (
             id              UUID            NOT NULL DEFAULT gen_random_uuid(),
