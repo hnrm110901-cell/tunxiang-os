@@ -16,7 +16,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.golden_id_routes import router as golden_id_router
+from services.tx_member.src.api.golden_id_routes import router as golden_id_router
 from fastapi.testclient import TestClient
 from main import app
 

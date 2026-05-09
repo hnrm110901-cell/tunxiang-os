@@ -30,7 +30,7 @@ import uuid
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from services.alliance_service import AllianceService, AllianceServiceError
+from services.tx_member.src.services.alliance_service import AllianceService, AllianceServiceError
 
 TENANT_ID = str(uuid.uuid4())
 CUSTOMER_A = str(uuid.uuid4())
@@ -496,7 +496,7 @@ class TestAllianceRoutes:
     async def test_api_create_partner(self):
         """验证 POST /partners 路由创建合作伙伴"""
 
-        from api.alliance_routes import CreatePartnerReq, api_create_partner
+        from services.tx_member.src.api.alliance_routes import CreatePartnerReq, api_create_partner
 
         body = CreatePartnerReq(
             partner_name="肯德基",
@@ -518,7 +518,7 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_list_partners(self):
         """验证 GET /partners 路由列表查询"""
-        from api.alliance_routes import api_list_partners
+        from services.tx_member.src.api.alliance_routes import api_list_partners
 
         db = AsyncMock()
         with patch.object(AllianceService, "get_partner_list", new_callable=AsyncMock) as mock_list:
@@ -537,7 +537,7 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_exchange_points(self):
         """验证 POST /exchange 路由积分兑换"""
-        from api.alliance_routes import ExchangePointsReq, api_exchange_points
+        from services.tx_member.src.api.alliance_routes import ExchangePointsReq, api_exchange_points
 
         body = ExchangePointsReq(
             customer_id=CUSTOMER_A,
@@ -561,7 +561,7 @@ class TestAllianceRoutes:
     @pytest.mark.asyncio
     async def test_api_dashboard(self):
         """验证 GET /dashboard 路由仪表盘"""
-        from api.alliance_routes import api_alliance_dashboard
+        from services.tx_member.src.api.alliance_routes import api_alliance_dashboard
 
         db = AsyncMock()
         with patch.object(AllianceService, "get_alliance_dashboard", new_callable=AsyncMock) as mock_dash:

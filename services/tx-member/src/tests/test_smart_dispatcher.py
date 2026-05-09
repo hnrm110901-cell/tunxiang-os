@@ -14,7 +14,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.smart_dispatch_routes import router as dispatch_router
+from services.tx_member.src.api.smart_dispatch_routes import router as dispatch_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -24,7 +24,7 @@ if not any(r.prefix == "/api/v1/member/dispatch" for r in app.routes if hasattr(
 client = TestClient(app)
 
 # 导入服务层辅助函数做单元测试
-from services.smart_dispatcher import (
+from services.tx_member.src.services.smart_dispatcher import (
     LEVEL_NAMES_CN,
     LEVEL_RANK,
     NOTIFICATION_CHANNELS,

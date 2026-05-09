@@ -62,7 +62,7 @@ _inject_stubs()
 
 # ─── 加载路由 ────────────────────────────────────────────────────────────────
 
-from api.member_level_routes import _get_tenant_db, router  # noqa: E402
+from services.tx_member.src.api.member_level_routes import _get_tenant_db, router  # noqa: E402
 
 app = FastAPI()
 app.include_router(router)

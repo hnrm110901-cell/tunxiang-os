@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # 注册 analytics_routes（若 main.py 尚未注册，在此补充）
-from api.analytics_routes import router as analytics_router
+from services.tx_member.src.api.analytics_routes import router as analytics_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -103,26 +103,26 @@ class TestChurnRiskCalculation:
 
     def test_high_risk_threshold(self):
         """>60天未消费应为高风险"""
-        from services.member_analytics import CHURN_HIGH_RISK_DAYS, CHURN_MEDIUM_RISK_DAYS
+        from services.tx_member.src.services.member_analytics import CHURN_HIGH_RISK_DAYS, CHURN_MEDIUM_RISK_DAYS
 
         assert CHURN_HIGH_RISK_DAYS == 60
         assert CHURN_MEDIUM_RISK_DAYS == 30
 
     def test_safe_ratio_zero_denominator(self):
-        from services.member_analytics import _safe_ratio
+        from services.tx_member.src.services.member_analytics import _safe_ratio
 
         assert _safe_ratio(100, 0) == 0.0
         assert _safe_ratio(0, 0) == 0.0
 
     def test_safe_ratio_normal(self):
-        from services.member_analytics import _safe_ratio
+        from services.tx_member.src.services.member_analytics import _safe_ratio
 
         assert _safe_ratio(1, 4) == 0.25
         assert _safe_ratio(3, 10) == 0.3
 
     def test_frequency_bands_cover_all(self):
         """频次带必须无缝覆盖 1 到 999999"""
-        from services.member_analytics import FREQUENCY_BANDS
+        from services.tx_member.src.services.member_analytics import FREQUENCY_BANDS
 
         assert len(FREQUENCY_BANDS) >= 4
         assert FREQUENCY_BANDS[0][1] == 1  # 从 1 开始

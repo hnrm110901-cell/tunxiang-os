@@ -11,8 +11,8 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.badge_routes import router as badge_router
-from api.challenge_routes import router as challenge_router
+from services.tx_member.src.api.badge_routes import router as badge_router
+from services.tx_member.src.api.challenge_routes import router as challenge_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -372,7 +372,7 @@ class TestSurpriseReward:
         # 验证函数签名要求 db 参数
         import inspect
 
-        from services.surprise_reward import (
+        from services.tx_member.src.services.surprise_reward import (
             delete_surprise_rule,
             get_surprise_rules,
             register_surprise_rule,
@@ -392,7 +392,7 @@ class TestSurpriseReward:
         """验证所有核心函数已改为 async"""
         import inspect
 
-        from services.surprise_reward import (
+        from services.tx_member.src.services.surprise_reward import (
             check_surprise,
             delete_surprise_rule,
             get_surprise_rules,

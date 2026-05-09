@@ -72,7 +72,7 @@ class TestCustomerDepthAPI:
 
 # ── 业务逻辑单元测试 ──────────────────────────────────────────
 
-from services.customer_depth import (
+from services.tx_member.src.services.customer_depth import (
     _rfm_level,
 )
 

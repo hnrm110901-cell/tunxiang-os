@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.gift_card import (
+from services.tx_member.src.services.gift_card import (
     _CardStore,
     _CardTypeStore,
     _OnlineConfigStore,

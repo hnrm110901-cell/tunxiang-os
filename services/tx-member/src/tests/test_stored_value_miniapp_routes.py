@@ -81,7 +81,7 @@ def _seq_db(*results):
 
 # ─── 加载路由 ──────────────────────────────────────────────
 
-from api.stored_value_miniapp_routes import _MOCK_PLANS, router
+from services.tx_member.src.api.stored_value_miniapp_routes import _MOCK_PLANS, router
 
 from shared.ontology.src.database import get_db
 

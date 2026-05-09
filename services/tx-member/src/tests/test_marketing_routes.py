@@ -54,7 +54,7 @@ def _make_row(mapping: dict):
 # 应用 & 路由
 # ---------------------------------------------------------------------------
 
-from api.marketing import router
+from services.tx_member.src.api.marketing import router
 
 app = FastAPI()
 app.include_router(router)
