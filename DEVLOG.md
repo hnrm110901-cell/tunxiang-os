@@ -1,7 +1,7 @@
 ## 2026-05-09 深夜 续 #4 — #298 codemod chain 100% 收官（test 端） — Phase 9 余 7 服务一波清
 
 ### 今日完成（5/9 第 9 PR — chain 收官）
-- **#XXX** Phase 9 chain closer — 余 7 服务一次性清理（gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops）
+- **#350** Phase 9 chain closer — 余 7 服务一次性清理（gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops）
   - **RED** `ef5db8e0` — 7 conftest 新建（决策 83 第 4-10 次） + 单一守门 fixture（chain 收官，覆盖 7 服务）
   - **GREEN** `20ee1915` — codemod --apply 7 服务循环：65 文件 / 159 import
   - **fix** `29c5c728` — patch literal 漂移 74 处 / 6 文件（bulk regex 改写）
@@ -32,7 +32,7 @@
 | 6 | #344 | tx-supply | 39 | 96 |
 | 7 | #348 | tx-growth | 20 | 70 |
 | 8 | #349 | tx-finance | 23 | 62 |
-| **9** | **#XXX** | **gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops** | **65** | **159** |
+| **9** | **#350** | **gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops** | **65** | **159** |
 | **累计** | | **13 服务** | **258** | **~906** |
 | 余 | | tx-civic（0 bare）/ tx-pay（0 bare）/ tx-expense（0 bare） | 0 | 0 |
 
@@ -49,7 +49,7 @@
 | #347 | conftest shared namespace fix | 5 服务 -16 errors |
 | #348 | Phase 7 + conftest | tx-growth 20/70 |
 | #349 | Phase 8 + conftest | tx-finance 23/62 |
-| **#XXX** | **Phase 9 chain closer + 7 conftest** | **7 服务 65/159** |
+| **#350** | **Phase 9 chain closer + 7 conftest** | **7 服务 65/159** |
 
 ### 遗留问题
 - **决策 77 仍未撤 band-aid**：本 PR 完成 chain test 端 100%，但 production 端 from api.X / from services.<bare> 短路径仍存在，撤 PR #287 extend_existing 兜底还需 production codemod
@@ -1144,8 +1144,8 @@ reviewer 还提了 4 个高优 smell（建议 merge 后 follow-up）：
 - **#251 [S1-08] 硬编码品牌色清理 — 已落地（98.3% 减幅）**
   - **hardcoded-color: 4112 → 69 baseline 锁定**
   - 3 波 codemod：
-    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#XXXXXX'` 字面量 → `txColors.<name>`（~3300 处）
-    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#XXXXXX` → `var(--tx-*)`（49 处）
+    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#350XXX'` 字面量 → `txColors.<name>`（~3300 处）
+    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#350XXX` → `var(--tx-*)`（49 处）
     - `scripts/lint-ui/codemod-color-cssinjs.mjs` — TSX/TS CSS shorthand string `'... #X ...'` → 模板字符串（424 处）
   - lint 豁免规则细化：跳过 inline `//` 注释 + `var(--*, #X)` defensive fallback
   - JSX 属性破损批量修复：`color=txColors.X` → `color={txColors.X}`（162 处，64 文件）
