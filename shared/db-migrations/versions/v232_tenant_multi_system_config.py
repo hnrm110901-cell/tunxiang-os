@@ -71,11 +71,13 @@ def upgrade() -> None:
     """)
 
     # ── 2. 为三品牌写入配置骨架（仅当 systems_config 为空时更新） ───
+    # SQLAlchemy text() 解析器在 `:cfg::jsonb` 上歧义（cast `::` 与命名参数 `:`
+    # 连写）；用 `cast(:cfg AS jsonb)` 显式表达 cast，参数边界明确。
     for tenant_code in ("t-czq", "t-zqx", "t-sgc"):
         op.execute(
             sa.text("""
                 UPDATE tenants
-                   SET systems_config = :cfg::jsonb
+                   SET systems_config = cast(:cfg AS jsonb)
                  WHERE code = :code
                    AND (systems_config IS NULL OR systems_config = '{}'::jsonb)
             """).bindparams(
