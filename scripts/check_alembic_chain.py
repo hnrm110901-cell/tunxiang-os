@@ -41,22 +41,14 @@ from typing import Iterable
 #     Downstream of these children is normal chain (they chain off real
 #     declared revisions), so we do NOT cascade the scope guard transitively.
 #
-# See docs/migration-chain-debt.md. Goal: drain both sets to empty before v400.
-KNOWN_BROKEN_PARENTS: frozenset[str] = frozenset(
-    {
-        "v301_refund_requests",
-        "v310_mv_performance_indexes",
-        "v387_pdpa_compliance",
-    }
-)
+# 2026-05-09 (B'): Both sets drained to empty — the 3 historical dangling
+#   refs (v310 → v301_refund_requests / v311 → v310_mv_performance_indexes /
+#   v388 → v387_pdpa_compliance) are now repaired with real revision IDs.
+#   The scope-guard mechanism is retained as a defensive net so future debt
+#   accrual is explicit. See docs/migration-chain-debt.md (debt cleared).
+KNOWN_BROKEN_PARENTS: frozenset[str] = frozenset()
 
-KNOWN_BROKEN_CHILDREN: frozenset[str] = frozenset(
-    {
-        "v310",            # v310_mv_performance_indexes.py declares revision="v310"; → v301_refund_requests
-        "v311",            # v311_rls_retrofit_26_tables.py → v310_mv_performance_indexes
-        "v388",            # v388_id_market.py → v387_pdpa_compliance
-    }
-)
+KNOWN_BROKEN_CHILDREN: frozenset[str] = frozenset()
 
 # Backwards-compat union — some callers / tests may want the combined view.
 KNOWN_BROKEN: frozenset[str] = KNOWN_BROKEN_PARENTS | KNOWN_BROKEN_CHILDREN
