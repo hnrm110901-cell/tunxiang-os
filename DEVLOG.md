@@ -1,7 +1,7 @@
 ## 2026-05-09 深夜 续 #2 — #298 codemod Phase 7 (tx-growth 20/70) + conftest 新建（决策 83）
 
 ### 今日完成（5/9 第 7 PR）
-- **#XXX** Phase 7 tx-growth 全清 — 模板沿用 #335 / #338 / #341 / #344
+- **#348** Phase 7 tx-growth 全清 — 模板沿用 #335 / #338 / #341 / #344
   - **RED** `0633de92` — `services/tx-growth/conftest.py` 新建（决策 83，~50 行）+ `test_codemod_phase7_bare_imports_tier1.py` AST 守门
   - **GREEN** `3c8193b5` — codemod --apply --service tx-growth：20 文件 / 70 import
   - **fix** `066ee2fa` — patch literal 漂移 25 处（test_journey_routes 8 / test_growth_approval 8 / test_content_factory 4 / test_touch_attribution 3 / test_ab_test_attribution 2）
@@ -29,7 +29,7 @@
 | 4 | #338 | tx-member | 30 | 112 |
 | 5 | #341 | tx-org | 39 | 102 |
 | 6 | #344 | tx-supply | 39 | 96 |
-| **7** | **#XXX** | **tx-growth** | **20** | **70** |
+| **7** | **#348** | **tx-growth** | **20** | **70** |
 | **累计** | | **5 服务** | **170** | **~685** |
 | 余待清 | | 9 服务 | ~? | ~52（tx-finance 52 实测，其他基本 0）|
 
@@ -46,7 +46,7 @@
 | #341 | Phase 5 tx-org 39/102 + 24 drift |
 | #344 | Phase 6 tx-supply 39/96 + 20 drift |
 | #347 | C 深挖 — conftest shared/shared.adapters namespace fix（5 服务 -16 collection errors）|
-| **#XXX** | **Phase 7 tx-growth 20/70 + conftest 新建 + 25 drift** |
+| **#348** | **Phase 7 tx-growth 20/70 + conftest 新建 + 25 drift** |
 
 ### 遗留问题
 - 决策 79 follow-up：tx-growth +63 surfaced failures（与 codemod 无关 pre-existing）
@@ -1139,8 +1139,8 @@ reviewer 还提了 4 个高优 smell（建议 merge 后 follow-up）：
 - **#251 [S1-08] 硬编码品牌色清理 — 已落地（98.3% 减幅）**
   - **hardcoded-color: 4112 → 69 baseline 锁定**
   - 3 波 codemod：
-    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#XXXXXX'` 字面量 → `txColors.<name>`（~3300 处）
-    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#XXXXXX` → `var(--tx-*)`（49 处）
+    - `scripts/lint-ui/codemod-color.mjs` — TSX/TS `'#348XXX'` 字面量 → `txColors.<name>`（~3300 处）
+    - `scripts/lint-ui/codemod-color-css.mjs` — .css/.scss `#348XXX` → `var(--tx-*)`（49 处）
     - `scripts/lint-ui/codemod-color-cssinjs.mjs` — TSX/TS CSS shorthand string `'... #X ...'` → 模板字符串（424 处）
   - lint 豁免规则细化：跳过 inline `//` 注释 + `var(--*, #X)` defensive fallback
   - JSX 属性破损批量修复：`color=txColors.X` → `color={txColors.X}`（162 处，64 文件）

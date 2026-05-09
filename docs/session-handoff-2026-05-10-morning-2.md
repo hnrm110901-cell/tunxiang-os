@@ -3,7 +3,7 @@
 ## 上一 session 终态（2026-05-09 23:30）
 
 main HEAD: `9f0ca7d4`
-我侧 OPEN：**7 PR**（#335 / #336 / #338 / #341 / #344 / #347 / #XXX）
+我侧 OPEN：**7 PR**（#335 / #336 / #338 / #341 / #344 / #347 / #348）
 
 ### 战绩（5/9 一日 7 PR）
 
@@ -15,7 +15,7 @@ main HEAD: `9f0ca7d4`
 | #341 | Phase 5 tx-org 39/102 | main | T1 | OPEN |
 | #344 | Phase 6 tx-supply 39/96 | main | T1 | OPEN |
 | #347 | conftest shared namespace fix | main | T2 | OPEN |
-| **#XXX** | **Phase 7 tx-growth 20/70 + conftest** | **main** | **T1** | **OPEN** |
+| **#348** | **Phase 7 tx-growth 20/70 + conftest** | **main** | **T1** | **OPEN** |
 
 ### chain 进度：~88%
 - 5 服务 / 170 文件 / ~685 imports cleared
@@ -56,7 +56,7 @@ find services -maxdepth 2 -name "conftest.py" | sort  # 决策 83 状态
 
 ### C. **决策 79 follow-up — tx-growth +63 surfaced failures 调查**
 - ~2-3h，T2
-- 解 #XXX 暴露的 pre-existing latent bugs
+- 解 #348 暴露的 pre-existing latent bugs
 - ROI 偏低（dev-experience 类）
 
 ### D. **决策 79 follow-up — shared.security 残留 10 collection errors**
@@ -110,7 +110,7 @@ find services -maxdepth 2 -name "conftest.py" | sort  # 决策 83 状态
 | tx-org | ✓ | 已有 |
 | tx-pay | ✓ | 已有 |
 | tx-supply | ✓ | 已有 |
-| tx-growth | ✓ | #XXX 新建 |
+| tx-growth | ✓ | #348 新建 |
 | 其余 9 服务 | ✗ | Phase 推到时新建 |
 
 ## 累计 #298 chain 数据快照
@@ -121,6 +121,6 @@ find services -maxdepth 2 -name "conftest.py" | sort  # 决策 83 状态
 | 4 | #338 | tx-member | 30 | 112 |
 | 5 | #341 | tx-org | 39 | 102 |
 | 6 | #344 | tx-supply | 39 | 96 |
-| 7 | #XXX | tx-growth | 20 | 70 |
+| 7 | #348 | tx-growth | 20 | 70 |
 | **累计** | | **5 服务** | **170** | **~685** |
 | 余待清 | | 9 服务 | ~? | ~52 |
