@@ -16,10 +16,14 @@ __path__ = [REPO_ROOT/services]。
 
 修复
 ====
-本 conftest 在 pytest 启动期把所有 `services/<svc>/src/services/` 追加到
-顶级 services namespace 的 __path__，让裸 import 能解析回正确文件。
+本 conftest 在 pytest 启动期：
+  1. 把所有 `services/<svc>/src/services/` 追加到顶级 services namespace
+     的 __path__（issue #220 root cause #4）
+  2. 把 `shared` 与 `shared.adapters` 注册成 namespace package（避免 pytest
+     importlib 模式下偶发缓存为非包，导致 `from shared.security.X` /
+     `from shared.adapters.xiaohongshu.X` 触发 'is not a package' 错误）
 
-这是 CI infra 修复（不改业务代码）— Issue #220 root cause #4。
+这是 CI infra 修复（不改业务代码）。
 """
 
 import os
@@ -69,3 +73,37 @@ def _patch_services_namespace() -> None:
 
 
 _patch_services_namespace()
+
+
+def _patch_shared_namespace() -> None:
+    """注册 shared 与 shared.adapters 为 namespace package。
+
+    pytest --import-mode=importlib 在 collection 阶段偶发将 `shared` 缓存为
+    非 package（无 __path__），导致 `from shared.security.src.X import Y` 在
+    业务代码 import 链触发时报 "shared is not a package"。
+
+    修补：启动期主动注册 shared / shared.adapters 为 namespace package，
+    指向真实磁盘路径。已有 __init__.py 时不覆盖（保持原 ModuleSpec）。
+    """
+    shared_dir = os.path.join(_REPO_ROOT, "shared")
+    if not os.path.isdir(shared_dir):
+        return
+
+    pkg = sys.modules.get("shared")
+    if pkg is None or not hasattr(pkg, "__path__"):
+        new_pkg = types.ModuleType("shared")
+        new_pkg.__path__ = [shared_dir]
+        new_pkg.__package__ = "shared"
+        sys.modules["shared"] = new_pkg
+
+    adapters_dir = os.path.join(shared_dir, "adapters")
+    if os.path.isdir(adapters_dir):
+        ad = sys.modules.get("shared.adapters")
+        if ad is None or not hasattr(ad, "__path__"):
+            ad_mod = types.ModuleType("shared.adapters")
+            ad_mod.__path__ = [adapters_dir]
+            ad_mod.__package__ = "shared.adapters"
+            sys.modules["shared.adapters"] = ad_mod
+
+
+_patch_shared_namespace()
