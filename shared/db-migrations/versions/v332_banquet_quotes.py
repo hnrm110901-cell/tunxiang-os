@@ -16,6 +16,12 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # 类 A 副本去重 (B'-4, 2026-05-09): 本文件 (revision="v332_banquet_quotes")
+    # 与 v316_banquet_quotes.py (revision="v316_banquet_quotes") 是 100% 内容
+    # 副本（diff 0 行 schema 差异）。v316 是 canonical 持有者；本文件改 no-op，
+    # 让 v316 唯一负责 schema (banquet_menu_templates / banquet_quotes /
+    # banquet_quote_items 三表)。
+    return
     # ── banquet_menu_templates 套餐模板 ──
     op.execute("""
         CREATE TABLE IF NOT EXISTS banquet_menu_templates (
@@ -159,6 +165,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.execute("DROP TABLE IF EXISTS banquet_quote_items CASCADE")
-    op.execute("DROP TABLE IF EXISTS banquet_quotes CASCADE")
+    # B'-4 (2026-05-09): no-op；副本回滚由 v316 downgrade 负责
+    return
     op.execute("DROP TABLE IF EXISTS banquet_menu_templates CASCADE")
