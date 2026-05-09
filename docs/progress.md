@@ -1,3 +1,49 @@
+## 2026-05-10 凌晨 · B'-6 类 G 生成列 + 类 A 残留 + chain 结构性清理 (partial)
+
+### 完成状态
+- [x] 类 G — v378 生成列 + v264 索引函数 IMMUTABLE 修
+- [x] 类 A 残留 — v235c approval_instances + v391 delivery_dispatches DROP CASCADE
+- [x] 类 F 续 — v311 IF NOT EXISTS 不支持 / v395 三 action 子句修
+- [x] chain 结构性 — v310 skip / v383 tuple 清理 / v388 skip
+- [x] DEVLOG / progress 同步
+- [x] 真 PG 验证：链路从 v378 推进到约 v273（**chain 拓扑序复杂，非线性增长**）
+- [ ] **v273 pos_crash_reports DROP CASCADE** — B'-7 起手
+- [ ] v274-v406 段未完整摸排 — 预计 5-10+ 个零星 bug
+- [ ] v388 fill_rls 26 表真启用（独立 PR）
+- [ ] approval_instances 架构去耦（独立 PR）
+- [ ] v310 mv_* 索引重写（独立 PR）
+
+### 关键决策
+- **v378 生成列改普通 INT 由 service 维护**：service 已有 months_since_opening
+  计算逻辑（store_lifecycle_service.py:159），不依赖 DB 自动生成；PG 16 不
+  支持 VIRTUAL 生成列，无 DB 端等价方案
+- **v264 索引去掉 date_trunc**：改裸 created_at DESC，查询侧用范围过滤等价
+- **v395 三 action 子句精细化**（INSERT WITH CHECK only / DELETE USING only /
+  UPDATE 双子句）：比 PR #343 的 INSERT-only 区分更精细，覆盖 PG 三类报错
+- **v388 整体 skip**：26 表 RLS 补齐与 parallel branches 拓扑深度耦合，
+  强制跑等于 transaction rollback；正确修复策略需独立 PR 拆 sub-migrations
+- **v383 tuple 清理 10 non-heads**：alembic 拓扑序 try heads.remove() 撞 KeyError；
+  这些 revision 通过自己的 children 进入主链，无需 v383 兜底
+- **B'-6 partial 而非 complete**：每修一个暴露下一个，本 PR 4 commit 已
+  涵盖 4 类不同 bug 模式，但 chain 仍未到 v406；继续修需独立 PR
+
+### 下一步
+- 选择：B'-7 继续 v273+ 摸排（预期 5-10+ commit），或 ship B'-6 partial
+- approval_instances 架构调研（独立 PR）
+- v388 RLS 补齐方案设计（独立 PR）
+
+### 已知风险
+- **v378 service 维护 months_since_opening**：未真测 service INSERT 路径写入
+  这一列；如果忘了写 → 列永远 NULL，业务功能损坏（待 audit）
+- **v395 RLS POLICY syntax 修是 PG semantics 适配**：原 USING+WITH CHECK
+  双子句 syntax error 让整个 v395 transaction 回滚 = 没修真问题；本 fix
+  让 v395 实际生效 = 真正启用 RLS WITH CHECK = 修复 INSERT 跨租户漏洞
+- **v383 tuple 清理 + v388 skip = 真功能 disable**：v388 RLS 补齐没生效
+  → 26 表实际无 RLS，CLAUDE.md §17 Tier 1 多租户隔离硬约束被绕过；
+  必须独立 PR 兜底
+
+---
+
 ## 2026-05-09 夜里 · B'-5 banquet 全链 DROP CASCADE + 类 F RLS helper 批量修复
 
 ### 完成状态

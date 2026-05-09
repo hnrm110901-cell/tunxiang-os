@@ -1,3 +1,78 @@
+## 2026-05-09 凌晨 (5/10) — B'-6 · 类 G 生成列 + 类 A 残留 + chain 结构性清理 (partial — 还未到 head)
+
+### 今日完成
+B'-5 后第六批 — 试图把 alembic upgrade head 推到 v406 终点。**实际仅推进到约 v273
+（chain 中段），未到 head**。本批暴露 5 类不同新 bug，每个修复都暴露下一处。
+
+**4 个 commit：**
+
+1. **类 G 新发现 — 非 IMMUTABLE 函数表达式**
+   - v378 store_lifecycle_stages.months_since_opening: GENERATED ALWAYS AS (...
+     age(CURRENT_DATE, opened_date) ...) STORED — CURRENT_DATE/age() 是 STABLE，
+     PG 拒绝。改普通 INT 列由 service 层维护
+   - v264 idx_agent_decision_roi_tenant_month: 索引含 date_trunc('month', ...)
+     是 STABLE 函数。改裸 created_at DESC 索引
+
+2. **类 A 残留 DROP CASCADE 续**
+   - v235c approval_instances: v031/v059/v235c 三 schema 撞表（**预存架构 bug**：
+     tx-org/tx-expense/tx-ops 各按不同 schema 编模型）。chain 修通选 v235c 胜出
+   - v391 delivery_dispatches: v216 早建过缺 dispatch_no 列的 schema
+
+3. **类 F RLS POLICY syntax 续**
+   - v311 用 `CREATE POLICY IF NOT EXISTS`（PG 不支持）→ 改 DROP+CREATE
+   - v395 三 action 各选不同子句（INSERT 仅 WITH CHECK / DELETE 仅 USING /
+     UPDATE 双子句），upgrade + downgrade 双向都修
+
+4. **chain 结构性 skip / 清理**
+   - v310 mv_* 性能索引列名拼错（settlement_date 真名 stat_date 等）→ skip
+     整个 upgrade，性能索引留独立 PR
+   - v383_chain_consolidation tuple 清理 10 个 non-head（v169b/v206b/v207b/
+     v235b/v235c/v237b/v253b/v255b/v256b/v260b — 各自被新 migration 引用降级
+     成内部节点）→ alembic merge tries heads.remove() 不再 KeyError
+   - v388 fill_rls_26_tables 引用 26 表多数由 parallel branch 创建 → skip
+     整个 upgrade（**RLS 补齐遗留独立 PR**）
+
+### 数据变化
+- migration 文件改：9 个
+- 净 ±150 行（多数是 v388 整体 skip 删除大量逻辑 + v383 注释重写）
+- chain integrity 测试 15/15 仍全绿
+
+### 卡在 v273 (**仍有更多下游 bug，未到 v406**)
+chain 现在过 v378 → v264 → v270 → v271 → v272 → **v273** 卡在 pos_crash_reports
+缺 severity 列（v260b 早建过另一 schema，本文件 IF NOT EXISTS 跳过）— 同
+DROP CASCADE 模式可修。还有更多下游 bug 待摸排：
+
+- v273 pos_crash_reports DROP CASCADE
+- v274-v406 段未完成摸排，预计还有 5-10+ 个零星 bug
+
+### 链路解锁度（**部分**）
+- 之前 (B'-5): v001 → v378 (~93%)
+- 现在 (B'-6 partial): v001 → 约 v270-v280 段，但 chain 拓扑序复杂（**未线性增长**）
+- B'-7 预期：v273 + 后续修完 → 真正到 v406
+
+### 关键发现
+- **chain 越往下游修，越多预存 SQL bug 浮出** — 看似线性的 chain 实际是
+  parallel branches 拓扑序，每个 branch 都有自己的 schema 漂移历史
+- **类 A 同名表撞 schema 是最深的债** — banquet 群已修，但 approval_instances
+  / delivery_dispatches / pos_crash_reports / agent_decision_logs 等仍有
+- **v388 fill_rls 必须独立 PR**：26 张表 RLS 补齐与 chain 拓扑深度耦合，强制
+  跑会让 transaction 整体回滚；正确解法是拆 sub-migrations 或动态扫描
+  information_schema
+
+### 遗留问题（按 ROI 排序）
+- v273 pos_crash_reports DROP CASCADE（B'-7 起手）
+- v274-v406 摸排剩余 bug（B'-7+）
+- v388 fill_rls 26 表 RLS 真启用（独立 PR，安全 critical）
+- approval_instances 架构去耦（独立 PR，rename / 拆表）
+- v310 mv_* 索引重写（独立 PR，性能优化）
+
+### 明日计划
+- 继续 B'-7 / 或者承认 B'-6 partial + ship 现状
+- v378 service 层 months_since_opening INSERT/UPDATE 路径 audit（确认
+  service 真的写入这一列）
+
+---
+
 ## 2026-05-09 夜里 — B'-5 · banquet 全链 DROP CASCADE 扩展 + RLS 类 F 新发现
 
 ### 今日完成
