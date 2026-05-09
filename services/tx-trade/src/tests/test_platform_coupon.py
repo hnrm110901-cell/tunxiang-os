@@ -57,35 +57,35 @@ class FakeSession:
 
 def test_identify_platform_meituan():
     """识别美团券码 — 18位纯数字"""
-    from services.coupon_platform_service import identify_platform
+    from services.tx_trade.src.services.coupon_platform_service import identify_platform
 
     assert identify_platform("123456789012345678") == "meituan"
 
 
 def test_identify_platform_douyin():
     """识别抖音券码 — DY 开头"""
-    from services.coupon_platform_service import identify_platform
+    from services.tx_trade.src.services.coupon_platform_service import identify_platform
 
     assert identify_platform("DY20260327ABC123") == "douyin"
 
 
 def test_identify_platform_koubei():
     """识别口碑券码 — KB 开头"""
-    from services.coupon_platform_service import identify_platform
+    from services.tx_trade.src.services.coupon_platform_service import identify_platform
 
     assert identify_platform("KB98765432100") == "koubei"
 
 
 def test_identify_platform_bank_gf():
     """识别广发银行券码 — GF 开头"""
-    from services.coupon_platform_service import identify_platform
+    from services.tx_trade.src.services.coupon_platform_service import identify_platform
 
     assert identify_platform("GF2026032700001") == "bank_gf"
 
 
 def test_identify_platform_unknown():
     """无法识别的券码格式"""
-    from services.coupon_platform_service import identify_platform
+    from services.tx_trade.src.services.coupon_platform_service import identify_platform
 
     assert identify_platform("UNKNOWN12345") is None
     assert identify_platform("") is None
@@ -98,7 +98,7 @@ def test_identify_platform_unknown():
 @pytest.mark.asyncio
 async def test_aggregate_verify_meituan():
     """聚合验证 — 自动识别美团并验证"""
-    from services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
+    from services.tx_trade.src.services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -115,7 +115,7 @@ async def test_aggregate_verify_meituan():
 @pytest.mark.asyncio
 async def test_aggregate_verify_unknown_platform():
     """聚合验证 — 无法识别平台"""
-    from services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
+    from services.tx_trade.src.services.coupon_platform_service import _PlatformCouponStore, aggregate_verify
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -132,7 +132,7 @@ async def test_aggregate_verify_unknown_platform():
 @pytest.mark.asyncio
 async def test_redeem_coupon_success():
     """核销 — 关联 order_id 成功"""
-    from services.coupon_platform_service import (
+    from services.tx_trade.src.services.coupon_platform_service import (
         _PlatformCouponStore,
         aggregate_verify,
         redeem_coupon,
@@ -157,7 +157,7 @@ async def test_redeem_coupon_success():
 @pytest.mark.asyncio
 async def test_redeem_coupon_missing_order_id():
     """核销 — 缺少 order_id 报错"""
-    from services.coupon_platform_service import _PlatformCouponStore, redeem_coupon
+    from services.tx_trade.src.services.coupon_platform_service import _PlatformCouponStore, redeem_coupon
 
     _PlatformCouponStore.clear()
     db = FakeSession()
@@ -169,7 +169,7 @@ async def test_redeem_coupon_missing_order_id():
 @pytest.mark.asyncio
 async def test_redeem_coupon_already_redeemed():
     """核销 — 已核销的券不可重复核销"""
-    from services.coupon_platform_service import (
+    from services.tx_trade.src.services.coupon_platform_service import (
         _PlatformCouponStore,
         aggregate_verify,
         redeem_coupon,
@@ -194,7 +194,7 @@ async def test_redeem_coupon_already_redeemed():
 @pytest.mark.asyncio
 async def test_redemption_report():
     """核销对账报告 — 按平台汇总"""
-    from services.coupon_platform_service import (
+    from services.tx_trade.src.services.coupon_platform_service import (
         _PlatformCouponStore,
         aggregate_verify,
         get_redemption_report,
@@ -236,7 +236,7 @@ async def test_redemption_report():
 @pytest.mark.asyncio
 async def test_reconcile_platform():
     """平台对账 — 金额比对"""
-    from services.coupon_platform_service import (
+    from services.tx_trade.src.services.coupon_platform_service import (
         _PlatformCouponStore,
         aggregate_verify,
         reconcile_platform,

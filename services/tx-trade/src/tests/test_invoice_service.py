@@ -31,7 +31,7 @@ TENANT_ID = _uid()
 
 @pytest.fixture(autouse=True)
 def _clear_stores():
-    from services.invoice_service import _invoice_queue, _invoices
+    from services.tx_trade.src.services.invoice_service import _invoice_queue, _invoices
 
     _invoices.clear()
     _invoice_queue.clear()
@@ -40,7 +40,7 @@ def _clear_stores():
 @pytest.mark.asyncio
 async def test_create_electronic_invoice():
     """创建电子发票"""
-    from services.invoice_service import create_invoice_request
+    from services.tx_trade.src.services.invoice_service import create_invoice_request
 
     result = await create_invoice_request(
         order_id=_uid(),
@@ -58,7 +58,7 @@ async def test_create_electronic_invoice():
 @pytest.mark.asyncio
 async def test_create_vat_special_invoice():
     """创建增值税专票（完整信息）"""
-    from services.invoice_service import create_invoice_request
+    from services.tx_trade.src.services.invoice_service import create_invoice_request
 
     result = await create_invoice_request(
         order_id=_uid(),
@@ -80,7 +80,7 @@ async def test_create_vat_special_invoice():
 @pytest.mark.asyncio
 async def test_vat_special_missing_fields():
     """增值税专票缺少必填字段"""
-    from services.invoice_service import create_invoice_request
+    from services.tx_trade.src.services.invoice_service import create_invoice_request
 
     with pytest.raises(ValueError, match="VAT special invoice requires"):
         await create_invoice_request(
@@ -94,7 +94,7 @@ async def test_vat_special_missing_fields():
 @pytest.mark.asyncio
 async def test_submit_to_tax_platform():
     """提交到税控平台（mock成功）"""
-    from services.invoice_service import create_invoice_request, submit_to_tax_platform
+    from services.tx_trade.src.services.invoice_service import create_invoice_request, submit_to_tax_platform
 
     inv = await create_invoice_request(
         order_id=_uid(),
@@ -112,7 +112,7 @@ async def test_submit_to_tax_platform():
 @pytest.mark.asyncio
 async def test_submit_already_issued():
     """重复提交已开票发票"""
-    from services.invoice_service import create_invoice_request, submit_to_tax_platform
+    from services.tx_trade.src.services.invoice_service import create_invoice_request, submit_to_tax_platform
 
     inv = await create_invoice_request(
         order_id=_uid(),
@@ -129,7 +129,7 @@ async def test_submit_already_issued():
 @pytest.mark.asyncio
 async def test_get_invoice_status():
     """查询发票状态"""
-    from services.invoice_service import create_invoice_request, get_invoice_status
+    from services.tx_trade.src.services.invoice_service import create_invoice_request, get_invoice_status
 
     inv = await create_invoice_request(
         order_id=_uid(),
@@ -146,7 +146,7 @@ async def test_get_invoice_status():
 @pytest.mark.asyncio
 async def test_get_invoice_not_found():
     """查询不存在的发票"""
-    from services.invoice_service import get_invoice_status
+    from services.tx_trade.src.services.invoice_service import get_invoice_status
 
     with pytest.raises(ValueError, match="Invoice not found"):
         await get_invoice_status("nonexistent", TENANT_ID)
@@ -155,7 +155,7 @@ async def test_get_invoice_not_found():
 @pytest.mark.asyncio
 async def test_generate_qrcode():
     """生成开票二维码数据"""
-    from services.invoice_service import generate_qrcode_data
+    from services.tx_trade.src.services.invoice_service import generate_qrcode_data
 
     result = await generate_qrcode_data(
         order_id=_uid(),
@@ -171,7 +171,7 @@ async def test_generate_qrcode():
 @pytest.mark.asyncio
 async def test_invoice_ledger():
     """发票台账查询"""
-    from services.invoice_service import create_invoice_request, get_invoice_ledger
+    from services.tx_trade.src.services.invoice_service import create_invoice_request, get_invoice_ledger
 
     # 创建几张发票
     for i in range(3):

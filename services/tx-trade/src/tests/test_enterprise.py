@@ -62,8 +62,8 @@ TENANT_ID_OTHER = str(uuid.uuid4())
 
 def _clear_stores():
     """清理模块级内存存储"""
-    from services.enterprise_account import _agreement_prices, _enterprises, _sign_records
-    from services.enterprise_billing import _bill_items, _bills
+    from services.tx_trade.src.services.enterprise_account import _agreement_prices, _enterprises, _sign_records
+    from services.tx_trade.src.services.enterprise_billing import _bill_items, _bills
 
     _enterprises.clear()
     _agreement_prices.clear()
@@ -84,7 +84,7 @@ class TestEnterpriseAccount:
     @pytest.mark.asyncio
     async def test_create_enterprise(self):
         """企业建档成功"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -106,7 +106,7 @@ class TestEnterpriseAccount:
     @pytest.mark.asyncio
     async def test_create_enterprise_invalid_cycle(self):
         """不支持的账期类型应失败"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -122,7 +122,7 @@ class TestEnterpriseAccount:
     @pytest.mark.asyncio
     async def test_update_enterprise(self):
         """更新企业信息"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -140,7 +140,7 @@ class TestEnterpriseAccount:
     @pytest.mark.asyncio
     async def test_list_enterprises_tenant_isolation(self):
         """租户隔离：只能看到自己的企业"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
 
@@ -171,7 +171,7 @@ class TestCreditCheck:
     @pytest.mark.asyncio
     async def test_credit_sufficient(self):
         """额度充足"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -187,7 +187,7 @@ class TestCreditCheck:
     @pytest.mark.asyncio
     async def test_credit_insufficient(self):
         """额度不足"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -202,7 +202,7 @@ class TestCreditCheck:
     @pytest.mark.asyncio
     async def test_credit_after_sign(self):
         """签单后额度减少"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -228,7 +228,7 @@ class TestAuthorizeSign:
     @pytest.mark.asyncio
     async def test_sign_success(self):
         """签单成功"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -249,7 +249,7 @@ class TestAuthorizeSign:
     @pytest.mark.asyncio
     async def test_sign_rejected_credit_exceeded(self):
         """额度超限拒绝签单"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -269,7 +269,7 @@ class TestAuthorizeSign:
     @pytest.mark.asyncio
     async def test_sign_requires_signer_name(self):
         """签单必须有授权人姓名"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -285,7 +285,7 @@ class TestAuthorizeSign:
     @pytest.mark.asyncio
     async def test_multiple_signs_accumulate(self):
         """多次签单额度累计"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -312,7 +312,7 @@ class TestAgreementPrice:
     @pytest.mark.asyncio
     async def test_set_and_get_agreement_price(self):
         """设置并查询协议价"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -331,7 +331,7 @@ class TestAgreementPrice:
     @pytest.mark.asyncio
     async def test_agreement_price_not_found(self):
         """未设置协议价返回None"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -353,8 +353,8 @@ class TestMonthlyBilling:
     @pytest.mark.asyncio
     async def test_generate_monthly_bill(self):
         """生成月结账单"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -388,8 +388,8 @@ class TestMonthlyBilling:
     @pytest.mark.asyncio
     async def test_duplicate_bill_rejected(self):
         """重复生成同月账单应失败"""
-        from services.enterprise_account import EnterpriseAccountService
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -415,8 +415,8 @@ class TestPaymentConfirmation:
     @pytest.mark.asyncio
     async def test_full_payment(self):
         """全额收款"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -438,7 +438,7 @@ class TestPaymentConfirmation:
             "signed_at": "2026-03-10T12:00:00+00:00",
         }
         # 手动增加已用额度（模拟签单流程）
-        from services.enterprise_account import _enterprises
+        from services.tx_trade.src.services.enterprise_account import _enterprises
 
         _enterprises[ent["id"]]["used_fen"] = 200000
 
@@ -456,8 +456,8 @@ class TestPaymentConfirmation:
     @pytest.mark.asyncio
     async def test_partial_payment(self):
         """部分收款"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -498,8 +498,8 @@ class TestStatement:
     @pytest.mark.asyncio
     async def test_generate_statement(self):
         """生成对账单PDF数据"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -532,8 +532,8 @@ class TestStatement:
     @pytest.mark.asyncio
     async def test_statement_without_bill_fails(self):
         """未生成账单时请求对账单应失败"""
-        from services.enterprise_account import EnterpriseAccountService
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -558,8 +558,8 @@ class TestEnterpriseAnalytics:
     @pytest.mark.asyncio
     async def test_analytics_basic(self):
         """基础消费分析"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -603,8 +603,8 @@ class TestOutstandingBills:
     @pytest.mark.asyncio
     async def test_outstanding_bills(self):
         """查询未结账单"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -649,7 +649,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_zero_credit_limit_rejected(self):
         """零额度创建企业应失败"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -660,7 +660,7 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_sign_zero_amount_rejected(self):
         """零金额签单应失败"""
-        from services.enterprise_account import EnterpriseAccountService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService
 
         db = FakeSession()
         svc = EnterpriseAccountService(db, TENANT_ID)
@@ -673,8 +673,8 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_overpayment_rejected(self):
         """超额收款应失败"""
-        from services.enterprise_account import EnterpriseAccountService, _sign_records
-        from services.enterprise_billing import EnterpriseBillingService
+        from services.tx_trade.src.services.enterprise_account import EnterpriseAccountService, _sign_records
+        from services.tx_trade.src.services.enterprise_billing import EnterpriseBillingService
 
         db = FakeSession()
 
@@ -709,7 +709,7 @@ class TestEnterpriseAPIRoutes:
 
     def test_enterprise_routes_exist(self):
         """验证所有10个端点已注册"""
-        from api.enterprise_routes import router
+        from services.tx_trade.src.api.enterprise_routes import router
 
         routes = {r.path: r.methods for r in router.routes if hasattr(r, "path")}
 
@@ -725,7 +725,7 @@ class TestEnterpriseAPIRoutes:
 
     def test_route_methods(self):
         """验证HTTP方法正确"""
-        from api.enterprise_routes import router
+        from services.tx_trade.src.api.enterprise_routes import router
 
         route_methods = {}
         for r in router.routes:

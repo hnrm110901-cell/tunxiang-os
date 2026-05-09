@@ -62,7 +62,7 @@ def _mock_db(*execute_results):
 @pytest.mark.asyncio
 async def test_hot_dishes_sorted_desc():
     """畅销榜按 order_count 降序，rank 字段正确"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     hot_rows = [
         FakeRow(dish_id=_uid(), dish_name="剁椒鱼头", order_count=42),
@@ -101,7 +101,7 @@ async def test_hot_dishes_sorted_desc():
 @pytest.mark.asyncio
 async def test_remake_dishes_sorted_by_rate():
     """退菜榜按退菜率降序，退菜率最高的排第1"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     remake_rows = [
         FakeRow(dish_id=_uid(), dish_name="外婆鸡", remake_count=5, total_count=20, remake_rate=0.25),
@@ -135,7 +135,7 @@ async def test_remake_dishes_sorted_by_rate():
 @pytest.mark.asyncio
 async def test_cold_dishes_include_zero_sales():
     """滞销榜应包含今日零销量菜品（来自 dishes 主表的 LEFT JOIN）"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     cold_rows = [
         FakeRow(dish_id=_uid(), dish_name="凉拌黄瓜", order_count=0),  # 零销量
@@ -170,7 +170,7 @@ async def test_cold_dishes_include_zero_sales():
 @pytest.mark.asyncio
 async def test_remake_rate_precision():
     """退菜率 = remake_count / total_count，精确到小数（round 4位）"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     # 3/7 ≈ 0.4286
     remake_rows = [
@@ -200,7 +200,7 @@ async def test_remake_rate_precision():
 @pytest.mark.asyncio
 async def test_no_data_returns_empty_lists():
     """指定日期无订单数据时，三个榜单均返回空列表"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     db = _mock_db(
         FakeResult(rows=[]),  # hot 空
@@ -226,7 +226,7 @@ async def test_no_data_returns_empty_lists():
 @pytest.mark.asyncio
 async def test_top_n_limit():
     """即使数据库返回超过10条，仍只保留10条（SQL LIMIT 保证）"""
-    from services.dish_ranking_service import TOP_N, DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import TOP_N, DishRankingService
 
     # 模拟 SQL 已按 LIMIT 10 返回最多10条
     hot_rows = [FakeRow(dish_id=_uid(), dish_name=f"菜品{i}", order_count=100 - i) for i in range(TOP_N)]
@@ -254,7 +254,7 @@ async def test_top_n_limit():
 @pytest.mark.asyncio
 async def test_tenant_isolation():
     """不同租户的查询结果互不干扰"""
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     tenant_a_rows = [
         FakeRow(dish_id=_uid(), dish_name="A租户烤鸭", order_count=50),
@@ -304,7 +304,7 @@ async def test_as_of_timestamp_present():
     """DishRankings.as_of 应返回当前时间（不为 None）"""
     from datetime import datetime
 
-    from services.dish_ranking_service import DishRankingService
+    from services.tx_trade.src.services.dish_ranking_service import DishRankingService
 
     db = _mock_db(
         FakeResult(rows=[]),

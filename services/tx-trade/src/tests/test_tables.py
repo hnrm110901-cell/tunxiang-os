@@ -78,7 +78,7 @@ class TestTransferTable:
     @pytest.mark.asyncio
     async def test_transfer_success(self):
         """转台成功：源桌 occupied -> free，目标桌 free -> occupied"""
-        from services.table_operations import transfer_table
+        from services.tx_trade.src.services.table_operations import transfer_table
 
         from_t = _make_table(table_no="A01", status="occupied", tenant_id=TENANT_ID)
         to_t = _make_table(table_no="A02", status="free", tenant_id=TENANT_ID)
@@ -95,7 +95,7 @@ class TestTransferTable:
     @pytest.mark.asyncio
     async def test_transfer_fails_if_source_not_occupied(self):
         """源桌非 occupied 时转台失败"""
-        from services.table_operations import transfer_table
+        from services.tx_trade.src.services.table_operations import transfer_table
 
         from_t = _make_table(table_no="A01", status="free", tenant_id=TENANT_ID)
         to_t = _make_table(table_no="A02", status="free", tenant_id=TENANT_ID)
@@ -108,7 +108,7 @@ class TestTransferTable:
     @pytest.mark.asyncio
     async def test_transfer_fails_if_target_not_free(self):
         """目标桌非 free 时转台失败"""
-        from services.table_operations import transfer_table
+        from services.tx_trade.src.services.table_operations import transfer_table
 
         from_t = _make_table(table_no="A01", status="occupied", tenant_id=TENANT_ID)
         to_t = _make_table(table_no="A02", status="occupied", tenant_id=TENANT_ID)
@@ -126,7 +126,7 @@ class TestMergeTables:
     @pytest.mark.asyncio
     async def test_merge_success(self):
         """并台成功：主桌 config 包含 merged_with"""
-        from services.table_operations import merge_tables
+        from services.tx_trade.src.services.table_operations import merge_tables
 
         t1 = _make_table(table_no="A01", status="occupied", seats=4, tenant_id=TENANT_ID)
         t2 = _make_table(table_no="A02", status="free", seats=4, tenant_id=TENANT_ID)
@@ -143,7 +143,7 @@ class TestMergeTables:
     @pytest.mark.asyncio
     async def test_merge_requires_at_least_two(self):
         """并台至少需要 2 张桌"""
-        from services.table_operations import merge_tables
+        from services.tx_trade.src.services.table_operations import merge_tables
 
         t1 = _make_table(table_no="A01", tenant_id=TENANT_ID)
         db = AsyncMock()
@@ -159,7 +159,7 @@ class TestClearTable:
     @pytest.mark.asyncio
     async def test_clear_occupied_table(self):
         """清台：occupied -> free"""
-        from services.table_operations import clear_table
+        from services.tx_trade.src.services.table_operations import clear_table
 
         t = _make_table(table_no="B01", status="occupied", tenant_id=TENANT_ID)
         db = _mock_db_returning(t)
@@ -173,7 +173,7 @@ class TestClearTable:
     @pytest.mark.asyncio
     async def test_clear_fails_if_free(self):
         """已空闲的桌台无法再清台"""
-        from services.table_operations import clear_table
+        from services.tx_trade.src.services.table_operations import clear_table
 
         t = _make_table(table_no="B02", status="free", tenant_id=TENANT_ID)
         db = _mock_db_returning(t)
@@ -189,7 +189,7 @@ class TestLockTable:
     @pytest.mark.asyncio
     async def test_lock_success(self):
         """预留成功：free -> reserved"""
-        from services.table_operations import lock_table
+        from services.tx_trade.src.services.table_operations import lock_table
 
         t = _make_table(table_no="C01", status="free", tenant_id=TENANT_ID)
         reservation_id = uuid.uuid4()
@@ -208,7 +208,7 @@ class TestRoomRules:
     @pytest.mark.asyncio
     async def test_minimum_charge_met(self):
         """低消达标"""
-        from services.room_rules import check_minimum_charge
+        from services.tx_trade.src.services.room_rules import check_minimum_charge
 
         room = _make_table(
             table_no="VIP01",
@@ -226,7 +226,7 @@ class TestRoomRules:
     @pytest.mark.asyncio
     async def test_minimum_charge_not_met(self):
         """低消未达标：gap_fen > 0"""
-        from services.room_rules import check_minimum_charge
+        from services.tx_trade.src.services.room_rules import check_minimum_charge
 
         room = _make_table(
             table_no="VIP02",
@@ -245,7 +245,7 @@ class TestRoomRules:
     @pytest.mark.asyncio
     async def test_get_room_config(self):
         """查询包厢配置"""
-        from services.room_rules import get_room_config
+        from services.tx_trade.src.services.room_rules import get_room_config
 
         room = _make_table(
             table_no="VIP03",
@@ -266,7 +266,7 @@ class TestRoomRules:
     @pytest.mark.asyncio
     async def test_set_room_rules(self):
         """设置包厢规则"""
-        from services.room_rules import set_room_rules
+        from services.tx_trade.src.services.room_rules import set_room_rules
 
         room = _make_table(
             table_no="VIP04",

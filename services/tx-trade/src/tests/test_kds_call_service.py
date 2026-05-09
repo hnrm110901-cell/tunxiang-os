@@ -88,7 +88,7 @@ def _make_task(status: str, called_at: datetime | None = None) -> MagicMock:
 @pytest.mark.asyncio
 async def test_mark_calling_from_cooking_succeeds():
     """cooking 状态的任务可以成功转为 calling，call_count +1。"""
-    from services.kds_call_service import KdsCallService
+    from services.tx_trade.src.services.kds_call_service import KdsCallService
 
     task_id = _uid()
     task = _make_task("cooking")
@@ -96,7 +96,7 @@ async def test_mark_calling_from_cooking_succeeds():
     db = _fake_db()
     db.execute = AsyncMock(return_value=FakeResult(scalar=task))
 
-    with patch("services.kds_call_service._broadcast", new=AsyncMock()):
+    with patch("services.tx_trade.src.services.kds_call_service._broadcast", new=AsyncMock()):
         result = await KdsCallService.mark_calling(task_id, TENANT_ID, db)
 
     assert result.status == "calling"
@@ -110,7 +110,7 @@ async def test_mark_calling_from_cooking_succeeds():
 @pytest.mark.asyncio
 async def test_mark_calling_from_pending_raises():
     """pending 状态的任务不允许直接转为 calling，应抛出 RuntimeError。"""
-    from services.kds_call_service import KdsCallService
+    from services.tx_trade.src.services.kds_call_service import KdsCallService
 
     task_id = _uid()
     task = _make_task("pending")
@@ -128,7 +128,7 @@ async def test_mark_calling_from_pending_raises():
 @pytest.mark.asyncio
 async def test_confirm_served_from_calling_succeeds():
     """calling 状态的任务可以成功转为 done，served_at 有值。"""
-    from services.kds_call_service import KdsCallService
+    from services.tx_trade.src.services.kds_call_service import KdsCallService
 
     task_id = _uid()
     called_at = datetime.now(timezone.utc) - timedelta(minutes=3)
@@ -137,7 +137,7 @@ async def test_confirm_served_from_calling_succeeds():
     db = _fake_db()
     db.execute = AsyncMock(return_value=FakeResult(scalar=task))
 
-    with patch("services.kds_call_service._broadcast", new=AsyncMock()):
+    with patch("services.tx_trade.src.services.kds_call_service._broadcast", new=AsyncMock()):
         result = await KdsCallService.confirm_served(task_id, TENANT_ID, db)
 
     assert result.status == "done"
@@ -151,7 +151,7 @@ async def test_confirm_served_from_calling_succeeds():
 @pytest.mark.asyncio
 async def test_confirm_served_from_done_raises():
     """已完成（done）的任务不可再次确认上桌，应抛出 RuntimeError。"""
-    from services.kds_call_service import KdsCallService
+    from services.tx_trade.src.services.kds_call_service import KdsCallService
 
     task_id = _uid()
     task = _make_task("done")
@@ -169,7 +169,7 @@ async def test_confirm_served_from_done_raises():
 @pytest.mark.asyncio
 async def test_calling_stats_wait_time_calculation():
     """等叫统计的 avg_waiting_minutes 应准确反映 called_at 到现在的时长。"""
-    from services.kds_call_service import CallingStats, KdsCallService
+    from services.tx_trade.src.services.kds_call_service import CallingStats, KdsCallService
 
     # 构造两个 calling 任务，等待时间分别为 4 分钟和 8 分钟
     now = datetime.now(timezone.utc)
@@ -190,7 +190,7 @@ async def test_calling_stats_wait_time_calculation():
 @pytest.mark.asyncio
 async def test_get_calling_tasks_returns_list():
     """get_calling_tasks 应返回所有 calling 状态任务的列表。"""
-    from services.kds_call_service import KdsCallService
+    from services.tx_trade.src.services.kds_call_service import KdsCallService
 
     now = datetime.now(timezone.utc)
     tasks = [_make_task("calling", called_at=now - timedelta(minutes=i)) for i in range(3)]
@@ -211,7 +211,7 @@ async def test_get_calling_tasks_returns_list():
 @pytest.mark.asyncio
 async def test_order_push_mode_default_is_immediate():
     """未配置时 get_store_mode 应返回 IMMEDIATE，should_push_on_order 返回 True。"""
-    from services.order_push_config import OrderPushConfigService, OrderPushMode
+    from services.tx_trade.src.services.order_push_config import OrderPushConfigService, OrderPushMode
 
     db = _fake_db()
     # 模拟数据库没有该门店的配置记录
@@ -234,7 +234,7 @@ async def test_order_push_mode_default_is_immediate():
 async def test_post_payment_mode_no_push_then_deferred():
     """POST_PAYMENT 模式下，should_push_on_order 为 False；
     收银完成后 push_deferred_tasks 激活 pending 任务。"""
-    from services.order_push_config import OrderPushConfigService, OrderPushMode
+    from services.tx_trade.src.services.order_push_config import OrderPushConfigService, OrderPushMode
 
     # 1) 模拟数据库返回 post_payment 配置行
     db_check = _fake_db()
@@ -267,7 +267,7 @@ async def test_post_payment_mode_no_push_then_deferred():
 
     with (
         patch(
-            "services.order_push_config.OrderPushConfigService.get_store_mode",
+            "services.tx_trade.src.services.order_push_config.OrderPushConfigService.get_store_mode",
             new=AsyncMock(return_value=OrderPushMode.POST_PAYMENT),
         ),
         patch("httpx.AsyncClient") as mock_client_cls,

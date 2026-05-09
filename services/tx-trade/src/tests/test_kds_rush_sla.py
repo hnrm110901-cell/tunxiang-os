@@ -79,14 +79,14 @@ class TestConfirmRush:
     @pytest.mark.asyncio
     async def test_confirm_rush_sets_promised_at(self):
         """厨师确认催菜后，promised_at被设置为当前时间+承诺分钟数"""
-        from services.kds_actions import confirm_rush
+        from services.tx_trade.src.services.kds_actions import confirm_rush
 
         task_id = _uid()
         db = _fake_db()
         fake_task = _make_task(status="cooking")
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True):
             result = await confirm_rush(task_id, promised_minutes=10, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         assert result["ok"] is True
@@ -98,7 +98,7 @@ class TestConfirmRush:
     @pytest.mark.asyncio
     async def test_confirm_rush_on_done_task_fails(self):
         """已完成的任务无法确认催菜"""
-        from services.kds_actions import confirm_rush
+        from services.tx_trade.src.services.kds_actions import confirm_rush
 
         task_id = _uid()
         db = _fake_db()
@@ -114,7 +114,7 @@ class TestConfirmRush:
     @pytest.mark.asyncio
     async def test_confirm_rush_task_not_found(self):
         """任务不存在时返回错误"""
-        from services.kds_actions import confirm_rush
+        from services.tx_trade.src.services.kds_actions import confirm_rush
 
         db = _fake_db()
         db.execute = AsyncMock(return_value=FakeResult(scalar=None))
@@ -131,7 +131,7 @@ class TestRushSLAPush:
     @pytest.mark.asyncio
     async def test_confirm_rush_pushes_to_web_crew(self):
         """确认催菜后推送promised_at到web-crew（通过KDS推送）"""
-        from services.kds_actions import confirm_rush
+        from services.tx_trade.src.services.kds_actions import confirm_rush
 
         task_id = _uid()
         db = _fake_db()
@@ -144,7 +144,7 @@ class TestRushSLAPush:
             push_calls.append({"station_id": station_id, "message": message})
             return True
 
-        with patch("services.kds_actions._push_to_kds_station", side_effect=mock_push):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", side_effect=mock_push):
             result = await confirm_rush(task_id, promised_minutes=8, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         assert result["ok"] is True
@@ -158,14 +158,14 @@ class TestRushSLAPush:
     @pytest.mark.asyncio
     async def test_push_failure_does_not_block_confirm(self):
         """KDS推送失败不阻塞承诺时间写入DB"""
-        from services.kds_actions import confirm_rush
+        from services.tx_trade.src.services.kds_actions import confirm_rush
 
         task_id = _uid()
         db = _fake_db()
         fake_task = _make_task(status="cooking")
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=False):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=False):
             result = await confirm_rush(task_id, promised_minutes=5, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         # 即使推送失败，DB写入应成功
@@ -180,7 +180,7 @@ class TestRushRateLimit:
     @pytest.mark.asyncio
     async def test_rush_allowed_when_count_is_zero(self):
         """首次催菜正常通过"""
-        from services.kds_actions import request_rush
+        from services.tx_trade.src.services.kds_actions import request_rush
 
         db = _fake_db()
         fake_task = _make_task(rush_count=0, last_rush_at=None)
@@ -191,9 +191,9 @@ class TestRushRateLimit:
 
         # request_rush查找内存+DB中的任务
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -204,7 +204,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(order_id, dish_id, db, tenant_id=TENANT_ID)
 
@@ -213,16 +213,16 @@ class TestRushRateLimit:
     @pytest.mark.asyncio
     async def test_rush_allowed_at_second_time(self):
         """第2次催菜（30分钟内）正常通过"""
-        from services.kds_actions import request_rush
+        from services.tx_trade.src.services.kds_actions import request_rush
 
         db = _fake_db()
         last_rush = datetime.now(timezone.utc) - timedelta(minutes=10)
         fake_task = _make_task(rush_count=1, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -233,7 +233,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(ORDER_ID, DISH_ID, db, tenant_id=TENANT_ID)
 
@@ -242,16 +242,16 @@ class TestRushRateLimit:
     @pytest.mark.asyncio
     async def test_rush_blocked_at_third_time_within_30min(self):
         """第3次催菜在30分钟内被限流拦截"""
-        from services.kds_actions import request_rush
+        from services.tx_trade.src.services.kds_actions import request_rush
 
         db = _fake_db()
         last_rush = datetime.now(timezone.utc) - timedelta(minutes=5)
         fake_task = _make_task(rush_count=2, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -271,7 +271,7 @@ class TestRushRateLimit:
     @pytest.mark.asyncio
     async def test_rush_resets_after_30min(self):
         """30分钟后限流重置，可以再次催菜"""
-        from services.kds_actions import request_rush
+        from services.tx_trade.src.services.kds_actions import request_rush
 
         db = _fake_db()
         # last_rush在35分钟前，超过30分钟窗口，rush_count=2
@@ -279,9 +279,9 @@ class TestRushRateLimit:
         fake_task = _make_task(rush_count=2, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -292,7 +292,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(ORDER_ID, DISH_ID, db, tenant_id=TENANT_ID)
 
@@ -306,7 +306,7 @@ class TestRushOverdue:
     @pytest.mark.asyncio
     async def test_check_overdue_finds_expired_promise(self):
         """承诺时间已过但任务未完成，触发升级告警"""
-        from services.kds_actions import check_rush_overdue
+        from services.tx_trade.src.services.kds_actions import check_rush_overdue
 
         db = _fake_db()
         now = datetime.now(timezone.utc)
@@ -327,7 +327,7 @@ class TestRushOverdue:
             push_calls.append(message)
             return True
 
-        with patch("services.kds_actions._push_to_kds_station", side_effect=mock_push):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", side_effect=mock_push):
             result = await check_rush_overdue(TENANT_ID, db)
 
         assert result["ok"] is True
@@ -340,7 +340,7 @@ class TestRushOverdue:
     @pytest.mark.asyncio
     async def test_check_overdue_ignores_on_time_tasks(self):
         """承诺时间未到的任务不触发告警"""
-        from services.kds_actions import check_rush_overdue
+        from services.tx_trade.src.services.kds_actions import check_rush_overdue
 
         db = _fake_db()
         now = datetime.now(timezone.utc)
@@ -356,7 +356,7 @@ class TestRushOverdue:
         # check_rush_overdue只查promised_at < NOW()的任务
         db.execute = AsyncMock(return_value=FakeResult(rows=[]))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True) as mock_push:
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True) as mock_push:
             result = await check_rush_overdue(TENANT_ID, db)
 
         assert result["ok"] is True
@@ -365,7 +365,7 @@ class TestRushOverdue:
     @pytest.mark.asyncio
     async def test_check_overdue_no_promised_at_skipped(self):
         """没有承诺时间的任务不参与超时检查"""
-        from services.kds_actions import check_rush_overdue
+        from services.tx_trade.src.services.kds_actions import check_rush_overdue
 
         db = _fake_db()
         # 没有promised_at的任务不会出现在查询结果中（SQL: promised_at IS NOT NULL）

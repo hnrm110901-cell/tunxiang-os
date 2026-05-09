@@ -32,7 +32,7 @@ TENANT_ID = _uid()
 @pytest.fixture(autouse=True)
 def _clear_stores():
     """每个测试前清空内存存储"""
-    from services.service_charge import _charge_configs, _charge_records, _charge_templates
+    from services.tx_trade.src.services.service_charge import _charge_configs, _charge_records, _charge_templates
 
     _charge_configs.clear()
     _charge_templates.clear()
@@ -42,7 +42,7 @@ def _clear_stores():
 @pytest.mark.asyncio
 async def test_calculate_by_person():
     """按人头: 4人 × 500分 = 2000分"""
-    from services.service_charge import calculate_service_charge, set_charge_config
+    from services.tx_trade.src.services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
     await set_charge_config(
@@ -69,7 +69,7 @@ async def test_calculate_by_person():
 @pytest.mark.asyncio
 async def test_calculate_by_table():
     """按包厢: 固定8800分"""
-    from services.service_charge import calculate_service_charge, set_charge_config
+    from services.tx_trade.src.services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
     await set_charge_config(
@@ -95,7 +95,7 @@ async def test_calculate_by_table():
 @pytest.mark.asyncio
 async def test_calculate_by_time():
     """按时间: 150分钟，免费120分钟，每30分钟2000分 → 1单位 = 2000分"""
-    from services.service_charge import calculate_service_charge, set_charge_config
+    from services.tx_trade.src.services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
     await set_charge_config(
@@ -124,7 +124,7 @@ async def test_calculate_by_time():
 @pytest.mark.asyncio
 async def test_calculate_by_amount_waived():
     """按金额: 满50000分免服务费"""
-    from services.service_charge import calculate_service_charge, set_charge_config
+    from services.tx_trade.src.services.service_charge import calculate_service_charge, set_charge_config
 
     store_id = _uid()
     await set_charge_config(
@@ -151,7 +151,7 @@ async def test_calculate_by_amount_waived():
 @pytest.mark.asyncio
 async def test_calculate_no_config():
     """无配置时返回0"""
-    from services.service_charge import calculate_service_charge
+    from services.tx_trade.src.services.service_charge import calculate_service_charge
 
     result = await calculate_service_charge(
         order_id=_uid(),
@@ -166,7 +166,7 @@ async def test_calculate_no_config():
 @pytest.mark.asyncio
 async def test_set_and_get_config():
     """设置并查询门店配置"""
-    from services.service_charge import get_charge_config, set_charge_config
+    from services.tx_trade.src.services.service_charge import get_charge_config, set_charge_config
 
     store_id = _uid()
     await set_charge_config(store_id, {"mode": "by_person", "charge_per_person_fen": 800, "enabled": True}, TENANT_ID)
@@ -180,7 +180,7 @@ async def test_set_and_get_config():
 @pytest.mark.asyncio
 async def test_create_template():
     """创建总部模板"""
-    from services.service_charge import create_charge_template
+    from services.tx_trade.src.services.service_charge import create_charge_template
 
     result = await create_charge_template(
         name="标准包厢费",
@@ -195,7 +195,7 @@ async def test_create_template():
 @pytest.mark.asyncio
 async def test_publish_template():
     """模板下发到多门店"""
-    from services.service_charge import create_charge_template, get_charge_config, publish_template
+    from services.tx_trade.src.services.service_charge import create_charge_template, get_charge_config, publish_template
 
     template = await create_charge_template(
         name="人头费模板",
@@ -215,7 +215,7 @@ async def test_publish_template():
 @pytest.mark.asyncio
 async def test_publish_template_not_found():
     """模板不存在时报错"""
-    from services.service_charge import publish_template
+    from services.tx_trade.src.services.service_charge import publish_template
 
     with pytest.raises(ValueError, match="Template not found"):
         await publish_template("nonexistent", [_uid()], TENANT_ID)

@@ -79,7 +79,7 @@ def _make_mock_db(execute_results=None):
 @pytest.mark.asyncio
 async def test_dispatch_order_maps_dishes_to_depts():
     """验证菜品根据 dish_dept_mappings 分配到正确的档口"""
-    from services.kds_dispatch import dispatch_order_to_kds
+    from services.tx_trade.src.services.kds_dispatch import dispatch_order_to_kds
 
     dept_hot_uuid = uuid.UUID(DEPT_HOT)
     dish_kp_uuid = uuid.UUID(DISH_KUNG_PAO)
@@ -114,7 +114,7 @@ async def test_dispatch_order_maps_dishes_to_depts():
 @pytest.mark.asyncio
 async def test_dispatch_unmapped_dish_goes_to_default():
     """未在 dish_dept_mappings 中配置的菜品应归入默认档口"""
-    from services.kds_dispatch import dispatch_order_to_kds
+    from services.tx_trade.src.services.kds_dispatch import dispatch_order_to_kds
 
     # Mock: 映射查询返回空，档口查询也空
     db = _make_mock_db([FakeResult(rows=[]), FakeResult(rows=[])])
@@ -133,7 +133,7 @@ async def test_dispatch_unmapped_dish_goes_to_default():
 @pytest.mark.asyncio
 async def test_cooking_order_vip_first():
     """VIP 订单应排在普通订单前面"""
-    from services.cooking_scheduler import calculate_cooking_order
+    from services.tx_trade.src.services.cooking_scheduler import calculate_cooking_order
 
     db = AsyncMock()
     now = datetime.now(timezone.utc).isoformat()
@@ -162,7 +162,7 @@ async def test_cooking_order_vip_first():
 @pytest.mark.asyncio
 async def test_cooking_order_urgent_highest():
     """催菜标记的任务应排在最前面，优先于 VIP"""
-    from services.cooking_scheduler import calculate_cooking_order
+    from services.tx_trade.src.services.cooking_scheduler import calculate_cooking_order
 
     db = AsyncMock()
     now = datetime.now(timezone.utc).isoformat()
@@ -191,7 +191,7 @@ async def test_cooking_order_urgent_highest():
 @pytest.mark.asyncio
 async def test_start_cooking_transitions_to_cooking():
     """pending → cooking 状态流转"""
-    from services.kds_actions import STATUS_COOKING, STATUS_PENDING, _task_store, start_cooking
+    from services.tx_trade.src.services.kds_actions import STATUS_COOKING, STATUS_PENDING, _task_store, start_cooking
 
     db = AsyncMock()
     task_id = _uid()
@@ -217,7 +217,7 @@ async def test_start_cooking_transitions_to_cooking():
 @pytest.mark.asyncio
 async def test_finish_cooking_transitions_to_done():
     """cooking → done 状态流转"""
-    from services.kds_actions import STATUS_COOKING, STATUS_DONE, _task_store, finish_cooking
+    from services.tx_trade.src.services.kds_actions import STATUS_COOKING, STATUS_DONE, _task_store, finish_cooking
 
     db = AsyncMock()
     task_id = _uid()
@@ -244,7 +244,7 @@ async def test_finish_cooking_transitions_to_done():
 @pytest.mark.asyncio
 async def test_remake_resets_to_pending():
     """重做应将状态重置为 pending 并标记 urgent"""
-    from services.kds_actions import STATUS_DONE, STATUS_PENDING, _task_store, request_remake
+    from services.tx_trade.src.services.kds_actions import STATUS_DONE, STATUS_PENDING, _task_store, request_remake
 
     db = AsyncMock()
     task_id = _uid()
@@ -269,7 +269,7 @@ async def test_remake_resets_to_pending():
 
 def test_timeout_classification():
     """验证超时分级：normal / warning / critical"""
-    from services.cooking_timeout import _classify_timeout_status
+    from services.tx_trade.src.services.cooking_timeout import _classify_timeout_status
 
     config = {"normal_minutes": 15, "warning_minutes": 20, "critical_minutes": 30}
 
@@ -287,7 +287,7 @@ def test_timeout_classification():
 @pytest.mark.asyncio
 async def test_report_shortage():
     """缺料上报应记录事件并返回成功"""
-    from services.kds_actions import _task_store, report_shortage
+    from services.tx_trade.src.services.kds_actions import _task_store, report_shortage
 
     db = AsyncMock()
     task_id = _uid()
@@ -314,7 +314,7 @@ async def test_report_shortage():
 @pytest.mark.asyncio
 async def test_task_timeline_completeness():
     """完整操作流程应产生完整时间线"""
-    from services.kds_actions import (
+    from services.tx_trade.src.services.kds_actions import (
         STATUS_PENDING,
         _task_store,
         finish_cooking,

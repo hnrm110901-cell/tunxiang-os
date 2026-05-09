@@ -35,7 +35,7 @@ TENANT_B = _uid()
 
 def _clear_stores():
     """在测试间清理内存存储，避免状态污染"""
-    from services.dispatch_code_service import _store_by_code, _store_by_order
+    from services.tx_trade.src.services.dispatch_code_service import _store_by_code, _store_by_order
 
     _store_by_order.clear()
     _store_by_code.clear()
@@ -48,7 +48,7 @@ def _clear_stores():
 async def test_generate_code_format():
     """生成的出餐码必须是 6 位字母数字（base62）"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     order_id = _uid()
     dc = await DispatchCodeService.generate(
@@ -73,7 +73,7 @@ async def test_generate_code_format():
 async def test_generate_idempotent():
     """同一订单重复生成，返回相同 code（幂等）"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     order_id = _uid()
     dc1 = await DispatchCodeService.generate(
@@ -98,7 +98,7 @@ async def test_generate_idempotent():
 async def test_confirm_by_scan_success():
     """扫码确认：confirmed=True，记录 confirmed_at 和 operator_id"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     order_id = _uid()
     operator_id = _uid()
@@ -141,7 +141,7 @@ async def test_confirm_by_scan_success():
 async def test_confirm_already_confirmed():
     """重复扫码应返回 already_confirmed=True，不报错"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     order_id = _uid()
     operator_id = _uid()
@@ -179,7 +179,7 @@ async def test_confirm_already_confirmed():
 async def test_confirm_invalid_code():
     """不存在的出餐码，ScanResult.success=False，error 有说明"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     result = await DispatchCodeService.confirm_by_scan(
         code="XXXXXX",
@@ -200,7 +200,7 @@ async def test_confirm_invalid_code():
 async def test_platform_notify_failure_does_not_block():
     """平台出餐回调网络错误，扫码仍应返回 success=True"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService, set_platform_client
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService, set_platform_client
 
     order_id = _uid()
     operator_id = _uid()
@@ -244,7 +244,7 @@ async def test_platform_notify_failure_does_not_block():
 async def test_cross_tenant_isolation():
     """租户 A 的出餐码不能被租户 B 扫到"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     order_id = _uid()
     operator_id = _uid()
@@ -283,7 +283,7 @@ async def test_cross_tenant_isolation():
 async def test_list_pending_only_unconfirmed():
     """list_pending 只返回 confirmed=False 的出餐码"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     tenant_id = _uid()
     operator_id = _uid()
@@ -320,7 +320,7 @@ async def test_list_pending_only_unconfirmed():
 async def test_get_by_order_not_found():
     """不存在的 order_id 返回 None"""
     _clear_stores()
-    from services.dispatch_code_service import DispatchCodeService
+    from services.tx_trade.src.services.dispatch_code_service import DispatchCodeService
 
     result = await DispatchCodeService.get_by_order(
         order_id=_uid(),
@@ -338,7 +338,7 @@ async def test_generate_code_base62_chars():
     _clear_stores()
     import string
 
-    from services.dispatch_code_service import generate_dispatch_code
+    from services.tx_trade.src.services.dispatch_code_service import generate_dispatch_code
 
     allowed = set(string.ascii_uppercase + string.ascii_lowercase + string.digits)
     for _ in range(20):
