@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.retail_mall_routes import router as retail_router
+from services.tx_trade.src.api.retail_mall_routes import router as retail_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -196,7 +196,7 @@ class TestGiftCards:
 
 class TestValidationHelpers:
     def test_validate_retail_items_ok(self):
-        from services.retail_mall import validate_retail_items
+        from services.tx_trade.src.services.retail_mall import validate_retail_items
 
         ok, msg = validate_retail_items(
             [
@@ -207,21 +207,21 @@ class TestValidationHelpers:
         assert msg == "ok"
 
     def test_validate_retail_items_empty(self):
-        from services.retail_mall import validate_retail_items
+        from services.tx_trade.src.services.retail_mall import validate_retail_items
 
         ok, msg = validate_retail_items([])
         assert ok is False
         assert msg == "items_empty"
 
     def test_validate_retail_items_missing_product_id(self):
-        from services.retail_mall import validate_retail_items
+        from services.tx_trade.src.services.retail_mall import validate_retail_items
 
         ok, msg = validate_retail_items([{"sku_id": "s1", "quantity": 1}])
         assert ok is False
         assert "missing_product_id" in msg
 
     def test_validate_retail_items_invalid_quantity(self):
-        from services.retail_mall import validate_retail_items
+        from services.tx_trade.src.services.retail_mall import validate_retail_items
 
         ok, msg = validate_retail_items(
             [
@@ -232,7 +232,7 @@ class TestValidationHelpers:
         assert "invalid_quantity" in msg
 
     def test_validate_address_ok(self):
-        from services.retail_mall import validate_address
+        from services.tx_trade.src.services.retail_mall import validate_address
 
         ok, msg = validate_address(
             {
@@ -247,7 +247,7 @@ class TestValidationHelpers:
         assert ok is True
 
     def test_validate_address_missing_field(self):
-        from services.retail_mall import validate_address
+        from services.tx_trade.src.services.retail_mall import validate_address
 
         ok, msg = validate_address({"name": "张三"})
         assert ok is False

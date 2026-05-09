@@ -21,9 +21,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from services.delivery_adapter import DeliveryPlatformAdapter
-from services.member_golden_id import MemberGoldenIDService
-from services.reconciliation import ReconciliationService
+from services.tx_trade.src.services.delivery_adapter import DeliveryPlatformAdapter
+from services.tx_trade.src.services.member_golden_id import MemberGoldenIDService
+from services.tx_trade.src.services.reconciliation import ReconciliationService
 
 # ─── Fixtures ───
 

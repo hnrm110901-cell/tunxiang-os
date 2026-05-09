@@ -164,7 +164,7 @@ def _make_gateway(
 # 从 PaymentSagaService 导入
 # ─────────────────────────────────────────────────────────────────────────────
 
-from services.payment_saga_service import (
+from services.tx_trade.src.services.payment_saga_service import (
     PaymentSagaService,
     SagaStep,
 )

@@ -100,7 +100,7 @@ def _make_booking_app(db: AsyncMock) -> FastAPI:
     booking_api 内部的 _get_db_session 调用 get_db_with_tenant，
     我们直接 override _get_db_session 本身，避免触碰真实数据库。
     """
-    import api.booking_api as booking_mod  # type: ignore[import]
+    import services.tx_trade.src.api.booking_api as booking_mod  # type: ignore[import]
 
     app = FastAPI()
     app.include_router(booking_mod.router)
@@ -298,7 +298,7 @@ def test_booking_get_queue_board_ok():
 
 def _make_mobile_app(db: AsyncMock) -> FastAPI:
     """构建挂载 mobile_ops_routes.router 的 FastAPI，并注入 mock DB。"""
-    import api.mobile_ops_routes as mobile_mod  # type: ignore[import]
+    import services.tx_trade.src.api.mobile_ops_routes as mobile_mod  # type: ignore[import]
 
     app = FastAPI()
     app.include_router(mobile_mod.router)

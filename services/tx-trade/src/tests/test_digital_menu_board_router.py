@@ -93,7 +93,7 @@ def _seq_db(*results):
 
 # ─── 加载路由 ──────────────────────────────────────────────
 
-from api.digital_menu_board_router import router
+from services.tx_trade.src.api.digital_menu_board_router import router
 
 from shared.ontology.src.database import get_db
 

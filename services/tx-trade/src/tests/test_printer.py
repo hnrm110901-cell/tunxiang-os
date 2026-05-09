@@ -10,9 +10,9 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.print_manager import PrinterRole, PrintManager
-from services.print_template import ReceiptTemplate
-from services.printer_driver import (
+from services.tx_trade.src.services.print_manager import PrinterRole, PrintManager
+from services.tx_trade.src.services.print_template import ReceiptTemplate
+from services.tx_trade.src.services.printer_driver import (
     ESC_ALIGN_CENTER,
     ESC_ALIGN_LEFT,
     ESC_ALIGN_RIGHT,
@@ -451,7 +451,7 @@ class TestPrinterDriverInit:
 
 class TestPrintManagerSingleton:
     def test_get_print_manager_returns_same_instance(self):
-        from services.print_manager import get_print_manager
+        from services.tx_trade.src.services.print_manager import get_print_manager
 
         mgr1 = get_print_manager()
         mgr2 = get_print_manager()
@@ -463,7 +463,7 @@ class TestPrintManagerSingleton:
 
 class TestPrintTask:
     def test_task_to_dict(self):
-        from services.print_manager import PrintTask
+        from services.tx_trade.src.services.print_manager import PrintTask
 
         task = PrintTask(
             task_id="test-001",

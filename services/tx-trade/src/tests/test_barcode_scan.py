@@ -119,7 +119,7 @@ class TestBarcodeGenerator:
     def test_generate_barcode_normal(self) -> None:
         """正常生成条码 — 标准格式"""
         # 直接内联实现以避免导入链
-        from services.barcode_generator import generate_barcode  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcode  # type: ignore[import]
 
         order_time = datetime(2026, 4, 25, 12, 0, 0, tzinfo=timezone.utc)
         barcode = generate_barcode("SH01", "A12", seq=1, order_time=order_time)
@@ -127,7 +127,7 @@ class TestBarcodeGenerator:
 
     def test_generate_barcode_long_table_truncated(self) -> None:
         """长桌号被截断到6字符"""
-        from services.barcode_generator import generate_barcode  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcode  # type: ignore[import]
 
         order_time = datetime(2026, 4, 25, 12, 0, 0, tzinfo=timezone.utc)
         barcode = generate_barcode("SH01", "VERYLONGTABLE", seq=5, order_time=order_time)
@@ -136,7 +136,7 @@ class TestBarcodeGenerator:
 
     def test_generate_barcode_empty_values(self) -> None:
         """空值安全处理"""
-        from services.barcode_generator import generate_barcode  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcode  # type: ignore[import]
 
         barcode = generate_barcode("", "", seq=1)
         assert barcode.startswith("S0-")
@@ -144,7 +144,7 @@ class TestBarcodeGenerator:
 
     def test_generate_barcodes_for_order(self) -> None:
         """批量生成 — 序号递增"""
-        from services.barcode_generator import generate_barcodes_for_order  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcodes_for_order  # type: ignore[import]
 
         order_time = datetime(2026, 4, 25, 12, 0, 0, tzinfo=timezone.utc)
         barcodes = generate_barcodes_for_order("SH01", "A12", 3, order_time=order_time)
@@ -377,14 +377,14 @@ class TestBarcodeFormat:
 
     def test_barcode_max_length(self) -> None:
         """条码长度不超过30字符"""
-        from services.barcode_generator import generate_barcode  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcode  # type: ignore[import]
 
         barcode = generate_barcode("LONGSTORECODE", "LONGTABLE", seq=999)
         assert len(barcode) <= 30
 
     def test_barcode_contains_date(self) -> None:
         """条码包含日期部分"""
-        from services.barcode_generator import generate_barcode  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcode  # type: ignore[import]
 
         order_time = datetime(2026, 12, 31, 12, 0, 0, tzinfo=timezone.utc)
         barcode = generate_barcode("S1", "T1", seq=1, order_time=order_time)
@@ -392,7 +392,7 @@ class TestBarcodeFormat:
 
     def test_barcode_unique_per_item(self) -> None:
         """同一订单的不同菜品条码不重复"""
-        from services.barcode_generator import generate_barcodes_for_order  # type: ignore[import]
+        from services.tx_trade.src.services.barcode_generator import generate_barcodes_for_order  # type: ignore[import]
 
         barcodes = generate_barcodes_for_order("S1", "A1", 10)
         assert len(set(barcodes)) == 10

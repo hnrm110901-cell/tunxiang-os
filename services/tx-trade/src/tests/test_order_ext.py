@@ -125,7 +125,7 @@ def _make_item(order_id, **overrides):
 @pytest.mark.asyncio
 async def test_gift_dish_success():
     """赠菜成功 — 有审批人"""
-    from services.order_extensions import gift_dish
+    from services.tx_trade.src.services.order_extensions import gift_dish
 
     order_id = _uid()
     order = _make_order(id=order_id)
@@ -150,7 +150,7 @@ async def test_gift_dish_success():
 @pytest.mark.asyncio
 async def test_gift_dish_no_approver():
     """赠菜缺审批人 — 被拒"""
-    from services.order_extensions import gift_dish
+    from services.tx_trade.src.services.order_extensions import gift_dish
 
     db = FakeSession()
     with pytest.raises(ValueError, match="审批人"):
@@ -168,7 +168,7 @@ async def test_gift_dish_no_approver():
 @pytest.mark.asyncio
 async def test_gift_dish_completed_order():
     """已结算订单不允许赠菜"""
-    from services.order_extensions import gift_dish
+    from services.tx_trade.src.services.order_extensions import gift_dish
 
     order_id = _uid()
     order = _make_order(id=order_id, status=OrderStatus.completed.value)
@@ -190,7 +190,7 @@ async def test_gift_dish_completed_order():
 @pytest.mark.asyncio
 async def test_split_order_too_few_groups():
     """拆单少于2组被拒"""
-    from services.order_extensions import split_order
+    from services.tx_trade.src.services.order_extensions import split_order
 
     db = FakeSession()
     with pytest.raises(ValueError, match="至少需要两组"):
@@ -205,7 +205,7 @@ async def test_split_order_too_few_groups():
 @pytest.mark.asyncio
 async def test_merge_orders_too_few():
     """并单不足2单被拒"""
-    from services.order_extensions import merge_orders
+    from services.tx_trade.src.services.order_extensions import merge_orders
 
     db = FakeSession()
     with pytest.raises(ValueError, match="至少需要两个"):
@@ -219,7 +219,7 @@ async def test_merge_orders_too_few():
 @pytest.mark.asyncio
 async def test_request_and_approve_change():
     """异常改单申请 + 审批流程"""
-    from services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
+    from services.tx_trade.src.services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
 
     # 清理全局状态
     _OrderChangeRequest._store.clear()
@@ -255,7 +255,7 @@ async def test_request_and_approve_change():
 @pytest.mark.asyncio
 async def test_approve_change_wrong_tenant():
     """审批改单 — 租户不匹配"""
-    from services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
+    from services.tx_trade.src.services.order_extensions import _OrderChangeRequest, approve_order_change, request_order_change
 
     _OrderChangeRequest._store.clear()
 

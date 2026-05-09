@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from datetime import datetime, timezone
 
-from services.dormancy_service import classify_dormancy, compute_dormancy_days, scan_dormant_items, suggest_cleanup
+from services.tx_trade.src.services.dormancy_service import classify_dormancy, compute_dormancy_days, scan_dormant_items, suggest_cleanup
 
 
 class TestDormancyDays:

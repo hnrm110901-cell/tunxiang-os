@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.reservation_flow import (
+from services.tx_trade.src.services.reservation_flow import (
     call_next,
     can_reservation_transition,
     compute_queue_stats,
