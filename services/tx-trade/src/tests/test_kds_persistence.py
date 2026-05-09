@@ -79,7 +79,7 @@ class TestTaskCreation:
         fake_task_row.tenant_id = uuid.UUID(TENANT_A)
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task_row))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True):
             result = await start_cooking(task_id, operator_id, db, tenant_id=TENANT_A)
 
         assert result["ok"] is True
@@ -103,7 +103,7 @@ class TestTaskCreation:
         fake_task_row.dept_id = None
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task_row))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True):
             result = await finish_cooking(task_id, operator_id, db, tenant_id=TENANT_A)
 
         assert result["ok"] is True
@@ -163,7 +163,7 @@ class TestStateTransition:
         fake_task_row.dept_id = None
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task_row))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True):
             result = await finish_cooking(task_id, "op1", db, tenant_id=TENANT_A)
 
         assert result["ok"] is True

@@ -217,7 +217,7 @@ class TestCreateScanOrder:
 
         items = [{"dish_id": DISH_ID_1, "quantity": 2}]
 
-        with patch("services.scan_order_service.sync_to_kds", new_callable=AsyncMock) as mock_kds:
+        with patch("services.tx_trade.src.services.scan_order_service.sync_to_kds", new_callable=AsyncMock) as mock_kds:
             mock_kds.return_value = {"items_synced": 1}
 
             result = await create_scan_order(
@@ -275,7 +275,7 @@ class TestAddItemsToOrder:
 
         items = [{"dish_id": DISH_ID_2, "quantity": 1}]
 
-        with patch("services.scan_order_service.sync_to_kds", new_callable=AsyncMock) as mock_kds:
+        with patch("services.tx_trade.src.services.scan_order_service.sync_to_kds", new_callable=AsyncMock) as mock_kds:
             mock_kds.return_value = {"items_synced": 1}
 
             result = await add_items_to_order(

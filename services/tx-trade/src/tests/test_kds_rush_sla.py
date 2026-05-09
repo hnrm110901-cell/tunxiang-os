@@ -86,7 +86,7 @@ class TestConfirmRush:
         fake_task = _make_task(status="cooking")
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True):
             result = await confirm_rush(task_id, promised_minutes=10, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         assert result["ok"] is True
@@ -144,7 +144,7 @@ class TestRushSLAPush:
             push_calls.append({"station_id": station_id, "message": message})
             return True
 
-        with patch("services.kds_actions._push_to_kds_station", side_effect=mock_push):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", side_effect=mock_push):
             result = await confirm_rush(task_id, promised_minutes=8, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         assert result["ok"] is True
@@ -165,7 +165,7 @@ class TestRushSLAPush:
         fake_task = _make_task(status="cooking")
         db.execute = AsyncMock(return_value=FakeResult(scalar=fake_task))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=False):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=False):
             result = await confirm_rush(task_id, promised_minutes=5, operator_id="chef_1", db=db, tenant_id=TENANT_ID)
 
         # 即使推送失败，DB写入应成功
@@ -191,9 +191,9 @@ class TestRushRateLimit:
 
         # request_rush查找内存+DB中的任务
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -204,7 +204,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(order_id, dish_id, db, tenant_id=TENANT_ID)
 
@@ -220,9 +220,9 @@ class TestRushRateLimit:
         fake_task = _make_task(rush_count=1, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -233,7 +233,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(ORDER_ID, DISH_ID, db, tenant_id=TENANT_ID)
 
@@ -249,9 +249,9 @@ class TestRushRateLimit:
         fake_task = _make_task(rush_count=2, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -279,9 +279,9 @@ class TestRushRateLimit:
         fake_task = _make_task(rush_count=2, last_rush_at=last_rush)
 
         with (
-            patch("services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
+            patch("services.tx_trade.src.services.kds_actions._find_active_tasks_for_dish", return_value=[fake_task]),
             patch(
-                "services.kds_actions._resolve_task_context",
+                "services.tx_trade.src.services.kds_actions._resolve_task_context",
                 return_value={
                     "dept_id": DEPT_ID,
                     "dept_name": "热菜间",
@@ -292,7 +292,7 @@ class TestRushRateLimit:
                     "quantity": 1,
                 },
             ),
-            patch("services.kds_actions._push_to_kds_station", return_value=True),
+            patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True),
         ):
             result = await request_rush(ORDER_ID, DISH_ID, db, tenant_id=TENANT_ID)
 
@@ -327,7 +327,7 @@ class TestRushOverdue:
             push_calls.append(message)
             return True
 
-        with patch("services.kds_actions._push_to_kds_station", side_effect=mock_push):
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", side_effect=mock_push):
             result = await check_rush_overdue(TENANT_ID, db)
 
         assert result["ok"] is True
@@ -356,7 +356,7 @@ class TestRushOverdue:
         # check_rush_overdue只查promised_at < NOW()的任务
         db.execute = AsyncMock(return_value=FakeResult(rows=[]))
 
-        with patch("services.kds_actions._push_to_kds_station", return_value=True) as mock_push:
+        with patch("services.tx_trade.src.services.kds_actions._push_to_kds_station", return_value=True) as mock_push:
             result = await check_rush_overdue(TENANT_ID, db)
 
         assert result["ok"] is True
