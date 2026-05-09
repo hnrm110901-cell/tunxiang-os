@@ -1,3 +1,68 @@
+## 2026-05-09 深夜 续 #4 — #298 codemod chain 100% 收官（test 端） — Phase 9 余 7 服务一波清
+
+### 今日完成（5/9 第 9 PR — chain 收官）
+- **#XXX** Phase 9 chain closer — 余 7 服务一次性清理（gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops）
+  - **RED** `ef5db8e0` — 7 conftest 新建（决策 83 第 4-10 次） + 单一守门 fixture（chain 收官，覆盖 7 服务）
+  - **GREEN** `20ee1915` — codemod --apply 7 服务循环：65 文件 / 159 import
+  - **fix** `29c5c728` — patch literal 漂移 74 处 / 6 文件（bulk regex 改写）
+
+### 数据变化
+- 改写文件：65（gateway 4 + tx-agent 19 + tx-analytics 17 + tx-brain 2 + tx-intel 4 + tx-menu 13 + tx-ops 6）
+- 改写 import：159
+- 新建 conftest：7（决策 83 第 4-10 次新建，模板已 9 PR 验证收敛）
+- 修补 patch literal：74 处（bulk regex 一次性 7 服务覆盖）
+- 新增测试：1（守门 fixture，Tier 1 收官）
+
+### 本地 pytest 实测对比（决策 78）— 7 服务汇总
+| | pre-codemod | post-codemod | delta |
+|---|---|---|---|
+| pass | 2511 | 2576 | **+65** |
+| fail | 305 | 277 | **-28** |
+| collection error | 140 | 126 | **-14** |
+
+**全方位正向**：codemod 净修复 28 fail / 14 collection error / +65 pass。
+**tx-menu** 单服务受益最大（+80 pass，-5 errors）。
+
+### 累计 #298 chain 数据快照 — chain 100%（test 端）
+| Phase | PR | 服务 | 文件 | import |
+|---|---|---|---|---|
+| 1-3 | #322 #335 | tx-trade | 42 | ~305 |
+| 4 | #338 | tx-member | 30 | 112 |
+| 5 | #341 | tx-org | 39 | 102 |
+| 6 | #344 | tx-supply | 39 | 96 |
+| 7 | #348 | tx-growth | 20 | 70 |
+| 8 | #349 | tx-finance | 23 | 62 |
+| **9** | **#XXX** | **gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops** | **65** | **159** |
+| **累计** | | **13 服务** | **258** | **~906** |
+| 余 | | tx-civic（0 bare）/ tx-pay（0 bare）/ tx-expense（0 bare） | 0 | 0 |
+
+### conftest 状态（决策 83）— 全 14 服务覆盖（含本 PR 新增 7）
+| ✓ 已有 | tx-trade / tx-org / tx-pay / tx-supply（旧）+ tx-member（#338）/ tx-growth（#348）/ tx-finance（#349）+ **gateway / tx-agent / tx-analytics / tx-brain / tx-intel / tx-menu / tx-ops（本 PR 一次性 7 个）** |
+
+### 5/9 一日成绩 = 9 PR（chain 完成）
+| PR | 内容 | files / imports |
+|---|---|---|
+| #335 / #336 | Phase 3 + RBAC follow-up | tx-trade 22/57 |
+| #338 | Phase 4 + conftest | tx-member 30/112 |
+| #341 | Phase 5 | tx-org 39/102 |
+| #344 | Phase 6 | tx-supply 39/96 |
+| #347 | conftest shared namespace fix | 5 服务 -16 errors |
+| #348 | Phase 7 + conftest | tx-growth 20/70 |
+| #349 | Phase 8 + conftest | tx-finance 23/62 |
+| **#XXX** | **Phase 9 chain closer + 7 conftest** | **7 服务 65/159** |
+
+### 遗留问题
+- **决策 77 仍未撤 band-aid**：本 PR 完成 chain test 端 100%，但 production 端 from api.X / from services.<bare> 短路径仍存在，撤 PR #287 extend_existing 兜底还需 production codemod
+- 决策 79 follow-up：余 7 服务 277 surfaced failures（多为 pre-existing latent bugs）
+- 决策 84 scanner 仍未抓 from-NS-import-module 形式（本 chain 无新触发）
+
+### 明日计划
+- 决策 77 production 端 codemod（撤 band-aid 前置）
+- 决策 79 follow-up：累计 ~600+ surfaced failures 调查
+- alembic chain integrity 修复（v310 dangling）
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成

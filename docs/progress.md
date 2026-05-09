@@ -1,3 +1,35 @@
+## 2026-05-09 深夜 续 #4 · #298 codemod chain 100% 收官（test 端） — Phase 9 余 7 服务一波清
+
+### 完成状态
+- [x] **RED** `ef5db8e0` — 7 conftest 新建（决策 83 第 4-10 次）+ 单一守门 fixture（chain 收官）
+- [x] **GREEN** `20ee1915` — codemod 应用 7 服务循环：65 文件 / 159 处 import
+- [x] **fix** `29c5c728` — 74 处 patch literal 漂移 bulk 修补（6 文件）
+- [x] 本地 pytest 7 服务汇总实测：pass 2511→2576（+65），fail 305→277（-28），collection error 140→126（-14）— 全方位正向
+- [x] DEVLOG / progress 同步（本 commit）
+- [ ] 仍待 admin override merge（Tier 1 强制 review）
+
+### 关键决策
+- **决策 83 第 4-10 次应用 — bulk 7 服务一次性建 conftest**：模板已 9 PR 验证收敛，bulk shell loop 一次生成 7 文件 / 350 行
+- **单 fixture 而非 7 个 — chain 收官守门**：覆盖 7 服务 + tx-civic（0 bare 但纳入防回退）；统一断言"余服务全清"
+- **bulk regex patch literal 修补**：74 处 / 6 文件 / 7 服务一次性覆盖（Python script），grep 验证 0 残留
+- **决策 78 真门禁验证**：本地 pytest 实测全方位正向（+65 pass / -28 fail / -14 errors）；codemod 是无副作用净提升
+- **决策 84 本轮 0 命中**：scanner 漏抓 from-NS-import-module 形式 — 余 7 服务未触发
+- **CLAUDE.md §17 Tier 1 触及**：tx-agent 含三条硬约束校验（毛利底线 / 食安合规 / 客户体验）；codemod 改的是 import 形式，业务 mock 用例隔离不受影响（前 8 PR 同模板验证）
+- 累计 chain：13 服务 / 258 文件 / ~906 imports（100% test 端）
+
+### 下一步
+- **决策 77 production 端 codemod**（撤 PR #287 extend_existing band-aid 前置）
+- 决策 79 follow-up：累计 ~600+ surfaced failures 调查（决定 tx-trade band-aid 撤前是否 fix 的关键）
+- alembic chain integrity 修复（v310 dangling，自 PR #128 起）
+
+### 已知风险
+- **决策 77 band-aid 仍未撤**：本 PR 完成 chain test 端 100%，但生产端 from api.X / from services.<bare> 短路径仍存在；撤 band-aid 还需 production codemod
+- **alembic chain integrity 仍断裂**（v310 dangling）— 与本 PR 无关
+- **Tier 1 真门禁绿**（AST 守门 fixture 通过 = 余 7 服务 test 路径上 0 裸 import）；CI 噪音（Ruff / python-lint-test (*) / frontend-build）按 ci_gates 规则忽略
+- 余 277 fail 多为 pre-existing latent bugs，决策 79 follow-up
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
