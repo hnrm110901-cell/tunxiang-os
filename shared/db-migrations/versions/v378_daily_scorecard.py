@@ -144,10 +144,13 @@ def upgrade() -> None:
                                         CHECK (current_stage IN ('rampup', 'mature', 'plateau', 'decline')),
             stage_entered_at        DATE NOT NULL,
 
-            months_since_opening    INT GENERATED ALWAYS AS (
-                (EXTRACT(YEAR FROM age(CURRENT_DATE, opened_date)) * 12
-                 + EXTRACT(MONTH FROM age(CURRENT_DATE, opened_date)))::INT
-            ) STORED,
+            -- B'-6 修：原 GENERATED ALWAYS AS (... CURRENT_DATE / age()) STORED 包含
+            -- 非 IMMUTABLE 表达式（CURRENT_DATE 是 STABLE / age() 依赖时区），PG 拒绝
+            -- 创建。改普通 nullable INT 列，由 services/tx-org/store_lifecycle_service
+            -- 在 INSERT/UPDATE 时显式计算写入；query 侧已用 `int(r["..."] or 0)` 容 NULL。
+            -- PG 16 不支持 VIRTUAL 生成列；query-time 计算 (EXTRACT(...) FROM age(...))
+            -- 也可行但需改服务代码 SELECT，scope 外。
+            months_since_opening    INT,
 
             health_baseline         JSONB,
             next_review_date        DATE,
