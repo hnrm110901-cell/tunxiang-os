@@ -1,3 +1,36 @@
+## 2026-05-09 下午 · B'-3 alembic upgrade 解锁 v288-v324 段
+
+### 完成状态
+- [x] 类 C — v288 `_seed_system_templates` 改 `exec_driver_sql` 跳过 sa.text 解析
+- [x] 类 E chain — v236 `down_revision = ("v235b", "v235c")` 改 merge migration
+- [x] 类 A 第一组 — v208b employee_transfers 副本 → no-op
+- [x] DEVLOG / progress 同步
+- [x] 真 PG 验证 — 链路从 v288 推进到 v315（30+ migration 解锁）
+- [ ] 类 A 第二组 banquet_leads (v267/v315/v331) — 下一 PR
+- [ ] 类 A 第三组 banquet_quotes (v316/v317/v332) — 下一 PR
+- [ ] 类 A 第四组 approval_instances (v031/v059/v235c) — 最复杂，需业务 audit
+- [ ] v310 mv_* 性能索引列名拼错
+- [ ] v332 → v406 段（25% 剩余链路）摸排
+
+### 关键决策
+- **v236 用 merge migration tuple 而非单 v235c 替换**：保留 v235b（LightRAG 知识图谱）的链路位置；alembic 调度自然处理两条 v235 平行分支
+- **v208b no-op 而非删 file**：保留链路节点完整性（v398 merge tuple 可能 reference v208b），仅去除 schema 副本 effect
+- **v288 用 exec_driver_sql 而非 escape `:N`**：JSON 字面量含冒号是 PG 数据语义，escape 会破坏 JSON 结构；driver-level execute 完全跳过 SQLAlchemy 参数解析才是正确根因修
+- **Tier 分级**：v288/v236 = Tier 1（核心 schema 和资金链路相关报表 / 费控）；v208b = Tier 2（员工借调 schema 工具）
+- **scope 严格 3 commit**：banquet_leads (v315) 同属类 A 但留独立 PR，避免 scope 创蔓
+
+### 下一步
+- B'-4 候选：banquet_leads + banquet_quotes 双组类 A（schema 都明显是 v315/v316 完整版胜出，删 v267/v331 + v317/v332 副本）
+- approval_instances（类 A 第四组）独立 PR — 需 grep 业务代码 audit 三个 schema 哪个被实际使用
+- v332→v406 摸排起新 session
+
+### 已知风险
+- **v236 merge migration 改 tuple**：alembic_version 表中如果某环境已 stamp v236 referencing 单 v235b，升级到 ("v235b", "v235c") 后该 stamp 仍有效（alembic 容忍 tuple 子集）。但若该环境从未走过 v235c → 升级时 v235c 会突然 retroactively 跑（可能撞已存在的 expense_* 表）。生产环境因 chain 一直断，无环境曾真跑过 v236，风险纸面
+- **v208b no-op 副本去重**：未来如果 v287 被回滚（downgrade），v208b downgrade 也是 no-op，schema 状态完全跟 v287 走 — 这是预期行为（副本之间不应独立回滚）
+- **v288 exec_driver_sql 绕过 SQLAlchemy event hooks**：本仓库 alembic env.py 未挂载 ddl event hook，所以无副作用；但若未来加 hook 需注意 driver-level execute 不触发 hook
+
+---
+
 ## 2026-05-09 中午 · B'-2 alembic upgrade 一锅端低危 SQL bug 批量修复
 
 ### 完成状态

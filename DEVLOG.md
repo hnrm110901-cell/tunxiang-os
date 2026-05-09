@@ -1,3 +1,53 @@
+## 2026-05-09 下午 — B'-3 · alembic upgrade 解锁 v288-v324 段（v236 chain + v288 + v208b 副本）
+
+### 今日完成
+B'-2 后第三批 — 3 个 commit 解锁 ~37 个 migration 阻塞段（v288 → v315）：
+
+1. **类 C — v288 `_seed_system_templates()` `op.execute(SQL)` JSON `:N` 数字误解析**
+   - 50 个行业模板 INSERT 含 `"default":20` / `"default":5`，SQLAlchemy text 解析器误判为 bind param
+   - 修法：`op.get_bind().exec_driver_sql(SQL)` 跳过 SQLAlchemy 解析，直接走 psycopg2 driver
+
+2. **类 E chain — v236 漏依赖 v235c → merge migration tuple**
+   - `down_revision = "v235b"` 让 alembic 在 v235c 跑前执行 v236 → expense_applications 不存在
+   - 修法：`down_revision = ("v235b", "v235c")` 改 alembic merge migration
+
+3. **类 A 第一组 — employee_transfers 副本（v208b vs v287）**
+   - v208_org_training_persistence.py (revision="v208b") 与 v287 是 100% 内容副本，平行分支撞 DuplicateColumn
+   - 修法：v208b 改 no-op（upgrade/downgrade 都 return），让 v287 唯一负责 schema
+
+### 数据变化
+- migration 文件改：3（v288 / v236 / v208b）
+- v208b 删 70 行加 9 行 = 净 -61 行（副本去重大量删）
+- 0 chain 改动级（v236 改 down_revision tuple 但不撞 PR #337 PJ.5 KNOWN_BROKEN，单 head 单 root 守恒）
+
+### 验证证据
+- `alembic upgrade head` 在 fresh pgvector PG 上：
+  - 之前 (B'-2): 卡 v288
+  - 现在 (B'-3): 跨过 v288 → v289 → ... → v314（30+ migration），停在 **v315 banquet_leads**
+- 卡点变迁：v310/v311/v388（B'）→ v151b/v232c/JSONB 5 文件/v287（B'-2）→ v288/v236/v208b（B'-3）→ **v315 banquet_leads triplicate**（下一 PR）
+- chain integrity 测试 15/15 仍绿（v236 改 tuple 不动 head/root/dangling 计数）
+
+### 链路解锁度
+- 已解锁段：v001 → v315（约 **75% 链路**）
+- 已修 bug 总数：3 dangling + 1 dup（B'）+ 5 SQL（B'-2）+ 3 SQL（B'-3）= **12 个 distinct root cause**
+
+### 卡在 v315（**非 B'-3 范畴**）
+v315_banquet_leads.py 创建 banquet_leads 表，但 v267_banquet_leads.py 早已用 IF NOT EXISTS 创建过同名表（不同 schema 无 status 列）。v315 后续 CREATE INDEX 引用 status 列 → ProgrammingError。
+- 类 A 第二组（banquet_leads triplicate：v267 / v315 / v331）— 下一 PR
+- 还剩类 A 第三组 banquet_quotes（v316/v317/v332）+ 第四组 approval_instances（v031/v059/v235c）
+
+### 遗留问题（按 ROI 排序）
+- 类 A 第二组 banquet_leads (v267/v315/v331) — schema 选 v315 完整版，需删 v267 + v331
+- 类 A 第三组 banquet_quotes — 类似 banquet_leads 处理
+- v310 mv_* 性能索引列名拼错（独立 PR / 或弃用文件并入 v404+）
+- 类 A 第四组 approval_instances — **最复杂**（v031/v059/v235c 三个完全不同 schema，需 audit 业务代码确定保留哪个）
+- v332 → v406 段（25% 剩余链路）未摸排
+
+### 明日计划
+- 看 user 决策：B'-4 = 类 A banquet_leads + banquet_quotes 双组（~30min），还是先等 PR review
+
+---
+
 ## 2026-05-09 中午 — B'-2 · alembic upgrade 一锅端低危 SQL bug 批量修复
 
 ### 今日完成
