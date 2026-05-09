@@ -1,3 +1,36 @@
+## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
+
+### 完成状态
+- [x] PR2.A 暴露层全部：#325 v404 / #326 v405 / #328 v406 — mv_* 8 表全暴露 + 敏感字段脱敏
+- [x] PR2.B sql_generator：#330 骨架 + #331 接真 ModelRouter（MigrationRouter wiring）
+- [x] PR2.C SSE 端点：#332 POST /api/v1/brain/nlq/query 串联 generator → run_safe_query
+- [x] PR2.D 真 PG 反测：#333 opt-in INTEGRATION_PG_DSN，4 组反测
+- [x] DEVLOG / progress 同步更新（本 PR）
+- [ ] PR2.A.4 orders.* 脱敏视图（选做，demo 不必需）
+- [ ] LLM 端到端真测（独立 issue，成本管理）
+- [ ] 仓库级 docker-compose-pg fixture（独立 issue）
+
+### 关键决策
+- **NLQ 沙箱双层防御** = 应用层（防火墙 + 白名单）+ DB 层（reports schema + tx_nlq_readonly role + REVOKE public）：即使 LLM/防火墙双失守，DB 也拒查原表
+- **security_invoker=on**（PG 15+）让视图 RLS 跟调用者 app.tenant_id，避免 view owner 持 BYPASSRLS 时跨租户绕过
+- **JSONB 明细字段不暴露**：含 PII 风险（批次号 / 证件号 / 设备 ID / 操作员），聚合数字够 NLQ 用
+- **SSE 错误协议**：端点 200 + event=error，generator/sandbox 内部错不返 5xx（前端基于 kind 决定降级）
+- **PR2.D opt-in**：沿 #323 模式 `pytest.skipif(not INTEGRATION_PG_DSN)`，CI 自动跳过本地手跑
+- **task_type 显式映射** `nlq_sql_generation→sonnet-4-6`：不靠 default fallback
+
+### 下一步
+- 评估 PR2.A.4 orders.* 脱敏视图是否纳入 demo
+- 仓库级 docker-compose-pg fixture
+- dev-plan-60d 5/7 重写（被 26 commit 推翻）
+
+### 已知风险
+- **alembic chain integrity 断裂**（自 #128 起 v310 dangling）：所有 migration PR 的 `Verify Migration Chain Integrity` 一律失败被 admin override，包括本批 v404/v405/v406；不影响视图实际生效，但影响 alembic downgrade 链路完整性
+- **CI 噪音**：`Ruff` / `python-lint-test (*)` / `frontend-build` 全 PR 失败的预存漂移；真门禁（`Tier 1 门禁判定` / `Run Tier 1 *` / `RLS 严格门禁` / `源改动必须配对测试改动`）全绿，按记忆里的 ci_gates 规则放过
+- **LLM 输出非确定性**：sql_generator 已用防火墙 + 白名单兜底；真线上调用前需观察初期 5-10% 灰度的拒绝率
+- **真 PG 反测未在 CI 跑**：PR2.D opt-in 模式，本地手跑验证；待 docker-compose-pg fixture 落地后纳入 CI
+
+---
+
 ## 2026-05-09 14:00 · #318 follow-up scanner 抓 import xxx 形式 (#329)
 
 ### 完成状态
