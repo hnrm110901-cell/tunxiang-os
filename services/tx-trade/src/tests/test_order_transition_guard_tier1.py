@@ -20,7 +20,7 @@ from pathlib import Path
 import pytest
 
 # 顶层 conftest.py 已经把 tx-trade/src 加进 sys.path
-from services.state_machine import (  # type: ignore[import-not-found]
+from services.tx_trade.src.services.state_machine import (  # type: ignore[import-not-found]
     InvalidTransitionError,
     can_order_status_transition,
     transition_order,
@@ -250,7 +250,7 @@ class TestNoDirectAssignmentOutsideStateMachine:
 class TestStateMachineConsistency:
     def test_all_orderstatus_in_transition_table(self) -> None:
         """ORDER_STATUS_TRANSITIONS 必须覆盖所有 OrderStatus 枚举（防词表漂移）"""
-        from services.state_machine import ORDER_STATUS_TRANSITIONS  # type: ignore[import-not-found]
+        from services.tx_trade.src.services.state_machine import ORDER_STATUS_TRANSITIONS  # type: ignore[import-not-found]
 
         for member in OrderStatus:
             assert (
@@ -259,7 +259,7 @@ class TestStateMachineConsistency:
 
     def test_terminal_states_are_terminal(self) -> None:
         """completed 与 cancelled 必须是终态（出度为 0）"""
-        from services.state_machine import ORDER_STATUS_TRANSITIONS  # type: ignore[import-not-found]
+        from services.tx_trade.src.services.state_machine import ORDER_STATUS_TRANSITIONS  # type: ignore[import-not-found]
 
         assert ORDER_STATUS_TRANSITIONS["completed"] == []
         assert ORDER_STATUS_TRANSITIONS["cancelled"] == []

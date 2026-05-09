@@ -274,28 +274,110 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="(Phase 2) 实际改写文件 — 本 Phase 1 PR 不允许",
+        help="(Phase 2) 实际改写文件 — 必须配 --service 或 --files 缩窄范围",
     )
     parser.add_argument(
         "--service",
         default=None,
-        help="(Phase 2) 限定改写到单服务（如 tx-trade）",
+        help="(Phase 2) 限定改写到单服务（disk 名，如 tx-trade）",
+    )
+    parser.add_argument(
+        "--files",
+        nargs="+",
+        default=None,
+        help="(Phase 2) 限定改写到特定 rel_path 文件列表",
     )
     return parser.parse_args(argv)
+
+
+def filter_sites(
+    sites: list[ImportSite],
+    service: str | None,
+    files: list[str] | None,
+) -> list[ImportSite]:
+    """按 --service / --files 缩窄站点列表。"""
+    if files:
+        files_set = set(files)
+        return [s for s in sites if s.rel_path in files_set]
+    if service:
+        prefix = f"services/{service}/"
+        return [s for s in sites if s.rel_path.startswith(prefix)]
+    return sites
+
+
+def apply_rewrites_to_file(path: Path, sites_in_file: list[ImportSite]) -> int:
+    """对单个文件做字符串级 import 改写（保留注释/空行/缩进）。
+
+    只处理 bare 站点。返回 changed line 数。
+    """
+    bare_sites = [s for s in sites_in_file if s.style == "bare"]
+    if not bare_sites:
+        return 0
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    changed = 0
+    for s in bare_sites:
+        idx = s.line - 1
+        if not (0 <= idx < len(lines)):
+            continue
+        old = f"from {s.module} import"
+        new = f"from {s.proposed} import"
+        if old in lines[idx]:
+            lines[idx] = lines[idx].replace(old, new, 1)
+            changed += 1
+    if changed > 0:
+        path.write_text("".join(lines), encoding="utf-8")
+    return changed
+
+
+def apply_rewrites(
+    root: Path,
+    sites: list[ImportSite],
+    service: str | None,
+    files: list[str] | None,
+) -> tuple[int, int]:
+    """批量改写。返回 (files_changed, sites_rewritten)。"""
+    targeted = filter_sites(sites, service, files)
+    if not targeted:
+        return 0, 0
+    by_file: dict[str, list[ImportSite]] = defaultdict(list)
+    for s in targeted:
+        by_file[s.rel_path].append(s)
+    files_changed = 0
+    sites_rewritten = 0
+    for rel, file_sites in sorted(by_file.items()):
+        path = root / rel
+        n = apply_rewrites_to_file(path, file_sites)
+        if n > 0:
+            files_changed += 1
+            sites_rewritten += n
+            print(f"  改写 {rel}：{n} 处", file=sys.stderr)
+    return files_changed, sites_rewritten
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     root = args.root.resolve()
+    sites = scan_repo(root)
 
     if args.apply:
+        if not args.service and not args.files:
+            print(
+                "ERROR: --apply 必须指定 --service <name> 或 --files <p1> <p2>...，"
+                "防止误改全仓（Phase 2 stacked PR 模式 ≤ 20 文件/PR）。",
+                file=sys.stderr,
+            )
+            return 2
+        files_changed, sites_rewritten = apply_rewrites(
+            root, sites, args.service, args.files
+        )
         print(
-            "ERROR: --apply 是 Phase 2 入口（stacked PR 改写）。本 Phase 1 PR 仅扫描。",
+            f"\n✅ 改写完毕：{files_changed} 文件 / {sites_rewritten} 处 import",
             file=sys.stderr,
         )
-        return 2
+        if files_changed == 0:
+            print("（filter 未命中任何 bare 站点，无改动）", file=sys.stderr)
+        return 0
 
-    sites = scan_repo(root)
     report = render_report(sites)
 
     if args.out:
