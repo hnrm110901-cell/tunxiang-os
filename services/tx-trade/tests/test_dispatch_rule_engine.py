@@ -63,7 +63,7 @@ def _make_rule(
     store_id=None,
 ):
     """构建测试用 DispatchRule 对象。"""
-    from models.dispatch_rule import DispatchRule
+    from services.tx_trade.src.models.dispatch_rule import DispatchRule
 
     rule = MagicMock(spec=DispatchRule)
     rule.id = uuid.uuid4()
