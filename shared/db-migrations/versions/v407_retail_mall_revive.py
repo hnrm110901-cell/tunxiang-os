@@ -1,41 +1,80 @@
-"""v073: 零售商城表 — 商品 / 订单 / 订单明细
+"""v407: 零售商城表 revive — retail_products_v2 / retail_orders_v2 / retail_order_items_v2
 
-新增表：
+历史背景：原 v073_retail_mall_tables 在 PR #128 chain rescue (a566102d) 中
+被改名 v073b 并 disabled（.py.disabled 后缀），但 main.py 已 wired
+retail_mall_routes — 这部分 API 实际访问会撞 "relation does not exist"。
+PR #357 ORM↔migration drift 检测捕获 (3 张 ORM 无 CREATE TABLE)。
+
+本 revive 修两处历史 bug 后并入 main chain：
+  1. revision/down_revision 改写为 v407 / v406_nlq_reports_views_p3 (current head)
+  2. _apply_rls helper 修 Class F bug — INSERT 用 WITH CHECK 而非 USING，
+     UPDATE 用 USING+WITH CHECK (PG.7 防 tenant_id 行漂移)
+
+新增表（columns 与 services/tx-trade/src/models/retail_mall.py ORM 完全对齐）：
   retail_products_v2    — 零售商品
   retail_orders_v2      — 零售订单
   retail_order_items_v2 — 零售订单明细
 
-RLS 策略：
-  全部使用 v006+ 标准安全模式（4操作 + NULL guard + FORCE ROW LEVEL SECURITY）
+RLS 策略（修正版）：
+  ENABLE + FORCE ROW LEVEL SECURITY
+  SELECT/DELETE: USING (tenant_id check)
+  INSERT:        WITH CHECK (tenant_id check)
+  UPDATE:        USING + WITH CHECK (PG.7 防跨租户行漂移)
 
-Revision ID: v073
-Revises: v070
-Create Date: 2026-03-31
+Revision ID: v407_retail_mall_revive
+Revises: v406_nlq_reports_views_p3
+Create Date: 2026-05-10
 """
+from typing import Sequence, Union
 
 from alembic import op
 
-revision = "v073b"
-down_revision = "v072b"
-branch_labels = None
-depends_on = None
+revision: str = "v407_retail_mall_revive"
+down_revision: Union[str, Sequence[str], None] = "v406_nlq_reports_views_p3"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+_TENANT_PREDICATE = (
+    "current_setting('app.tenant_id', TRUE) IS NOT NULL "
+    "AND current_setting('app.tenant_id', TRUE) <> '' "
+    "AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID"
+)
 
 
 def _apply_rls(table_name: str) -> None:
-    """为指定表启用 RLS 并创建 4 条标准策略"""
+    """ENABLE+FORCE RLS + 4 条 RESTRICTIVE 策略（INSERT WITH CHECK / UPDATE 双子句）。"""
     op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;")
     op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY;")
 
-    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
-            CREATE POLICY {table_name}_{action.lower()}_tenant ON {table_name}
-            AS RESTRICTIVE FOR {action}
-            USING (
-                current_setting('app.tenant_id', TRUE) IS NOT NULL
-                AND current_setting('app.tenant_id', TRUE) <> ''
-                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
-            );
-        """)
+    # SELECT — USING only
+    op.execute(f"""
+        CREATE POLICY {table_name}_select_tenant ON {table_name}
+        AS RESTRICTIVE FOR SELECT
+        USING ({_TENANT_PREDICATE});
+    """)
+
+    # INSERT — WITH CHECK only (PG: USING invalid for INSERT)
+    op.execute(f"""
+        CREATE POLICY {table_name}_insert_tenant ON {table_name}
+        AS RESTRICTIVE FOR INSERT
+        WITH CHECK ({_TENANT_PREDICATE});
+    """)
+
+    # UPDATE — USING + WITH CHECK (PG.7 防 tenant_id 行漂移)
+    op.execute(f"""
+        CREATE POLICY {table_name}_update_tenant ON {table_name}
+        AS RESTRICTIVE FOR UPDATE
+        USING ({_TENANT_PREDICATE})
+        WITH CHECK ({_TENANT_PREDICATE});
+    """)
+
+    # DELETE — USING only
+    op.execute(f"""
+        CREATE POLICY {table_name}_delete_tenant ON {table_name}
+        AS RESTRICTIVE FOR DELETE
+        USING ({_TENANT_PREDICATE});
+    """)
 
 
 def upgrade() -> None:
