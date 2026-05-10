@@ -122,15 +122,17 @@ def _compute_orm_drift() -> dict[str, list[str]]:
 
 # ── baseline ratchet ───────────────────────────────────────────────────────
 
-# Phase 4a-3 baseline — 实测 18 处 drift（2026-05-09，HEAD `1619a9fe` 合 PR #354 后）。
-# 这 18 个 ORM 表 migration 完全没创建路径，service 实际查询会撞 "relation does
-# not exist"（runtime startup 失败）。可能 fix 方向：
-#   1. 在对应 service 的 db-migrations/versions/ 加 CREATE TABLE
-#   2. 删除已废弃的 ORM model（_v2 / 旧版无 migration 残留 / dead code）
-#   3. Phase 4a-4 baseline pg_dump 自动包含 production 实际存在的表
+# Phase 4a-3 baseline — 起点 18 处 drift（PR #357 锁定）。
+# 当前 ratchet 至 15（本 PR 修 Class B 命名漂移 3 张：tx-menu menu_template.py
+# channel_prices/seasonal_menus/room_menus → menu_channel_prices/store_seasonal_menus/
+# store_room_menus，对齐 v095 migration 实创表名）。
 #
+# 剩余 15 张分两类待修：
+#   Class A (7+ 张): migration 文件存在但被 .py.disabled 禁用（chain rescue 副作用,
+#                    PR #128 / a566102d）
+#   Class C (8 张): ORM-only，migration 无任何痕迹（dead code or 真未迁移）
 # 修一个 drift → ratchet 下调本数值。终态 0：所有 ORM model 都有对应 migration 创建路径。
-_ORM_DRIFT_BASELINE = 18
+_ORM_DRIFT_BASELINE = 15
 
 
 def test_orm_migration_drift_no_new_violations():

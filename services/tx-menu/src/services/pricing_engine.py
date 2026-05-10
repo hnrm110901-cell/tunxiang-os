@@ -124,11 +124,10 @@ class PricingEngine:
             text(
                 """
                 SELECT price_fen
-                FROM dish_channel_prices
+                FROM menu_channel_prices
                 WHERE dish_id = :dish_id
                   AND tenant_id = :tenant_id
                   AND channel = :channel
-                  AND is_deleted = false
                 LIMIT 1
             """
             ),
@@ -434,12 +433,12 @@ class PricingEngine:
             await self.db.execute(
                 text(
                     """
-                    INSERT INTO dish_channel_prices
-                        (id, dish_id, tenant_id, channel, price_fen, is_deleted)
+                    INSERT INTO menu_channel_prices
+                        (id, dish_id, tenant_id, channel, price_fen)
                     VALUES
-                        (:id, :dish_id, :tenant_id, :channel, :price_fen, false)
-                    ON CONFLICT (dish_id, tenant_id, channel)
-                    DO UPDATE SET price_fen = :price_fen, is_deleted = false
+                        (:id, :dish_id, :tenant_id, :channel, :price_fen)
+                    ON CONFLICT (tenant_id, dish_id, channel)
+                    DO UPDATE SET price_fen = :price_fen, updated_at = NOW()
                 """
                 ),
                 {
