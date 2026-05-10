@@ -1,24 +1,91 @@
-"""v071: 资金分账表 — 分账规则 / 分账流水 / 结算批次
+"""v409: 资金分账表 revive — split_rules / split_ledgers / settlement_batches
 
-新增表：
-  split_rules         — 分账规则（平台费/品牌费/加盟商分成）
-  split_ledgers       — 分账流水（每笔订单分账明细）
-  settlement_batches  — 结算批次（按周期汇总结算）
+PR #357 ORM↔migration drift 检测捕获 fund_settlement.py 三张 ORM (split_rules /
+split_ledgers / settlement_batches) 在 main chain 中均无 CREATE TABLE。
 
-RLS 策略：
-  全部使用 v006+ 标准安全模式（4操作 + NULL guard + FORCE ROW LEVEL SECURITY）
+LIVE 影响（runtime 必坏）：
+  - services/tx-finance/src/services/fund_settlement_service.py 大量 raw SQL
+    INSERT/SELECT split_rules / split_ledgers — API 调用时表不存在即 500
+  - services/tx-finance/src/api/fund_settlement_routes.py 暴露
+    list_split_rules / list_settlement_batches 端点
+  - services/tx-finance/src/api/split_routes.py / split_payment_routes.py 共用
 
-Revision ID: v071
-Revises: v070
-Create Date: 2026-03-31
+历史背景：原 v071_fund_settlement_tables 在 PR #128 chain rescue (a566102d) 中
+被改名 v071b 并 disabled (.py.disabled 后缀)。同名 v071_model_call_logs.py 后续
+独立 enabled，但本文件未 revive。enabled chain 中 v100_profit_split_engine 建的
+是 profit_split_rules / profit_split_records（**前缀不同**）；v346_stored_value_settlement
+建的是 stored_value_split_* / sv_settlement_batches（**前缀不同**）—— 三张 ORM 表名
+在 enabled chain 中无任何痕迹，本 PR 完整 revive。
+
+──────── 列对齐验证（v071 SQL ↔ ORM ↔ 现行 raw SQL）────────
+- settlement_batches: 13 列全对齐（NOT NULL / 类型 / DEFAULT 三方一致）
+- split_ledgers:      16 列全对齐 + raw SQL INSERT 子集（10 列）全在
+- split_rules:        12 列全对齐 + raw SQL INSERT 子集（8 列）全在
+索引命名漂移（ORM 与 v071 SQL 命名不一致，drift 检测目前不覆盖）属次重点，
+本 PR 仅采用 v071 SQL 索引名（保持单源真相），ORM 引用是 SQLAlchemy 内部对象
+不依赖物理索引名。
+
+──────── 修复 v071 原文件 SECURITY bug (Class F2) ────────
+原 _apply_rls 4 个 action 全用 USING；PG 不接受 INSERT POLICY USING。
+按 PR #361 / #362 同模式修：
+  SELECT/DELETE: USING only
+  INSERT:        WITH CHECK only
+  UPDATE:        USING + WITH CHECK (PG.7 防 tenant_id 行漂移)
+
+Revision ID: v409_fund_settlement_revive
+Revises: v408_distribution_trips_items_revive
+Create Date: 2026-05-10
 """
+from typing import Sequence, Union
 
 from alembic import op
 
-revision = "v071b"
-down_revision = "v070b"
-branch_labels = None
-depends_on = None
+revision: str = "v409_fund_settlement_revive"
+down_revision: Union[str, Sequence[str], None] = "v408_distribution_trips_items_revive"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+_TENANT_PREDICATE = (
+    "current_setting('app.tenant_id', TRUE) IS NOT NULL "
+    "AND current_setting('app.tenant_id', TRUE) <> '' "
+    "AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID"
+)
+
+
+def _apply_rls(table_name: str) -> None:
+    """ENABLE+FORCE RLS + 4 条 RESTRICTIVE 策略（INSERT WITH CHECK / UPDATE 双子句）。"""
+    op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY;")
+    op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY;")
+
+    # SELECT — USING only
+    op.execute(f"""
+        CREATE POLICY {table_name}_select_tenant ON {table_name}
+        AS RESTRICTIVE FOR SELECT
+        USING ({_TENANT_PREDICATE});
+    """)
+
+    # INSERT — WITH CHECK only (PG: USING invalid for INSERT)
+    op.execute(f"""
+        CREATE POLICY {table_name}_insert_tenant ON {table_name}
+        AS RESTRICTIVE FOR INSERT
+        WITH CHECK ({_TENANT_PREDICATE});
+    """)
+
+    # UPDATE — USING + WITH CHECK (PG.7 防 tenant_id 行漂移)
+    op.execute(f"""
+        CREATE POLICY {table_name}_update_tenant ON {table_name}
+        AS RESTRICTIVE FOR UPDATE
+        USING ({_TENANT_PREDICATE})
+        WITH CHECK ({_TENANT_PREDICATE});
+    """)
+
+    # DELETE — USING only
+    op.execute(f"""
+        CREATE POLICY {table_name}_delete_tenant ON {table_name}
+        AS RESTRICTIVE FOR DELETE
+        USING ({_TENANT_PREDICATE});
+    """)
 
 
 def upgrade() -> None:
@@ -42,19 +109,7 @@ def upgrade() -> None:
         );
     """)
 
-    op.execute("ALTER TABLE split_rules ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE split_rules FORCE ROW LEVEL SECURITY;")
-
-    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
-            CREATE POLICY split_rules_{action.lower()}_tenant ON split_rules
-            AS RESTRICTIVE FOR {action}
-            USING (
-                current_setting('app.tenant_id', TRUE) IS NOT NULL
-                AND current_setting('app.tenant_id', TRUE) <> ''
-                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
-            );
-        """)
+    _apply_rls("split_rules")
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_split_rules_tenant
@@ -93,19 +148,7 @@ def upgrade() -> None:
         );
     """)
 
-    op.execute("ALTER TABLE split_ledgers ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE split_ledgers FORCE ROW LEVEL SECURITY;")
-
-    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
-            CREATE POLICY split_ledgers_{action.lower()}_tenant ON split_ledgers
-            AS RESTRICTIVE FOR {action}
-            USING (
-                current_setting('app.tenant_id', TRUE) IS NOT NULL
-                AND current_setting('app.tenant_id', TRUE) <> ''
-                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
-            );
-        """)
+    _apply_rls("split_ledgers")
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_split_ledgers_tenant
@@ -149,19 +192,7 @@ def upgrade() -> None:
         );
     """)
 
-    op.execute("ALTER TABLE settlement_batches ENABLE ROW LEVEL SECURITY;")
-    op.execute("ALTER TABLE settlement_batches FORCE ROW LEVEL SECURITY;")
-
-    for action in ("SELECT", "INSERT", "UPDATE", "DELETE"):
-        op.execute(f"""
-            CREATE POLICY settlement_batches_{action.lower()}_tenant ON settlement_batches
-            AS RESTRICTIVE FOR {action}
-            USING (
-                current_setting('app.tenant_id', TRUE) IS NOT NULL
-                AND current_setting('app.tenant_id', TRUE) <> ''
-                AND tenant_id = NULLIF(current_setting('app.tenant_id', TRUE), '')::UUID
-            );
-        """)
+    _apply_rls("settlement_batches")
 
     op.execute("""
         CREATE INDEX IF NOT EXISTS ix_settlement_batches_tenant
