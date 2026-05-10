@@ -1,3 +1,55 @@
+## 2026-05-11 中午 · production codemod 真终态闭环 + 决策 84 第七轮（CI gate 边界 → §流程 3）
+
+### 完成状态
+- [x] **决策 77 真终态完工**：6 服务 production codemod chain 全 MERGED（tx-org #353 / tx-growth #355 / tx-member #356 / tx-finance+tx-intel+tx-supply #358）
+- [x] **#358** rebase 双轮 + admin-squash merge：v1 `044442ef`（rebase 871c2502→bbefda66）→ v2 `c9a5bb4f`（rebase bbefda66→c6796316，main 又 +5 channel commits）→ admin merge `ccaa4375`（13:27Z）
+- [x] **#358 本地 pytest 真门禁验证**（决策 78）：净 +22 pass / 0 NEW failure，不依赖 CI 噪音
+- [x] **#411** new PR — codemod review 流程 2 lesson 沉淀（cherry-pick 自 #370）[T3]，admin-merge `93fda2bb`（13:30Z）
+- [x] **#370 close**（13:05Z）— 决策 81 second instance：commit history 与 main 严重 diverge，cherry-pick unique lessons → #411，不死磕 rebase
+- [x] worktree 清理 21 → 13（6 active 完成的 worktree 删除 + 2 stale 清理）
+- [x] main HEAD: `ccaa4375` → `93fda2bb`（自上 session `bbefda66` 共 +7 commit）
+- [x] **决策 84 第七轮文档化**（本 followup PR）：`docs/codemod/namespace-completeness.md` §"Review 流程沉淀" 加 流程 3：CI gate false positive → admin-merge 边界（5 项裁决标准 + 4 PR established pattern + 根治 follow-up 框架）
+
+### 关键决策
+- **决策 81 second instance 应用**：#370 三轮 rebase 后 commit history 与 main 仍 diverge，cherry-pick 路线性价比远高于继续死磕；audit trail 必须 cross-reference 替代 PR（#411/#409/#410）
+- **决策 82 应用**：context >80% 单 session 押收双 admin-merge + 本 followup PR，不拖跨 session 真终态闭环
+- **决策 84 第七轮 lesson 类别归属**：CI gate 边界属 process / governance lane，不计入 6 轮漏抓主表（codemod 工具完整性 lane），写入 §"Review 流程沉淀 流程 3"。两 lane 独立 evolution，避免 lesson 类别混乱
+- **本 session 不修 alembic v310 dangling**：自 #128 起 chain integrity 断裂，所有 migration PR admin override，独立 follow-up 才是正确范围
+- **本 session 不动 #409**：user 用作 canonical handoff reference，admin-merge 时机由 user 决定
+- **CI infra carve-out 不在本 PR**：tier1-gate import-only 检测属 CI infra 工作，与 codemod 完整性 doc 不在同 lane，独立 issue 立后再修
+
+### 下一步
+- A（#409 admin-merge，5min，user 决定时机）
+- B（dev-plan-60d 重写，需 user 输入新 demo 故事核心）
+- C（DailySummary / Header export，需 user §18 ontology 对齐）
+- E（backlog 协同挑一：#271/#272/#347/#336/S-02 stack/V4/channel CH-02.7a — CH-02.7a 须先 §19 独立验证 #404/#406）
+- CI infra carve-out（tier1-gate import-only 检测）独立 issue 立
+
+### 已知风险
+- **5/13 deal-breaker 倒计时 2 天**：channel-aggregation 3 平台企业资质未启动；任一未到位 → CH-03..06 全 stuck → demo 故事崩；user 创始人级别非技术 task
+- **main 完全无 branch protection**：admin-merge 风险归操作者；本 session 4 次 admin-merge（#358 + #411 + 上 session #353/#355/#356）已用尽 codemod false positive 类的合理性，未来非 codemod 主题须重新评估（流程 3 §不适用 admin-merge 已写明）
+- **仓库无真 PG 测试基建**：`tests/tier1/test_rls_all_tables_tier1.py` 静态扫 / `services/tx-trade/tests/test_rls_isolation_tier1.py` mock — "全 N 表 RLS"真行为 CI 从未验证；docker-compose-pg fixture 是独立 follow-up
+- **#370 close audit trail 风险**：未来贡献者若仅看 #370 closed comment 可能不理解为何不 rebase；handoff doc + DEVLOG + progress 三重 cross-reference 防止信息丢失
+- **#409 不 merge 但留作 canonical reference**：若 user 后续在新 worktree 改写 5/11 handoff，#409 与 main canonical 可能 diverge；处理时机：完结 5/11 主题后 admin-merge 或 close-with-pointer
+- **流程 3 实例未来 PR 可能挪用**：admin-merge 5 项裁决标准必须**全部满足**才合理；未来贡献者若选择性应用单条标准 bypass gate，会破坏 main 完整性。流程 3 §"不适用 admin-merge" 列表必读
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 93fda2bb 或更新
+gh pr list --state open --author "@me" --limit 30
+git worktree list                   # 应 13 个（含主 + 12 linked）
+head -300 DEVLOG.md
+gh pr view 358 411 --json mergedAt,mergeCommit
+gh pr view 370 --json state,closedAt
+gh pr view 409 --json state,mergedAt
+```
+
+详细 cold-start 上下文见 `docs/session-handoff-2026-05-11-noon.md`。
+
+---
+
 ## 2026-05-11 凌晨 · #353 codex P1 review 落地 — codemod 漏抓函数体内 lazy import
 
 ### 完成状态
