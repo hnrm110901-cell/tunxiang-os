@@ -61,7 +61,7 @@ with patch.dict(
     fake_svc.auto_stamp = AsyncMock(return_value=_mock_auto_stamp_result)
     fake_svc.get_my_cards = AsyncMock(return_value=_mock_my_cards_result)
     fake_svc.redeem_card = AsyncMock(return_value=_mock_redeem_result)
-    sys.modules["services.stamp_card_service"] = fake_svc
+    sys.modules["services.tx_member.src.services.stamp_card_service"] = fake_svc
 
     from api.stamp_card_routes import get_db, router
 
@@ -154,7 +154,7 @@ def test_list_templates_ok():
     app.dependency_overrides[get_db] = _override_db(db)
     client = TestClient(app)
 
-    fake_svc.list_templates = AsyncMock(return_value=[_mock_template_result])
+    fake_svc.list_templates.return_value = [_mock_template_result]
 
     resp = client.get("/api/v1/stamp-cards/templates", headers=_HEADERS)
     assert resp.status_code == 200
@@ -175,7 +175,7 @@ def test_list_templates_service_returns_empty():
     app.dependency_overrides[get_db] = _override_db(db)
     client = TestClient(app)
 
-    fake_svc.list_templates = AsyncMock(return_value=[])
+    fake_svc.list_templates.return_value = []
 
     resp = client.get("/api/v1/stamp-cards/templates", headers=_HEADERS)
     assert resp.status_code == 200

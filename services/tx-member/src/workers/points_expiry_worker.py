@@ -11,7 +11,7 @@
   - 数据获取留给 Repository 模式（本版预留接口）
 
 集成方式（main.py lifespan 中注册）：
-    from workers.points_expiry_worker import PointsExpiryWorker
+    from services.tx_member.src.workers.points_expiry_worker import PointsExpiryWorker
     _scheduler.add_job(
         lambda: asyncio.create_task(PointsExpiryWorker().run_for_all_tenants()),
         "cron", hour=3, minute=0,
@@ -48,7 +48,7 @@ class PointsExpiryWorker:
         Returns:
             {"tenant_id", "cleared_count", "cleared_points", "details"}
         """
-        from services.points_expiry_fifo import clear_expired_batches_fifo  # noqa: PLC0415
+        from services.tx_member.src.services.points_expiry_fifo import clear_expired_batches_fifo  # noqa: PLC0415
 
         try:
             from datetime import datetime, timezone  # noqa: PLC0415
@@ -114,7 +114,7 @@ class PointsExpiryWorker:
             return await self._batch_loader(tenant_id)
         # 生产路径：接入 services.points_expiry._points_batches（内存版，待迁 DB）
         try:
-            from services.points_expiry import _points_batches  # noqa: PLC0415
+            from services.tx_member.src.services.points_expiry import _points_batches  # noqa: PLC0415
 
             collected: list[dict[str, Any]] = []
             for batches in _points_batches.values():
@@ -127,7 +127,7 @@ class PointsExpiryWorker:
         # 生产路径：从 tenants 表读取；本版 stub
         # TODO: 接入 RLS-aware 租户列表查询
         try:
-            from services.points_expiry import _points_batches  # noqa: PLC0415
+            from services.tx_member.src.services.points_expiry import _points_batches  # noqa: PLC0415
 
             tids: set[str] = set()
             for batches in _points_batches.values():

@@ -118,7 +118,7 @@ async def charge(
     5. 记录充值 + bonus 流水
     """
     # 查找或创建储值卡
-    from models.stored_value import StoredValueCard
+    from services.tx_member.src.models.stored_value import StoredValueCard
 
     card_result = await db.execute(
         select(StoredValueCard)
@@ -232,7 +232,7 @@ async def refund(
 ):
     """找到原消费记录，回退余额（仅退本金）。"""
     # 查原始流水的消费金额
-    from models.stored_value import StoredValueTransaction
+    from services.tx_member.src.models.stored_value import StoredValueTransaction
 
     txn_result = await db.execute(
         select(StoredValueTransaction).where(
@@ -278,7 +278,7 @@ async def get_balance(
     tenant_id: uuid.UUID = Depends(_parse_tenant_id),
 ):
     """查询会员储值卡余额（本金 + 赠送余额分项）。"""
-    from models.stored_value import StoredValueCard
+    from services.tx_member.src.models.stored_value import StoredValueCard
 
     card_result = await db.execute(
         select(StoredValueCard)
@@ -318,7 +318,7 @@ async def get_transactions(
     tenant_id: uuid.UUID = Depends(_parse_tenant_id),
 ):
     """分页查询会员储值流水，按时间倒序。"""
-    from models.stored_value import StoredValueCard
+    from services.tx_member.src.models.stored_value import StoredValueCard
 
     card_result = await db.execute(
         select(StoredValueCard)

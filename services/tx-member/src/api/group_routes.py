@@ -20,7 +20,7 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
-from models.group_config import BrandGroup
+from services.tx_member.src.models.group_config import BrandGroup
 from pydantic import BaseModel, Field
 from sqlalchemy import select, text
 from sqlalchemy.exc import SQLAlchemyError

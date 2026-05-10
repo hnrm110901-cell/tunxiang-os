@@ -66,7 +66,7 @@ def _inject_stubs():
     BrandGroupStub = MagicMock()
     group_config_mod.BrandGroup = BrandGroupStub
     sys.modules.setdefault("models", types.ModuleType("models"))
-    sys.modules["models.group_config"] = group_config_mod
+    sys.modules["services.tx_member.src.models.group_config"] = group_config_mod
 
     # --- services.group_analytics ---
     group_analytics_mod = types.ModuleType("services.group_analytics")
@@ -79,7 +79,7 @@ def _inject_stubs():
     GroupAnalyticsServiceStub = MagicMock(return_value=_analytics_svc)
     group_analytics_mod.GroupAnalyticsService = GroupAnalyticsServiceStub
     sys.modules.setdefault("services", types.ModuleType("services"))
-    sys.modules["services.group_analytics"] = group_analytics_mod
+    sys.modules["services.tx_member.src.services.group_analytics"] = group_analytics_mod
 
     # --- api.services.gdpr_service (相对导入 ..services.gdpr_service) ---
     # gdpr_routes 使用 `from ..services.gdpr_service import REQUEST_TYPES, GDPRService`
@@ -87,7 +87,7 @@ def _inject_stubs():
     gdpr_svc_mod = types.ModuleType("services.gdpr_service")
     gdpr_svc_mod.REQUEST_TYPES = ("erasure", "portability", "restriction")
     gdpr_svc_mod.GDPRService = MagicMock()
-    sys.modules["services.gdpr_service"] = gdpr_svc_mod
+    sys.modules["services.tx_member.src.services.gdpr_service"] = gdpr_svc_mod
     # 相对导入展开后会被解析为 api.services.gdpr_service
     sys.modules.setdefault("api", types.ModuleType("api"))
     sys.modules.setdefault("api.services", types.ModuleType("api.services"))

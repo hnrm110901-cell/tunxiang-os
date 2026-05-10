@@ -91,7 +91,7 @@ def _inject_stubs():
         return_value={"new": 5, "active": 20, "dormant": 3, "churned": 1, "reactivated": 2, "changed": 4}
     )
     _lc_svc_mod.LifecycleService = MagicMock(return_value=_mock_lc_svc)
-    sys.modules["services.lifecycle_service"] = _lc_svc_mod
+    sys.modules["services.tx_member.src.services.lifecycle_service"] = _lc_svc_mod
     sys.modules["src.services.lifecycle_service"] = _lc_svc_mod
 
     # api.services.lifecycle_service（相对导入解析）
@@ -158,7 +158,7 @@ def _invite_override(db_mock):
 with patch.dict(
     sys.modules,
     {
-        "services.lifecycle_service": sys.modules["services.lifecycle_service"],
+        "services.lifecycle_service": sys.modules["services.tx_member.src.services.lifecycle_service"],
     },
 ):
     lc_mod = importlib.import_module("api.lifecycle_routes")
@@ -180,7 +180,7 @@ def _lc_override(db_mock):
 with patch.dict(
     sys.modules,
     {
-        "services.lifecycle_service": sys.modules["services.lifecycle_service"],
+        "services.lifecycle_service": sys.modules["services.tx_member.src.services.lifecycle_service"],
     },
 ):
     lcr_mod = importlib.import_module("api.lifecycle_router")
