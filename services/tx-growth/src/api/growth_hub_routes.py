@@ -101,15 +101,15 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
-from services.growth_brand_service import GrowthBrandService
-from services.growth_cross_brand_service import GrowthCrossBrandService
-from services.growth_experiment_service import GrowthExperimentService
-from services.growth_journey_service import GrowthJourneyService
-from services.growth_profile_service import GrowthProfileService
-from services.growth_repair_service import GrowthRepairService
-from services.growth_store_capability_service import GrowthStoreCapabilityService
-from services.growth_suggestion_service import GrowthSuggestionService
-from services.growth_touch_service import GrowthTouchService
+from services.tx_growth.src.services.growth_brand_service import GrowthBrandService
+from services.tx_growth.src.services.growth_cross_brand_service import GrowthCrossBrandService
+from services.tx_growth.src.services.growth_experiment_service import GrowthExperimentService
+from services.tx_growth.src.services.growth_journey_service import GrowthJourneyService
+from services.tx_growth.src.services.growth_profile_service import GrowthProfileService
+from services.tx_growth.src.services.growth_repair_service import GrowthRepairService
+from services.tx_growth.src.services.growth_store_capability_service import GrowthStoreCapabilityService
+from services.tx_growth.src.services.growth_suggestion_service import GrowthSuggestionService
+from services.tx_growth.src.services.growth_touch_service import GrowthTouchService
 from sqlalchemy import text
 
 from shared.ontology.src.database import async_session_factory
@@ -129,8 +129,8 @@ _cross_brand_svc = GrowthCrossBrandService()
 _store_cap_svc = GrowthStoreCapabilityService()
 
 # 天气/日历信号服务（无状态纯计算，直接在 growth 中实例化）
-from services.calendar_signal_proxy import CalendarSignalService as _CalendarSvc
-from services.weather_signal_proxy import WeatherSignalService as _WeatherSvc
+from services.tx_growth.src.services.calendar_signal_proxy import CalendarSignalService as _CalendarSvc
+from services.tx_growth.src.services.weather_signal_proxy import WeatherSignalService as _WeatherSvc
 
 _weather_svc = _WeatherSvc()
 _calendar_svc = _CalendarSvc()

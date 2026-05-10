@@ -430,7 +430,7 @@ class GrowthSuggestionService:
         # 创建enrollment
         enrollment_id: Optional[str] = None
         if customer_id and template_id:
-            from services.growth_journey_service import GrowthJourneyService
+            from services.tx_growth.src.services.growth_journey_service import GrowthJourneyService
 
             journey_svc = GrowthJourneyService()
             try:

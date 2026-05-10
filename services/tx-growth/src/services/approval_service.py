@@ -17,7 +17,7 @@ from typing import Optional
 
 import httpx
 import structlog
-from models.approval import ApprovalRequest, ApprovalWorkflow
+from services.tx_growth.src.models.approval import ApprovalRequest, ApprovalWorkflow
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -550,7 +550,7 @@ class GrowthJourneyService:
         if ab_row and ab_row[0]:
             ab_test_id = str(ab_row[0])
             try:
-                from services.ab_test_service import ABTestService
+                from services.tx_growth.src.services.ab_test_service import ABTestService
 
                 ab_svc = ABTestService()
                 ab_variant = await ab_svc.assign_variant(

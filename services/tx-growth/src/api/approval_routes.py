@@ -18,9 +18,9 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
-from models.approval import ApprovalRequest, ApprovalWorkflow
+from services.tx_growth.src.models.approval import ApprovalRequest, ApprovalWorkflow
 from pydantic import BaseModel, field_validator
-from services.approval_service import ApprovalService
+from services.tx_growth.src.services.approval_service import ApprovalService
 from sqlalchemy import and_, select
 
 from shared.security.src.error_handler import safe_http_exception

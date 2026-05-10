@@ -14,7 +14,7 @@ from datetime import date, datetime, timezone
 from typing import Any, Optional
 
 import structlog
-from models.brand_strategy import (
+from services.tx_growth.src.models.brand_strategy import (
     BrandContentConstraintsCreate,
     BrandProfileCreate,
     BrandProfileUpdate,

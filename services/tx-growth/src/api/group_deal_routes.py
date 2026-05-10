@@ -18,8 +18,8 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from services.dual_reward_service import DualRewardService
-from services.group_deal_service import GroupDealError, GroupDealService
+from services.tx_growth.src.services.dual_reward_service import DualRewardService
+from services.tx_growth.src.services.group_deal_service import GroupDealError, GroupDealService
 
 log = structlog.get_logger(__name__)
 

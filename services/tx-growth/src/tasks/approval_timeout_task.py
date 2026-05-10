@@ -19,8 +19,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import structlog
-from models.approval import ApprovalRequest, ApprovalWorkflow
-from services.approval_service import ApprovalService
+from services.tx_growth.src.models.approval import ApprovalRequest, ApprovalWorkflow
+from services.tx_growth.src.services.approval_service import ApprovalService
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

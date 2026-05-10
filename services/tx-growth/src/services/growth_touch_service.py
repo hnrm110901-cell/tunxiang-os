@@ -13,7 +13,7 @@ from typing import Optional
 from uuid import UUID, uuid4
 
 import structlog
-from services.growth_cross_brand_service import GrowthCrossBrandService
+from services.tx_growth.src.services.growth_cross_brand_service import GrowthCrossBrandService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -271,7 +271,7 @@ class GrowthTouchService:
         if execution_state == "pending":
             try:
                 # 通过channel_engine发送
-                from services.channel_engine import ChannelEngine
+                from services.tx_growth.src.services.channel_engine import ChannelEngine
 
                 engine = ChannelEngine()
                 send_result_data = await engine.send_message(
@@ -354,7 +354,7 @@ class GrowthTouchService:
         # 7. 写归因触点（仅delivered状态）
         if execution_state == "delivered":
             try:
-                from services.roi_attribution import ROIAttributionService
+                from services.tx_growth.src.services.roi_attribution import ROIAttributionService
 
                 attr_svc = ROIAttributionService()
                 await attr_svc.record_touch(

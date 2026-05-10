@@ -15,13 +15,13 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from pydantic import BaseModel
-from services.audience_segmentation import AudienceSegmentationService
-from services.brand_strategy import BrandStrategyService
-from services.journey_orchestrator import JourneyOrchestratorService
+from services.tx_growth.src.services.audience_segmentation import AudienceSegmentationService
+from services.tx_growth.src.services.brand_strategy import BrandStrategyService
+from services.tx_growth.src.services.journey_orchestrator import JourneyOrchestratorService
 
 # ChannelEngine / ContentEngine / OfferEngine: v144 DB化，已移至各自路由文件
-from services.roi_attribution import ROIAttributionService
-from workers.journey_executor import JourneyEventListener, JourneyExecutor
+from services.tx_growth.src.services.roi_attribution import ROIAttributionService
+from services.tx_growth.src.workers.journey_executor import JourneyEventListener, JourneyExecutor
 
 from shared.events.event_publisher import MemberEventPublisher
 from shared.ontology.src.database import async_session_factory, init_db
@@ -90,7 +90,7 @@ def _on_tick_done(task: asyncio.Task) -> None:
 
 from engine.event_bridge import get_event_bridge as _get_event_bridge
 from engine.journey_engine import JourneyEngine as _JourneyEngine
-from services.approval_service import ApprovalService as _ApprovalService
+from services.tx_growth.src.services.approval_service import ApprovalService as _ApprovalService
 
 from .api.ab_test_routes import router as ab_test_router
 from .api.ai_marketing_routes import router as ai_marketing_router  # AI营销自动化（v207）
@@ -235,8 +235,8 @@ def _on_approval_expiry_done(task: asyncio.Task) -> None:
 # APScheduler — Growth Journey V2 tick（每60秒）
 # ---------------------------------------------------------------------------
 
-from services.growth_brand_service import GrowthBrandService as _GrowthBrandService
-from services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
+from services.tx_growth.src.services.growth_brand_service import GrowthBrandService as _GrowthBrandService
+from services.tx_growth.src.services.growth_journey_service import GrowthJourneyService as _GrowthJourneyService
 
 # Feature Flag SDK — 控制 Growth Journey V2 / 沉默召回 等 cron 任务
 try:
@@ -317,8 +317,8 @@ def _on_growth_journey_tick_done(task: asyncio.Task) -> None:
 # APScheduler — Silent Detection（每日凌晨2点）
 # ---------------------------------------------------------------------------
 
-from services.growth_experiment_service import GrowthExperimentService as _GrowthExperimentService
-from services.growth_profile_service import GrowthProfileService as _GrowthProfileService
+from services.tx_growth.src.services.growth_experiment_service import GrowthExperimentService as _GrowthExperimentService
+from services.tx_growth.src.services.growth_profile_service import GrowthProfileService as _GrowthProfileService
 
 _growth_experiment_svc = _GrowthExperimentService()
 _growth_profile_svc = _GrowthProfileService()
@@ -477,7 +477,7 @@ def _on_auto_iterate_done(task: asyncio.Task) -> None:
 # APScheduler — Calendar Trigger Check（每日08:00 节庆信号检测）
 # ---------------------------------------------------------------------------
 
-from services.calendar_signal_proxy import CalendarSignalService as _CalendarSignalService
+from services.tx_growth.src.services.calendar_signal_proxy import CalendarSignalService as _CalendarSignalService
 
 _calendar_signal_svc = _CalendarSignalService()
 
@@ -522,7 +522,7 @@ def _on_calendar_trigger_done(task: asyncio.Task) -> None:
 # APScheduler — Sales CRM Daily Scan（每日凌晨2:30）
 # ---------------------------------------------------------------------------
 
-from services.sales_task_scheduler import SalesTaskScheduler as _SalesTaskScheduler
+from services.tx_growth.src.services.sales_task_scheduler import SalesTaskScheduler as _SalesTaskScheduler
 
 _sales_task_scheduler = _SalesTaskScheduler()
 
@@ -569,7 +569,7 @@ def _on_sales_daily_scan_done(task: asyncio.Task) -> None:
 # APScheduler — Live Code Daily Stats（每日凌晨1:00）
 # ---------------------------------------------------------------------------
 
-from services.live_code_service import LiveCodeService as _LiveCodeService
+from services.tx_growth.src.services.live_code_service import LiveCodeService as _LiveCodeService
 
 _live_code_svc = _LiveCodeService()
 
@@ -620,7 +620,7 @@ def _on_live_code_daily_stats_done(task: asyncio.Task) -> None:
 # APScheduler — Audience Pack Batch Refresh（每日凌晨4:00）
 # ---------------------------------------------------------------------------
 
-from services.audience_pack_service import AudiencePackService as _AudiencePackService
+from services.tx_growth.src.services.audience_pack_service import AudiencePackService as _AudiencePackService
 
 _audience_pack_svc = _AudiencePackService()
 
@@ -667,7 +667,7 @@ def _on_audience_pack_refresh_done(task: asyncio.Task) -> None:
 # APScheduler — Marketing Task Schedule Check（每5分钟）
 # ---------------------------------------------------------------------------
 
-from services.marketing_task_service import MarketingTaskService as _MarketingTaskService
+from services.tx_growth.src.services.marketing_task_service import MarketingTaskService as _MarketingTaskService
 
 _marketing_task_svc = _MarketingTaskService()
 

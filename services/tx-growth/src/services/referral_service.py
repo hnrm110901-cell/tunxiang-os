@@ -78,7 +78,7 @@ class ReferralService:
         Raises:
             ReferralError: 活动不存在/已结束/超出邀请上限
         """
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import func, select
 
         # 1. 查活动并验证状态
@@ -179,7 +179,7 @@ class ReferralService:
         Returns:
             {success, invitee_reward, referrer_rewarded}
         """
-        from models.referral import ReferralCampaign, ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralCampaign, ReferralRecord
         from sqlalchemy import select
 
         now = datetime.now(timezone.utc)
@@ -368,7 +368,7 @@ class ReferralService:
         Returns:
             {rewarded, referrer_customer_id, reward_details}
         """
-        from models.referral import ReferralCampaign, ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralCampaign, ReferralRecord
         from sqlalchemy import select
 
         now = datetime.now(timezone.utc)
@@ -574,7 +574,7 @@ class ReferralService:
                 fraud_detected, conversion_rate, top_referrers
             }
         """
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import func, select
 
         # 验证活动归属
@@ -647,7 +647,7 @@ class ReferralService:
         Returns:
             {invite_url, total_invited, total_rewarded, records: [...]}
         """
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import select
 
         result = await db.execute(
@@ -705,7 +705,7 @@ class ReferralService:
         db: Any,
     ):
         """查询并验证活动处于 active 状态且在有效期内"""
-        from models.referral import ReferralCampaign
+        from services.tx_growth.src.models.referral import ReferralCampaign
         from sqlalchemy import select
 
         now = datetime.now(timezone.utc)
@@ -739,7 +739,7 @@ class ReferralService:
         db: Any,
     ) -> None:
         """验证活动归属于当前租户"""
-        from models.referral import ReferralCampaign
+        from services.tx_growth.src.models.referral import ReferralCampaign
         from sqlalchemy import select
 
         result = await db.execute(
@@ -782,7 +782,7 @@ class ReferralService:
         db: Any,
     ) -> bool:
         """检查同设备在同 campaign 内是否已被使用（防刷）"""
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import func, select
 
         result = await db.execute(
@@ -804,7 +804,7 @@ class ReferralService:
         db: Any,
     ) -> bool:
         """检查同手机前7位在同 campaign 内是否已注册（防家庭套现）"""
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import func, select
 
         result = await db.execute(
@@ -826,7 +826,7 @@ class ReferralService:
         db: Any,
     ) -> bool:
         """检查同IP在同 campaign 内是否已注册（可选，移动端不可靠）"""
-        from models.referral import ReferralRecord
+        from services.tx_growth.src.models.referral import ReferralRecord
         from sqlalchemy import func, select
 
         result = await db.execute(

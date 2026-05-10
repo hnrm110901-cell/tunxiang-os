@@ -18,8 +18,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from services.live_coupon_engine import LiveCouponEngine, LiveCouponError
-from services.live_streaming_service import LiveStreamingError, LiveStreamingService
+from services.tx_growth.src.services.live_coupon_engine import LiveCouponEngine, LiveCouponError
+from services.tx_growth.src.services.live_streaming_service import LiveStreamingError, LiveStreamingService
 
 log = structlog.get_logger(__name__)
 

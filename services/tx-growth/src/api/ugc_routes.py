@@ -17,9 +17,9 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from services.photo_reviewer import PhotoReviewer, PhotoReviewError
-from services.ugc_service import UGCError, UGCService
-from services.viral_tracker import ViralTracker, ViralTrackerError
+from services.tx_growth.src.services.photo_reviewer import PhotoReviewer, PhotoReviewError
+from services.tx_growth.src.services.ugc_service import UGCError, UGCService
+from services.tx_growth.src.services.viral_tracker import ViralTracker, ViralTrackerError
 
 log = structlog.get_logger(__name__)
 
