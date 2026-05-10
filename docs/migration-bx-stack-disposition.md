@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-**所有 5 PR 建议 CLOSE 不 merge**。理由：fix 全部针对 `shared/db-migrations/versions/` 的历史 migration 文件，路线 a Phase 4a-7 完成后这些文件移至 `_archive/`，fix 失效。**唯一安全关注点（PR #343 类 F RLS helper bug）已被 PR #346 schema linter `test_class_f2_no_insert_policy_using_clause`（baseline=0）防回归覆盖**。
+**所有 5 PR 建议 CLOSE 不 merge**。理由：fix 全部针对 `shared/db-migrations/versions/` 的历史 migration 文件，路线 a Phase 4a-7 完成后这些文件移至 `_archive/`，fix 失效。**PR #343 类 F RLS helper bug 已被 PR #346 schema linter `test_class_f2_no_insert_policy_using_clause`（baseline=0）静态检测部分覆盖** — 注：linter 仅匹配硬编码 `FOR INSERT TO PUBLIC USING` 字面量，复制了 `_enable_rls()` helper 然后改错逻辑的动态生成路径不在检测范围。production RLS audit 仍是必要的（见下方 follow-up）。
 
 ## B'-X stack 5 PR 现状
 

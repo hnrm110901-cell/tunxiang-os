@@ -15,7 +15,7 @@
 # 行为：
 #   - postgres 启动 + health-check 通过 → migrate 启动
 #   - migrate 跑 ./scripts/db-bootstrap.sh --skip-create（DB 已由 POSTGRES_DB 创建）
-#   - 17 services + gateway 等待 migrate 跑完才启动（service_completed_successfully）
+#   - 21 services 等待 migrate 跑完才启动（service_completed_successfully）
 #   - migrate 完成后 exit 0，restart: no（一次性）
 #
 # 不在范围（生产部署）：
@@ -35,19 +35,22 @@ services:
     container_name: tunxiang-migrate
     working_dir: /app
     volumes:
+      # docker-compose v2 实测：volume 相对路径从首个 `-f` 文件所在目录解析（即
+      # base.yml 在 infra/compose/，所以 `../..` = 项目根），不是各文件自己的目录。
+      # 与 base.yml 的 `context: ../..` 保持一致。
       - ../..:/app:ro
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:-tunxiang_os}"
       PARALLEL_JOBS: "${MIGRATE_PARALLEL_JOBS:-4}"
-      # 跳过 CREATE DATABASE — postgres image 用 POSTGRES_DB env 已建好
-      ALEMBIC_SKIP_CREATE: "true"
     command: >
       bash -c "
         set -e
         echo '[migrate] 安装 alembic + psycopg2 + postgresql-client'
         apt-get update -qq >/dev/null
         apt-get install -qq -y --no-install-recommends postgresql-client >/dev/null
-        pip install -q --no-cache-dir alembic sqlalchemy psycopg2-binary
+        # 版本 pin 与 services/*/requirements.txt 对齐（alembic>=1.13 / sqlalchemy>=2.0
+        # / psycopg2-binary 默认稳定）；防 `up` 时拉到不兼容新版本
+        pip install -q --no-cache-dir 'alembic==1.13.*' 'sqlalchemy[asyncio]==2.0.*' 'psycopg2-binary==2.9.*'
         echo '[migrate] 跑 db-bootstrap.sh --skip-create'
         ./scripts/db-bootstrap.sh --skip-create
       "
@@ -61,7 +64,7 @@ services:
       tunxiang.env: "${TUNXIANG_ENV:-base}"
       tunxiang.role: "migrate"
 
-  # ── 17 services + gateway 等 migrate 跑完 ──
+  # ── 21 services 等 migrate 跑完 ──
   # 用 YAML override 给每个 service 加 depends_on.migrate.condition。
   # base.yml 里现有的 depends_on (postgres + redis) 与本文件 merge — 见
   # docker-compose merge 规则：depends_on 字典深度合并。
