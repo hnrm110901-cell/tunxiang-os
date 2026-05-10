@@ -1,3 +1,31 @@
+## 2026-05-11 凌晨 · #353 codex P1 review 落地 — codemod 漏抓函数体内 lazy import
+
+### 完成状态
+- [x] 处理 chatgpt-codex-connector P1 review (2 comments on PR #353)：
+  - `transfers.py:124` `api_create_transfer` 内 `from services.store_transfer_service`
+  - `payroll_engine_v3.py:710` `compute_payroll` 内 `from services.income_tax`
+- [x] Sweep 同时发现 + 修：
+  - `main.py:154` `lifespan` 内 `from services.hr_agent_scheduler`
+  - `main.py:160` `lifespan` 内 `from services.hr_event_consumer`
+- [x] 所有 4 处统一改 `services.tx_org.src.services.X` 与 commit 8dbc0e3555 codemod 一致
+- [x] commit `0910d99c` 推 #353
+- [x] 跨 5 个 PR worktree sweep 验证：#355 (tx-growth) 已在 commit 54e90465 内修过；#356 (tx-member) 仅 2 处 try/except-wrapped dead import (`services.tx_finance_client` 文件不存在)，留；#358 (tx-fis) 0 残留
+
+### 关键决策
+- **codex P1 必须当 PR 内修，不拆 follow-up**：codemod 的目标就是容器布局，lazy import 没改是 codemod 残缺，不是 pre-existing bug；决策 79 不适用
+- **不修 #356 dead import**：`services.tx_finance_client` 在仓库内根本不存在，`try/except ImportError` 已是 designed-degradation；改路径不修 bug，纯 churn，per CLAUDE.md "外科手术式修改" 留
+- **决策 84 第六轮沉淀**：codemod 必须扫描函数体内 lazy import（不仅 top-level）。单纯 `^from services\.` 行首正则会漏抓缩进 import；本批静态扫验证用 `^[[:space:]]\+from services\.`
+
+### 下一步
+- 等 #353 / #355 / #356 / #358 review（passive，本 session 已交付到顶）
+- 候选 B（60d plan，需 user 输入）/ C（DailySummary，需 user ontology 对齐）/ D（决策 84 文档化，可起手）
+
+### 已知风险
+- **未跑 tx-org tier1 测试**：tx-org 没有 Tier 1 测试文件，CI tier1-gate 不触发；只能依赖 codex 静态分析判断
+- **container 真测缺**：本仓库无 main_import_smoke 真测（PR #351 OPEN），lazy import 修复正确性靠静态匹配 codemod convention 验证
+
+---
+
 ## 2026-05-10 上午 · drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
 
 ### 完成状态

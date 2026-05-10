@@ -1,3 +1,32 @@
+## 2026-05-11 凌晨 — #353 codex P1 review 落地（决策 84 第六轮沉淀）
+
+### 今日完成
+- [tx-org] 修 codex 2 P1 + sweep 2 处 = 4 lazy import：转 `services.tx_org.src.services.X` 容器布局
+  - `transfers.py:124` `api_create_transfer` 内 `from services.store_transfer_service`
+  - `payroll_engine_v3.py:710` `compute_payroll` 内 `from services.income_tax`
+  - `main.py:154` `lifespan` 内 `from services.hr_agent_scheduler`
+  - `main.py:160` `lifespan` 内 `from services.hr_event_consumer`
+- [跨 5 worktree sweep] 验证其他 PR：#355 已在 commit 54e90465 修过；#356 仅 2 处 try/except-wrapped dead import (file 不存在)，不动；#358 0 残留
+
+### 数据变化
+- 修复 4 lazy import / 3 文件
+- commit `0910d99c` → PR #353
+
+### 战绩
+- 决策 84 第六轮沉淀：codemod 必须扫函数体内 lazy import；静态扫正则用 `^[[:space:]]\+from services\.`（已写入 commit message + 本日志）
+
+### 遗留问题
+- tx-org 无 Tier 1 测试文件 → CI tier1-gate 不触发；本批靠 codex 静态分析判断
+- 仓库无 main_import_smoke 真测（PR #351 仍 OPEN），lazy import 修复正确性靠静态匹配 codemod convention 验证
+- #355 / #356 / #358 review 仍 OPEN（passive）
+
+### 明日计划
+- 候选 B（60d plan，需 user 输入方向）
+- 候选 C（DailySummary / Header export，需 user 创始人对齐 §18 ontology）
+- 候选 D（决策 84 第六轮沉淀文档化，可立即起手）
+
+---
+
 ## 2026-05-10 上午 — drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
 
 ### 今日完成
