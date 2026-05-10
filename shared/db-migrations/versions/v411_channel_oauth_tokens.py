@@ -38,10 +38,12 @@ CH-01（channel-aggregation milestone, issue #375）：
   - ix_channel_oauth_tokens_tenant_expires (tenant_id, expires_at) — 自动续期 job 高频扫
   - WHERE is_deleted = FALSE — partial index 节省空间
 
-RLS：v403 / v395 模式
+RLS：v403 / v395 模式（PG 语义对齐）
   - ENABLE + FORCE
-  - SELECT       USING-only
-  - INSERT/UPDATE/DELETE  USING + WITH CHECK（v395 PR #139 §19 修法）
+  - SELECT  USING-only
+  - INSERT  WITH CHECK-only（PG 拒绝 INSERT + USING）
+  - UPDATE  USING + WITH CHECK（v395 修法本意，双保护）
+  - DELETE  USING-only（PG 拒绝 DELETE + WITH CHECK）
 
 部署约束（CLAUDE.md §17 Tier1 + §21 灰度）：
   - 新表 + 4 RLS policy，DDL 毫秒级，可在低峰窗口直接灰度
@@ -64,9 +66,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 _TABLE = "channel_oauth_tokens"
 _RLS_EXPR = "NULLIF(current_setting('app.tenant_id', true), '')::UUID"
-
-# 写入侧 actions — INSERT/UPDATE/DELETE 必须 USING + WITH CHECK（v395 修法）
-_WRITE_ACTIONS = ("INSERT", "UPDATE", "DELETE")
 
 # 与 shared/adapters/delivery_canonical/base.py:ALLOWED_PLATFORMS 对齐
 # 新增平台时需同步两处
@@ -122,16 +121,30 @@ def upgrade() -> None:
         f"USING (tenant_id = {_RLS_EXPR});"
     )
 
-    # 5. INSERT/UPDATE/DELETE 策略 — USING + WITH CHECK（v395 修法）
-    for action in _WRITE_ACTIONS:
-        policy = f"rls_{_TABLE}_{action.lower()}_with_check"
-        op.execute(f"DROP POLICY IF EXISTS {policy} ON {_TABLE};")
-        op.execute(
-            f"CREATE POLICY {policy} ON {_TABLE} "
-            f"AS PERMISSIVE FOR {action} TO PUBLIC "
-            f"USING (tenant_id = {_RLS_EXPR}) "
-            f"WITH CHECK (tenant_id = {_RLS_EXPR});"
-        )
+    # 5. INSERT 策略 — 只 WITH CHECK（PG 拒绝 INSERT + USING）
+    op.execute(f"DROP POLICY IF EXISTS rls_{_TABLE}_insert_with_check ON {_TABLE};")
+    op.execute(
+        f"CREATE POLICY rls_{_TABLE}_insert_with_check ON {_TABLE} "
+        f"AS PERMISSIVE FOR INSERT TO PUBLIC "
+        f"WITH CHECK (tenant_id = {_RLS_EXPR});"
+    )
+
+    # 6. UPDATE 策略 — USING + WITH CHECK（v395 修法本意，双保护）
+    op.execute(f"DROP POLICY IF EXISTS rls_{_TABLE}_update_with_check ON {_TABLE};")
+    op.execute(
+        f"CREATE POLICY rls_{_TABLE}_update_with_check ON {_TABLE} "
+        f"AS PERMISSIVE FOR UPDATE TO PUBLIC "
+        f"USING (tenant_id = {_RLS_EXPR}) "
+        f"WITH CHECK (tenant_id = {_RLS_EXPR});"
+    )
+
+    # 7. DELETE 策略 — 只 USING（PG 拒绝 DELETE + WITH CHECK）
+    op.execute(f"DROP POLICY IF EXISTS rls_{_TABLE}_delete_with_check ON {_TABLE};")
+    op.execute(
+        f"CREATE POLICY rls_{_TABLE}_delete_with_check ON {_TABLE} "
+        f"AS PERMISSIVE FOR DELETE TO PUBLIC "
+        f"USING (tenant_id = {_RLS_EXPR});"
+    )
 
 
 def downgrade() -> None:
