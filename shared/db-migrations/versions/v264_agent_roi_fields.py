@@ -1,4 +1,4 @@
-"""v264 — agent_decision_logs 新增 ROI 四字段 + mv_agent_roi_monthly 物化视图
+"""v264 — agent_decision_logs 新增 ROI 四字段（仅列 + 索引，MV 由 v265 负责）
 
 Sprint D2（2026-04-24）：为 Agent 决策留痕注入 ROI 量化能力。
 
@@ -8,8 +8,10 @@ Sprint D2（2026-04-24）：为 Agent 决策留痕注入 ROI 量化能力。
   improved_kpi        JSONB          — 改善 KPI 的结构化证据 {"metric": str, "delta_pct": float}
   roi_evidence        JSONB          — 证据来源/上游事件/算法版本等审计链
 
-新增物化视图：
-  mv_agent_roi_monthly — 按 (tenant_id, agent_id, 月) 聚合 ROI，RLS 保护
+物化视图（PR #352 critical fix）：
+  mv_agent_roi_monthly 已移至 v265_mv_agent_roi_monthly.py 唯一负责
+  （v265 schema 含 store_id 列，与 INDEX 引用对齐）。本文件仅 ADD COLUMN +
+  CREATE INDEX，不创建 MV。
 
 签字提醒：本迁移对应 docs/sprint-plan-2026Q2-unified.md §4 决策点 #1
           （"D2 agent_decision_logs 新增 6 列 = 核心留痕变更 = 需创始人签字"）。
