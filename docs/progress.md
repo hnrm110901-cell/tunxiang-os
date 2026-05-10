@@ -1,3 +1,40 @@
+## 2026-05-10 上午 · drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
+
+### 完成状态
+- [x] **drift 治理主题真终态归零**（main HEAD `661b2db1`，baseline 锁定 0）
+- [x] 3 PR 全 merged：#363 fund_settlement 三表 revive [Tier1+SECURITY] / #369 Class C dead ORM 清理 [Tier3] / #373 detector 加 op.create_table 变量间接识别 [Tier3]
+- [x] PR #371 closed（v410 思路错被替代 — reviewer 调查揭露 4 张表已建）
+- [x] 5 个 follow-up issue 立：#364 distribution column drift / #365 detector column-level 升级 / #366 production RLS audit / #372 kds_tasks 6 列漂移 / #368 B'-X CLOSE audit trail
+- [x] 1 个过期 issue close：#367 v310 dangling alembic chain（验证已修，docstring chain repair 注释明确）
+- [x] B'-X stack 4 PR closed：#340 / #342 / #343 / #345 按 disposition doc 路线 a 后 obsolete
+- [x] 1 个 stale worktree 清理：class-c-dead-cleanup（PR #369 已 merged）
+- [x] 测试 infra 修两轮副产品：
+  - PR #363：`test_rls_all_tables_tier1` 静态 grep 加 `_apply_rls` helper + `_NEW_TABLES` list 循环识别（消除 v407/v408/v409 admin override 根因）
+  - PR #373：drift detector 加 `op.create_table(VAR)` 变量间接识别（消除 4 张表误报）
+- [x] DEVLOG / progress 同步（本 PR）
+- [ ] column-level drift 治理（#364 / #365 / #372，独立 thread）
+- [ ] production RLS audit (#366)，待 founder 提供 PG 访问
+- [ ] dev-plan-60d 5/7 重写（独立 thread）
+
+### 关键决策
+- **修真 detector bug 替代加冗余 migration**：本会话最大方法论收益。reviewer 揭露 v410 (#371) premise 错后，一次 detector regex 升级（#373）替代 3 张表 revive PR + 1 issue。**修真 bug ≫ hack workaround**。同款思路在 #363 修 RLS 静态 grep 白名单（避免 admin override）。
+- **三步法 audit（grep import / raw SQL CRUD / API endpoint）**：Class C 7 张表 dead/live 判定零误判。starter memory 旧记忆错（split_rules 与 v100/v346 表不齐 — 实际 v100/v346 表名前缀完全不同），独立 grep verify 推翻 starter 记忆。
+- **B 选项止线 code-reviewer**：3 PR 全用 code-reviewer subagent 独立审，B 选项（真 BUG only）+ 显式停止线声明。**#371 reviewer 揭露 premise 错避免冗余 migration 落地**。
+- **PR base 链合并**：#371 一度 base on chore/class-c-dead-orm-cleanup 分支（drift 4→1 才能连续）。#371 close 后该链失效但模式可复用。
+- **不擅自动其他主题 OPEN PR**：会话结束时我侧 OPEN 30 PR（codemod / production main.py / security audit / payment / v4 等并发 session 主题），全留给对应 session 处理。
+
+### 下一步
+- column-level drift 治理新 thread（#364 distribution_warehouses/plans / #365 detector column-level 升级 / #372 kds_tasks 6 列漂移联动）
+- 等 founder 决策 production RLS audit (#366) 准入
+- dev-plan-60d 5/7 重写（跨 session 大主题，需 user 战略输入）
+
+### 已知风险
+- **column-level drift 全开放**：drift 终态 0 是 tablename-level；列/类型/NOT NULL/DEFAULT 漂移由 #364/#365/#372 独立追，独立未消除。kds_tasks 已知 6 列 ORM↔raw SQL 漂移会触发 runtime crash（已有 graceful degradation 补丁掩盖）。
+- **PR #370 (5/10 晚上 entry) 并发**：另一 session 加 5/10 晚上 entry，本 PR 加 5/10 上午 entry，**两者 trivial conflict 由后合者 rebase**（5/10 晚上 entry 排在 5/10 上午之上，按时间倒序）。
+- **kds_tasks 已 know-broken graceful degradation 补丁**：`test_graceful_degradation_when_kds_tasks_missing` 是 column drift 的掩盖，#372 落地后该测试可移除（独立 PR）。
+
+---
+
 ## 2026-05-09 上午 · B' alembic chain dangling refs 修复
 
 ### 完成状态
