@@ -19,7 +19,7 @@ import uuid
 from typing import Any, Optional
 
 import structlog
-from engine.journey_engine import JourneyEngine
+from services.tx_growth.src.engine.journey_engine import JourneyEngine
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -448,7 +448,7 @@ async def import_journey_template(
     except ValueError:
         raise HTTPException(status_code=400, detail="X-Tenant-ID 格式错误")
 
-    from templates.journey_templates import TEMPLATES
+    from services.tx_growth.src.templates.journey_templates import TEMPLATES
 
     template = TEMPLATES.get(body.template_name)
     if not template:

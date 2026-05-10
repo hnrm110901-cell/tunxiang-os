@@ -47,7 +47,7 @@ _MockApprovalRequest = MagicMock()
 _approval_mod.ApprovalWorkflow = _MockApprovalWorkflow
 _approval_mod.ApprovalRequest = _MockApprovalRequest
 sys.modules.setdefault("models", _types.ModuleType("models"))
-sys.modules["models.approval"] = _approval_mod
+sys.modules["services.tx_growth.src.models.approval"] = _approval_mod
 
 # services.approval_service — stub，防止 httpx/structlog import 链
 _svc_mod = _types.ModuleType("services.approval_service")
@@ -128,7 +128,7 @@ _svc_mod._evaluate_condition = _evaluate_condition_real
 _svc_mod._evaluate_conditions = _evaluate_conditions_real
 
 sys.modules.setdefault("services", _types.ModuleType("services"))
-sys.modules["services.approval_service"] = _svc_mod
+sys.modules["services.tx_growth.src.services.approval_service"] = _svc_mod
 
 # shared.ontology — stub（TenantBase 依赖）
 _ont_mod = _types.ModuleType("shared.ontology")

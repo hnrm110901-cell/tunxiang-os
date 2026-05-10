@@ -17,7 +17,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Request
 from pydantic import BaseModel, field_validator
-from services.referral_service import ReferralError, ReferralService
+from services.tx_growth.src.services.referral_service import ReferralError, ReferralService
 
 log = structlog.get_logger(__name__)
 
@@ -128,7 +128,7 @@ async def create_campaign(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> dict:
     """创建裂变活动（初始状态为 draft，需手动启动）"""
-    from models.referral import ReferralCampaign
+    from services.tx_growth.src.models.referral import ReferralCampaign
     from sqlalchemy.ext.asyncio import AsyncSession
 
     tenant_id = uuid.UUID(x_tenant_id)
@@ -178,7 +178,7 @@ async def list_campaigns(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
 ) -> dict:
     """获取裂变活动列表（支持按 status 过滤）"""
-    from models.referral import ReferralCampaign
+    from services.tx_growth.src.models.referral import ReferralCampaign
     from sqlalchemy import select
 
     tenant_id = uuid.UUID(x_tenant_id)

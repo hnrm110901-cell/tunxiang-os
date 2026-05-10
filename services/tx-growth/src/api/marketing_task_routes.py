@@ -42,7 +42,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-from services.marketing_task_service import MarketingTaskError, MarketingTaskService
+from services.tx_growth.src.services.marketing_task_service import MarketingTaskError, MarketingTaskService
 
 from shared.ontology.src.database import async_session_factory
 

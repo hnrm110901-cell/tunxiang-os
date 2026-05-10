@@ -22,13 +22,13 @@ from typing import Any, Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from models.brand_strategy import (
+from services.tx_growth.src.models.brand_strategy import (
     BrandContentConstraintsCreate,
     BrandProfileCreate,
     BrandProfileUpdate,
     BrandSeasonalCalendarCreate,
 )
-from services.brand_strategy_db_service import BrandStrategyDbService
+from services.tx_growth.src.services.brand_strategy_db_service import BrandStrategyDbService
 
 from shared.ontology.src.database import get_db_with_tenant
 from shared.security.src.error_handler import safe_http_exception

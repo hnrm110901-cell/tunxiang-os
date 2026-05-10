@@ -55,7 +55,7 @@ _fake_svc = MagicMock()
 _seg_svc_mod.AudienceSegmentationService = MagicMock(return_value=_fake_svc)
 _svc_parent = types.ModuleType("services")
 sys.modules.setdefault("services", _svc_parent)
-sys.modules["services.audience_segmentation"] = _seg_svc_mod
+sys.modules["services.tx_growth.src.services.audience_segmentation"] = _seg_svc_mod
 
 from api.segmentation_routes import router  # noqa: E402
 

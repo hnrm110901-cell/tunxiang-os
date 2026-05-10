@@ -32,7 +32,7 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-from services.audience_pack_service import AudiencePackError, AudiencePackService
+from services.tx_growth.src.services.audience_pack_service import AudiencePackError, AudiencePackService
 
 from shared.ontology.src.database import async_session_factory
 

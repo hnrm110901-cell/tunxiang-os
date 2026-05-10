@@ -37,8 +37,8 @@ from typing import Any, Optional
 import structlog
 from fastapi import APIRouter, Header, HTTPException, Query, Request
 from pydantic import BaseModel, field_validator
-from services.attribution_aggregator import AttributionAggregator
-from services.touch_tracker import TouchTracker
+from services.tx_growth.src.services.attribution_aggregator import AttributionAggregator
+from services.tx_growth.src.services.touch_tracker import TouchTracker
 
 from shared.ontology.src.database import async_session_factory
 from shared.security.src.error_handler import safe_http_exception

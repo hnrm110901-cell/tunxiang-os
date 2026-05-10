@@ -19,7 +19,7 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Optional
 
 import structlog
-from models.attribution import AttributionSummary, MarketingTouch
+from services.tx_growth.src.models.attribution import AttributionSummary, MarketingTouch
 from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -254,7 +254,7 @@ class ROIAttributionService:
         # 若此次归因关联了 AB 测试，同步记录 ABTestAssignment 的转化
         if ab_test_id is not None:
             try:
-                from services.ab_test_service import ABTestService
+                from services.tx_growth.src.services.ab_test_service import ABTestService
 
                 ab_svc = ABTestService()
                 await ab_svc.record_conversion(

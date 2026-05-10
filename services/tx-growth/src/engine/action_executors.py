@@ -444,7 +444,7 @@ class BranchActionExecutor(BaseActionExecutor):
 
         condition_met = False
         if actual is not None:
-            from engine.journey_engine import OPERATORS
+            from services.tx_growth.src.engine.journey_engine import OPERATORS
 
             op_fn = OPERATORS.get(operator)
             if op_fn:

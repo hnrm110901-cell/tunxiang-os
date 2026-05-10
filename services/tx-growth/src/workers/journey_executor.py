@@ -27,12 +27,12 @@ import structlog
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis  # noqa: F401 — 仅供类型注解
-from models.journey_instance import JourneyInstance
-from services.journey_orchestrator import (
+from services.tx_growth.src.models.journey_instance import JourneyInstance
+from services.tx_growth.src.services.journey_orchestrator import (
     _journey_executions,
     _journeys,
 )
-from services.roi_attribution import ROIAttributionService
+from services.tx_growth.src.services.roi_attribution import ROIAttributionService
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -880,8 +880,8 @@ class JourneyExecutor:
             2. 查询会员的企微 external_userid
             3. ChannelEngine.send_wecom_message 通过 gateway 内部 API 发送
         """
-        from services.channel_engine import ChannelEngine
-        from services.content_engine import PersonalizedContentEngine
+        from services.tx_growth.src.services.channel_engine import ChannelEngine
+        from services.tx_growth.src.services.content_engine import PersonalizedContentEngine
 
         content_type: str = node.get("content_type", "wecom_chat")
         template_key: str = node.get("template_key", "generic")

@@ -636,17 +636,17 @@ _ugc_svc_mod.UGCService = MagicMock(return_value=MagicMock())
 _ugc_svc_mod.UGCError = UGCError
 _svc_parent = sys.modules.get("services") or types.ModuleType("services")
 sys.modules.setdefault("services", _svc_parent)
-sys.modules["services.ugc_service"] = _ugc_svc_mod
+sys.modules["services.tx_growth.src.services.ugc_service"] = _ugc_svc_mod
 
 _photo_mod = types.ModuleType("services.photo_reviewer")
 _photo_mod.PhotoReviewer = MagicMock(return_value=MagicMock())
 _photo_mod.PhotoReviewError = PhotoReviewError
-sys.modules["services.photo_reviewer"] = _photo_mod
+sys.modules["services.tx_growth.src.services.photo_reviewer"] = _photo_mod
 
 _viral_mod = types.ModuleType("services.viral_tracker")
 _viral_mod.ViralTracker = MagicMock(return_value=MagicMock())
 _viral_mod.ViralTrackerError = ViralTrackerError
-sys.modules["services.viral_tracker"] = _viral_mod
+sys.modules["services.tx_growth.src.services.viral_tracker"] = _viral_mod
 
 from api.ugc_routes import _ugc_svc, _viral_tracker, router  # noqa: E402
 from fastapi import FastAPI, Request

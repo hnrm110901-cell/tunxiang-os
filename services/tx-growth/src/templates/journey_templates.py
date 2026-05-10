@@ -1,7 +1,7 @@
 """内置旅程模板 — 5个开箱即用的营销旅程
 
 导入方式：
-    from templates.journey_templates import TEMPLATES
+    from services.tx_growth.src.templates.journey_templates import TEMPLATES
     template = TEMPLATES["first_visit_welcome"]
 
 模板说明：

@@ -49,13 +49,13 @@ _fake_tracker = MagicMock()
 _tracker_mod.TouchTracker = MagicMock(return_value=_fake_tracker)
 _svc_parent = types.ModuleType("services")
 sys.modules.setdefault("services", _svc_parent)
-sys.modules["services.touch_tracker"] = _tracker_mod
+sys.modules["services.tx_growth.src.services.touch_tracker"] = _tracker_mod
 
 # Stub services.attribution_aggregator
 _agg_mod = types.ModuleType("services.attribution_aggregator")
 _fake_agg = MagicMock()
 _agg_mod.AttributionAggregator = MagicMock(return_value=_fake_agg)
-sys.modules["services.attribution_aggregator"] = _agg_mod
+sys.modules["services.tx_growth.src.services.attribution_aggregator"] = _agg_mod
 
 # Stub shared.ontology.src.database
 _shared = types.ModuleType("shared")
