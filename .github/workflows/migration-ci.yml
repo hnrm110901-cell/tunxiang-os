@@ -5,11 +5,15 @@ on:
     branches: [main, develop]
     paths:
       - 'shared/db-migrations/**'
+      - 'shared/db-migrations-core/**'
+      - 'services/*/db-migrations/**'
       - '.github/workflows/migration-ci.yml'
   pull_request:
     branches: [main]
     paths:
       - 'shared/db-migrations/**'
+      - 'shared/db-migrations-core/**'
+      - 'services/*/db-migrations/**'
 
 permissions:
   contents: read
@@ -63,6 +67,21 @@ jobs:
 
           echo ""
           echo "=== Migration check passed ==="
+
+      - name: Schema lint (PR #346 — 7 类 bug 静态扫描 + per-service shells smoke)
+        # PR #346 引入的 schema linter 检测 7 类常见 migration bug 模式：
+        #   类 A 同名表撞名 / B JSONB 引号嵌套 / C bind+cast 歧义 /
+        #   D PK 函数表达式 / F-1 POLICY IF NOT EXISTS / F-2 INSERT POLICY USING /
+        #   G GENERATED/索引含非 IMMUTABLE 函数
+        # 各类有 baseline ratchet — 新 PR 引入超过 baseline 的违例 → fail
+        # 同时验证 per-service alembic shells 完整性
+        # 详细规则与修复指引：docs/migration-schema-lint-rules.md
+        run: |
+          pip install pytest
+          python3 -m pytest \
+              shared/db-migrations/tests/test_schema_lint_tier1.py \
+              shared/db-migrations/tests/test_per_service_shells_tier1.py \
+              -v --tb=short
 
       - name: PG.7 — UPDATE/ALL policies must include WITH CHECK
         # 防退化：新 migration 加 FOR UPDATE/ALL ... USING (...) 必须同时带 WITH CHECK，

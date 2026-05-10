@@ -270,6 +270,12 @@ def test_class_f2_no_insert_policy_using_clause():
 # vs EXTRACT(EPOCH FROM timestamptz) STABLE）。规则会漏掉 EXTRACT 滥用 case，但
 # blanket 标 STABLE 会大量 false positive（v377 5 处合法 EXTRACT(EPOCH FROM interval)
 # 减法间隔被误捕）。Trade-off：宁漏不错杀。
+# Spot check (PR #346, 2026-05-10): grep 全仓 `EXTRACT(EPOCH FROM` 出现在 v377
+# (5 处) + v287 (1 处)，全是 timestamptz - timestamptz = interval 减法语境
+# (IMMUTABLE)。当前仓库无 STABLE tz_aware EXTRACT 真违例。
+# TODO: 加 SQL comment strip 预处理（`-- comment` 和 `/* ... */`），防止注释中
+# 出现函数名（如 age/now）误触发 GENERATED 正则。当前通过回避注释字面量绕过
+# （v378 PR #346 修复时改"原值由 PG 自动生成（含 STABLE 函数）"抽象表述）。
 _NON_IMMUTABLE_FUNCS = (
     "now",
     "current_date",
@@ -292,8 +298,9 @@ _CLASS_G_GEN_RE = re.compile(
 )
 # 必须先匹配 `ON <ident>` 才能继续，防止 `[^;]*?` 跨多 op.execute 跨行误捕
 # `op.execute("CREATE INDEX ... ON tbl(col)")` 后面的 `sa.text("NOW()")` 列默认值。
+# 支持 CREATE INDEX [CONCURRENTLY] [IF NOT EXISTS] <name> ON <tbl>(...)
 _CLASS_G_IDX_RE = re.compile(
-    rf"CREATE\s+(?:UNIQUE\s+)?INDEX\s+\S+\s+ON\s+\S+\s*\([^)]*?\b({_FUNC_PATTERN})\s*\(",
+    rf"CREATE\s+(?:UNIQUE\s+)?INDEX\s+(?:CONCURRENTLY\s+)?(?:IF\s+NOT\s+EXISTS\s+)?\S+\s+ON\s+\S+\s*\([^)]*?\b({_FUNC_PATTERN})\s*\(",
     re.IGNORECASE | re.DOTALL,
 )
 

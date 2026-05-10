@@ -128,6 +128,7 @@ class StoreLifecycleService:
                 UPDATE store_lifecycle_stages
                 SET current_stage = :stage,
                     stage_entered_at = :entered,
+                    months_since_opening = :months,
                     health_baseline = CAST(:bl AS jsonb),
                     next_review_date = :nr,
                     updated_at = NOW()
@@ -137,6 +138,7 @@ class StoreLifecycleService:
             {
                 "stage": adjusted_stage,
                 "entered": stage_entered_at,
+                "months": months,  # PR #346: 列原由 PG GENERATED 自动算，迁移 schema 后 service 维护
                 "bl": baseline_json,
                 "nr": next_review,
                 "tid": tenant_id,
@@ -313,15 +315,16 @@ class StoreLifecycleService:
                 """
                 INSERT INTO store_lifecycle_stages
                     (id, tenant_id, store_id, opened_date, current_stage,
-                     stage_entered_at, health_baseline, next_review_date)
+                     stage_entered_at, months_since_opening, health_baseline, next_review_date)
                 VALUES
                     (:id, :tid, :sid, :opened, :stage,
-                     :entered, CAST(:bl AS jsonb), :nr)
+                     :entered, :months, CAST(:bl AS jsonb), :nr)
                 ON CONFLICT (tenant_id, store_id)
                 DO UPDATE SET
                     opened_date = EXCLUDED.opened_date,
                     current_stage = EXCLUDED.current_stage,
                     stage_entered_at = EXCLUDED.stage_entered_at,
+                    months_since_opening = EXCLUDED.months_since_opening,
                     health_baseline = EXCLUDED.health_baseline,
                     next_review_date = EXCLUDED.next_review_date,
                     updated_at = NOW()
@@ -334,6 +337,7 @@ class StoreLifecycleService:
                 "opened": opened_date,
                 "stage": stage,
                 "entered": date.today(),
+                "months": months,  # PR #346: 列原由 PG GENERATED 自动算，迁移 schema 后 service 维护
                 "bl": baseline_json,
                 "nr": date.today() + timedelta(days=30),
             },
