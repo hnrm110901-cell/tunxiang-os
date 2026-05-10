@@ -674,7 +674,7 @@ async def get_performance_stats(
 # 评审周期管理 + 在线打分端点 (v254 review_cycles + review_scores)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-from services.performance_scoring_service import (
+from services.tx_org.src.services.performance_scoring_service import (
     aggregate_cycle_scores,
     create_review_cycle,
     get_cycle_detail,
@@ -684,7 +684,7 @@ from services.performance_scoring_service import (
     submit_review_score,
     update_cycle_status,
 )
-from services.performance_scoring_service import (
+from services.tx_org.src.services.performance_scoring_service import (
     calibrate_score as svc_calibrate_score,
 )
 

@@ -22,7 +22,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
-from services.permission_service import PermissionService
+from services.tx_org.src.services.permission_service import PermissionService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 

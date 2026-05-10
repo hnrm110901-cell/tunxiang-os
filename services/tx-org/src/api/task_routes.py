@@ -27,8 +27,8 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
-from repositories.task_repo import PgTaskRepository
-from services.task_dispatch_service import (
+from services.tx_org.src.repositories.task_repo import PgTaskRepository
+from services.tx_org.src.services.task_dispatch_service import (
     CancelReasonRequired,
     EscalationChainMissing,
     TaskDispatchService,

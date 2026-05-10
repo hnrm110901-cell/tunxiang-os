@@ -45,7 +45,7 @@ from typing import Any, Optional
 from uuid import UUID, uuid4
 
 import structlog
-from repositories.task_repo import InMemoryTaskRepository, TaskQuery, TaskRepository
+from services.tx_org.src.repositories.task_repo import InMemoryTaskRepository, TaskQuery, TaskRepository
 
 from shared.events.src import TaskEventType, emit_event
 from shared.ontology.src.extensions.tasks import Task, TaskStatus, TaskType

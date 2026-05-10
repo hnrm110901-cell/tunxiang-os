@@ -4,8 +4,8 @@ from typing import Any
 
 from fastapi import APIRouter, Request
 from pydantic import BaseModel
-from services.im_sync_service import IMSyncConfig, push_alert_to_im
-from services.im_webhook_handler import (
+from services.tx_org.src.services.im_sync_service import IMSyncConfig, push_alert_to_im
+from services.tx_org.src.services.im_webhook_handler import (
     handle_dingtalk_callback,
     handle_wecom_callback,
 )
