@@ -15,8 +15,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     PaymentRequest,
@@ -44,6 +46,7 @@ class ShouqianbaChannel(BasePaymentChannel):
         payment_id = f"SQB{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
 
         if self._client is None:
+            payment_channel_requests_total.labels(channel="shouqianba", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -54,20 +57,28 @@ class ShouqianbaChannel(BasePaymentChannel):
                 channel_data={"mock": True, "provider": "shouqianba"},
             )
 
-        if request.trade_type == TradeType.B2C and request.auth_code:
-            result = await self._client.pay(
-                out_trade_no=payment_id,
-                auth_code=request.auth_code,
-                total_amount=str(request.amount_fen),
-                subject=request.description or "屯象OS订单",
-            )
-        else:
-            result = await self._client.precreate(
-                out_trade_no=payment_id,
-                total_amount=str(request.amount_fen),
-                subject=request.description or "屯象OS订单",
-            )
+        try:
+            if request.trade_type == TradeType.B2C and request.auth_code:
+                result = await self._client.pay(
+                    out_trade_no=payment_id,
+                    auth_code=request.auth_code,
+                    total_amount=str(request.amount_fen),
+                    subject=request.description or "屯象OS订单",
+                )
+            else:
+                result = await self._client.precreate(
+                    out_trade_no=payment_id,
+                    total_amount=str(request.amount_fen),
+                    subject=request.description or "屯象OS订单",
+                )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="shouqianba", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="shouqianba", status="connect_error").inc()
+            raise
 
+        payment_channel_requests_total.labels(channel="shouqianba", status="2xx").inc()
         sqb_status = result.get("order_status", "")
         status_map = {
             "PAID": PayStatus.SUCCESS,

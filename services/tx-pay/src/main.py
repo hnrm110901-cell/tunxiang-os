@@ -75,6 +75,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Prometheus 指标暴露：/metrics 端点 + 通用 HTTP 指标
+# 注：渠道层 payment_channel_requests_total 在 .metrics 模块定义并
+# 在 .channels.* 中 inc，import 即注册到默认 registry。
+from . import metrics  # noqa: F401  注册 payment_channel_requests_total
+
+try:
+    from prometheus_fastapi_instrumentator import Instrumentator
+
+    Instrumentator().instrument(app).expose(app)
+except ImportError:
+    # 生产 Dockerfile 已安装 prometheus-fastapi-instrumentator；
+    # 本地无 instrumentator 时降级，仅 /metrics 端点不暴露通用 HTTP 指标。
+    # 渠道层 Counter 仍正常注册到 prometheus_client 默认 registry。
+    logger.warning("prometheus_instrumentator_unavailable")
+
 # CORS
 app.add_middleware(
     CORSMiddleware,

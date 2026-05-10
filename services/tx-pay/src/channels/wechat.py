@@ -18,8 +18,10 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+import httpx
 import structlog
 
+from ..metrics import payment_channel_requests_total
 from .base import (
     BasePaymentChannel,
     CallbackPayload,
@@ -57,6 +59,7 @@ class WechatPayChannel(BasePaymentChannel):
 
         if self._service is None:
             # Mock 模式
+            payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
             return PaymentResult(
                 payment_id=payment_id,
                 status=PayStatus.SUCCESS,
@@ -68,14 +71,22 @@ class WechatPayChannel(BasePaymentChannel):
             )
 
         # JSAPI 场景：创建预支付订单
-        result = await self._service.create_jsapi_order(
-            out_trade_no=payment_id,
-            total_fen=request.amount_fen,
-            description=request.description or "屯象OS订单",
-            openid=request.openid or "",
-            notify_url=request.notify_url or self._notify_url,
-        )
+        try:
+            result = await self._service.create_jsapi_order(
+                out_trade_no=payment_id,
+                total_fen=request.amount_fen,
+                description=request.description or "屯象OS订单",
+                openid=request.openid or "",
+                notify_url=request.notify_url or self._notify_url,
+            )
+        except httpx.TimeoutException:
+            payment_channel_requests_total.labels(channel="wechat", status="timeout").inc()
+            raise
+        except httpx.ConnectError:
+            payment_channel_requests_total.labels(channel="wechat", status="connect_error").inc()
+            raise
 
+        payment_channel_requests_total.labels(channel="wechat", status="2xx").inc()
         return PaymentResult(
             payment_id=payment_id,
             status=PayStatus.PENDING,
