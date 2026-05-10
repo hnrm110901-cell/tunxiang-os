@@ -125,17 +125,17 @@ def _compute_orm_drift() -> dict[str, list[str]]:
 # Phase 4a-3 baseline — 起点 18 处 drift（PR #357 锁定）。
 # Ratchet: 18 (起点) → 15 (PR #360 Class B 命名漂移) → 12 (PR #361 retail_mall revive +
 # Class F SECURITY 修) → 10 (PR #362 distribution_trips/items revive) →
-# 7 (PR #363 fund_settlement 三表 revive) → 4 (本 PR Class C dead ORM 清理 —
-# audit 见 docs/orm-drift-class-c-audit.md，删 banquet_menu_templates_v2 /
-# daily_plans / stored_value_account_transactions 三个 ORM-only 0 引用 dead 类)。
+# 7 (PR #363 fund_settlement 三表 revive) → 4 (PR #369 Class C dead ORM 清理) →
+# 1 (本 PR v410_class_c_live_revive — brand_groups / cook_time_baselines /
+# delivery_auto_accept_rules 三张 LIVE 表 revive，沿 v407/v408/v409 helper 模板)。
 #
-# 剩余 4 张全部 Class C LIVE（待 v410 revive PR 收尾归零）：
-#   brand_groups (tx-member, group_member_service heavy raw SQL) /
-#   cook_time_baselines (tx-trade, cook_time_stats raw SQL) /
-#   delivery_auto_accept_rules (tx-trade, ORM CRUD via Repository) /
-#   kds_tasks (tx-trade, 9+ raw SQL CRUD 跨 5 文件) — 需 v410 单 migration 全部 revive
+# 剩余 1 张终态待修：
+#   kds_tasks — ORM↔raw SQL 列漂移 6 列（banquet_session_id / banquet_section_id /
+#   store_id / platform / items / push_mode 在 raw SQL 用但 ORM 缺）—
+#   归属 issue #(kds-tasks-column-drift) 跟进，与 #364 distribution_warehouses/plans
+#   同 column-level drift 模式
 # 修一个 drift → ratchet 下调本数值。终态 0：所有 ORM model 都有对应 migration 创建路径。
-_ORM_DRIFT_BASELINE = 4
+_ORM_DRIFT_BASELINE = 1
 
 
 def test_orm_migration_drift_no_new_violations():
