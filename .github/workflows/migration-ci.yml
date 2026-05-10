@@ -14,12 +14,60 @@ on:
       - 'shared/db-migrations/**'
       - 'shared/db-migrations-core/**'
       - 'services/*/db-migrations/**'
+      - 'scripts/migrate-all.sh'
+      - 'scripts/db-bootstrap.sh'
       - '.github/workflows/migration-ci.yml'
 
 permissions:
   contents: read
 
 jobs:
+  fresh-pg-upgrade-test:
+    name: Fresh PG — 18 alembics 全跑通
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: tunxiang_os
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: pip install "alembic>=1.13" "sqlalchemy>=2.0" "psycopg2-binary>=2.9"
+
+      - name: Bootstrap fresh PG (init-rls + init-pgvector + 18 alembics)
+        env:
+          DATABASE_URL: postgresql://postgres:test@localhost:5432/tunxiang_os
+          PARALLEL_JOBS: 4
+        run: |
+          # PG service container 已 health-check ready，--skip-create
+          ./scripts/db-bootstrap.sh --skip-create
+
+      - name: Verify version_tables 完整性（18 个 service stamp 表互不冲突）
+        env:
+          PGPASSWORD: test
+        run: |
+          # 注：versions/ 当前为空（Phase 4a-3 骨架阶段），alembic 不建 stamp 表
+          # 是预期行为；Phase 4a-4 baseline 注入后本步骤改 assert 18 表存在
+          # 当前仅 smoke test：确认 init-rls + init-pgvector 应用 + 18 alembic 全跑通无错
+          psql -h localhost -U postgres -d tunxiang_os -c "\dt" || true
+          echo "Phase 4a-3 阶段：versions/ 空 → alembic stamp 表不创建（预期）"
+          echo "Phase 4a-4 baseline 入栈后此处改 assert 18 个 <svc>_alembic_version 表存在"
+
   check-migration-chain:
     name: Verify Migration Chain Integrity
     runs-on: ubuntu-latest
