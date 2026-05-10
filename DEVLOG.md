@@ -27,6 +27,63 @@
 
 ---
 
+## 2026-05-10 晚上 — channel-aggregation Phase 0 起手（CH-01/02.5/13 + 28 issue + 4 PR merged）
+
+### 今日完成
+全渠道聚合主题（美团/抖音/饿了么/微信/小红书/高德）从规划到落地完整链路。
+
+**规划层**：
+- `docs/channel-aggregation-plan-2026-05-10.md`（560 行）— 真值表（adapter 双层并存 + channel_canonical 已部分接入二次校准发现）+ 28 PR 明细 + 5 Gating 全部 ✅ 创始人定盘
+- `docs/qualification-tracker-2026-05.md` — 4 平台资质追踪 + **5/13 deal-breaker**（必须 5/13 前提交美团/抖音/饿了么 3 套企业资质申请）
+- `docs/dev-plan-60d-2026-05-09.md` 加 3 处交叉引用 + deal-breaker 警示
+
+**项目层**：
+- GitHub milestone #1 channel-aggregation（due 2026-07-04）
+- 28 issue (#375-#402) 全部含模板化 body + label + milestone
+
+**代码层**：
+- 3 PR (#404/#405/#406) — 10 文件 / 1700+ LOC / 86 单元 + 结构 test 全过 / 8 真 PG opt-in stub
+  - PR #404 (CH-01): v411 channel_oauth_tokens + OAuthTokenStore（Fernet 加密，密钥 env `OAUTH_TOKEN_ENCRYPTION_KEY`）
+  - PR #405 (CH-02.5): v412 raw_channel_events 落湖表（dedup UNIQUE + status 4 枚举 + partial pending index）
+  - PR #406 (CH-13): v413 member_identity_map + ChannelIdentityResolver（PG 15+ NULLS NOT DISTINCT，SHA256+salt 哈希）
+- docs PR #407（plan/tracker/dev-plan-60d 三文档）
+
+**清理层**：
+- 上 session 6 OPEN PR (#353/#355/#356/#358/#370/#403) → 4 admin-merged ✅ (#353/#355/#356/#403)，2 留 conflict 待处理（#358/#370 在 user worktree 里活跃）
+- 我侧 4 PR (#404-#407) 全部 admin-merged ✅
+- main HEAD: `11294a61` → **`5d95071f`**（8 commit 入主，含 4 production codemod fix + 4 channel）
+
+### 数据变化
+- 8 PR merged / 3 issue auto-closed (#375 #377 #393)
+- migration 链: v409 → **v411 → v412 → v413**（完整无断裂）
+- 新增 service 模块 2: `shared/adapters/base/src/oauth_token_store.py` + `services/tx-member/src/services/channel_identity_resolver.py`
+- 新增 RLS 表 3: channel_oauth_tokens / raw_channel_events / member_identity_map（全部 v403/v395 模式 USING + WITH CHECK）
+
+### 5/10 创始人定盘记录
+- G-CH-1 = **A 全平台真接入**（资质 deal-breaker 5/13）
+- G-CH-2 = **B top-level 为 SoT**（CH-02.7 估时 1d → 3d，拆 3 sub-PR）
+- G-CH-3 = **A 做完整微信外卖**（CH-06 维持 3d）
+- G-CH-4 = **A 隔离 schema 不上 demo**（CH-11 走 reviews_crawler_*）
+- G-CH-5 = **A 钉 4 张全渠道报表**（mv_channel_funnel / mv_review_sentiment / mv_ad_roi / mv_member_clv 入 14 报表清单）
+
+### 战绩
+- **二次校准节省 2.5d**：发现 channel_canonical_service.py + 三平台 webhook 路由已存在，CH-02/03 等估时全面降时
+- **§19 独立验证防漂移**：CH-13 发现 identity_resolver.py 已被 S2W5 CDP WiFi 占用 397 LOC → 改用 channel_identity_resolver.py 不动既有
+- **PG 15+ NULLS NOT DISTINCT**：解决 phone 类型 (platform=NULL) 复合 UNIQUE 不能去重的隐患
+
+### 遗留问题
+- **🚨 5/13 deal-breaker 倒计时 3 天**：3 套企业资质申请未启动；明日 5/11 必须联系美团/抖音/饿了么 BD + 法务/财务对齐资质材料
+- 上 session #358 / #370 conflict 待 user 在对应 worktree 解（不动 user 的 worktree）
+- 8 个 真 PG 反测 stub (3+2+3) opt-in via `INTEGRATION_PG_DSN`，待仓库级 docker-compose-pg fixture（与 #323 / PR2.D 同诉求）
+- CH-02.7a 是 G-CH-2=B 决策后 Phase 1 真正起跑信号，需独立验证 #404/#406 通过后再起（动 1334 LOC + 35 baseline tests）
+
+### 明日计划
+- **5/11 创始人级别（非技术）**：联系 3 平台 BD + 法务/财务 — deal-breaker 关
+- **§19 独立验证**（推荐 user 开新 session）：从徐记海鲜收银员视角重检 #404 / #406（修改 3+ 文件 + DB 迁移 + Tier 1 路径，触发条件全中）
+- **CH-02.7a 起手**（验证通过后）：meituan subdir 1334 LOC → top-level 收敛，1.5d/300 LOC，拆 3 sub-PR 中第一个
+
+---
+
 ## 2026-05-10 上午 — drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
 
 ### 今日完成
