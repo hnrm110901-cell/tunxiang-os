@@ -209,3 +209,133 @@ def test_resolver_validate_unknown_type():
     resolver = ChannelIdentityResolver(MagicMock(), salt=SALT)
     with pytest.raises(InvalidIdentityTypeError):
         resolver._validate("biometric", None)
+
+
+# ─────────────────────────────────────────────────────────────────
+# 8. 并发 race — link()/get_or_create_member 必须返回 DB 真实 member_id
+# ─────────────────────────────────────────────────────────────────
+
+
+def _make_mock_row(member_id_or_none):
+    from unittest.mock import MagicMock
+    m = MagicMock()
+    m.mappings.return_value.first.return_value = (
+        {"member_id": member_id_or_none} if member_id_or_none is not None else None
+    )
+    return m
+
+
+async def test_link_returns_db_member_id_on_conflict_keeps_existing():
+    """ON CONFLICT 场景：link() 通过 RETURNING 返回 DB 已有的 member_id（非本地传入值）。
+
+    防止 issue：caller 在并发 race 中传入新 uuid，但 DB 已有记录，必须以 DB 为准。
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from services.channel_identity_resolver import ChannelIdentityResolver
+
+    db_existing_id = uuid4()
+    local_member_id = uuid4()
+
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(return_value=_make_mock_row(db_existing_id))
+
+    resolver = ChannelIdentityResolver(fake_session, salt=SALT)
+    returned = await resolver.link(
+        tenant_id=uuid4(),
+        member_id=local_member_id,
+        identity_type="phone",
+        value="13900001111",
+        platform=None,
+    )
+    assert returned == db_existing_id, "link() 必须返回 RETURNING 的 DB 真实值"
+    assert returned != local_member_id, "并发 race 下 DB 真实值与本地传入值必然不同"
+
+
+async def test_get_or_create_member_concurrent_race_returns_db_real_id():
+    """并发 race：caller B 的本地 uuid4 与 DB 实际 member_id 不一致时，
+    必须返回 DB 真实 ID，且 was_created=False。
+
+    Race 场景（200 桌外卖 ingest 同手机号同时入）：
+      T0: A、B 并发调 get_or_create_member 同 phone hash
+      T1: A、B 各自 resolve() → 都返回 None
+      T2: A 先 link()/INSERT，DB 写入 uuid_A
+      T3: B 后 link()/INSERT，命中 ON CONFLICT DO UPDATE，DB 仍是 uuid_A
+      T4: B 的 RETURNING 必须返回 uuid_A → 防止 orders.member_id 写入 uuid_B 错位
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from services.channel_identity_resolver import ChannelIdentityResolver
+
+    db_winner_id = uuid4()
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(side_effect=[
+        _make_mock_row(None),           # resolve() → None
+        _make_mock_row(db_winner_id),    # link() → DB 真实值（A 的）
+    ])
+
+    resolver = ChannelIdentityResolver(fake_session, salt=SALT)
+    actual_id, was_created = await resolver.get_or_create_member(
+        tenant_id=uuid4(),
+        identity_type="phone",
+        value="13900001111",
+        platform=None,
+    )
+    assert actual_id == db_winner_id, (
+        "并发 race 下必须返回 DB 真实 member_id，否则 orders.member_id 错位"
+    )
+    assert was_created is False, (
+        "DB RETURNING 与本地 candidate 不同 → 本调用没真正创建 member"
+    )
+
+
+async def test_get_or_create_member_first_creator_was_created_true():
+    """无 race：DB RETURNING 等于本调用 candidate → was_created=True。"""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import UUID, uuid4
+    from services.channel_identity_resolver import ChannelIdentityResolver
+
+    fake_session = MagicMock()
+
+    def execute_side_effect(stmt, params=None):
+        # link() 路径：params 含 'member_id' 键 → 回显本调用传入的 uuid
+        if params and "member_id" in params:
+            return _make_mock_row(UUID(params["member_id"]))
+        # resolve() 路径
+        return _make_mock_row(None)
+
+    fake_session.execute = AsyncMock(side_effect=execute_side_effect)
+
+    resolver = ChannelIdentityResolver(fake_session, salt=SALT)
+    actual_id, was_created = await resolver.get_or_create_member(
+        tenant_id=uuid4(),
+        identity_type="phone",
+        value="13900001111",
+        platform=None,
+    )
+    assert was_created is True, "无 race，DB RETURNING == candidate → 本调用真正创建"
+    assert isinstance(actual_id, UUID)
+
+
+async def test_get_or_create_member_existing_match_returns_was_created_false():
+    """resolve() 命中已有 member → 直接返回，was_created=False，不生成新 uuid。"""
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from services.channel_identity_resolver import ChannelIdentityResolver
+
+    existing_member_id = uuid4()
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(side_effect=[
+        _make_mock_row(existing_member_id),       # resolve() → 命中
+        _make_mock_row(existing_member_id),        # link() refresh last_seen_at
+    ])
+
+    resolver = ChannelIdentityResolver(fake_session, salt=SALT)
+    actual_id, was_created = await resolver.get_or_create_member(
+        tenant_id=uuid4(),
+        identity_type="phone",
+        value="13900001111",
+        platform=None,
+    )
+    assert actual_id == existing_member_id
+    assert was_created is False
