@@ -1,3 +1,62 @@
+## 2026-05-10 上午 — drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
+
+### 今日完成
+承接 starter prompt 接力 session，drift 治理主题真终态归零。3 PR merged + 1 PR closed（premise 错被替代修真 detector bug） + 1 issue closed（过期）。
+
+**3 PR 全 merged：**
+- **#363** `fix(tx-finance)`: fund_settlement 三表 revive — split_rules / split_ledgers / settlement_batches v071.disabled → v409 [Tier1][SECURITY]
+  - drift 7→4，沿 v407/v408 chain rescue helper 模板（class F2 修后）
+  - 列对齐三方验证（ORM ↔ raw SQL ↔ DDL 完全一致）
+  - 副产品：测试 infra 修 `test_rls_all_tables_tier1.py` 静态 grep 加 `_apply_rls` helper + `_NEW_TABLES` list 循环识别（v407/v408/v409 之前 admin override 的根因从此消除）
+- **#369** `chore(orm)`: Class C dead 类清理 — 删 3 张 0 引用 ORM (drift 7→4)
+  - audit doc `docs/orm-drift-class-c-audit.md` 三步法（grep import / raw SQL CRUD / API endpoint）
+  - 删 banquet_menu_templates_v2 (fork 残留 / 同名 LIVE 类在 banquet.py) / daily_plans (整文件) / stored_value_account_transactions (TODO 性质)
+  - 副产品：test_no_decimal_amount baseline 同步 stored_value_account 行漂移
+- **#373** `test(tier1)`: drift detector 加 op.create_table 变量间接识别 — drift 真终态归零 4→0 [Tier3]
+  - 替代关闭的 #371（思路错误：试图建已建表）
+  - reviewer 调查揭露：4 张表（brand_groups / cook_time_baselines / delivery_auto_accept_rules / kds_tasks）本来就在 main chain（v016/v019/v024/v084 用 `_TABLE = "name"` + `op.create_table(_TABLE, ...)` 模式建表），detector regex 漏识别变量间接调用 → 误报为 drift
+  - 加 `_VAR_STR_DEF_RE` + `_OP_CREATE_TABLE_VAR_RE` 两 regex + 模式 3 处理（var→value 映射 + 间接消费），drift 真终态 0 ✅
+
+**5 个 follow-up issue 立 + 1 audit trail close：**
+- #364 distribution_warehouses/plans column drift — runtime 必坏 [Tier1]（PR #362 揭露）
+- #365 ORM↔migration drift 检测器 column-level 升级 [Tier3]
+- #366 production RLS 状态 audit — Class F 影响 6 表 + Class F2 防回归延伸 [Tier1]
+- #367 v310 dangling alembic chain — 验证后**已修过 stale 关闭**（v310 实际 down_revision="v304"，docstring 5/9 chain repair 注释明确记录，`test_no_dangling_down_revisions` 4/4 全绿）
+- #368 B'-X stack 4 PR CLOSE 决议 — 已 close 留 audit trail
+- #372 kds_tasks ORM↔raw SQL 列漂移 6 列（同 #364 模式，本会话新发现）
+
+**B'-X stack 4 PR closed**：#340 / #342 / #343 / #345 按 `docs/migration-bx-stack-disposition.md` 路线 a baseline squash 后 obsolete + comment 留痕。
+
+### 数据变化
+- 迁移版本：v406 → v409（fund_settlement 3 表 revive）
+- ORM 文件：删 daily_plan.py 整文件 + banquet_quote.py / stored_value_account.py 的 dead 类
+- drift baseline 锁定：18 (#357 起点) → 15 (#360) → 12 (#361) → 10 (#362) → 7 (#363) → 4 (#369) → 0 (#373) ✅
+- 新增测试 / 修测试：drift detector 加模式 3 + RLS detector 加 `_apply_rls` helper + `_NEW_TABLES` list 循环 + decimal_amount baseline 行漂移修
+- 新增 doc：`docs/orm-drift-class-c-audit.md`（7 张 audit 矩阵 + dead/live 分类决策）
+
+### 关键决策（lessons learned）
+- **修真 detector bug 替代加冗余 migration**：本会话最大方法论收益。reviewer 揭露 v410 (#371) premise 错（4 张表已被 v016/v019/v024/v084 建过，detector 漏检）后，一次升级 detector regex 替代 3 张表 revive PR + 1 个 issue。同样路径在 #363 修 RLS 静态 grep 白名单（避免 admin override）。**修测试 infra 真 bug 比 hack workaround 更干净**。
+- **三步法 audit (grep import / raw SQL CRUD / API endpoint)**：Class C 7 张表 dead/live 判定零误判。对比 starter memory 旧记忆错（说 split_rules 与 v100/v346 不齐），实际 v100 建 profit_split_rules（前缀不同）/ v346 建 stored_value_split_rules（前缀不同）—— starter 记忆可错，必须独立 grep verify。
+- **B 选项止线 review**：3 PR 全用 code-reviewer subagent 独立审，B 选项（真 BUG only）+ 显式停止线声明。#371 reviewer 揭露重大 premise 错；#363/#369/#373 全 0 真 BUG approved。
+- **link 链合并**：PR #371 一度 base on PR #369 分支（drift baseline 7→4 才能 4→1）。#371 close 后这条链失效，但模式可复用。
+
+### 验证证据
+- 4 gates 每 PR docker run pytest 全绿（#363: 14/14, #369: 26/26, #373: 28/28）
+- Tier 1 真门禁全绿（`Tier 1 门禁判定` / `Run Tier 1 tests/tier1` / `Fresh PG 18 alembics` / `Verify Migration Chain Integrity` / `源改动必须配对测试改动` / `RLS 严格门禁`）
+- 噪音 fail (frontend-build / python-lint-test) 全 PR 失败的预存漂移，按记忆 ci_gates 规则放过
+
+### 遗留问题
+- **column-level drift 系列**（独立 issue，**非本会话 scope**）：#364 distribution_warehouses/plans / #365 detector column-level 升级 / #372 kds_tasks 6 列漂移
+- **production RLS audit** (#366)：需 production PG 访问权限
+- **clean up**：1 个 stale worktree (`class-c-dead-cleanup`) 清理（PR #369 已 merged）
+
+### 明日计划
+- column-level drift 治理新 thread（#364 / #365 / #372 联动）
+- production RLS audit (#366) 待 founder 提供 PG 访问
+- dev-plan-60d 5/7 重写（仍 pending，跨 session）
+
+---
+
 ## 2026-05-09 上午 — B' · alembic chain dangling refs 修复（chain integrity 历史债清零）
 
 ### 今日完成
