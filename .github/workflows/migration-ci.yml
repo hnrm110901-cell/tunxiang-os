@@ -14,6 +14,7 @@ on:
       - 'shared/db-migrations/**'
       - 'shared/db-migrations-core/**'
       - 'services/*/db-migrations/**'
+      - '.github/workflows/migration-ci.yml'
 
 permissions:
   contents: read
