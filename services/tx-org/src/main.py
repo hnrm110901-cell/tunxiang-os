@@ -151,13 +151,13 @@ async def lifespan(app: FastAPI):
         )
 
     # 启动 HR Agent 调度器（定时任务：合规扫描/离职风险/排班优化/贡献度重算）
-    from services.hr_agent_scheduler import HRAgentScheduler
+    from services.tx_org.src.services.hr_agent_scheduler import HRAgentScheduler
 
     scheduler = HRAgentScheduler()
     scheduler.start()
 
     # 启动 HR 事件消费器（监听 Redis Stream: org_events）
-    from services.hr_event_consumer import HREventConsumer
+    from services.tx_org.src.services.hr_event_consumer import HREventConsumer
 
     consumer = HREventConsumer()
     _consumer_task = asyncio.create_task(consumer.start())

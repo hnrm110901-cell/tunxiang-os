@@ -707,7 +707,7 @@ class PayrollEngine:
         gross_pay_fen = max(0, gross_pay_fen)
 
         # 4. 简易个税（累计预扣法）
-        from services.income_tax import IncomeTaxCalculator
+        from services.tx_org.src.services.income_tax import IncomeTaxCalculator
 
         tax_calc = IncomeTaxCalculator()
         tax_result = tax_calc.calculate_monthly(
