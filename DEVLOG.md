@@ -58,6 +58,55 @@
 
 ---
 
+## 2026-05-11 凌晨 — production codemod 4 PR merged + 决策 84 完工 + #298 chain 7 PR deferred
+
+### 今日完成（本 session 5/10→11 主线）
+
+承接 5/10 evening session（#353/#355/#356/#358 都 OPEN 等 review），本 session 推到生产 codemod 真终态：
+
+**4 PR 已 merged：**
+- **#403** `chore(docs): codemod namespace 完整性沉淀（决策 84，6 轮）[T3]`（merge `49a8d803`）— 117 行 docs/codemod/namespace-completeness.md
+- **#353** `fix(tx-org)` 含 5/11 凌晨 codex P1 lazy import 修（merge `c8ff35dc`）
+- **#355** `fix(tx-growth)` 脱链 #348，conftest 创建（10 namespaces）（merge `a6e48d73`）
+- **#356** `fix(tx-member)` 脱链 #338，conftest 创建（7 namespaces）（merge `bbefda66`）
+
+**1 PR 仍 OPEN：** #358 (tx-finance/intel/supply) — main 推 4 merge 后撞冲突，等下 session rebase
+
+**7 PR closed as deferred + 1 tracking issue：**
+- #335 / #338 / #341 / #344 / #348 / #349 / #350 → tracking #408
+- 理由：main HEAD conftest namespace 注册让 bare imports 功能可用 → 零 runtime 影响
+- 7 PR 落后 main 13 commits（drift 治理 / alembic chain / ORM / RLS）→ rebase 成本 vs style-only 收益不成正比
+- 7 worktree (`codemod-batch3-9`) 全清
+
+### 数据变化
+- merged 4 PR / closed 7 PR / OPEN -7 / 立 1 tracking issue (#408)
+- 新增 doc：`docs/codemod/namespace-completeness.md`（决策 84 6 轮沉淀）
+- main HEAD `bbefda66`（PR #356 merge 后）
+
+### 关键决策（lessons learned）
+- **决策 81 应用确认（second instance）**：长期 OPEN 的 deferred PR 应 close + audit trail，不死磕 rebase。第 1 instance 是 architect agent 是 BUG 范围纠错；本批是 #298 chain 7 PR 处置（13 commits drift 漂移过深）。
+- **决策 84 6 轮沉淀**：codemod 必须做 5 件事 — A 命名空间发现（ls 子目录） / B 双路径扫 import / C 双路扫 stub key / D conftest models/ 别名兜底 / E 验收闸（静态扫 + pytest + Tier 1 门禁）。
+- **production codemod 真终态闭环**：从 5/10 evening session 启动，5/11 凌晨完工 — 6 服务 production main.py 容器布局可启动（mktemp 真测仅缺第三方 dep）。
+
+### 验证证据
+- 4 PR merge 顺序：#403 → #353 → #355 → #356（跨 ~3 小时）
+- Tier 1 真门禁全绿（每 PR）：`Tier 1 门禁判定` ✅ / `Run Tier 1 *` ✅ / `源改动必须配对测试改动` ✅ / `RLS 严格门禁` ✅
+- CI 噪音失败按 5/9 ci_gates 规则放过
+
+### 遗留问题
+- **#358 rebase**：main 推 4 merge 后撞冲突；预期 DEVLOG/progress 顺序合并 + 业务 0 改动；下 session 优先 A 任务 ~10-15min
+- **#370 5/10 evening handoff**：另一 session 留下的 docs PR，UNKNOWN ms，等 GitHub 算
+- **194 文件 bare-import test 残留**：tracking #408；功能 0 影响，未来排期重跑 codemod
+- **dev-plan-60d 5/7 重写**：旧计划被 18+ commit 推翻，需 user 战略输入
+
+### 明日计划
+- A. #358 rebase onto main（推荐）
+- B. 60d plan 重写（需 user 输入方向）
+- C. DailySummary / Header export（需 user 创始人对齐 §18 ontology）
+- D. 被动等 #358 / #370 review
+
+---
+
 ## 2026-05-11 凌晨 — #353 codex P1 review 落地（决策 84 第六轮沉淀）
 
 ### 今日完成
