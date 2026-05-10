@@ -20,7 +20,7 @@ from typing import Annotated
 import httpx
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.voucher_generator import VoucherGenerator
+from services.tx_finance.src.services.voucher_generator import VoucherGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.adapters.erp.src import (

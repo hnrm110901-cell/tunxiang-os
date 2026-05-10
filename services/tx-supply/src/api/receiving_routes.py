@@ -23,7 +23,7 @@ try:
     )
 except ImportError:
     # sys.path 直接指向 src/ 时（测试环境），使用绝对导入
-    from services.receiving_service import (  # type: ignore[no-redef]
+    from services.tx_supply.src.services.receiving_service import (  # type: ignore[no-redef]
         confirm_transfer,
         create_receiving,
         create_transfer,

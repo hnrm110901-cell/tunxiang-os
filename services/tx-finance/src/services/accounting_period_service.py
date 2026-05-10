@@ -26,7 +26,7 @@ import uuid
 from datetime import date, datetime
 
 import structlog
-from models.accounting_period import (  # type: ignore
+from services.tx_finance.src.models.accounting_period import (  # type: ignore
     STATUS_CLOSED,
     STATUS_OPEN,
     AccountingPeriod,

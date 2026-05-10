@@ -17,7 +17,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.geo_seo_service import GeoSEOService
+from services.tx_intel.src.services.geo_seo_service import GeoSEOService
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession

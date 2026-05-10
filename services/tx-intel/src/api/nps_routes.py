@@ -15,7 +15,7 @@ import uuid
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.nps_service import NPSService
+from services.tx_intel.src.services.nps_service import NPSService
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession

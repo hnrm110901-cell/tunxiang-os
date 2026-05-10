@@ -31,7 +31,7 @@ from shared.ontology.src.database import get_db
 # Imports work both in production (relative within tx-supply package) and in
 # tests where src/ is added to sys.path directly. `models` becomes top-level.
 try:
-    from models.stocktake_loss import (  # type: ignore[no-redef]
+    from services.tx_supply.src.models.stocktake_loss import (  # type: ignore[no-redef]
         ApproveDecisionPayload,
         AssignResponsibilityPayload,
         CaseStatus,
@@ -41,7 +41,7 @@ try:
         SubmitForApprovalPayload,
         WriteoffPayload,
     )
-    from services.stocktake_loss_service import (  # type: ignore[no-redef]
+    from services.tx_supply.src.services.stocktake_loss_service import (  # type: ignore[no-redef]
         ApprovalPermissionError,
         CaseNotFoundError,
         CaseValidationError,
