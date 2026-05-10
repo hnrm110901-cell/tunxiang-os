@@ -121,7 +121,7 @@ class StoreMenuPublish(TenantBase):
 class ChannelPrice(TenantBase):
     """渠道差异价 — 某菜品在某渠道的特殊售价"""
 
-    __tablename__ = "channel_prices"
+    __tablename__ = "menu_channel_prices"
 
     dish_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -144,7 +144,7 @@ class ChannelPrice(TenantBase):
 class SeasonalMenu(TenantBase):
     """季节菜单 — 门店 + 季节维度"""
 
-    __tablename__ = "seasonal_menus"
+    __tablename__ = "store_seasonal_menus"
 
     store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -180,7 +180,7 @@ class SeasonalMenu(TenantBase):
 class RoomMenu(TenantBase):
     """包间菜单 — 门店 + 包间类型维度"""
 
-    __tablename__ = "room_menus"
+    __tablename__ = "store_room_menus"
 
     store_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
