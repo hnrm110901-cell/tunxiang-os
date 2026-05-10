@@ -1,4 +1,10 @@
-"""宴会报价与套餐模板 ORM模型 — Phase 1"""
+"""宴会报价 ORM 模型 — Phase 1
+
+注：原同模块 BanquetMenuTemplate (v2 后缀变体) 类移除 — fork 残留 dead code，
+0 外部引用。真正在用的同名类在 services/tx-trade/src/models/banquet.py，
+表名无 v2 后缀，已被 v332_banquet_quotes migration 建表。
+audit 详见 docs/orm-drift-class-c-audit.md。
+"""
 
 import uuid
 from datetime import datetime
@@ -10,85 +16,6 @@ from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from shared.ontology.src.base import TenantBase
-
-
-class BanquetMenuTemplate(TenantBase):
-    """宴会套餐模板"""
-
-    __tablename__ = "banquet_menu_templates_v2"
-
-    store_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True),
-        nullable=True,
-        index=True,
-        comment="NULL=集团通用，非NULL=门店专属",
-    )
-    name: Mapped[str] = mapped_column(String(200), nullable=False)
-    tier: Mapped[str] = mapped_column(
-        String(20),
-        nullable=False,
-        comment="economy/standard/premium/luxury/custom",
-    )
-    event_type: Mapped[str] = mapped_column(
-        String(30),
-        nullable=False,
-        comment="wedding/birthday/business/tour_group/conference/annual_party/memorial/other",
-    )
-    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    price_per_table_fen: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        comment="每桌价格(分)",
-    )
-    price_per_person_fen: Mapped[Optional[int]] = mapped_column(
-        Integer,
-        nullable=True,
-        comment="每人价格(分)",
-    )
-    min_table_count: Mapped[int] = mapped_column(Integer, default=1)
-    max_table_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    deposit_rate: Mapped[Decimal] = mapped_column(
-        Numeric(5, 4),
-        nullable=False,
-        default=Decimal("0.3000"),
-        comment="定金比例，如0.3000=30%",
-    )
-    dish_list: Mapped[Optional[list]] = mapped_column(
-        JSON,
-        nullable=True,
-        comment="菜品清单JSON数组",
-    )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    sort_order: Mapped[int] = mapped_column(Integer, default=0)
-
-    __table_args__ = (
-        Index("idx_bmt_tenant_store", "tenant_id", "store_id"),
-        Index("idx_bmt_tier", "tenant_id", "tier"),
-        Index("idx_bmt_event_type", "tenant_id", "event_type"),
-        {"comment": "宴会套餐模板"},
-    )
-
-    def to_dict(self) -> dict:
-        return {
-            "id": str(self.id),
-            "tenant_id": str(self.tenant_id),
-            "store_id": str(self.store_id) if self.store_id else None,
-            "name": self.name,
-            "tier": self.tier,
-            "event_type": self.event_type,
-            "description": self.description,
-            "price_per_table_fen": self.price_per_table_fen,
-            "price_per_person_fen": self.price_per_person_fen,
-            "min_table_count": self.min_table_count,
-            "max_table_count": self.max_table_count,
-            "deposit_rate": float(self.deposit_rate) if self.deposit_rate else None,
-            "dish_list": self.dish_list,
-            "is_active": self.is_active,
-            "sort_order": self.sort_order,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "is_deleted": self.is_deleted,
-        }
 
 
 class BanquetQuote(TenantBase):
