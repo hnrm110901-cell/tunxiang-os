@@ -50,6 +50,46 @@ gh pr view 409 --json state,mergedAt
 
 ---
 
+## 2026-05-11 凌晨 · 5/10→11 session 收尾 — production codemod 4 PR merged + 决策 84 完工 + #298 chain 7 PR deferred
+
+### 完成状态
+- [x] **production codemod 真终态**（决策 77 完工延伸）：6 服务全清 — 4 PR merged，1 PR OPEN 等 rebase
+  - #353 tx-org（含 codex P1 lazy import 修）→ MERGED `c8ff35dc`
+  - #355 tx-growth（脱链 #348，conftest 10 namespaces）→ MERGED `a6e48d73`
+  - #356 tx-member（脱链 #338，conftest 7 namespaces）→ MERGED `bbefda66`
+  - #358 tx-fis（含 conftest models/ 身份别名段，决策 84 第 5 轮）→ OPEN（main 推 4 merge 后 DIRTY，等 rebase）
+- [x] **决策 84 6 轮沉淀文档化**：#403 `docs/codemod/namespace-completeness.md` 117 行 → MERGED `49a8d803`
+- [x] **#298 codemod chain 7 PR closed as deferred** + tracking issue #408（决策 81 应用 second instance）
+  - #335 / #338 / #341 / #344 / #348 / #349 / #350 全 close + audit trail
+  - 7 worktree 移除（codemod-batch3-9）
+  - 194 文件 bare-import test 残留留 #408 issue（未来排期重跑 codemod）
+- [x] PR #358 + #370 + 5 PR review 触 coderabbit `@coderabbitai full review`（5/10 09:58 UTC，仅 ack 未 review body）
+- [x] PR #353 4/4 review thread 全 resolve（codex 2 + coderabbit 2）
+- [x] DEVLOG / progress / handoff 同步（本 PR）
+- [ ] #358 rebase onto main（main 推 4 merge 后撞冲突；下 session A 任务）
+- [ ] #370 5/10 evening handoff merge（UNKNOWN ms，等 GitHub 算）
+- [ ] dev-plan-60d 5/7 重写（独立 thread，需 user 输入方向）
+
+### 关键决策
+- **决策 81 应用确认**（second instance）：长期 OPEN 的 deferred PR 应 close + audit trail，不死磕 rebase。13 commits drift 漂移 + style-only 收益 + main HEAD conftest namespace 注册已让 bare imports 功能可用 → close 比 rebase ROI 高
+- **#355/#356 脱链 #348/#338**：rebase --onto + 手动转 conftest "edit" → "create with full namespaces"。同步改 PR base = main，让 #355/#356 独立可合（不依赖永远不会合的 #348/#338）
+- **决策 84 第 6 轮沉淀**：codemod 必须 test/production 双路径同跑。第 2 轮原以为已彻底修，实测 #353 production 端仍有函数体内 lazy import 残留 → 真终态在第 6 轮（5/11 凌晨 codex P1 揭露）
+- **conftest models/ 身份别名段**（决策 84 第 5 轮）：production codemod 切 `from services.<svc>.src.models.X` 后，未切 test 仍 `from models.X` → 两条 sys.modules → isinstance 假阴性。tx-finance conftest 加预加载段消除（PR #358）
+- **本 session 未拆 session**：决策 82 触发条件全集（4× "继续" / 4 PR rebase / 多 cycle / cross-day），用户 4× override 不拆。最终 single-session 完成 production codemod 真终态闭环 + 决策 84 沉淀 + #298 chain 处置
+
+### 下一步
+- A. #358 rebase onto main（推荐，10-15min，唯一 OPEN production codemod，闭环 5/10→11 production codemod 真终态）
+- B. dev-plan-60d 5/7 重写（独立 thread，需 user 战略输入）
+- C. tx-ops DailySummary / tx-supply Header export（独立 thread，需 user 创始人对齐 §18 ontology）
+- D. 被动等 #358 / #370 review
+
+### 已知风险
+- **CI 噪音不影响合入**：`Test Changed Services` / `python-lint-test (*)` / `Ruff` / `frontend-build` 仍红 — 全 PR 一律红的预存漂移
+- **#358 rebase 风险**：DEVLOG/progress 顺序合并是机械操作，但 main 推 4 merge 后可能影响 #358 的 #353/#355/#356 引用链
+- **194 文件 bare-import test 残留**：tracking #408；如未来 codemod 重跑，需按 #403 验收闸 A-E 走每 PR
+
+---
+
 ## 2026-05-11 凌晨 · #353 codex P1 review 落地 — codemod 漏抓函数体内 lazy import
 
 ### 完成状态
