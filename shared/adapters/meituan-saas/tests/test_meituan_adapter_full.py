@@ -3,36 +3,16 @@
 覆盖：Webhook接收验证、等位数据处理、订单管理、商品管理、错误处理
 只mock HTTP请求层（httpx），不mock适配器内部逻辑
 
-迁移说明：
-- 源文件：tunxiang/packages/api-adapters/meituan-saas/tests/test_meituan_adapter_full.py
-- 移除了 core.exceptions 导入（新项目中不存在该模块）
-- 更新了 sys.path 设置以适配新项目目录结构
-- 适配器类名和方法签名保持一致，无需修改
+path / env 设置在 conftest.py 集中。
 """
-
-import os
-import sys
-
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-
-_here = os.path.dirname(os.path.abspath(__file__))
-_repo_root = os.path.abspath(os.path.join(_here, "../../../.."))
-_gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
-if _gateway_src not in sys.path:
-    sys.path.insert(0, _gateway_src)
-
-_adapter_src = os.path.abspath(os.path.join(_here, "../src"))
-if _adapter_src not in sys.path:
-    sys.path.insert(0, _adapter_src)
 
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from adapter import MeituanSaasAdapter
+
+from src.adapter import MeituanSaasAdapter
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -128,7 +108,7 @@ class TestReservationMixin:
     @pytest.mark.asyncio
     async def test_query_reservation_detail(self, adapter):
         """验证预订详情查询"""
-        from reservation import MeituanReservationMixin
+        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
@@ -164,7 +144,7 @@ class TestReservationMixin:
     @pytest.mark.asyncio
     async def test_confirm_reservation(self, adapter):
         """验证预订确认操作"""
-        from reservation import MeituanReservationMixin
+        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
@@ -188,7 +168,7 @@ class TestReservationMixin:
     @pytest.mark.asyncio
     async def test_cancel_reservation_with_reason(self, adapter):
         """验证带原因的预订取消"""
-        from reservation import MeituanReservationMixin
+        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
