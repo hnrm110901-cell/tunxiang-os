@@ -22,7 +22,7 @@ from decimal import Decimal
 from typing import Any
 
 import structlog
-from services.payroll_engine import (
+from services.tx_org.src.services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
     compute_early_leave_deduction,
@@ -707,7 +707,7 @@ class PayrollEngine:
         gross_pay_fen = max(0, gross_pay_fen)
 
         # 4. 简易个税（累计预扣法）
-        from services.income_tax import IncomeTaxCalculator
+        from services.tx_org.src.services.income_tax import IncomeTaxCalculator
 
         tax_calc = IncomeTaxCalculator()
         tax_result = tax_calc.calculate_monthly(

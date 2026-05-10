@@ -19,7 +19,7 @@ from uuid import UUID
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, Field
-from services.permission_service import PermissionCheckResult, PermissionService
+from services.tx_org.src.services.permission_service import PermissionCheckResult, PermissionService
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 

@@ -10,7 +10,7 @@ from typing import AsyncGenerator, List, Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
-from services.store_transfer_service import (
+from services.tx_org.src.services.store_transfer_service import (
     compute_cost_split,
     compute_time_split,
     generate_cost_analysis_report,
@@ -121,7 +121,9 @@ async def api_create_transfer(
     """创建借调单（持久化到 employee_transfers 表）。"""
     # 业务校验（利用原有纯函数服务）
     try:
-        from services.store_transfer_service import create_transfer_order as _validate
+        from services.tx_org.src.services.store_transfer_service import (
+            create_transfer_order as _validate,
+        )
 
         _validate(
             employee_id=req.employee_id,

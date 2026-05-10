@@ -10,20 +10,20 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Header
 from pydantic import BaseModel
-from services.legal_entity import (
+from services.tx_org.src.services.legal_entity import (
     assign_store_to_company,
     create_company,
     create_legal_entity,
     get_company_stores,
     get_entity_structure,
 )
-from services.store_batch import (
+from services.tx_org.src.services.store_batch import (
     batch_activate,
     batch_create_stores,
     batch_deactivate,
     import_stores_from_excel,
 )
-from services.store_clone import batch_clone, clone_store, get_clone_preview
+from services.tx_org.src.services.store_clone import batch_clone, clone_store, get_clone_preview
 
 from shared.security.src.error_handler import safe_http_exception
 

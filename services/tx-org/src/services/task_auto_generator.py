@@ -37,7 +37,7 @@ from typing import Awaitable, Callable, Optional
 from uuid import UUID
 
 import structlog
-from services.task_dispatch_service import TaskDispatchService
+from services.tx_org.src.services.task_dispatch_service import TaskDispatchService
 
 from shared.ontology.src.extensions.tasks import Task, TaskType
 

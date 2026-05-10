@@ -20,7 +20,7 @@ from typing import Any, List, Optional
 import structlog
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from services.ai_salary_advisor_service import (
+from services.tx_org.src.services.ai_salary_advisor_service import (
     batch_recommend,
     get_region_factors_catalog,
     get_role_tiers_catalog,

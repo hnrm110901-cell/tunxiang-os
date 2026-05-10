@@ -5,7 +5,7 @@ from typing import Optional
 
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
-from services.labor_efficiency_service import (
+from services.tx_org.src.services.labor_efficiency_service import (
     INDUSTRY_BENCHMARKS,
     compare_stores,
     compute_store_efficiency,

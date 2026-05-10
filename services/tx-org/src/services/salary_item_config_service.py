@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import structlog
-from services.salary_item_library import _ITEM_INDEX, STORE_TEMPLATES
+from services.tx_org.src.services.salary_item_library import _ITEM_INDEX, STORE_TEMPLATES
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
