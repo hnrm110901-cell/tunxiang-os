@@ -59,7 +59,7 @@ _ref_svc_mod.ReferralService = MagicMock(return_value=_fake_ref_svc)
 _ref_svc_mod.ReferralError = _ReferralError
 _svc_parent = types.ModuleType("services")
 sys.modules.setdefault("services", _svc_parent)
-sys.modules["services.referral_service"] = _ref_svc_mod
+sys.modules["services.tx_growth.src.services.referral_service"] = _ref_svc_mod
 
 # Stub models.referral (used in create_campaign)
 _models_mod = types.ModuleType("models")
@@ -74,7 +74,7 @@ class _FakeReferralCampaign:
 
 _models_ref_mod.ReferralCampaign = _FakeReferralCampaign
 sys.modules.setdefault("models", _models_mod)
-sys.modules["models.referral"] = _models_ref_mod
+sys.modules["services.tx_growth.src.models.referral"] = _models_ref_mod
 
 # Stub sqlalchemy.ext.asyncio
 _sqla_ext = types.ModuleType("sqlalchemy.ext.asyncio")

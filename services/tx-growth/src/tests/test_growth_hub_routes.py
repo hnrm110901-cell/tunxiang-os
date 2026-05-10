@@ -99,7 +99,7 @@ class _FakeGrowthProfileService:
 
 
 _profile_svc_mod.GrowthProfileService = _FakeGrowthProfileService
-sys.modules["services.growth_profile_service"] = _profile_svc_mod
+sys.modules["services.tx_growth.src.services.growth_profile_service"] = _profile_svc_mod
 
 # ── stub: services.growth_journey_service ────────────────────────────────────
 _journey_svc_mod = _types.ModuleType("services.growth_journey_service")
@@ -138,7 +138,7 @@ class _FakeGrowthJourneyService:
 
 
 _journey_svc_mod.GrowthJourneyService = _FakeGrowthJourneyService
-sys.modules["services.growth_journey_service"] = _journey_svc_mod
+sys.modules["services.tx_growth.src.services.growth_journey_service"] = _journey_svc_mod
 
 # ── stub: services.growth_touch_service ──────────────────────────────────────
 _touch_svc_mod = _types.ModuleType("services.growth_touch_service")
@@ -159,7 +159,7 @@ class _FakeGrowthTouchService:
 
 
 _touch_svc_mod.GrowthTouchService = _FakeGrowthTouchService
-sys.modules["services.growth_touch_service"] = _touch_svc_mod
+sys.modules["services.tx_growth.src.services.growth_touch_service"] = _touch_svc_mod
 
 # ── stub: services.growth_repair_service ─────────────────────────────────────
 _repair_svc_mod = _types.ModuleType("services.growth_repair_service")
@@ -183,7 +183,7 @@ class _FakeGrowthRepairService:
 
 
 _repair_svc_mod.GrowthRepairService = _FakeGrowthRepairService
-sys.modules["services.growth_repair_service"] = _repair_svc_mod
+sys.modules["services.tx_growth.src.services.growth_repair_service"] = _repair_svc_mod
 
 # ── stub: services.growth_suggestion_service ─────────────────────────────────
 _suggestion_svc_mod = _types.ModuleType("services.growth_suggestion_service")
@@ -207,7 +207,7 @@ class _FakeGrowthSuggestionService:
 
 
 _suggestion_svc_mod.GrowthSuggestionService = _FakeGrowthSuggestionService
-sys.modules["services.growth_suggestion_service"] = _suggestion_svc_mod
+sys.modules["services.tx_growth.src.services.growth_suggestion_service"] = _suggestion_svc_mod
 
 # ── stub: services.growth_brand_service ─────────────────────────────────────
 _brand_svc_mod = _types.ModuleType("services.growth_brand_service")
@@ -231,7 +231,7 @@ class _FakeGrowthBrandService:
 
 
 _brand_svc_mod.GrowthBrandService = _FakeGrowthBrandService
-sys.modules["services.growth_brand_service"] = _brand_svc_mod
+sys.modules["services.tx_growth.src.services.growth_brand_service"] = _brand_svc_mod
 
 # ── stub: services.growth_experiment_service ────────────────────────────────
 _experiment_svc_mod = _types.ModuleType("services.growth_experiment_service")
@@ -255,7 +255,7 @@ class _FakeGrowthExperimentService:
 
 
 _experiment_svc_mod.GrowthExperimentService = _FakeGrowthExperimentService
-sys.modules["services.growth_experiment_service"] = _experiment_svc_mod
+sys.modules["services.tx_growth.src.services.growth_experiment_service"] = _experiment_svc_mod
 
 # ── stub: services.growth_cross_brand_service ──────────────────────────────
 _cross_brand_svc_mod = _types.ModuleType("services.growth_cross_brand_service")
@@ -276,7 +276,7 @@ class _FakeGrowthCrossBrandService:
 
 
 _cross_brand_svc_mod.GrowthCrossBrandService = _FakeGrowthCrossBrandService
-sys.modules["services.growth_cross_brand_service"] = _cross_brand_svc_mod
+sys.modules["services.tx_growth.src.services.growth_cross_brand_service"] = _cross_brand_svc_mod
 
 # ── stub: services.growth_store_capability_service ─────────────────────────
 _store_cap_svc_mod = _types.ModuleType("services.growth_store_capability_service")
@@ -297,7 +297,7 @@ class _FakeGrowthStoreCapabilityService:
 
 
 _store_cap_svc_mod.GrowthStoreCapabilityService = _FakeGrowthStoreCapabilityService
-sys.modules["services.growth_store_capability_service"] = _store_cap_svc_mod
+sys.modules["services.tx_growth.src.services.growth_store_capability_service"] = _store_cap_svc_mod
 
 # ── stub: services.weather_signal_proxy ────────────────────────────────────
 _weather_svc_mod = _types.ModuleType("services.weather_signal_proxy")
@@ -312,7 +312,7 @@ class _FakeWeatherSignalService:
 
 
 _weather_svc_mod.WeatherSignalService = _FakeWeatherSignalService
-sys.modules["services.weather_signal_proxy"] = _weather_svc_mod
+sys.modules["services.tx_growth.src.services.weather_signal_proxy"] = _weather_svc_mod
 
 # ── stub: services.calendar_signal_proxy ───────────────────────────────────
 _calendar_svc_mod = _types.ModuleType("services.calendar_signal_proxy")
@@ -330,7 +330,7 @@ class _FakeCalendarSignalService:
 
 
 _calendar_svc_mod.CalendarSignalService = _FakeCalendarSignalService
-sys.modules["services.calendar_signal_proxy"] = _calendar_svc_mod
+sys.modules["services.tx_growth.src.services.calendar_signal_proxy"] = _calendar_svc_mod
 
 # ── stub: seeds.growth_offer_seeds ─────────────────────────────────────────
 _seeds_mod = _types.ModuleType("seeds")

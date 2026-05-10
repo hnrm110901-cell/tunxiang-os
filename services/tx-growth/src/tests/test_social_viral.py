@@ -639,8 +639,8 @@ _reward_svc_mod.DualRewardError = _FakeDualRewardError
 
 _svc_parent = types.ModuleType("services")
 sys.modules["services"] = _svc_parent
-sys.modules["services.group_deal_service"] = _deal_svc_mod
-sys.modules["services.dual_reward_service"] = _reward_svc_mod
+sys.modules["services.tx_growth.src.services.group_deal_service"] = _deal_svc_mod
+sys.modules["services.tx_growth.src.services.dual_reward_service"] = _reward_svc_mod
 
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
