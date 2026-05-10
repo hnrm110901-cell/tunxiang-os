@@ -100,6 +100,41 @@ pytest services/$SVC/src/tests -q  # 必绿
 | 80 | Tier 1 修复优先 AST 静态扫，不写脆弱 mock |
 | 83 | 每服务首接入 codemod chain 需建 `services/<svc>/conftest.py`（标准模板见任一已建服务） |
 
+## Review 流程沉淀（5/10 决策 77 完工反向收割）
+
+> 来源：5/10 晚上 #355 / #358 review-fix wave 2（review-found 漏抓 namespace），用 code-reviewer
+> agent 独立审 + B 选项止线（真 BUG only）。两条流程 lesson 直接影响后续 codemod review 应不应
+> 该 inline-fix vs follow-up，独立沉淀避免下次重判。
+
+### 流程 1：MUST FIX vs SHOULD CONSIDER 边界
+
+reviewer 把"漏抓 namespace"列 SHOULD CONSIDER + 建议独立 issue（属 codemod tooling 改进
+范畴），但 codemod **任务定义**是覆盖**所有 production 裸 namespace**（不仅
+services/models/workers/repositories/api 五个标准 namespace）。
+
+**裁决标准**：
+
+- 任务定义内的漏抓 → **MUST FIX 当 PR 内修**（codemod 不完整即不算完工，决策 79 不适用）
+- 任务定义外暴露的 prod BUG → **SHOULD CONSIDER follow-up issue**（决策 79 适用）
+
+**实例**：tx-growth `engine` / `templates` / `seeds` 9 处漏抓 + tx-intel `adapters` 5 处漏抓
+均属任务定义内 → 各 PR 加 commit 4 当 PR 内修，不拆 follow-up。
+
+### 流程 2：mock binding fix 并入 PR（决策 79 边缘判定）
+
+`fake_svc.X = AsyncMock(...)` → `.return_value = ...` 的 1-line trivial 改在 codemod PR 中
+属"latent bug 借 codemod 暴露"：codemod 切换 production import 路径后，router once-bind
+captures 出旧实例，导致 test 中 `fake_svc.X = AsyncMock(...)` 重新赋值无效（router 仍
+持旧 bind）。
+
+**裁决标准**：
+
+- 修是 codemod 直接副作用一致性维护（不修 codemod 自带 test 即红） → **并入原 PR**
+- 修非 codemod 直接相关、属独立 prod 行为 BUG → **独立 follow-up PR**（决策 79）
+
+**实例**：#356 mock binding 1-line 修并入 PR，比独立 follow-up 价值高（避免审 review +
+PR overhead 8 倍于 1 行 fix）。
+
 ## 历史 PR 链
 
 - #298 issue 元 PR（trace + baseline 路径）
