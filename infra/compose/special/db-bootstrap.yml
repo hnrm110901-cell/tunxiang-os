@@ -1,0 +1,179 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 屯象OS — db-bootstrap overlay (Phase 4a-5 docker-compose 集成)
+#
+# 提供 `migrate` 一次性 service：在 postgres ready 后跑 scripts/db-bootstrap.sh
+# 拉起完整 schema (init-rls.sql + init-pgvector.sql + 18 个 alembic upgrade head)。
+#
+# 用法（dev / 演示 / 新机房）：
+#
+#   docker compose \
+#     -f infra/compose/base.yml \
+#     -f infra/compose/envs/dev.yml \
+#     -f infra/compose/special/db-bootstrap.yml \
+#     up -d
+#
+# 行为：
+#   - postgres 启动 + health-check 通过 → migrate 启动
+#   - migrate 跑 ./scripts/db-bootstrap.sh --skip-create（DB 已由 POSTGRES_DB 创建）
+#   - 21 services 等待 migrate 跑完才启动（service_completed_successfully）
+#   - migrate 完成后 exit 0，restart: no（一次性）
+#
+# 不在范围（生产部署）：
+#   - 生产用 GitOps + 单独 migrate Job/CronJob，不通过 docker-compose
+#   - 仅在 dev / staging / demo / new-tenant 一键部署场景使用本 overlay
+#   - 不在 envs/prod.yml 启用此 overlay
+#
+# Phase 4a-1 audit 中无 alembic shell 但 base.yml 仍部署的 service
+# （tx-civic / tx-devforge / tx-forge / mcp-server 等）仍 depends_on postgres
+# + migrate 完成（防它们对 cross-service 表的运行时依赖）。
+# tx-indonesia / tx-vietnam 仅在 services/ 有 src + db-migrations，无 Dockerfile，
+# 不部署为 runtime service — 不在本 overlay depends_on 列表。
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── 一次性迁移 service ──
+  migrate:
+    image: python:3.11-slim
+    container_name: tunxiang-migrate
+    working_dir: /app
+    volumes:
+      # docker-compose v2 实测：volume 相对路径从首个 `-f` 文件所在目录解析（即
+      # base.yml 在 infra/compose/，所以 `../..` = 项目根），不是各文件自己的目录。
+      # 与 base.yml 的 `context: ../..` 保持一致。
+      - ../..:/app:ro
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-tunxiang}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:-tunxiang_os}"
+      PARALLEL_JOBS: "${MIGRATE_PARALLEL_JOBS:-4}"
+    command: >
+      bash -c "
+        set -e
+        echo '[migrate] 安装 alembic + psycopg2 + postgresql-client'
+        apt-get update -qq >/dev/null
+        apt-get install -qq -y --no-install-recommends postgresql-client >/dev/null
+        # 版本 pin 与 services/*/requirements.txt 对齐（alembic>=1.13 / sqlalchemy>=2.0
+        # / psycopg2-binary 默认稳定）；防 `up` 时拉到不兼容新版本
+        pip install -q --no-cache-dir 'alembic==1.13.*' 'sqlalchemy[asyncio]==2.0.*' 'psycopg2-binary==2.9.*'
+        echo '[migrate] 跑 db-bootstrap.sh --skip-create'
+        ./scripts/db-bootstrap.sh --skip-create
+      "
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-base}"
+      tunxiang.role: "migrate"
+
+  # ── 21 services 等 migrate 跑完 ──
+  # 用 YAML override 给每个 service 加 depends_on.migrate.condition。
+  # base.yml 里现有的 depends_on (postgres + redis) 与本文件 merge — 见
+  # docker-compose merge 规则：depends_on 字典深度合并。
+
+  gateway:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-trade:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-menu:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-member:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-growth:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-ops:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-supply:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-finance:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-agent:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-analytics:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-brain:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-intel:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-org:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-civic:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-pay:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-expense:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # tx-malaysia 不在 base.yml 中（只有 src + db-migrations，无 Dockerfile / 不部署
+  # 为 runtime service）— migrate 仍会跑其 alembic shell，但无 service 容器需 depends_on
+  tx-predict:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-devforge:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tx-forge:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  tunxiang-api:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  mcp-server:
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
