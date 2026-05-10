@@ -136,31 +136,44 @@ CREATE_POLICY_RE = re.compile(
     r"CREATE\s+POLICY\s+\w+\s+ON\s+([a-zA-Z_][a-zA-Z0-9_]*)",
     re.IGNORECASE,
 )
-# 本 codebase 专用 helper：_apply_safe_rls("table_name") / _enable_rls("table_name")
+# 本 codebase 专用 helper：_apply_safe_rls / _enable_rls / _apply_rls
+# (后者由 v407/v408/v409 chain rescue revive PR 系列引入，命名变体)
 # 等价于 ENABLE RLS + CREATE POLICY；string literal 直接传入
 APPLY_RLS_CALL_RE = re.compile(
-    r"(?:_apply_safe_rls|_enable_rls)\s*\(\s*['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]",
+    r"(?:_apply_safe_rls|_enable_rls|_apply_rls)\s*\(\s*['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]",
 )
 # 间接调用：_TABLE = "table_name" + _apply_safe_rls(_TABLE)（v374/v375 模式）
 TABLE_CONST_RE = re.compile(
     r"^_TABLE\s*=\s*['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]",
     re.MULTILINE,
 )
-APPLY_RLS_INDIRECT_RE = re.compile(r"(?:_apply_safe_rls|_enable_rls)\s*\(\s*_TABLE\s*\)")
+APPLY_RLS_INDIRECT_RE = re.compile(r"(?:_apply_safe_rls|_enable_rls|_apply_rls)\s*\(\s*_TABLE\s*\)")
+# list 循环调用：_NEW_TABLES = [...] + for t in _NEW_TABLES: _apply_rls(t)
+# (v057 / v346 / v408 模式)
+NEW_TABLES_LIST_RE = re.compile(
+    r"^_NEW_TABLES\s*=\s*\[(.*?)\]",
+    re.DOTALL | re.MULTILINE,
+)
+APPLY_RLS_LIST_LOOP_RE = re.compile(
+    r"for\s+\w+\s+in\s+_NEW_TABLES\s*:\s*[^\n]*\n\s*(?:_apply_safe_rls|_enable_rls|_apply_rls)\s*\(",
+)
+LIST_STRING_LITERAL_RE = re.compile(r"['\"]([a-zA-Z_][a-zA-Z0-9_]*)['\"]")
 
 
 def _scan_migration(source: str) -> tuple[set[str], set[str], set[str]]:
     """扫一份 migration 源文件，返回 (创建的表, 启用 RLS 的表, 建 policy 的表)
 
-    识别三种 RLS 启用模式：
+    识别四种 RLS 启用模式：
     1. 静态 SQL：ALTER TABLE <name> ENABLE ROW LEVEL SECURITY
-    2. 直接 helper 调用：_apply_safe_rls("name") / _enable_rls("name")
+    2. 直接 helper 调用：_apply_safe_rls("name") / _enable_rls("name") / _apply_rls("name")
     3. 间接 helper 调用：_TABLE = "name" + _apply_safe_rls(_TABLE)（v374/v375 模式）
+    4. list 循环调用：_NEW_TABLES = [...] + for t in _NEW_TABLES: _apply_rls(t)
+       (v057 / v346 / v408 模式)
     """
     created = {m.group(1).lower() for m in CREATE_TABLE_RE.finditer(source)}
     rls_enabled = {m.group(1).lower() for m in ENABLE_RLS_RE.finditer(source)}
     policies = {m.group(1).lower() for m in CREATE_POLICY_RE.finditer(source)}
-    # 模式2：_apply_safe_rls("name") / _enable_rls("name")
+    # 模式2：_apply_safe_rls("name") / _enable_rls("name") / _apply_rls("name")
     for m in APPLY_RLS_CALL_RE.finditer(source):
         table = m.group(1).lower()
         rls_enabled.add(table)
@@ -168,6 +181,13 @@ def _scan_migration(source: str) -> tuple[set[str], set[str], set[str]]:
     # 模式3：_TABLE = "name" + _apply_safe_rls(_TABLE)
     if APPLY_RLS_INDIRECT_RE.search(source):
         for m in TABLE_CONST_RE.finditer(source):
+            table = m.group(1).lower()
+            rls_enabled.add(table)
+            policies.add(table)
+    # 模式4：_NEW_TABLES = [...] + for X in _NEW_TABLES: _apply_rls(X)
+    list_match = NEW_TABLES_LIST_RE.search(source)
+    if list_match and APPLY_RLS_LIST_LOOP_RE.search(source):
+        for m in LIST_STRING_LITERAL_RE.finditer(list_match.group(1)):
             table = m.group(1).lower()
             rls_enabled.add(table)
             policies.add(table)
