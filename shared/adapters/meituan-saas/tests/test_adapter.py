@@ -1,33 +1,15 @@
 """
 美团SAAS适配器单元测试 - 重点覆盖 to_order() 和 to_staff_action()
+
+path / env 设置在 conftest.py 集中。
 """
-
-import os
-import sys
-
-# 必须在 import src 前设置环境变量（避免 pydantic-settings 校验失败）
-os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://test:test@localhost/test")
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
-os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
-
-# 确保 repo root 在 sys.path（用于 schema 导入）
-_here = os.path.dirname(__file__)
-_repo_root = os.path.abspath(os.path.join(_here, "../../../.."))
-_gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
-if _gateway_src not in sys.path:
-    sys.path.insert(0, _gateway_src)
 
 from datetime import datetime
 from decimal import Decimal
 
 import pytest
 
-# 将 meituan-saas/src 加入 path
-_adapter_src = os.path.abspath(os.path.join(_here, "../src"))
-if _adapter_src not in sys.path:
-    sys.path.insert(0, _adapter_src)
-
-from adapter import MeituanSaasAdapter
+from src.adapter import MeituanSaasAdapter
 
 
 @pytest.fixture
