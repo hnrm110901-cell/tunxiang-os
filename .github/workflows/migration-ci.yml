@@ -141,6 +141,7 @@ jobs:
               shared/db-migrations/tests/test_schema_lint_tier1.py \
               shared/db-migrations/tests/test_per_service_shells_tier1.py \
               shared/db-migrations/tests/test_chain_integrity_tier1.py \
+              shared/db-migrations/tests/test_orm_migration_drift_tier1.py \
               -v --tb=short
 
       - name: PG.7 — UPDATE/ALL policies must include WITH CHECK
