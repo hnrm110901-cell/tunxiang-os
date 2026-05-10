@@ -88,7 +88,11 @@ from typing import Sequence, Union
 from alembic import op
 
 revision: str = "v388"
-down_revision: Union[str, Sequence[str], None] = "v387"
+# Chain repair (2026-05-09, B'): 原 down_revision = "v387" 与 v388_id_market.py
+# 撞 v388 ID。已把 v388_id_market 重命名为唯一 revision "v388_id_market" 并插入
+# v387 之后；本文件改 down_revision 指向新插入的 v388_id_market，链路成为
+# v387 → v388_id_market → v388 (fill_rls) → v389_vn_market（不变）。
+down_revision: Union[str, Sequence[str], None] = "v388_id_market"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

@@ -1,3 +1,35 @@
+## 2026-05-09 上午 · B' alembic chain dangling refs 修复
+
+### 完成状态
+- [x] chain integrity 静态测试（4 项 Tier 1）：dup / dangling / 单 head / 单 root，TDD red→green 留痕
+- [x] 4 处迁移文件元数据修复（v310 / v311 / v388_id_market 重命名 / v388_fill_rls_26_tables）
+- [x] `scripts/check_alembic_chain.py` 的 `KNOWN_BROKEN_PARENTS` / `KNOWN_BROKEN_CHILDREN` 排空（保留 scope-guard 机制）
+- [x] PJ.5 scope-guard scenario 测试用合成 fixture 重构，1 snapshot 测试改排空语义
+- [x] `docs/migration-chain-debt.md` 标 3 处债务清零
+- [x] DEVLOG / progress 同步
+- [ ] 4 个预存 SQL bug 修复（独立 issue/PR，非 B' 范畴）
+- [ ] A 任务 docker-compose-pg fixture（前置依赖未解锁，待 SQL bug 修齐）
+
+### 关键决策
+- **v310 真前置选 v304**（不选 v167b/v383）：(a) v304 在 PR #128 引入时是 active head，(b) 与 mv 索引语义无依赖冲突，(c) 不跨太大 v3xx 段产生回退困惑
+- **v388 重命名而非反向（不让 fill_rls 改 ID）**：v388_id_market 引入时已撞 ID，链路重排 `v387 → v388_id_market → v388 → v389`，v389.down_revision 不变（仍指 v388 fill_rls）
+- **PJ.5 scope-guard 排空但保留**：机制对未来新 dangling 仍然有效（防止 v406 之后再积累债），用合成 fixture 测试不依赖磁盘内容
+- **B' 仅修 chain，不修下游 SQL bug**：保 PR diff ≤ 200 行可审；下游 SQL bug 是独立工程
+- **侦察 (option 3) 替代盲目 ship**：跑 1 次 alembic upgrade head 暴露 4 个 SQL bug + 估算总量，让 user 选 A/B/C/D
+
+### 下一步
+- 4 个独立 SQL bug 立 issue（按 ROI 1>2>3>4）
+- 评估 v287→v406 增量摸排或 pg_dump pivot
+- dev-plan-60d 5/7 重写
+
+### 已知风险
+- **侦察样本偏小**：外推 v287→v406 还有 5-10+ unknown bug 是估计，可能更多或更少
+- **B' 改动包含 revision ID 重命名**：`v388_id_market.py` 的 revision 由 `"v388"` → `"v388_id_market"`。若任何环境（dev/staging/test PG）已 stamp 过 `v388` 指向 v388_id_market，需要 `UPDATE alembic_version SET version_num='v388_id_market' WHERE version_num='v388' AND <某条件区分>`。但因 chain 一直断在 v310，新 DB 从未走到 v388，所以实际风险低（生产从未跑过这条链）。文档中已说明
+- **v310 真前置历史考据**：选 v304 是合理猜测，没有 PR #128 作者明确证词。若原意是别的 v3xx，对生产无影响（chain 重排不动 schema），但版本化语义可能与作者意图不符
+- **A 任务仍 blocked**：B' 不解锁 A，只解锁"能发现下游 bug"
+
+---
+
 ## 2026-05-09 凌晨 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 完成状态
