@@ -170,12 +170,16 @@ vs 业务改动 → false positive。
 真门禁验证全绿（决策 78）后 admin-squash merge。main 完全无 branch protection 是 admin-merge
 机制可用前提；未来若启用 protection 需另议。
 
-**根治 follow-up（独立 issue，不在本 codemod chain 主线）**：
+**根治 follow-up**：
 
-- 给 `tier1-gate` 加 import-only carve-out：检测 diff hunk 是否仅 import / from 行（比如非空
-  非注释行 100% 匹配 `^[+-].*(?:from |import )`），若是则跳过测试配对要求
-- 或：PR title prefix `[codemod]` 显式 skip
-- 属 CI infra 工作，与本文档侧重 codemod 完整性不在同一 lane，独立 issue 立后再修
+- ✅ **方案 1 已落地（issue #417）**：`tier1-gate` 加 import-only carve-out。
+  `scripts/ci/detect_import_only_diff.py` 扫 PR diff，所有改动行必须为 from/import / 注释 /
+  空白，且至少有一行真 import 改动；满足则跳过 `源改动必须配对测试改动` 校验。17 单测覆盖：
+  纯 from/import 切换 / 缩进 lazy import / PEP 328 相对 import / import 删除 / 多文件混合 /
+  业务改 / docstring / 注释 / stub key setdefault / 非 .py 文件 / 多行括号续行（保守 false）/
+  无效 SHA。
+- 🔜 **方案 2 兜底（未实施）**：PR title prefix `[codemod]` 显式 skip — 留作未来逃生通道，
+  当方案 1 检测漏（如 AST 解析能力不足）时人工干预
 
 ## 历史 PR 链
 
