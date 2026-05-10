@@ -217,10 +217,14 @@ class ChannelIdentityResolver:
         *,
         confidence: float = 1.0,
         source: Optional[str] = None,
-    ) -> None:
+    ) -> UUID:
         """upsert 一条 identity 记录，关联到给定 member_id。
 
         同业务键再次 link → 更新 last_seen_at + confidence（取大值）。
+        返回 DB 实际生效的 member_id：
+          - 新插入时 == 传入的 member_id
+          - ON CONFLICT 时 == DB 已有行的 member_id（保留先到者）
+        get_or_create_member 依赖此返回值识别并发 race。
         """
         self._validate(identity_type, platform)
         if not 0 <= confidence <= 1:
@@ -229,7 +233,7 @@ class ChannelIdentityResolver:
             )
         identity_hash = hash_identity(identity_type, value, salt=self._salt)
 
-        await self._session.execute(
+        result = await self._session.execute(
             text(f"""
                 INSERT INTO {self._TABLE}
                     (tenant_id, member_id, identity_type, identity_value_hash,
@@ -244,6 +248,7 @@ class ChannelIdentityResolver:
                         {self._TABLE}.confidence, EXCLUDED.confidence
                     ),
                     updated_at = NOW()
+                RETURNING member_id
             """),
             {
                 "tenant_id": str(tenant_id),
@@ -255,15 +260,18 @@ class ChannelIdentityResolver:
                 "source": source,
             },
         )
+        row = result.mappings().first()
+        actual_member_id = row["member_id"]
         logger.info(
             "channel_identity_linked",
             tenant_id=str(tenant_id),
-            member_id=str(member_id),
+            member_id=str(actual_member_id),
             identity_type=identity_type,
             platform=platform,
             confidence=confidence,
             source=source,
         )
+        return actual_member_id
 
     async def get_or_create_member(
         self,
@@ -278,6 +286,10 @@ class ChannelIdentityResolver:
 
         返回 (member_id, was_created)。
         was_created=True 表示这一调用新建了 member（调用方可能需要后续填充 customer 主表）。
+
+        并发 race 安全：resolve→link 之间如果有并发 caller 抢先 INSERT，
+        link() 的 ON CONFLICT 会保留先到者的 member_id，本调用通过 RETURNING
+        感知并返回 DB 真实值（而非本地 uuid4 candidate），was_created=False。
         """
         existing = await self.resolve(tenant_id, identity_type, value, platform)
         if existing is not None:
@@ -287,12 +299,13 @@ class ChannelIdentityResolver:
             )
             return existing, False
 
-        new_member_id = uuid4()
-        await self.link(
-            tenant_id, new_member_id, identity_type, value, platform,
+        candidate_member_id = uuid4()
+        actual_member_id = await self.link(
+            tenant_id, candidate_member_id, identity_type, value, platform,
             source=source,
         )
-        return new_member_id, True
+        was_created = actual_member_id == candidate_member_id
+        return actual_member_id, was_created
 
     async def list_member_identities(
         self, tenant_id: UUID, member_id: UUID
