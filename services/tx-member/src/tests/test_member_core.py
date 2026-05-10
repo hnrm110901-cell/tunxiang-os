@@ -141,7 +141,7 @@ _svc_module.PlanNotFoundError = PlanNotFoundError
 _svc_module.TransferNotAllowedError = TransferNotAllowedError
 
 sys.modules.setdefault("services", types.ModuleType("services"))
-sys.modules["services.stored_value_service"] = _svc_module
+sys.modules["services.tx_member.src.services.stored_value_service"] = _svc_module
 
 # ─── 注入 ..services.stored_value_service（相对导入路径，for stored_value_routes） ─
 

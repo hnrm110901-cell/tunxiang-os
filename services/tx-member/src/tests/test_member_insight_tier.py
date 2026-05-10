@@ -92,7 +92,7 @@ def _inject_stubs():
     )
     rfm_updater_mod.RFMUpdater = MagicMock(return_value=_mock_rfm_updater)
     sys.modules.setdefault("workers", types.ModuleType("workers"))
-    sys.modules["workers.rfm_updater"] = rfm_updater_mod
+    sys.modules["services.tx_member.src.workers.rfm_updater"] = rfm_updater_mod
 
     # services.platform_binding_service（platform_routes 用裸路径导入）
     _mock_pbs = MagicMock()
@@ -106,7 +106,7 @@ def _inject_stubs():
     pbs_mod = types.ModuleType("services.platform_binding_service")
     pbs_mod.PlatformBindingService = MagicMock(return_value=_mock_pbs)
     sys.modules.setdefault("services", types.ModuleType("services"))
-    sys.modules["services.platform_binding_service"] = pbs_mod
+    sys.modules["services.tx_member.src.services.platform_binding_service"] = pbs_mod
 
     return _mock_rfm_updater, _mock_pbs
 

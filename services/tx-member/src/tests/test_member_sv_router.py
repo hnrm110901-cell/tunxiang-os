@@ -88,7 +88,7 @@ _sv_models_mod = types.ModuleType("models.stored_value")
 _sv_models_mod.StoredValueCard = _FakeStoredValueCard
 _sv_models_mod.StoredValueTransaction = _FakeStoredValueTransaction
 _ensure_pkg("models")
-sys.modules["models.stored_value"] = _sv_models_mod
+sys.modules["services.tx_member.src.models.stored_value"] = _sv_models_mod
 
 
 # ─── 异常类定义（与 StoredValueService 使用的同名异常） ──────────────────────────
@@ -132,7 +132,7 @@ _svc_mod.CardNotActiveError = CardNotActiveError
 _svc_mod.CardNotFoundError = CardNotFoundError
 _svc_mod.InsufficientBalanceError = InsufficientBalanceError
 _ensure_pkg("services")
-sys.modules["services.stored_value_service"] = _svc_mod
+sys.modules["services.tx_member.src.services.stored_value_service"] = _svc_mod
 
 
 # ─── structlog 存根 ────────────────────────────────────────────────────────────
