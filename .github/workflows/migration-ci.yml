@@ -7,6 +7,8 @@ on:
       - 'shared/db-migrations/**'
       - 'shared/db-migrations-core/**'
       - 'services/*/db-migrations/**'
+      - 'services/*/src/models/**'
+      - 'shared/ontology/src/**'
       - '.github/workflows/migration-ci.yml'
   pull_request:
     branches: [main]
@@ -14,6 +16,8 @@ on:
       - 'shared/db-migrations/**'
       - 'shared/db-migrations-core/**'
       - 'services/*/db-migrations/**'
+      - 'services/*/src/models/**'
+      - 'shared/ontology/src/**'
       - 'scripts/migrate-all.sh'
       - 'scripts/db-bootstrap.sh'
       - '.github/workflows/migration-ci.yml'
