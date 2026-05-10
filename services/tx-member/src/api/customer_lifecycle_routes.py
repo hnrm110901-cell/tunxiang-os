@@ -22,8 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 
 try:
-    from repositories.customer_lifecycle_repo import CustomerLifecycleRepository
-    from services.customer_lifecycle_fsm import CustomerLifecycleFSM
+    from services.tx_member.src.repositories.customer_lifecycle_repo import CustomerLifecycleRepository
+    from services.tx_member.src.services.customer_lifecycle_fsm import CustomerLifecycleFSM
 except ImportError:  # pragma: no cover
     from ..repositories.customer_lifecycle_repo import (  # type: ignore[no-redef]
         CustomerLifecycleRepository,

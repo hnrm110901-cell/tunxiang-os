@@ -63,7 +63,7 @@ from shared.ontology.src.extensions.customer_lifecycle import (
 
 try:
     # 运行态（tx-member 以 src/ 为 cwd 时）—— 绝对导入
-    from repositories.customer_lifecycle_repo import CustomerLifecycleRepository
+    from services.tx_member.src.repositories.customer_lifecycle_repo import CustomerLifecycleRepository
 except ImportError:  # pragma: no cover
     # 包装态（作为 tunxiang_os.services.tx_member.src 导入）—— 相对导入兜底
     from ..repositories.customer_lifecycle_repo import CustomerLifecycleRepository  # type: ignore[no-redef]

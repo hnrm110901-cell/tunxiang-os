@@ -58,7 +58,7 @@ async def receive_probe(
     results = []
     for p in body.probes:
         # 内存模式：记录到内存，生产环境替换为DB
-        from services.wifi_probe_service import _detect_vendor, _hash_mac
+        from services.tx_member.src.services.wifi_probe_service import _detect_vendor, _hash_mac
 
         mac_hash = _hash_mac(p.mac_address)
         vendor = _detect_vendor(p.mac_address)
