@@ -109,9 +109,11 @@ if _ASYNC_DEPS_AVAILABLE:
             pool_size=2,
             max_overflow=1,
         )
-        # 一次性创建 non-superuser role + GRANT
-        async with engine.connect() as conn:
-            await conn.execution_options(isolation_level="AUTOCOMMIT")
+        # 一次性创建 non-superuser role + GRANT。
+        # CREATE ROLE / GRANT 是 DDL，用 engine.begin() 显式事务包裹（每 fixture 一个 txn）。
+        # 不用 `connect() + execution_options(AUTOCOMMIT)`（已知 SQLAlchemy 2.x async
+        # 对此不修改原 conn，依赖 driver 隐式行为，post-review 已修）。
+        async with engine.begin() as conn:
             await conn.execute(text(f"""
                 DO $do$
                 BEGIN
@@ -124,7 +126,6 @@ if _ASYNC_DEPS_AVAILABLE:
                 await conn.execute(text(
                     f"GRANT SELECT, INSERT, UPDATE, DELETE ON {tbl} TO {_RLS_TEST_ROLE}"
                 ))
-            await conn.commit()
         try:
             yield engine
         finally:

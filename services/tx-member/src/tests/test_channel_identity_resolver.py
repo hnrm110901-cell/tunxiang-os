@@ -339,3 +339,43 @@ async def test_get_or_create_member_existing_match_returns_was_created_false():
     )
     assert actual_id == existing_member_id
     assert was_created is False
+
+
+async def test_get_or_create_member_existing_branch_uses_link_returning():
+    """existing 分支必须使用 link() 的 RETURNING 真实值（而非本地 resolve() 结果）。
+
+    防御 #412 race fix 的"另一面"漏洞：
+      - T0: resolve() → uuid_A（行存在，DB 当前 member_id=uuid_A）
+      - T1: 并发或 admin 操作改了 member_id（成员合并 / hard delete + 重插）
+            DB 当前 member_id=uuid_X
+      - T2: 我侧 link(existing=uuid_A) ON CONFLICT DO UPDATE，UPDATE SET 不含
+            member_id 列，RETURNING 返 uuid_X（DB 真实值）
+      - T3: existing 分支必须返回 uuid_X，不能返回 resolve() 时拍到的 uuid_A
+
+    若 caller 拿 uuid_A 写到 orders.member_id → 错位失真（与 PR #412 同种 BUG）。
+    """
+    from unittest.mock import AsyncMock, MagicMock
+    from uuid import uuid4
+    from services.channel_identity_resolver import ChannelIdentityResolver
+
+    resolved_id = uuid4()      # T0 resolve() 看到的 uuid
+    db_actual_id = uuid4()      # T1 后 DB 真实值（admin/race 改过）
+
+    fake_session = MagicMock()
+    fake_session.execute = AsyncMock(side_effect=[
+        _make_mock_row(resolved_id),    # resolve() → uuid_A
+        _make_mock_row(db_actual_id),    # link() RETURNING → uuid_X (DB 真实)
+    ])
+
+    resolver = ChannelIdentityResolver(fake_session, salt=SALT)
+    actual_id, was_created = await resolver.get_or_create_member(
+        tenant_id=uuid4(),
+        identity_type="phone",
+        value="13900001111",
+        platform=None,
+    )
+    assert actual_id == db_actual_id, (
+        f"existing 分支必须返回 link() RETURNING 的 DB 真实值 {db_actual_id}，"
+        f"实际返回 {actual_id}（应是本地 resolve 结果 {resolved_id} 或 DB 真实值）"
+    )
+    assert was_created is False

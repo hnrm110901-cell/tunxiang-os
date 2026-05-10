@@ -293,11 +293,13 @@ class ChannelIdentityResolver:
         """
         existing = await self.resolve(tenant_id, identity_type, value, platform)
         if existing is not None:
-            await self.link(
+            # 用 link() 的 RETURNING 真实值（防 admin/race 在 resolve→link 之间
+            # 改动 DB row member_id 的"另一面"漏洞，配套 PR #412 主修复）
+            actual_member_id = await self.link(
                 tenant_id, existing, identity_type, value, platform,
                 source=source,
             )
-            return existing, False
+            return actual_member_id, False
 
         candidate_member_id = uuid4()
         actual_member_id = await self.link(
