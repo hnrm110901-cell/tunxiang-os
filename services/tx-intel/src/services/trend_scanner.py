@@ -51,7 +51,7 @@ class TrendScannerService:
         try:
             import os
 
-            from adapters.douyin_adapter import DouyinAdapter
+            from services.tx_intel.src.adapters.douyin_adapter import DouyinAdapter
 
             adapter = DouyinAdapter(
                 client_key=os.environ.get("DOUYIN_CLIENT_KEY", ""),

@@ -88,14 +88,14 @@ sys.modules["shared.events.src.event_types"] = _evt_types_stub
 # ── services.fund_settlement_service 存根 ────────────────────────────────────
 _FundSettlementServiceMock = MagicMock()
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.fund_settlement_service"] = _make_stub(
+sys.modules["services.tx_finance.src.services.fund_settlement_service"] = _make_stub(
     "services.fund_settlement_service",
     FundSettlementService=_FundSettlementServiceMock,
 )
 
 # ── services.pnl_engine 存根 ─────────────────────────────────────────────────
 _PnLEngineMock = MagicMock()
-sys.modules["services.pnl_engine"] = _make_stub(
+sys.modules["services.tx_finance.src.services.pnl_engine"] = _make_stub(
     "services.pnl_engine",
     PnLEngine=_PnLEngineMock,
 )

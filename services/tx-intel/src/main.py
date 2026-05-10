@@ -12,15 +12,15 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from services.calendar_signal import CalendarSignalService
-from services.competitor_monitor import CompetitorMonitorService
-from services.consumer_insight import ConsumerInsightService
-from services.intel_report_engine import IntelReportEngine
-from services.new_product_radar import NewProductRadar
-from services.pilot_suggestion import PilotSuggestionService
-from services.pricing_insight import PricingInsightService
-from services.review_topic_engine import ReviewTopicEngine
-from services.weather_signal import WeatherSignalService
+from services.tx_intel.src.services.calendar_signal import CalendarSignalService
+from services.tx_intel.src.services.competitor_monitor import CompetitorMonitorService
+from services.tx_intel.src.services.consumer_insight import ConsumerInsightService
+from services.tx_intel.src.services.intel_report_engine import IntelReportEngine
+from services.tx_intel.src.services.new_product_radar import NewProductRadar
+from services.tx_intel.src.services.pilot_suggestion import PilotSuggestionService
+from services.tx_intel.src.services.pricing_insight import PricingInsightService
+from services.tx_intel.src.services.review_topic_engine import ReviewTopicEngine
+from services.tx_intel.src.services.weather_signal import WeatherSignalService
 
 AGENT_SERVICE_URL = os.getenv("AGENT_SERVICE_URL", "http://tx-agent:8008")
 

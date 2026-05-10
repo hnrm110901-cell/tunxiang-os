@@ -33,7 +33,7 @@ from enum import Enum
 from typing import Any, Optional
 
 import structlog
-from models.three_way_match import ThreeWayMatchRecord
+from services.tx_finance.src.models.three_way_match import ThreeWayMatchRecord
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession

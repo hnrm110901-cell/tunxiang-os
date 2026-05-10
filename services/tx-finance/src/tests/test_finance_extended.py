@@ -89,7 +89,7 @@ _vat_svc_stub = _make_stub(
     VALID_INVOICE_TYPES=("vat_special", "vat_ordinary", "electronic_vat_special"),
 )
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.vat_service"] = _vat_svc_stub
+sys.modules["services.tx_finance.src.services.vat_service"] = _vat_svc_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 

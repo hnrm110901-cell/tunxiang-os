@@ -46,7 +46,7 @@ sys.modules["shared.ontology.src.database"] = _db_stub
 # services.channel_pl_calculator 存根
 _calc_cls = MagicMock()
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.channel_pl_calculator"] = _make_stub(
+sys.modules["services.tx_finance.src.services.channel_pl_calculator"] = _make_stub(
     "services.channel_pl_calculator", ChannelPLCalculator=_calc_cls
 )
 

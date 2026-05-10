@@ -37,7 +37,7 @@ from shared.events.src.event_types import StocktakeLossEventType
 # Imports work both in production (relative within tx-supply package) and in
 # tests where src/ is added to sys.path directly. `models` becomes top-level.
 try:
-    from models.stocktake_loss import (  # type: ignore[no-redef]
+    from services.tx_supply.src.models.stocktake_loss import (  # type: ignore[no-redef]
         ALLOWED_TRANSITIONS,
         ApproverRole,
         CaseStatus,

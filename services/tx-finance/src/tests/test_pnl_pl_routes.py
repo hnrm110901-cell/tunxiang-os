@@ -85,7 +85,7 @@ class _FakePnLEngine:
         return _FakePnLResult()
 
 
-sys.modules["services.pnl_engine"].PnLEngine = _FakePnLEngine
+sys.modules["services.tx_finance.src.services.pnl_engine"].PnLEngine = _FakePnLEngine
 
 # ── Mock services.tx_finance.src.services.pl_report (used by pl_routes.py) ─
 for _n in [

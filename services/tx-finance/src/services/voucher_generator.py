@@ -393,7 +393,7 @@ class VoucherGenerator:
         import uuid as _uuid
 
         # 延迟 import 避循环: service 依赖 model 依赖 generator
-        from services.financial_voucher_service import (  # type: ignore
+        from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore
             VoucherCreateInput,
             VoucherLineInput,
         )

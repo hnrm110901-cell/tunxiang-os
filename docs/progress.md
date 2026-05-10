@@ -26,6 +26,31 @@
 
 ---
 
+## 2026-05-11 凌晨 · #358 Tier 1 isinstance 假阴性回修
+
+### 完成状态
+- [x] 定位 PR #358 `Run Tier 1 services/tx-finance/src/tests` 失败根因：production codemod 把 `financial_voucher_service.py` 改 `from services.tx_finance.src.models.voucher` 后，11 个 Tier 1 测试仍 `from models.voucher`，两个 sys.modules 条目 → `isinstance()` 假阴性
+- [x] `services/tx-finance/conftest.py` 加 models/ 子目录模块身份别名：预加载裸路径，把全路径 sys.modules 别名指过去
+- [x] 本地 289 tier1 全绿（修前 11 failed / 278 passed → 修后 0 failed / 289 passed）
+- [x] CI 真 required gates 全绿：`Tier 1 门禁判定` ✅ / `Run Tier 1 services/tx-finance/src/tests` ✅ / `源改动必须配对测试改动` ✅ / 11 个其他 service Tier 1 ✅
+- [x] commit 9eb85ac6 推 #358
+
+### 关键决策
+- **conftest 模块别名 vs 改 8 个测试 import**：选别名 — 范围最小（1 文件 24 行），test-side codemod #349 仍 OPEN，不抢其工作；models/ 是 SQLAlchemy declarative 纯注册元数据，预加载无副作用
+- **范围只限 models/**：services/repositories 等其他子目录有循环 import 风险；仅 models/ 是 isinstance 检查的来源
+- **不在 #358 加测试**：本 fix 不引入新行为（仅恢复 import 路径一致性），无需新 tier1 测试用例
+
+### 下一步
+- 等 #353 / #355 / #356 review（passive，本 session 无主动起手）
+- 新 session 候选 B（60d plan）/ C（DailySummary export）需 user 输入
+- 决策 84 第五轮沉淀：codemod 切换 production import 路径时必须同步检查 models/ 子目录的 isinstance 用法，或在 conftest 加身份别名兜底
+
+### 已知风险
+- **其他服务（tx-org / tx-growth / tx-member / tx-intel / tx-supply）暂未观察到同类失败**：但若未来 codemod 在这些服务的 production source 切换 models import 路径，需同步加 conftest 别名（本 PR 仅给 tx-finance 加）
+- **CI 噪音不影响合入**：`Test Changed Services` / `python-lint-test (*)` / `Ruff` / `frontend-build` 仍红 — 全 PR 一律红的预存漂移，per handoff 可忽略
+
+---
+
 ## 2026-05-10 21:00 · channel-aggregation Phase 0 起手（CH-01/02.5/13 + 28 issue + 4 PR merged）
 
 ### 完成状态

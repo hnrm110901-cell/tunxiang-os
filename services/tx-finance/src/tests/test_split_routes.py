@@ -73,14 +73,14 @@ _split_engine_stub = _make_stub(
     SPLIT_METHODS={"percentage", "fixed_fen"},
 )
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.split_engine"] = _split_engine_stub
+sys.modules["services.tx_finance.src.services.split_engine"] = _split_engine_stub
 
 # ── services.split_notify_security 存根 ──────────────────────────────────────
 _split_notify_stub = _make_stub(
     "services.split_notify_security",
     verify_split_channel_notify_signature=MagicMock(return_value=None),
 )
-sys.modules["services.split_notify_security"] = _split_notify_stub
+sys.modules["services.tx_finance.src.services.split_notify_security"] = _split_notify_stub
 
 # ─── 加载被测路由模块 (必须在存根注册后) ──────────────────────────────────────
 # 修正导入路径: src.api.split_routes 通过相对导入引用 ..services.split_engine

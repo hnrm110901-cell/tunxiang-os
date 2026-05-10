@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from services.waste_guard_service import (
+from services.tx_supply.src.services.waste_guard_service import (
     ROOT_CAUSE_ACTIONS,
     build_top5_item,
     build_waste_rate_summary,

@@ -27,6 +27,34 @@
 
 ---
 
+## 2026-05-11 凌晨 — #358 Tier 1 isinstance 假阴性回修（决策 84 第五轮沉淀）
+
+### 今日完成
+- [tx-finance/conftest.py] 加 models/ 子目录模块身份别名 — 修 #358 production codemod 引入的 `Run Tier 1 services/tx-finance/src/tests` 红
+  - 根因：commit 406f640e 把 `financial_voucher_service.py` 改 `from services.tx_finance.src.models.voucher`，但 11 个 Tier 1 测试（test_financial_voucher_service_tier1.py / test_voucher_period_check_tier1.py 等）仍 `from models.voucher` → 两个 sys.modules 条目，同文件两个类对象，`isinstance()` 假阴性
+  - 方案：conftest 第 3 段，对 `services/tx-finance/src/models/` 每个 .py 预加载 `models.X` 裸模块，把 `services.tx_finance.src.models.X` sys.modules 键别名指过去 — SQLAlchemy declarative 纯元数据，预加载无副作用
+  - 范围最小：1 文件 24 行，不改 8 个 Tier 1 测试 import（test-side codemod #349 仍 OPEN，不抢其工作）
+
+### 数据变化
+- 新增 conftest 别名段：1 处（tx-finance）
+- Tier 1 finance: 修前 11 failed / 278 passed → 修后 0 failed / 289 passed
+- CI 真 required gates 全绿：`Tier 1 门禁判定` ✅ / `Run Tier 1 services/tx-finance/src/tests` ✅ / `源改动必须配对测试改动` ✅ / 11 个其他 service Tier 1 ✅
+
+### 战绩
+- commit 9eb85ac6 → PR #358（codemod 完工后 review-fix 第一波）
+- 决策 84 第五轮沉淀：codemod 切换 production import 路径时必须同步检查 models/ 子目录的 isinstance 用法，或在 conftest 加身份别名兜底（已写入 commit message + 本日志）
+
+### 遗留问题
+- #353 / #355 / #356 仍 OPEN 等 review（passive）
+- 其他服务（tx-org / tx-growth / tx-member / tx-intel / tx-supply）暂未观察到同类 isinstance 失败，但若未来 codemod 在这些服务切换 production source 的 models import 路径，需同步加 conftest 别名
+
+### 明日计划
+- 候选 B（60d plan 重写，需 user 输入方向）
+- 候选 C（DailySummary / Header export 修复，需 user 创始人对齐 §18 ontology）
+- 候选 D（决策 84 第五轮沉淀文档化，可立即起手）
+
+---
+
 ## 2026-05-10 晚上 — channel-aggregation Phase 0 起手（CH-01/02.5/13 + 28 issue + 4 PR merged）
 
 ### 今日完成

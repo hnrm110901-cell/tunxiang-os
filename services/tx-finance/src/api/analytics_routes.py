@@ -6,7 +6,7 @@
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.finance_analytics import (
+from services.tx_finance.src.services.finance_analytics import (
     coupon_cost_analysis,
     discount_structure,
     financial_audit_view,

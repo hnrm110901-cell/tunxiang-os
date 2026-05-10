@@ -18,7 +18,7 @@ from datetime import date, timedelta
 from typing import Optional
 
 import structlog
-from models.budget import Budget, BudgetExecution
+from services.tx_finance.src.models.budget import Budget, BudgetExecution
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

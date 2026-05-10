@@ -17,7 +17,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
-from services.reputation_monitor import ReputationMonitor
+from services.tx_intel.src.services.reputation_monitor import ReputationMonitor
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession

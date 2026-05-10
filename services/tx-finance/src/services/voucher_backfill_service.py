@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import structlog
-from models.voucher import FinancialVoucherLine  # type: ignore
+from services.tx_finance.src.models.voucher import FinancialVoucherLine  # type: ignore
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 

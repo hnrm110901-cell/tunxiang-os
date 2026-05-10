@@ -8,7 +8,7 @@
   POST   /reconciliation/auto-approve                — 自动核销小额差异
 
 注册方式（在 tx-finance/src/main.py 中添加）：
-  from api.reconciliation_routes import router as reconciliation_router
+  from services.tx_finance.src.api.reconciliation_routes import router as reconciliation_router
   app.include_router(reconciliation_router, prefix="/api/v1")
 """
 
@@ -19,7 +19,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from services.three_way_match_engine import (
+from services.tx_finance.src.services.three_way_match_engine import (
     BatchMatchResult,
     MatchResult,
     MatchStatus,
@@ -308,7 +308,7 @@ async def resolve_variance(
         )
         # 手动核销状态改为 resolved（而非 auto_approved）
 
-        from models.three_way_match import ThreeWayMatchRecord
+        from services.tx_finance.src.models.three_way_match import ThreeWayMatchRecord
         from sqlalchemy import update
 
         tid = uuid.UUID(tenant_id)

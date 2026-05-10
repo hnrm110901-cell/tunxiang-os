@@ -14,7 +14,7 @@ from decimal import Decimal
 from typing import Any, Optional
 
 import structlog
-from models.invoice import Invoice
+from services.tx_finance.src.models.invoice import Invoice
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

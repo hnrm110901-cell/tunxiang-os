@@ -151,7 +151,7 @@ _voucher_gen_stub = _make_stub(
     VoucherGenerator=_VoucherGeneratorMock,
 )
 sys.modules.setdefault("services", sys.modules.get("services", _make_stub("services")))
-sys.modules["services.voucher_generator"] = _voucher_gen_stub
+sys.modules["services.tx_finance.src.services.voucher_generator"] = _voucher_gen_stub
 
 # ── services.invoice_service 存根 ────────────────────────────────────────────
 _invoice_mock = MagicMock()
@@ -193,7 +193,7 @@ _invoice_svc_stub = _make_stub(
     InvoiceStatusError=_InvoiceStatusError,
     _invoice_to_dict=_invoice_to_dict,
 )
-sys.modules["services.invoice_service"] = _invoice_svc_stub
+sys.modules["services.tx_finance.src.services.invoice_service"] = _invoice_svc_stub
 
 # ── models.invoice 存根 ───────────────────────────────────────────────────────
 _Invoice = MagicMock()
@@ -202,7 +202,7 @@ _Invoice.tenant_id = MagicMock()
 _models_stub = _make_stub("models")
 _models_invoice_stub = _make_stub("models.invoice", Invoice=_Invoice)
 sys.modules.setdefault("models", _models_stub)
-sys.modules["models.invoice"] = _models_invoice_stub
+sys.modules["services.tx_finance.src.models.invoice"] = _models_invoice_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 import importlib.util

@@ -245,7 +245,7 @@ async def trigger_competitor_snapshot(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """手动触发竞对快照采集"""
-    from services.competitor_monitor_ext import CompetitorMonitorExtService
+    from services.tx_intel.src.services.competitor_monitor_ext import CompetitorMonitorExtService
 
     svc = CompetitorMonitorExtService(db)
     result = await svc.run_competitor_snapshot(tenant_id, competitor_id)
@@ -322,7 +322,7 @@ async def collect_reviews(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """手动触发点评采集"""
-    from services.review_collector import ReviewCollectorService
+    from services.tx_intel.src.services.review_collector import ReviewCollectorService
 
     svc = ReviewCollectorService(db)
     result = await svc.collect_store_reviews(
@@ -402,7 +402,7 @@ async def scan_dish_trends(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """手动触发菜品趋势扫描"""
-    from services.trend_scanner import TrendScannerService
+    from services.tx_intel.src.services.trend_scanner import TrendScannerService
 
     svc = TrendScannerService(db)
     result = await svc.scan_dish_trends(tenant_id, req.city, req.cuisine_type)
@@ -418,7 +418,7 @@ async def scan_ingredient_trends(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     """手动触发食材趋势扫描"""
-    from services.trend_scanner import TrendScannerService
+    from services.tx_intel.src.services.trend_scanner import TrendScannerService
 
     svc = TrendScannerService(db)
     result = await svc.scan_ingredient_trends(tenant_id, req.category, req.region)

@@ -63,7 +63,7 @@ async def api_export_purchase_receipt(
     x_tenant_id: str = Header(...),
 ):
     """采购入库汇总 → 金蝶凭证"""
-    from services.kingdee_bridge import export_purchase_receipt
+    from services.tx_supply.src.services.kingdee_bridge import export_purchase_receipt
 
     try:
         result = await export_purchase_receipt(
@@ -88,7 +88,7 @@ async def api_export_cost_transfer(
     x_tenant_id: str = Header(...),
 ):
     """成本结转汇总 → 金蝶凭证"""
-    from services.kingdee_bridge import export_cost_transfer
+    from services.tx_supply.src.services.kingdee_bridge import export_cost_transfer
 
     try:
         result = await export_cost_transfer(
@@ -113,7 +113,7 @@ async def api_export_transfer(
     x_tenant_id: str = Header(...),
 ):
     """调拨出入库汇总 → 金蝶凭证"""
-    from services.kingdee_bridge import export_transfer_in_out
+    from services.tx_supply.src.services.kingdee_bridge import export_transfer_in_out
 
     try:
         result = await export_transfer_in_out(
@@ -138,7 +138,7 @@ async def api_export_salary_accrual(
     x_tenant_id: str = Header(...),
 ):
     """工资计提 → 金蝶凭证"""
-    from services.kingdee_bridge import export_salary_accrual
+    from services.tx_supply.src.services.kingdee_bridge import export_salary_accrual
 
     try:
         result = await export_salary_accrual(
@@ -163,7 +163,7 @@ async def api_export_daily_revenue(
     x_tenant_id: str = Header(...),
 ):
     """收营日报 → 金蝶凭证"""
-    from services.kingdee_bridge import export_daily_revenue
+    from services.tx_supply.src.services.kingdee_bridge import export_daily_revenue
 
     try:
         result = await export_daily_revenue(
@@ -188,7 +188,7 @@ async def api_export_sales_delivery(
     x_tenant_id: str = Header(...),
 ):
     """销售出库汇总 → 金蝶凭证"""
-    from services.kingdee_bridge import export_sales_delivery
+    from services.tx_supply.src.services.kingdee_bridge import export_sales_delivery
 
     try:
         result = await export_sales_delivery(
@@ -216,7 +216,7 @@ async def api_export_history(
     size: int = 20,
 ):
     """查询金蝶导出历史"""
-    from services.kingdee_bridge import get_export_history
+    from services.tx_supply.src.services.kingdee_bridge import get_export_history
 
     result = await get_export_history(
         x_tenant_id,
@@ -240,7 +240,7 @@ async def api_retry_export(
     x_tenant_id: str = Header(...),
 ):
     """重试失败的金蝶导出"""
-    from services.kingdee_bridge import retry_failed_export
+    from services.tx_supply.src.services.kingdee_bridge import retry_failed_export
 
     try:
         result = await retry_failed_export(

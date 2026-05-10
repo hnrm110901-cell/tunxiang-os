@@ -13,7 +13,7 @@ from datetime import date, timedelta
 
 import structlog
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from services.pnl_engine import PnLEngine
+from services.tx_finance.src.services.pnl_engine import PnLEngine
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
