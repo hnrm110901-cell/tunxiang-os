@@ -1,3 +1,42 @@
+## 2026-05-10 晚上 — 决策 77 production codemod 完工（6 服务真容器布局可启动）
+
+### 今日完成
+- **3 PR 交付**（决策 77 production 端 codemod chain 全 6 服务清）：
+  - **#355** tx-growth — 4 commits / 36+9 文件 / 90 imports + 26 stub keys
+  - **#356** tx-member — 3 commits / 18 文件 / 53 imports + 14 stub/binding fixes
+  - **#358** tx-finance + tx-intel + tx-supply — 4 commits / 42+4 文件 / 59 imports + 22 stub/setdefault keys
+- **review-found 真 BUG 修复**（PR-A 各加 commit 4，决策 84 第四类沉淀）：
+  - tx-growth: `engine` / `templates` / `seeds` 9 处漏抓 + conftest 子包注册 + 3 stub key
+  - tx-intel: `adapters` 5 处漏抓 + conftest 子包注册
+  - 我 codemod NAMESPACES 列表只含标准 5 个（services / models / workers / repositories / api），漏了非标准服务子目录。如不修，main.py 启动即 ImportError，决策 77 名义完工实际未完工。
+
+### 数据变化
+- 迁移版本：未涉及（仅 import 路径改写）
+- 决策 77 完工：6 服务（tx-org #353 ✅ + tx-growth #355 + tx-member #356 + tx-finance/tx-intel/tx-supply #358）
+- 累计 production import rewrites：**214 处** + **62 stub keys** 跨 **100 文件**
+- 本地 pytest 净 +26 pass / 0 NEW failure（3 PR 总和）
+- alembic chain 任务（D candidate）调研发现 **PR #337 已修完**（origin/main HEAD `11294a61`：508 revisions / 0 dup / chain OK），无需 re-fix
+
+### 决策沉淀（lessons learned）
+- **决策 84 第四轮**：codemod NAMESPACES 列表必须**先 ls services/<svc>/src/ 列出所有子目录**，不仅依赖标准 5 namespace（services / models / workers / repositories / api）。tx-growth 含 `engine` / `templates` / `seeds`；tx-intel 含 `adapters`。
+- **决策 78 净持平 vs 净正向**：6 服务 codemod 实测全部净 ≥ 0 pass（tx-supply 净持平 / 其余净正向 +4 / +22 等），**0 NEW failure**。
+- **决策 79 边缘判定**：mock binding fix（`fake_svc.X = AsyncMock(...)` → `.return_value = ...`）属 codemod 直接副作用一致性维护（router once-bind 暴露 mock 重 assign 无效 bug），1-line trivial 并入 PR 比独立 follow-up 价值高。
+- **review session 流程**：用 code-reviewer agent 独立审，B 选项止线（真 BUG only）。reviewer SHOULD CONSIDER 我升 MUST FIX 是因 reviewer 误判"engine.X 不在 codemod 范围" — 但决策 77 任务定义是覆盖**所有 production 裸 namespace**。
+
+### 遗留问题
+- **C task** tx-ops `DailySummary` + tx-supply `Header` 缺失导出修：阻塞需创始人确认 §18 ontology 修改。
+- **D task** alembic chain integrity：调研发现已被 PR #337 修完（origin/main 全绿），从遗留清单删除。
+- **E task** dev-plan-60d 5/7 重写：T3 文档类，需 user 提供新方向才能反映真实战略意图，建议下 session 与 user 对齐后起手。
+- 本 session 14 commit 待 review-and-merge：#355 / #356 / #358 各 OPEN（含 review fix commit 4）。
+
+### 明日计划
+- 等 #355 / #356 / #358 review 推进或合并；
+- 若 user 提供 dev-plan-60d 新方向 → 启动 E；
+- 若 user 创始人对齐 §18 ontology → 启动 C；
+- 否则按 candidate 顺序看是否还有 backlog 起手。
+
+---
+
 ## 2026-05-09 上午 — B' · alembic chain dangling refs 修复（chain integrity 历史债清零）
 
 ### 今日完成

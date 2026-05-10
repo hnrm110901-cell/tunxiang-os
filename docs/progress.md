@@ -1,3 +1,34 @@
+## 2026-05-10 晚上 · 决策 77 production codemod 完工 + review fix
+
+### 完成状态
+- [x] **决策 77 真完工** — 6 服务 production main.py 容器布局 import 修复（tx-org #353 / tx-growth #355 / tx-member #356 / tx-finance + tx-intel + tx-supply #358）
+- [x] code-reviewer agent 独立 review 3 PR，B 选项止线
+- [x] review-found P0 真 BUG 修复（决策 84 第四类沉淀）：tx-growth `engine`/`templates`/`seeds` 9 处 + tx-intel `adapters` 5 处漏抓
+- [x] 累计 214 production imports + 62 stub/setdefault keys 跨 100 文件
+- [x] 本地 pytest 净 +26 pass / 0 NEW（3 PR 总和）
+- [x] 容器布局 mktemp 真测：6 服务 main.py 全部解析过 import 阶段，仅缺第三方 dep（dev venv）
+- [x] 决策 84 第四轮沉淀：codemod NAMESPACES 列表必须含所有非标准子目录
+- [ ] D task（alembic chain integrity）：**调研发现已被 PR #337 修完**，无需做（origin/main 508 revisions / chain OK）
+- [ ] C task（tx-ops/tx-supply 导出）：阻塞需创始人确认 §18 ontology
+- [ ] E task（dev-plan-60d 重写）：T3 需 user 新方向
+
+### 关键决策
+- **review fix 升 MUST FIX 而非 SHOULD CONSIDER**：reviewer 把 `from engine.X` 漏抓列 SHOULD CONSIDER + 建议独立 issue。我反对此边界 — 决策 77 任务定义是覆盖所有 production 裸 namespace（不仅 services/models/workers/repositories/api 五个标准），漏抓即 codemod 不完整，应原 PR 内修。两个 PR 各加 commit 4，决策 77 真完工。
+- **mock binding fix 并入 #356**（决策 79 边缘判定）：1-line `fake_svc.X = AsyncMock(...)` → `.return_value = ...` 是 codemod 副作用一致性维护（router once-bind 暴露 mock 重 assign 无效 latent bug），并入 PR 比独立 follow-up 价值高。
+- **不启动 D task**：调研发现 PR #337 5/10 上午合并后 chain 已全绿（worktree 落后误判）。
+
+### 下一步
+- 等 #355 / #356 / #358 review 推进（17 commits / 100 文件待 review）
+- 若 user 对齐 §18 ontology → C task
+- 若 user 提供 dev-plan-60d 方向 → E task
+
+### 已知风险
+- #355 / #358 含 review fix commit 4，reviewer 已审过 PR 表观结构 → 加 commit 4 需重审
+- #358 自补 conftest 与 #349/#350（OPEN）合并冲突 trivial（diff 只多一行 workers/adapters 子包注册）；reviewer 建议合并预案：take ours
+- 17 个 commit 跨 100 文件提交涉及 6 服务 production 端，**理论 Tier 1 范围（含 invoice / financial_voucher / stored_value 等资金路径文件）**，但本 PR **不动业务逻辑只改 import 形式**，blast radius 限于模块加载阶段
+
+---
+
 ## 2026-05-09 上午 · B' alembic chain dangling refs 修复
 
 ### 完成状态
