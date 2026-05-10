@@ -32,6 +32,11 @@ KNOWN_BROKEN_CHILDREN → fail。豁免只覆盖"既存的孤儿引用"，新 PR
   4. 普通连续 chain 无问题 → pass
 
 不依赖真 alembic env、不依赖 DB；用 tmp_path 构造假 migration 树。
+
+2026-05-09 (B') 后：production KNOWN_BROKEN_PARENTS / KNOWN_BROKEN_CHILDREN 排空（历史
+  3 处 dangling 已修复）。机制本身仍然有效，scenario 测试改用 ``_PARENTS_FIXTURE`` /
+  ``_CHILDREN_FIXTURE`` 合成白名单传给 ``check_chain()``，验证机制行为不依赖磁盘真实
+  白名单内容。
 """
 
 from __future__ import annotations
@@ -49,6 +54,12 @@ from scripts.check_alembic_chain import (
     collect_revisions,
     collect_revisions_with_duplicates,
 )
+
+# Synthetic fixtures — production allow-lists are now empty (B' drained 2026-05-09).
+# Scenario tests below pass these to ``check_chain()`` to exercise the mechanism
+# without depending on real historical orphan names.
+_PARENTS_FIXTURE = frozenset({"vXXX_orphan_parent_a", "vXXX_orphan_parent_b"})
+_CHILDREN_FIXTURE = frozenset({"vXXX_legacy_child_a", "vXXX_legacy_child_b"})
 
 # ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -105,21 +116,23 @@ def _write_migration(
 
 
 def test_scenario_pre_existing_self_break_is_excused(tmp_path: Path) -> None:
-    """白名单 rev 自身 down_revision 指向不存在的父 → 豁免（pre-existing 警告，不 fail）。"""
+    """白名单 rev 自身 down_revision 指向不存在的父 → 豁免（pre-existing 警告，不 fail）。
+
+    用合成 fixture 白名单（生产 KNOWN_BROKEN_* 已 B' 排空）。
+    """
     versions = tmp_path / "versions"
     versions.mkdir()
 
-    # Real-world shape: v310 (whitelisted child) points at orphan
-    # v301_refund_requests (whitelisted parent).
+    # Synthetic shape: legacy child points at synthetic orphan parent.
     _write_migration(versions, "v309", down_revision=None)
-    _write_migration(versions, "v310", down_revision="v301_refund_requests", typed=False)
+    _write_migration(versions, "vXXX_legacy_child_a", down_revision="vXXX_orphan_parent_a", typed=False)
 
     revisions = collect_revisions(versions)
-    errors, warnings = check_chain(revisions)
+    errors, warnings = check_chain(revisions, _PARENTS_FIXTURE, _CHILDREN_FIXTURE)
 
     assert errors == [], f"unexpected errors: {errors}"
-    assert any("v310" in w and "v301_refund_requests" in w for w in warnings), (
-        f"expected pre-existing warning for v310 → v301_refund_requests, got: {warnings}"
+    assert any("vXXX_legacy_child_a" in w and "vXXX_orphan_parent_a" in w for w in warnings), (
+        f"expected pre-existing warning for legacy child → orphan, got: {warnings}"
     )
 
 
@@ -130,19 +143,22 @@ def test_scenario_new_rev_referencing_whitelist_fails(tmp_path: Path) -> None:
     """新 rev (不在白名单) 把 down_revision 指向 KNOWN_BROKEN → fail。
 
     这是 PJ.5 修复的核心：CodeRabbit 发现的污染传播路径。
+    用合成 fixture 白名单（生产 KNOWN_BROKEN_* 已 B' 排空）。
     """
     versions = tmp_path / "versions"
     versions.mkdir()
 
-    # v500 is brand-new (not in KNOWN_BROKEN) and tries to chain off
-    # v301_refund_requests (whitelisted orphan parent). Must be rejected.
-    _write_migration(versions, "v500_new_pollutant", down_revision="v301_refund_requests")
+    # v500 is brand-new (not in fixture children) and tries to chain off
+    # the synthetic orphan parent. Must be rejected.
+    _write_migration(versions, "v500_new_pollutant", down_revision="vXXX_orphan_parent_a")
 
     revisions = collect_revisions(versions)
-    errors, warnings = check_chain(revisions)
+    errors, warnings = check_chain(revisions, _PARENTS_FIXTURE, _CHILDREN_FIXTURE)
 
-    assert any("v500_new_pollutant" in e and "v301_refund_requests" in e and "KNOWN_BROKEN" in e for e in errors), (
-        f"expected scope-guard error for v500_new_pollutant → v301_refund_requests, "
+    assert any(
+        "v500_new_pollutant" in e and "vXXX_orphan_parent_a" in e and "KNOWN_BROKEN" in e for e in errors
+    ), (
+        f"expected scope-guard error for v500_new_pollutant → orphan parent, "
         f"got errors={errors} warnings={warnings}"
     )
 
@@ -150,27 +166,28 @@ def test_scenario_new_rev_referencing_whitelist_fails(tmp_path: Path) -> None:
 def test_scenario_downstream_of_legacy_child_is_normal_chain(tmp_path: Path) -> None:
     """白名单 child 自己是真 declared revision → 其下游是正常 chain，不级联豁免。
 
-    e.g. v311 在 KNOWN_BROKEN_CHILDREN（因为它已经 references 孤儿
-    ``v310_mv_performance_indexes``）。但 v311 本身是 declared rev，所以
-    NEW v600 down_revision="v311" 是 OK 的（chain off real rev）。
+    e.g. legacy child 在 KNOWN_BROKEN_CHILDREN（因为它已经 references 孤儿父）。
+    但 child 本身是 declared rev，所以 NEW v600 down_revision="<child>" 是 OK 的
+    （chain off real rev）。
 
     这条很重要：否则白名单要级联整个下游链，无穷扩散。
+    用合成 fixture 白名单（生产 KNOWN_BROKEN_* 已 B' 排空）。
     """
     versions = tmp_path / "versions"
     versions.mkdir()
 
-    # v311 itself is a real declared revision (and a whitelisted child).
-    _write_migration(versions, "v311", down_revision="v310_mv_performance_indexes")
-    # NEW v600 chains off v311. v311 is a real rev, so this is normal chain — pass.
-    _write_migration(versions, "v600_legitimate_downstream", down_revision="v311")
+    # legacy child itself is a real declared revision (and a fixture whitelisted child).
+    _write_migration(versions, "vXXX_legacy_child_a", down_revision="vXXX_orphan_parent_a")
+    # NEW v600 chains off the legacy child. Child is a real rev, so this is normal chain — pass.
+    _write_migration(versions, "v600_legitimate_downstream", down_revision="vXXX_legacy_child_a")
 
     revisions = collect_revisions(versions)
-    errors, warnings = check_chain(revisions)
+    errors, warnings = check_chain(revisions, _PARENTS_FIXTURE, _CHILDREN_FIXTURE)
 
     assert errors == [], f"downstream of declared child must pass, got errors: {errors}"
-    # The only warning should be the v311 → orphan-parent edge.
-    assert any("v311" in w and "v310_mv_performance_indexes" in w for w in warnings), (
-        f"expected pre-existing warning for v311, got: {warnings}"
+    # The only warning should be the legacy child → orphan-parent edge.
+    assert any("vXXX_legacy_child_a" in w and "vXXX_orphan_parent_a" in w for w in warnings), (
+        f"expected pre-existing warning for legacy child, got: {warnings}"
     )
 
 
@@ -180,22 +197,22 @@ def test_scenario_downstream_of_legacy_child_is_normal_chain(tmp_path: Path) -> 
 def test_scenario_whitelist_to_whitelist_link_is_allowed(tmp_path: Path) -> None:
     """白名单 rev 之间互相链接允许（都是历史遗留 debt）。
 
-    e.g. v311 → v310_mv_performance_indexes (both ∈ KNOWN_BROKEN) → 只报 warning。
-    v310 → v301_refund_requests (both ∈ KNOWN_BROKEN) → 只报 warning。
+    e.g. legacy_child_a → orphan_parent_a (both ∈ fixture whitelist) → 只报 warning。
+    legacy_child_b → orphan_parent_b (both ∈ fixture whitelist) → 只报 warning。
+    用合成 fixture 白名单（生产 KNOWN_BROKEN_* 已 B' 排空）。
     """
     versions = tmp_path / "versions"
     versions.mkdir()
 
-    # All three legacy edges; none of these are "new" so all should be excused.
-    _write_migration(versions, "v310", down_revision="v301_refund_requests", typed=False)
-    _write_migration(versions, "v311", down_revision="v310_mv_performance_indexes")
-    _write_migration(versions, "v388", down_revision="v387_pdpa_compliance")
+    # Two legacy edges; both children are whitelisted → only warnings, no errors.
+    _write_migration(versions, "vXXX_legacy_child_a", down_revision="vXXX_orphan_parent_a", typed=False)
+    _write_migration(versions, "vXXX_legacy_child_b", down_revision="vXXX_orphan_parent_b")
 
     revisions = collect_revisions(versions)
-    errors, warnings = check_chain(revisions)
+    errors, warnings = check_chain(revisions, _PARENTS_FIXTURE, _CHILDREN_FIXTURE)
 
     assert errors == [], f"whitelist→whitelist must not error, got: {errors}"
-    assert len(warnings) == 3, f"expected exactly 3 pre-existing warnings, got {len(warnings)}: {warnings}"
+    assert len(warnings) == 2, f"expected exactly 2 pre-existing warnings, got {len(warnings)}: {warnings}"
 
 
 # ─── scenario 4: clean chain → pass ───────────────────────────────────────
@@ -239,20 +256,20 @@ def test_scenario_new_orphan_parent_still_fails(tmp_path: Path) -> None:
 # ─── auxiliary: KNOWN_BROKEN constant sanity ──────────────────────────────
 
 
-def test_known_broken_parents_match_documented_orphans() -> None:
-    """KNOWN_BROKEN_PARENTS 必须严格等于 docs/migration-chain-debt.md 里追踪的 3 处孤儿父。
+def test_known_broken_parents_drained_to_empty() -> None:
+    """KNOWN_BROKEN_PARENTS 应保持为空 frozenset（B' 2026-05-09 还清历史债）。
 
-    严格相等：多了说明有未文档化的债；少了说明 CI 可能漏放过既存断链。
+    2026-05-09 之前白名单含 3 处孤儿父：v301_refund_requests /
+    v310_mv_performance_indexes / v387_pdpa_compliance。已通过：
+      - v310 down_revision: "v301_refund_requests" → "v304"
+      - v311 down_revision: "v310_mv_performance_indexes" → "v310"
+      - v388_id_market revision/down_revision: 重命名为 v388_id_market 并指向 v387
+    全部修正为真 revision ID。本测试保持机制活着，确保未来不再悄悄新增白名单条目。
     """
-    expected_orphan_parents = {
-        "v301_refund_requests",
-        "v310_mv_performance_indexes",
-        "v387_pdpa_compliance",
-    }
-    assert set(KNOWN_BROKEN_PARENTS) == expected_orphan_parents, (
-        f"KNOWN_BROKEN_PARENTS drift vs docs/migration-chain-debt.md: "
-        f"missing={expected_orphan_parents - set(KNOWN_BROKEN_PARENTS)}, "
-        f"extra={set(KNOWN_BROKEN_PARENTS) - expected_orphan_parents}"
+    assert set(KNOWN_BROKEN_PARENTS) == set(), (
+        f"KNOWN_BROKEN_PARENTS 不应再含历史孤儿父（B' 已还清）。"
+        f"如需新增，请同步更新 docs/migration-chain-debt.md 并说明根因。"
+        f"当前: {sorted(KNOWN_BROKEN_PARENTS)}"
     )
 
 
@@ -261,6 +278,9 @@ def test_known_broken_children_match_main_baseline() -> None:
 
     扫一遍 shared/db-migrations/versions 真实文件，确认白名单孩子集合与磁盘吻合。
     若新增/删减引用孤儿的文件，需同步更新 KNOWN_BROKEN_CHILDREN，否则 CI 红。
+
+    2026-05-09 (B') 后：PARENTS 排空 → 磁盘上无 child 引用孤儿父 → 期望 actual_children
+    与 KNOWN_BROKEN_CHILDREN 同为空集。
     """
     versions_dir = Path(__file__).resolve().parents[4] / "shared" / "db-migrations" / "versions"
     if not versions_dir.is_dir():

@@ -1,7 +1,7 @@
 """v311: 补齐 26 张历史表 RLS（关闭 RLS 技术债）
 
 Revision ID: v311
-Revises: v310_mv_performance_indexes
+Revises: v310
 Create Date: 2026-05-02
 
 批量操作为 26 张表：
@@ -10,12 +10,15 @@ Create Date: 2026-05-02
 
 安全策略统一使用 app.tenant_id（项目标准）。
 所有操作使用 IF NOT EXISTS 保证幂等。
+
+Chain repair (2026-05-09, B'): 原 down_revision 误写文件名 stem
+  "v310_mv_performance_indexes"，已订正为真 revision ID "v310"。
 """
 
 from alembic import op
 
 revision = "v311"
-down_revision = "v310_mv_performance_indexes"
+down_revision = "v310"
 branch_labels = None
 depends_on = None
 

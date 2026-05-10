@@ -1,5 +1,9 @@
 # Migration Chain Debt 跟踪
 
+> **✅ 2026-05-09 (B') — 全部 3 处历史断链修复完毕。** `KNOWN_BROKEN_PARENTS` /
+> `KNOWN_BROKEN_CHILDREN` 排空。`scripts/check_alembic_chain.py` scope-guard
+> 机制保留为防御性兜底，但白名单内已无条目。
+>
 > 由 PI.1（2026-05-04）建立。`migration-ci.yml` 修了 regex bug 后暴露 3 个 main 既存断链。
 > 暂以 `KNOWN_BROKEN` 白名单允许 CI 通过，必须在 v400 之前清零。
 >
@@ -23,38 +27,59 @@ PI.1 修了正则后真实暴露的 3 个断链如下：
 
 ## 断链清单
 
-### 1. `v310_mv_performance_indexes`（被 v311 引用）
+### 1. `v310_mv_performance_indexes`（被 v311 引用）— ✅ 已修复 (B', 2026-05-09)
 
 - 文件：`shared/db-migrations/versions/v310_mv_performance_indexes.py`
 - 实际 `revision = "v310"`（短形式）
 - 引用方：`v311_rls_retrofit_26_tables.py` 的 `down_revision = "v310_mv_performance_indexes"`
 - 同 v310 命名空间还有 `v310_challenges.py`（`revision = "v310_challenges"`）— **revision 撞短前缀**
-- 修复方向：把 `v310_mv_performance_indexes.py` 的 `revision` 改为 `"v310_mv_performance_indexes"`
-- 风险：若已 apply 过 v310（写入 alembic_version），DB 端需手工 `UPDATE alembic_version SET version_num='v310_mv_performance_indexes' WHERE version_num='v310';`
+- ~~修复方向：把 `v310_mv_performance_indexes.py` 的 `revision` 改为 `"v310_mv_performance_indexes"`~~
+- **B' 实际修复**：把 `v311_rls_retrofit_26_tables.py` 的 `down_revision` 从 filename stem
+  `"v310_mv_performance_indexes"` 改为真 revision ID `"v310"`（1 字符订正，不动 v310 自身 revision，
+  避开 v310/v310_challenges 撞前缀风险，也无需 alembic_version 数据修复）。
+- 风险：~~若已 apply 过 v310（写入 alembic_version），DB 端需手工~~（已规避）
 
-### 2. `v387_pdpa_compliance`（被 v388 引用）
+### 2. `v387_pdpa_compliance`（被 v388 引用）— ✅ 已修复 (B', 2026-05-09)
 
 - 文件：`shared/db-migrations/versions/v387_pdpa_compliance.py`
 - 实际 `revision: str = "v387"`
 - 引用方：`v388_id_market.py` 的 `down_revision = "v387_pdpa_compliance"`
-- 修复方向：同 (1)，把文件 revision 改为 `"v387_pdpa_compliance"`
-- 风险：同 (1)
+- ~~修复方向：同 (1)，把文件 revision 改为 `"v387_pdpa_compliance"`~~
+- **B' 实际修复**：v388_id_market.py 与 v388_fill_rls_26_tables.py **重复声明 `revision="v388"`**（alembic 拒绝加载）。
+  把 v388_id_market.py revision 重命名为唯一 ID `"v388_id_market"`，down_revision 由 filename stem
+  `"v387_pdpa_compliance"` 订正为真 revision ID `"v387"`。同步把 v388_fill_rls_26_tables.py 的
+  down_revision 从 `"v387"` 改为 `"v388_id_market"`。链路：
+  `v387 → v388_id_market → v388 (fill_rls) → v389_vn_market`。
+- 风险：~~同 (1)~~（已规避，v389_vn_market 的 down_revision = "v388" 仍然有效，指向 fill_rls）
 
-### 3. `v301_refund_requests`（被 v310_mv_performance_indexes 引用，文件不存在）
+### 3. `v301_refund_requests`（被 v310_mv_performance_indexes 引用，文件不存在）— ✅ 已修复 (B', 2026-05-09)
 
 - 引用方：`v310_mv_performance_indexes.py` 的 `down_revision = "v301_refund_requests"`
 - v301 命名空间存在的文件：
   - `v301_group_ops_material.py`（`revision = "v301_group_ops_material"`）
   - `v301_table_analytics_views.py`（`revision = "v151b"` — **本身就异常**）
-- 修复方向需考古：v310_mv_performance_indexes 的真实上游是哪个 v300 系列？需 founder/原作者确认。
+- ~~修复方向需考古：v310_mv_performance_indexes 的真实上游是哪个 v300 系列？需 founder/原作者确认。~~
+- **B' 实际修复**：考古 PR #128 (fd94028e) 引入 v310 时，仓库无任何文件声明 `revision="v301_refund_requests"`
+  （PR 作者拍脑袋取名，对应文件未提交）。当时 active heads 含 v304 / v330_reputation_alerts /
+  v383_chain_consolidation 等。选 `v304` 作为真前置：(a) 是真 revision ID（不是 filename stem），
+  (b) 与 mv 索引语义无依赖冲突，(c) 不跨太大 v3xx 段。v398 merge migration 后续把 v310 + 其他
+  b-suffix head 一同合到主链，不影响。
 
 ## 处置方案
 
-1. **本次（PI.1）：** 加 `KNOWN_BROKEN` 白名单，CI 报 warning 不 block；让 PR #144 等 SECURITY 修复可合入。
-2. **下个 sprint：** 单独 PR 逐项修复，按 (1) → (2) → (3) 顺序：
-   - (1)/(2) 改 revision 字符串 + 准备 alembic_version 数据修复脚本
-   - (3) 与原作者对接确定上游 → 改 down_revision
-3. **目标：** v400 migration 落库前清零白名单。
+1. ~~**本次（PI.1）：** 加 `KNOWN_BROKEN` 白名单，CI 报 warning 不 block；让 PR #144 等 SECURITY 修复可合入。~~ ✅ 历史
+2. ~~**下个 sprint：** 单独 PR 逐项修复~~ ✅ 已在 B' (2026-05-09) 一次性完成
+3. ~~**目标：** v400 migration 落库前清零白名单。~~ ✅ v406 已落库，B' 同 PR 内清零
+
+### B' 后状态（2026-05-09）
+
+- `KNOWN_BROKEN_PARENTS = frozenset()` — 排空
+- `KNOWN_BROKEN_CHILDREN = frozenset()` — 排空
+- `scripts/check_alembic_chain.py` scope-guard 机制保留作为防御性兜底
+- `shared/db-migrations/tests/test_chain_integrity_tier1.py` 新增 4 项静态扫描测试覆盖
+  无 dup revision、无 dangling、单 head、单 root
+- 解锁能力：CI 真 PG 反测 fixture（B'→A 串行的 A 任务）、生产新机房 `alembic upgrade head`、
+  本地 dev DB 完整初始化
 
 ---
 

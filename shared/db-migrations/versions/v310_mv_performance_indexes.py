@@ -11,14 +11,21 @@
   - BRIN 索引 — 大表日期列，节省空间
 
 Revision ID: v310
-Revises: v301_refund_requests
+Revises: v304
 Create Date: 2026-05-02
+
+Chain repair (2026-05-09, B'): 原 down_revision = "v301_refund_requests" 在 PR #128
+  引入时即不存在（同 PR 内拍脑袋取名，无对应文件）。当时 active head 含
+  v304 / v330_reputation_alerts / v383_chain_consolidation 等，选 v304 因：
+  (a) 是真 revision ID（不是 filename stem），(b) 与 mv 索引语义无依赖冲突，
+  (c) 不跨太大 v3xx 段产生回退困惑。v398 merge migration 后续把 v310 + 其他
+  b-suffix head 一同合到主链；此处仅修复 dangling，让 alembic 能 walk 到 v310。
 """
 
 from alembic import op
 
 revision = "v310"
-down_revision = "v301_refund_requests"
+down_revision = "v304"
 branch_labels = None
 depends_on = None
 

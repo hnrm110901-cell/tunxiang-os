@@ -1,3 +1,56 @@
+## 2026-05-09 上午 — B' · alembic chain dangling refs 修复（chain integrity 历史债清零）
+
+### 今日完成
+ship B' — 修通 alembic chain integrity，解锁 A 任务（仓库级 docker-compose-pg fixture）的前置依赖。
+
+**3 处历史 dangling + 1 处 dup revision 一锅修：**
+- `v311.down_revision`: filename stem `"v310_mv_performance_indexes"` → 真 revision ID `"v310"`（1 字符订正）
+- `v310.down_revision`: 拍脑袋 `"v301_refund_requests"`（PR #128 引入时即不存在）→ `"v304"`（当时 active head 中语义最干净的）
+- `v388_id_market.revision`: `"v388"` → `"v388_id_market"`（与 `v388_fill_rls_26_tables.py` 撞 ID，alembic 拒绝加载）；down_revision filename stem `"v387_pdpa_compliance"` → `"v387"`
+- `v388_fill_rls_26_tables.down_revision`: `"v387"` → `"v388_id_market"`（保持链路单 head：`v387 → v388_id_market → v388 → v389_vn_market`）
+
+**PJ.5 KNOWN_BROKEN allow-list 排空 + scope-guard 机制保留：**
+- `scripts/check_alembic_chain.py` 的 `KNOWN_BROKEN_PARENTS` / `KNOWN_BROKEN_CHILDREN` 由 3+3 项排到空 frozenset
+- PJ.5 scope-guard scenarios 测试用合成 fixture 白名单重构（不依赖磁盘真实白名单内容，机制本身仍受测覆盖）
+
+**新增 chain integrity 静态测试（Tier 1）：**
+- `shared/db-migrations/tests/test_chain_integrity_tier1.py` — 4 项断言：无 dup revision / 无 dangling down_revision / 单 head / 单 root
+- TDD red→green 留痕：red 时 dup + dangling 各 1 项 fail；fix 后 4/4 全绿
+
+### 数据变化
+- 迁移文件改：4（v310 / v311 / v388_id_market / v388_fill_rls_26_tables，仅元数据 down_revision/revision 字段，无 schema 改动）
+- 新增测试：`test_chain_integrity_tier1.py` 4 用例
+- 改动 CI 脚本：`scripts/check_alembic_chain.py` 排空白名单
+- 改动现有测试：`test_alembic_chain_known_broken_scope_pj5_tier1.py` 4 scenario 用合成 fixture 重构 + 1 snapshot 测试改"排空"语义
+- 改动 doc：`docs/migration-chain-debt.md` 标 3 处债务清零
+
+### 验证证据
+- `python3 scripts/check_alembic_chain.py` → `Found 505 unique revisions ... No duplicate revisions ... Chain integrity OK (0 pre-existing warnings)`
+- `pytest test_chain_integrity_tier1.py test_alembic_chain_known_broken_scope_pj5_tier1.py` → 15/15 全绿
+- `alembic heads` → 单 head `v406_nlq_reports_views_p3`
+- `alembic history` → walk `<base> → v001 → ... → v406` 完整连续
+
+### 侦察发现（独立 issue，**非 B' 范畴**）
+chain 修通后第一次跑 `alembic upgrade head` 在新 PG（pgvector/pgvector:pg16），暴露 ≥ 4 个独立**预存** SQL bug（与 chain 无关，从未被任何环境真跑过）：
+
+1. **v151b** (`v301_table_analytics_views.py:74`): `PRIMARY KEY (..., COALESCE(zone_id, ...))` PG 拒绝表达式 PK
+2. **v151b** (同文件:197): `INSERT INTO projector_checkpoints (last_processed_at)` 列不存在；`ON CONFLICT (projector_name)` 与真 PK `(projector_name, tenant_id)` 不匹配；缺 NOT NULL `tenant_id`
+3. **v232c** (`v232_tenant_multi_system_config.py:81`): `sa.text("...:cfg::jsonb...").bindparams(...)` SQLAlchemy text parser 在 `:cfg::jsonb` 上 ArgumentError（cast 与命名参数歧义）
+4. **v287** (parallel branch): `CREATE INDEX idx_employee_transfers_to_store` 兄弟分支早建过 → DuplicateTable，需 `IF NOT EXISTS`
+
+侦察跨越 v001→v287（57% 链路）；外推 v287→v406 还可能有 5-10+ unknown bug。**这是 chain 修通后第一次有能力发现这些** — 之前断在 v310/v311/v388 永远走不到 v151b。
+
+### 遗留问题
+- 4 个独立 SQL bug 待立 issue 修（按 ROI 排序：1>2>3>4，1 是 mv 物化视图核心 schema bug）
+- v287→v406 增量 SQL bug 摸排（需更长侦察 session，每修 1 个继续往前走）
+- A 任务（docker-compose-pg fixture）仍然 blocked — 直到上述 SQL bug 修齐 alembic upgrade head 才能在空 DB 跑通
+
+### 明日计划
+- 看 user 决策：4 个 SQL bug 是开 4 个独立 PR / 一个集合 PR / 还是 pivot A 用 pg_dump snapshot 跳过 alembic
+- dev-plan-60d 重写仍然 pending
+
+---
+
 ## 2026-05-09 凌晨 — 5/9 通宵 · S4-02 PR2 NLQ 端到端闭环交付（issue #289 完整 Demo）
 
 ### 今日完成
