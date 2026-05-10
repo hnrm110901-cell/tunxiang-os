@@ -52,6 +52,9 @@ on:
       - 'shared/db-migrations/versions/**'
       # Workflow 自身
       - '.github/workflows/tier1-gate.yml'
+      # import-only carve-out 脚本与单测（issue #417 / 流程 3）
+      - 'scripts/ci/detect_import_only_diff.py'
+      - 'tests/ci/test_detect_import_only_diff.py'
       # 补充 Tier 1 路径（issue D6 修复）
       - 'services/tx-pay/**'
       - 'services/tx-trade/src/order_service.py'
@@ -176,6 +179,10 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
       - name: 检查 Tier 1 源改动是否配对 tier1 测试改动
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"
@@ -222,10 +229,22 @@ jobs:
               echo "::notice::Tier 1 测试变更检测到"
           fi
 
-          # 源改动 + 无测试改动 = 强校验失败
+          # 源改动 + 无测试改动 = 进入 import-only carve-out 检查
+          # （issue #417 / 流程 3 §"根治 follow-up" 方案 1）
           if [ "$HAS_TIER1_SOURCE_CHANGE" = "true" ] && [ "$HAS_TIER1_TEST_CHANGE" = "false" ]; then
+              echo "运行 import-only carve-out 检测..."
+              IS_IMPORT_ONLY=$(python3 scripts/ci/detect_import_only_diff.py --base "$BASE" --head "$HEAD")
+              echo "is_import_only=$IS_IMPORT_ONLY"
+
+              if [ "$IS_IMPORT_ONLY" = "true" ]; then
+                  echo "::notice title=Carve-out 通过::PR diff 仅 from/import 改动，无业务行为变化（流程 3 §根治 follow-up 方案 1）。跳过 *tier1*.py 测试配对要求。"
+                  echo "✅ 源/测试改动配对检查通过（import-only carve-out）"
+                  exit 0
+              fi
+
               echo "::error title=Tier 1 源改动未配对测试::本 PR 修改了 Tier 1 源文件，但未修改对应 *tier1*.py 测试。CLAUDE.md § 20 要求 TDD：测试先于实现。"
               echo "缺少的改动：新增或更新对应的 test_*tier1*.py"
+              echo "若本 PR 仅 from/import 路径切换（codemod / namespace 重整），见 docs/codemod/namespace-completeness.md §Review 流程沉淀 流程 3"
               exit 1
           fi
 
