@@ -124,11 +124,59 @@ def test_upgrade_has_select_policy():
     assert "rls_{_TABLE}_select" in src
 
 
-def test_upgrade_has_write_policies_with_check():
+def test_upgrade_has_three_write_policies():
     src = _read_v413_source()
-    assert '_WRITE_ACTIONS = ("INSERT", "UPDATE", "DELETE")' in src
-    assert "rls_{_TABLE}_{action.lower()}_with_check" in src
-    assert src.count("WITH CHECK") >= 3
+    for action in ("insert", "update", "delete"):
+        policy_name = f"rls_{{_TABLE}}_{action}_with_check"
+        assert policy_name in src, f"缺 {action.upper()} policy 命名 `{policy_name}`"
+
+
+def test_insert_policy_only_with_check_no_using():
+    """PG 语义：INSERT policy 只能 WITH CHECK，不能含 USING。"""
+    src = _read_v413_source()
+    insert_blocks = re.findall(
+        r"FOR\s+INSERT\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
+    )
+    assert insert_blocks, "v413 缺 INSERT policy"
+    for block in insert_blocks:
+        upper = block.upper()
+        assert "USING" not in upper, (
+            f"INSERT policy 不能含 USING（PG 拒绝）：{block!r}"
+        )
+        assert "WITH CHECK" in upper, (
+            f"INSERT policy 必须 WITH CHECK：{block!r}"
+        )
+
+
+def test_delete_policy_only_using_no_with_check():
+    """PG 语义：DELETE policy 只能 USING，不能含 WITH CHECK。"""
+    src = _read_v413_source()
+    delete_blocks = re.findall(
+        r"FOR\s+DELETE\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
+    )
+    assert delete_blocks, "v413 缺 DELETE policy"
+    for block in delete_blocks:
+        upper = block.upper()
+        assert "WITH CHECK" not in upper, (
+            f"DELETE policy 不能含 WITH CHECK（PG 拒绝）：{block!r}"
+        )
+        assert "USING" in upper, f"DELETE policy 必须 USING：{block!r}"
+
+
+def test_update_policy_has_using_and_with_check():
+    """UPDATE policy USING + WITH CHECK（v395 修法）。"""
+    src = _read_v413_source()
+    update_blocks = re.findall(
+        r"FOR\s+UPDATE\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
+    )
+    assert update_blocks, "v413 缺 UPDATE policy"
+    for block in update_blocks:
+        upper = block.upper()
+        assert "USING" in upper, f"UPDATE policy 必须 USING：{block!r}"
+        assert "WITH CHECK" in upper, f"UPDATE policy 必须 WITH CHECK：{block!r}"
 
 
 def test_upgrade_has_member_index():

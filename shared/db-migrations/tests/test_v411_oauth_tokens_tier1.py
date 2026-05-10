@@ -110,21 +110,80 @@ def test_upgrade_has_select_policy():
     assert "FOR SELECT" in src
 
 
-def test_upgrade_has_write_policies_with_check():
-    """写入侧 INSERT/UPDATE/DELETE 必须 USING + WITH CHECK（v395 修法）。"""
+def test_upgrade_has_three_write_policies():
+    """写入侧 INSERT/UPDATE/DELETE 各有独立 policy，命名一致。"""
     src = _read_v411_source()
-    # 三个写入侧 actions 通过 _WRITE_ACTIONS 元组 + for-loop 生成 policy
-    assert '_WRITE_ACTIONS = ("INSERT", "UPDATE", "DELETE")' in src, (
-        "缺 _WRITE_ACTIONS 三元组定义"
+    for action in ("insert", "update", "delete"):
+        policy_name = f"rls_{{_TABLE}}_{action}_with_check"
+        assert policy_name in src, (
+            f"缺 {action.upper()} policy 命名 `{policy_name}`"
+        )
+
+
+def test_insert_policy_only_with_check_no_using():
+    """PG 语义：INSERT policy 只能 WITH CHECK，不能含 USING。
+
+    根因：USING 是行筛选（SELECT/UPDATE/DELETE 用），INSERT 没有"已存在的行"
+    可筛选；硬塞 USING 会导致 `only WITH CHECK expression allowed for INSERT`，
+    fresh PG `alembic upgrade head` 100% 失败。
+    """
+    src = _read_v411_source()
+    # 抓所有 `FOR INSERT TO PUBLIC` 之后到下一个 `;` 的 policy 块文本
+    insert_blocks = re.findall(
+        r"FOR\s+INSERT\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
     )
-    assert "rls_{_TABLE}_{action.lower()}_with_check" in src, (
-        "缺写入侧 policy 命名模板"
+    assert insert_blocks, (
+        "v411 缺 INSERT policy（应有 `FOR INSERT TO PUBLIC ...`）— "
+        "若用 f-string 模板生成，此测试需配合 impl 改成显式 INSERT 块"
     )
-    # 计数 WITH CHECK 出现次数 ≥ 3（三个写入侧 policy + docstring 提及，至少 3）
-    assert src.count("WITH CHECK") >= 3, (
-        f"WITH CHECK 出现次数 {src.count('WITH CHECK')} < 3，"
-        f"写入侧 RLS 防伪造保护不足"
+    for block in insert_blocks:
+        upper = block.upper()
+        assert "USING" not in upper, (
+            f"INSERT policy 不能含 USING（PG 拒绝）：{block!r}"
+        )
+        assert "WITH CHECK" in upper, (
+            f"INSERT policy 必须 WITH CHECK：{block!r}"
+        )
+
+
+def test_delete_policy_only_using_no_with_check():
+    """PG 语义：DELETE policy 只能 USING，不能含 WITH CHECK。
+
+    根因：WITH CHECK 是写入校验（INSERT/UPDATE 后行的合法性），DELETE 不写入
+    新行；硬塞 WITH CHECK 会导致 `WITH CHECK cannot be applied to DELETE`。
+    """
+    src = _read_v411_source()
+    delete_blocks = re.findall(
+        r"FOR\s+DELETE\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
     )
+    assert delete_blocks, "v411 缺 DELETE policy"
+    for block in delete_blocks:
+        upper = block.upper()
+        assert "WITH CHECK" not in upper, (
+            f"DELETE policy 不能含 WITH CHECK（PG 拒绝）：{block!r}"
+        )
+        assert "USING" in upper, (
+            f"DELETE policy 必须 USING（限定可删行）：{block!r}"
+        )
+
+
+def test_update_policy_has_using_and_with_check():
+    """PG 语义：UPDATE policy USING + WITH CHECK 双重保护（v395 修法）。
+
+    USING 限定可读/可改的旧行，WITH CHECK 限定改后新行属性。
+    """
+    src = _read_v411_source()
+    update_blocks = re.findall(
+        r"FOR\s+UPDATE\s+TO\s+PUBLIC[^;]*",
+        src, re.DOTALL | re.IGNORECASE,
+    )
+    assert update_blocks, "v411 缺 UPDATE policy"
+    for block in update_blocks:
+        upper = block.upper()
+        assert "USING" in upper, f"UPDATE policy 必须 USING：{block!r}"
+        assert "WITH CHECK" in upper, f"UPDATE policy 必须 WITH CHECK：{block!r}"
 
 
 def test_upgrade_creates_expiry_index():
