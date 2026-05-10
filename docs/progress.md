@@ -26,6 +26,48 @@
 
 ---
 
+## 2026-05-10 21:00 · channel-aggregation Phase 0 起手（CH-01/02.5/13 + 28 issue + 4 PR merged）
+
+### 完成状态
+- [x] 全渠道聚合主题完整链路：规划 → 跟踪 → 28 issue → 3 起手 PR + 1 docs PR → 全部 admin-merged
+- [x] `channel-aggregation-plan-2026-05-10.md` (560 行) — 真值表 + 28 PR 明细 + 5 Gating 创始人定盘
+- [x] `qualification-tracker-2026-05.md` — 4 平台资质追踪 + 5/13 deal-breaker
+- [x] GitHub milestone #1 channel-aggregation (due 2026-07-04) + 28 issue (#375-#402)
+- [x] 3 PR (#404/#405/#406) 起手 — 10 文件 / 1700+ LOC / 86 test 全过
+  - #404: CH-01 v411 channel_oauth_tokens + OAuthTokenStore (Fernet 加密)
+  - #405: CH-02.5 v412 raw_channel_events 落湖 + dedup
+  - #406: CH-13 v413 member_identity_map + ChannelIdentityResolver (NULLS NOT DISTINCT)
+- [x] docs PR #407 落地（plan/tracker/dev-plan-60d 三文档）
+- [x] 上 session 6 OPEN PR 清理：4 admin-merged (#353/#355/#356/#403)，2 留 conflict (#358/#370 user worktree 占用)
+- [x] 我侧 4 PR 全部 admin-merged → 3 issue auto-closed (#375 #377 #393)
+
+### 关键决策（创始人 5/10 定盘 5 Gating）
+- **G-CH-1 = A 全平台真接入**：故事最强但触发 5/13 deal-breaker（3 套企业资质≥2 周/套审核），明日 5/11 必须联系 BD + 法务/财务对齐
+- **G-CH-2 = B top-level 为 SoT**：与推荐方向相反，CH-02.7 估时 1d → 3d 拆 3 sub-PR；meituan-saas 1334 LOC 改写有回归风险
+- **G-CH-3 = A 做完整微信外卖**：CH-06 维持 3d，需先确认徐记是"小程序自营"还是"公众号点餐"
+- **G-CH-4 = A 隔离 schema 不上 demo**：crawler 数据进 reviews_crawler_*，NLQ 端不暴露
+- **G-CH-5 = A 钉 4 张全渠道报表**：mv_channel_funnel/review_sentiment/ad_roi/member_clv 入 14 报表清单（dev-plan-60d G3 仅剩 10 待答）
+
+### 关键技术决策（已 inline 在代码注释）
+- **Fernet 加密 vs pgcrypto** (CH-01)：选 Fernet（应用层，cryptography lib），密钥在 env 不下沉到 SQL；upsert 失败计数 + last_refresh_error 字段供告警
+- **PG 15+ NULLS NOT DISTINCT** (CH-13)：解决 phone 类型 (platform=NULL) 复合 UNIQUE 不能去重隐患；屯象生产 PG 16 OK
+- **channel_identity_resolver.py 独立文件**：原 `identity_resolver.py` 已被 S2W5 CDP WiFi 匹配 397 LOC 占用，新建独立 `ChannelIdentityResolver` 类不动既有；两者共享 member_identity_map 表，未来可合并到统一 CDP IdentityService（独立 issue）
+- **二次校准节省 2.5d**：发现 channel_canonical_service.py + 三平台 webhook 路由已存在，CH-02/03/04/05 估时全面降时（plan §1.2 已记录）
+
+### 下一步
+- **§19 独立验证**（推荐 user 开新 session）：从徐记海鲜收银员视角重检 #404 / #406（修改 3+ 文件 + DB 迁移 + Tier 1 路径，触发条件全中）— starter prompt 见本 session 末尾
+- **5/11 创始人级别（非技术）**：联系 3 平台 BD + 法务/财务 — deal-breaker 关
+- **CH-02.7a 起手**（验证通过后）：meituan subdir 1334 LOC → top-level 收敛，1.5d/300 LOC，拆 3 sub-PR 中第一个
+
+### 已知风险
+- **🚨 5/13 deal-breaker 倒计时 3 天**：3 套资质流程未启动；任一未到位 → CH-03..06 全 stuck → demo 故事崩；见 `qualification-tracker-2026-05.md` §6 降级方案
+- **8 个真 PG 反测 stub**：所有 cross-tenant / UNIQUE / CHECK 反测 opt-in via `INTEGRATION_PG_DSN`，待仓库级 docker-compose-pg fixture（与 #323 / S4-02 PR2.D 同诉求）
+- **CH-02.7a 高回归风险**：动 meituan-saas 1334 LOC + 35 baseline tests，须独立验证 #404/#406 通过后再起，避免基础不稳上叠加
+- **#358 / #370 conflict 留置**：上 session PR 在 user worktree 里活跃，本 session 不动；user 自行在 worktree 内 rebase
+- **CH-13 文件名分歧**：`channel_identity_resolver.py` 与既有 `identity_resolver.py` 并存可能让未来贡献者困惑；后续 issue 可考虑合并到统一 CDP IdentityService
+
+---
+
 ## 2026-05-10 上午 · drift 治理 main thread CLOSED（baseline 18 → 0 真终态）
 
 ### 完成状态
