@@ -1,0 +1,105 @@
+name: Integration PG Tests
+
+# S5（channel-aggregation 基建）— 跑 *_tier1.py 中 opt-in via INTEGRATION_PG_DSN 的真 PG 反测。
+#
+# 触发：PR 改动 channel-aggregation 关键路径或本 workflow 自身。
+# 行为：起 PG 16 service container → 应用 init-rls.sql → alembic stamp v409 + upgrade head
+#        → 跑 8 stub real_pg tests → 通过/失败汇报。
+#
+# 阻塞依赖：
+#   - 全 chain alembic upgrade 受历史 v301 PRIMARY KEY COALESCE bug 影响（pre-existing 债，
+#     不在 S5 scope）。本 workflow 只跑 v409→v413 增量 chain（stamp v409 跳过历史）。
+#   - 完整 chain 修复后，可去掉 stamp + 直接 upgrade head。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'shared/db-migrations/versions/v41*.py'
+      - 'shared/db-migrations/versions/v40*.py'
+      - 'shared/db-migrations/tests/test_v41*_tier1.py'
+      - 'shared/db-migrations/tests/test_v40*_tier1.py'
+      - 'shared/db-migrations/tests/conftest.py'
+      - 'services/tx-member/src/services/channel_identity_resolver.py'
+      - 'shared/adapters/base/src/oauth_token_store.py'
+      - '.github/workflows/integration-pg-tests.yml'
+      - 'infra/compose/test-pg.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integration-pg-tests:
+    name: Integration PG — channel-aggregation 真 PG 反测
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: tunxiang_test
+          POSTGRES_PASSWORD: test_password_dev_only
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tunxiang_test -d tunxiang_os_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+      INTEGRATION_PG_DSN: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+      OAUTH_TOKEN_ENCRYPTION_KEY: ZHVtbXktdGVzdC1mZXJuZXQta2V5LTMyLWJ5dGVzLXY=
+      IDENTITY_HASH_SALT: integration-test-salt-v1
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          pip install \
+            "alembic>=1.13" "sqlalchemy[asyncio]>=2.0" \
+            "asyncpg>=0.29" "psycopg2-binary>=2.9" \
+            pytest "pytest-asyncio>=0.23" \
+            structlog cryptography
+
+      - name: Apply init-rls.sql + init-pgvector.sql
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-rls.sql
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-pgvector.sql
+
+      - name: Alembic stamp v409 + upgrade head (跳过 pre-v409 历史 chain)
+        # v411/v412/v413 down_revision = v409，不需要 v408 之前的历史。
+        # stamp v409 让 alembic 视 v409 为已应用，再 upgrade 跑 v411→v412→v413。
+        # 完整 chain 修复（v301 等历史 bug）属独立 issue。
+        working-directory: shared/db-migrations
+        run: |
+          python -m alembic stamp v409_fund_settlement_revive
+          python -m alembic upgrade head
+          # 验证 3 表已建
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -c "\dt channel_oauth_tokens raw_channel_events member_identity_map"
+
+      - name: Run integration PG tests (8 stub + 既有真测)
+        run: |
+          python -m pytest \
+            shared/db-migrations/tests/test_v411_oauth_tokens_tier1.py \
+            shared/db-migrations/tests/test_v412_raw_channel_events_tier1.py \
+            shared/db-migrations/tests/test_v413_member_identity_map_tier1.py \
+            -v --tb=short
+
+      - name: Verify policy table state (debug aid)
+        if: always()
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -c "SELECT tablename, policyname, cmd, qual IS NOT NULL AS has_using, with_check IS NOT NULL AS has_check FROM pg_policies WHERE tablename IN ('channel_oauth_tokens', 'raw_channel_events', 'member_identity_map') ORDER BY tablename, cmd;"

@@ -1,0 +1,56 @@
+# Integration PG fixture — 本地真 PG 反测容器
+#
+# S5 (channel-aggregation 基建) 提供 — 让 *_tier1.py 里 opt-in via INTEGRATION_PG_DSN
+# 的真 PG 反测能本地跑（对应 CI workflow integration-pg-tests.yml）。
+#
+# 启动：
+#   docker compose -f infra/compose/test-pg.yml up -d
+#
+# 初始化（首次起表）：
+#   DATABASE_URL=postgresql://tunxiang_test:test_password_dev_only@localhost:5433/tunxiang_os_test \
+#     ./scripts/db-bootstrap.sh --skip-create
+#   # legacy 链含 v411/v412/v413 等 channel-aggregation 表
+#   DATABASE_URL=postgresql://tunxiang_test:test_password_dev_only@localhost:5433/tunxiang_os_test \
+#     ./scripts/migrate-all.sh --include-legacy
+#
+# 跑反测：
+#   INTEGRATION_PG_DSN=postgresql://tunxiang_test:test_password_dev_only@localhost:5433/tunxiang_os_test \
+#     pytest shared/db-migrations/tests/ -k real_pg -v
+#
+# 销毁：
+#   docker compose -f infra/compose/test-pg.yml down -v
+#
+# 端口约定：5433（不撞主机的 prod PG 5432）
+# 数据卷：tunxiang-test-pg-data（命名卷，down -v 时一同清理）
+#
+# 完整使用文档见 docs/integration-pg-fixture.md
+
+name: tunxiang-test-pg
+
+services:
+  test-pg:
+    image: pgvector/pgvector:pg16
+    container_name: tunxiang-test-pg
+    environment:
+      POSTGRES_USER: tunxiang_test
+      POSTGRES_PASSWORD: test_password_dev_only
+      POSTGRES_DB: tunxiang_os_test
+    ports:
+      - "5433:5432"
+    volumes:
+      # init-*.sql 在容器首次起 PG 时由 docker-entrypoint 自动按字典序执行
+      - ../../infra/docker/init-rls.sql:/docker-entrypoint-initdb.d/01-init-rls.sql:ro
+      - ../../infra/docker/init-pgvector.sql:/docker-entrypoint-initdb.d/02-init-pgvector.sql:ro
+      - test-pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U tunxiang_test -d tunxiang_os_test
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  test-pg-data:
+    name: tunxiang-test-pg-data
