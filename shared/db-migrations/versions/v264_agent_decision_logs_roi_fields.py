@@ -9,13 +9,28 @@
   roi_evidence        JSONB          —— 证据链（数据源 URL/SQL/事件 ID，便于 audit）
 
 Revision ID: v264_roi
-Revises: v263
+Revises: v264 (chain serialization, see PR #352 - v264 multi-head debt)
 Create Date: 2026-04-23
+
+Chain repair note (PR #352):
+  原 down_revision = "v263"，与 v264_agent_roi_fields.py 形成两个 v263 子分叉，
+  都改同一张 agent_decision_logs 表。两 migration 均用 ADD COLUMN IF NOT EXISTS
+  对相同 4 列幂等添加（v264 用 NULL 默认，本文件用 DEFAULT 0），whoever runs first
+  wins. Index 不同 (v264 索引 created_at / 本文件索引 decided_at + agent_id)，二者
+  互补不冲突，runtime 都需要。
+
+  本次 chain serialization：把 down_revision 改为 "v264"（v264 先跑添加列与默认 NULL，
+  本文件后跑因 IF NOT EXISTS 跳过 ADD COLUMN，但补加 decided_at 索引），让 v263
+  → v264 → v264_roi → v265_mv_agent_roi_monthly 链路 deterministic，不再受 alembic
+  随机拓扑序影响。schema 终态等价 v264 winning + 索引 v264 + v264_roi 各 1 个。
+
+  独立 fork 仍保留 (v264b/v264c/v265/v266_mem_evo) — 它们改不同表，是合法 parallel
+  feature。Phase 4a-4 baseline squash 后整链重写时彻底清理。
 """
 from alembic import op
 
 revision = "v264_roi"
-down_revision = "v263"
+down_revision = "v264"  # 原 "v263"，PR #352 chain serialization 见 docstring
 branch_labels = None
 depends_on = None
 
