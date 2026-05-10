@@ -84,7 +84,7 @@ def _make_supply_stubs():
     # 各测试用例会通过 patch 替换此类
     auto_proc_mod = types.ModuleType("services.auto_procurement")
     auto_proc_mod.AutoProcurementService = MagicMock()  # type: ignore[attr-defined]
-    sys.modules.setdefault("services.auto_procurement", auto_proc_mod)
+    sys.modules.setdefault("services.tx_supply.src.services.auto_procurement", auto_proc_mod)
 
 
 _make_supply_stubs()

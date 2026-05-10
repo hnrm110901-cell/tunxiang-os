@@ -111,14 +111,14 @@ _invoice_svc_stub = _make_stub(
     _invoice_to_dict=_invoice_to_dict,
 )
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.invoice_service"] = _invoice_svc_stub
+sys.modules["services.tx_finance.src.services.invoice_service"] = _invoice_svc_stub
 
 # ── models.invoice ────────────────────────────────────────────────────────────
 _Invoice = MagicMock()
 _Invoice.order_id = MagicMock()
 _Invoice.tenant_id = MagicMock()
 sys.modules.setdefault("models", _make_stub("models"))
-sys.modules["models.invoice"] = _make_stub("models.invoice", Invoice=_Invoice)
+sys.modules["services.tx_finance.src.models.invoice"] = _make_stub("models.invoice", Invoice=_Invoice)
 
 # ─── 加载被测路由 ──────────────────────────────────────────────────────────────
 import importlib.util

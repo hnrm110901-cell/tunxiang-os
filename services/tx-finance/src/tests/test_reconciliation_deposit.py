@@ -109,7 +109,7 @@ _three_way_stub = _make_stub(
     VarianceItem=MagicMock(),
 )
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.three_way_match_engine"] = _three_way_stub
+sys.modules["services.tx_finance.src.services.three_way_match_engine"] = _three_way_stub
 
 # ── models.three_way_match 存根 ───────────────────────────────────────────────
 _models_stub = _make_stub("models")
@@ -118,7 +118,7 @@ _match_record_stub = _make_stub(
     ThreeWayMatchRecord=MagicMock(),
 )
 sys.modules.setdefault("models", _models_stub)
-sys.modules["models.three_way_match"] = _match_record_stub
+sys.modules["services.tx_finance.src.models.three_way_match"] = _match_record_stub
 
 # ─── 加载被测路由模块 ─────────────────────────────────────────────────────────
 

@@ -77,7 +77,7 @@ sys.modules.setdefault("shared.ontology.src.database", _shared_ont_db)
 # stub food_safety service
 _food_safety_svc = types.ModuleType("services.food_safety")
 sys.modules.setdefault("services", types.ModuleType("services"))
-sys.modules.setdefault("services.food_safety", _food_safety_svc)
+sys.modules.setdefault("services.tx_supply.src.services.food_safety", _food_safety_svc)
 
 # relative import path used by food_safety_routes: ..services.food_safety
 # We need to provide it under the package path the route module uses

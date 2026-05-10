@@ -90,10 +90,10 @@ _notify_stub = _make_stub(
 )
 
 sys.modules.setdefault("services", _make_stub("services"))
-sys.modules["services.stored_value_split_service"] = _split_svc_stub
+sys.modules["services.tx_finance.src.services.stored_value_split_service"] = _split_svc_stub
 sys.modules.setdefault("tasks", _make_stub("tasks"))
 sys.modules["tasks.settlement_scheduler"] = _scheduler_stub
-sys.modules["services.settlement_notify_service"] = _notify_stub
+sys.modules["services.tx_finance.src.services.settlement_notify_service"] = _notify_stub
 
 # 确保 src 包结构
 sys.modules.setdefault("src", _make_stub("src"))

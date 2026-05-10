@@ -104,7 +104,7 @@ class _FakeRevenueService:
 
 _svc_ra_mod.RevenueAggregationService = _FakeRevenueService
 sys.modules.setdefault("services", _svc_mod)
-sys.modules.setdefault("services.revenue_aggregation_service", _svc_ra_mod)
+sys.modules.setdefault("services.tx_finance.src.services.revenue_aggregation_service", _svc_ra_mod)
 
 # ── Mock shared.events.src.emitter ──────────────────────────────────────────
 _shared_events = types.ModuleType("shared.events")

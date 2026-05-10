@@ -71,7 +71,7 @@ class _CompetitorMonitorExtService:
 
 _competitor_ext_mod = types.ModuleType("services.competitor_monitor_ext")
 _competitor_ext_mod.CompetitorMonitorExtService = _CompetitorMonitorExtService
-sys.modules["services.competitor_monitor_ext"] = _competitor_ext_mod
+sys.modules["services.tx_intel.src.services.competitor_monitor_ext"] = _competitor_ext_mod
 
 
 # review_collector 桩
@@ -85,7 +85,7 @@ class _ReviewCollectorService:
 
 _review_collector_mod = types.ModuleType("services.review_collector")
 _review_collector_mod.ReviewCollectorService = _ReviewCollectorService
-sys.modules["services.review_collector"] = _review_collector_mod
+sys.modules["services.tx_intel.src.services.review_collector"] = _review_collector_mod
 
 
 # trend_scanner 桩
@@ -102,7 +102,7 @@ class _TrendScannerService:
 
 _trend_scanner_mod = types.ModuleType("services.trend_scanner")
 _trend_scanner_mod.TrendScannerService = _TrendScannerService
-sys.modules["services.trend_scanner"] = _trend_scanner_mod
+sys.modules["services.tx_intel.src.services.trend_scanner"] = _trend_scanner_mod
 
 # pydantic（路由用到 BaseModel / Field）
 try:
