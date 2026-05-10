@@ -76,6 +76,16 @@ _CREATE_TABLE_RE = re.compile(
 _OP_CREATE_TABLE_RE = re.compile(
     r"""op\.create_table\s*\(\s*["']([a-z_][a-z0-9_]*)["']""",
 )
+# module-level 字符串赋值 — `VAR = "value"`（用于解析 op.create_table 间接变量调用）
+# 注：仅匹配 ^ 开头（module-level），避免误匹配 dict/function 内的赋值
+_VAR_STR_DEF_RE = re.compile(
+    r"""^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*["']([a-z_][a-z0-9_]*)["']""",
+    re.MULTILINE,
+)
+# op.create_table(VAR, ...) 变量间接调用 — `[A-Za-z_]` 排除 quote 不与 _OP_CREATE_TABLE_RE 重叠
+_OP_CREATE_TABLE_VAR_RE = re.compile(
+    r"""op\.create_table\s*\(\s*([A-Za-z_][A-Za-z0-9_]*)\s*[,)]""",
+)
 
 
 def _scan_migration_tablenames() -> set[str]:
@@ -83,6 +93,13 @@ def _scan_migration_tablenames() -> set[str]:
     - shared/db-migrations/versions/
     - shared/db-migrations-core/versions/
     - services/*/db-migrations/versions/
+
+    识别 3 种 op.create_table 调用模式：
+    1. raw SQL: `CREATE TABLE [IF NOT EXISTS] <name> (`
+    2. Python API 直接字面量: `op.create_table("name", ...)`
+    3. Python API 变量间接: `VAR = "name"` then `op.create_table(VAR, ...)`
+       (v016/v019/v024/v084 等 chain rescue 路径常见模式 — VAR 命名包括
+       _TABLE / TABLE_NAME / _AUTO_ACCEPT_TABLE 等任意 identifier)
     """
     tables: set[str] = set()
     migration_dirs = [
@@ -104,10 +121,20 @@ def _scan_migration_tablenames() -> set[str]:
                 src = path.read_text()
             except (OSError, UnicodeDecodeError):
                 continue
+            # 模式 1+2 — 直接命中
             for m in _CREATE_TABLE_RE.finditer(src):
                 tables.add(m.group(1))
             for m in _OP_CREATE_TABLE_RE.finditer(src):
                 tables.add(m.group(1))
+            # 模式 3 — 变量间接：先建 var→value 映射，再消费 op.create_table(VAR) 调用
+            var_to_value = {
+                m.group(1): m.group(2) for m in _VAR_STR_DEF_RE.finditer(src)
+            }
+            if var_to_value:
+                for m in _OP_CREATE_TABLE_VAR_RE.finditer(src):
+                    var = m.group(1)
+                    if var in var_to_value:
+                        tables.add(var_to_value[var])
     return tables
 
 
@@ -125,17 +152,16 @@ def _compute_orm_drift() -> dict[str, list[str]]:
 # Phase 4a-3 baseline — 起点 18 处 drift（PR #357 锁定）。
 # Ratchet: 18 (起点) → 15 (PR #360 Class B 命名漂移) → 12 (PR #361 retail_mall revive +
 # Class F SECURITY 修) → 10 (PR #362 distribution_trips/items revive) →
-# 7 (PR #363 fund_settlement 三表 revive) → 4 (本 PR Class C dead ORM 清理 —
-# audit 见 docs/orm-drift-class-c-audit.md，删 banquet_menu_templates_v2 /
-# daily_plans / stored_value_account_transactions 三个 ORM-only 0 引用 dead 类)。
+# 7 (PR #363 fund_settlement 三表 revive) → 4 (PR #369 Class C dead ORM 清理) →
+# 0 (本 PR detector 升级 — 加 op.create_table(VAR) 变量间接识别模式 — v016/v019/
+# v024/v084 等 chain rescue 路径用 `_TABLE = "name"` 模式建表本来就在 main chain，
+# detector regex 漏识别变量间接调用导致 4 张表误报为 drift；修 detector 后这 4 张
+# 表自动从 drift list 移除，drift 真终态归零)。
 #
-# 剩余 4 张全部 Class C LIVE（待 v410 revive PR 收尾归零）：
-#   brand_groups (tx-member, group_member_service heavy raw SQL) /
-#   cook_time_baselines (tx-trade, cook_time_stats raw SQL) /
-#   delivery_auto_accept_rules (tx-trade, ORM CRUD via Repository) /
-#   kds_tasks (tx-trade, 9+ raw SQL CRUD 跨 5 文件) — 需 v410 单 migration 全部 revive
-# 修一个 drift → ratchet 下调本数值。终态 0：所有 ORM model 都有对应 migration 创建路径。
-_ORM_DRIFT_BASELINE = 4
+# tablename-level drift 终态 0 ✅。column-level 漂移（ORM↔DDL 列不齐）由 issue
+# #364 (distribution_warehouses/plans) / #365 (drift 检测器 column-level 升级) /
+# #372 (kds_tasks 6 列漂移) 独立跟进。
+_ORM_DRIFT_BASELINE = 0
 
 
 def test_orm_migration_drift_no_new_violations():
