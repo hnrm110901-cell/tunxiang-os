@@ -56,16 +56,14 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         ("services/tx-finance/src/models/invoice.py", 67, "tax_amount"),
         ("services/tx-finance/src/models/voucher.py", 110, "total_amount"),
         # ── tx-member ───────────────────────────────────────────────────
-        ("services/tx-member/src/models/stored_value_account.py", 85, "balance"),
-        ("services/tx-member/src/models/stored_value_account.py", 91, "gift_balance"),
-        ("services/tx-member/src/models/stored_value_account.py", 99, "total_recharged"),
-        ("services/tx-member/src/models/stored_value_account.py", 105, "total_consumed"),
-        ("services/tx-member/src/models/stored_value_account.py", 151, "amount"),
-        ("services/tx-member/src/models/stored_value_account.py", 156, "gift_amount"),
-        ("services/tx-member/src/models/stored_value_account.py", 164, "balance_before"),
-        ("services/tx-member/src/models/stored_value_account.py", 169, "balance_after"),
-        ("services/tx-member/src/models/stored_value_account.py", 174, "gift_balance_before"),
-        ("services/tx-member/src/models/stored_value_account.py", 180, "gift_balance_after"),
+        # 行号 85/91/99/105 由 PR #369 stored_value_account_transactions class
+        # 删除 + docstring 同步收缩漂移到 72/78/86/92。
+        # 原 lines 151/156/164/169/174/180 属 Transaction class（PR #369 删除，
+        # 0 引用 dead — audit 见 docs/orm-drift-class-c-audit.md），从 baseline 移除。
+        ("services/tx-member/src/models/stored_value_account.py", 72, "balance"),
+        ("services/tx-member/src/models/stored_value_account.py", 78, "gift_balance"),
+        ("services/tx-member/src/models/stored_value_account.py", 86, "total_recharged"),
+        ("services/tx-member/src/models/stored_value_account.py", 92, "total_consumed"),
         # ── tx-trade ────────────────────────────────────────────────────
         ("services/tx-trade/src/models/chef_performance_daily.py", 22, "dish_amount"),
         # 待专项 PR 修复后删除：
