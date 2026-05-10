@@ -88,8 +88,8 @@ def _on_tick_done(task: asyncio.Task) -> None:
 # FastAPI App（lifespan 管理 DB 初始化 + scheduler）
 # ---------------------------------------------------------------------------
 
-from engine.event_bridge import get_event_bridge as _get_event_bridge
-from engine.journey_engine import JourneyEngine as _JourneyEngine
+from services.tx_growth.src.engine.event_bridge import get_event_bridge as _get_event_bridge
+from services.tx_growth.src.engine.journey_engine import JourneyEngine as _JourneyEngine
 from services.tx_growth.src.services.approval_service import ApprovalService as _ApprovalService
 
 from .api.ab_test_routes import router as ab_test_router
@@ -917,7 +917,7 @@ async def lifespan(app: FastAPI):
 
     # 停止 EventBridge
     try:
-        from engine.event_bridge import _bridge_instance as _eb
+        from services.tx_growth.src.engine.event_bridge import _bridge_instance as _eb
 
         if _eb is not None:
             await _eb.stop()

@@ -89,16 +89,13 @@ _fake_templates_mod.TEMPLATES = {
         "target_segment": "new_customer",
     }
 }
-sys.modules["templates"] = _types.ModuleType("templates")
-sys.modules["templates.journey_templates"] = _fake_templates_mod
+sys.modules["services.tx_growth.src.templates.journey_templates"] = _fake_templates_mod
 
-with patch("engine.journey_engine.JourneyEngine", return_value=_fake_engine):
-    # engine 模块
-    engine_mod = _types.ModuleType("engine")
-    engine_mod.journey_engine = _types.ModuleType("engine.journey_engine")
-    engine_mod.journey_engine.JourneyEngine = MagicMock(return_value=_fake_engine)
-    sys.modules["engine"] = engine_mod
-    sys.modules["engine.journey_engine"] = engine_mod.journey_engine
+with patch("services.tx_growth.src.engine.journey_engine.JourneyEngine", return_value=_fake_engine):
+    # engine 模块（容器布局长路径）
+    engine_jm = _types.ModuleType("services.tx_growth.src.engine.journey_engine")
+    engine_jm.JourneyEngine = MagicMock(return_value=_fake_engine)
+    sys.modules["services.tx_growth.src.engine.journey_engine"] = engine_jm
 
     from api.journey_routes import router
 

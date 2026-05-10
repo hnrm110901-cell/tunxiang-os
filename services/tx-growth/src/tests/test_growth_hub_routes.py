@@ -352,7 +352,7 @@ _offer_seeds_mod.GROWTH_OFFER_PACKS = [
         "offers": [{"type": "coupon", "value_fen": 1000}],
     },
 ]
-sys.modules["seeds.growth_offer_seeds"] = _offer_seeds_mod
+sys.modules["services.tx_growth.src.seeds.growth_offer_seeds"] = _offer_seeds_mod
 
 # ── 导入被测路由 ──────────────────────────────────────────────────────────────
 from api.growth_hub_routes import router  # noqa: E402

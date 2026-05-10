@@ -19,7 +19,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from engine.action_executors import ActionExecutorRegistry
+from services.tx_growth.src.engine.action_executors import ActionExecutorRegistry
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 

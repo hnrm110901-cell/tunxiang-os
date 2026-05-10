@@ -1786,7 +1786,7 @@ async def list_offer_packs(
     """查询 P0 权益包模板（当前从内存种子数据返回）。"""
     _parse_tenant(x_tenant_id)  # 验证 tenant 格式
     try:
-        from seeds.growth_offer_seeds import GROWTH_OFFER_PACKS
+        from services.tx_growth.src.seeds.growth_offer_seeds import GROWTH_OFFER_PACKS
 
         items = list(GROWTH_OFFER_PACKS)
         if pack_type:
