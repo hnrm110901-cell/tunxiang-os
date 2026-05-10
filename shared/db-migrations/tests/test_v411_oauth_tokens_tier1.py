@@ -9,16 +9,17 @@ CH-01（issue #375）。覆盖范围：
 
 技术约束：
   - 1-4 不连真 PG，仅静态扫 SQL 文本
-  - 5 真连 PG，跑完 upgrade → 反测 → downgrade，不污染主库
+  - 5 真连 PG，事务 rollback 隔离（fixture 见 conftest.py:integration_pg_session）
 """
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -254,37 +255,123 @@ def test_platforms_aligned_with_canonical():
 
 
 # ─────────────────────────────────────────────────────────────────
-# 5. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，参照 PR #333 模式）
+# 5. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，fixture 见 conftest.py）
 # ─────────────────────────────────────────────────────────────────
+#
+# 共用 fixture：
+#   - integration_pg_session  事务隔离 session（teardown 自动 rollback）
+#   - set_tenant_guc          设 app.tenant_id GUC（事务级）
+#
+# 未配置 DSN 时 fixture 自身 pytest.skip — 不污染 default 测试套件。
 
 
-_INTEGRATION_PG_DSN = os.environ.get("INTEGRATION_PG_DSN")
-pytestmark_integration = pytest.mark.skipif(
-    not _INTEGRATION_PG_DSN,
-    reason="INTEGRATION_PG_DSN 未配置，跳过真 PG 反测（opt-in）",
-)
+_INSERT_TOKEN_SQL = text("""
+    INSERT INTO channel_oauth_tokens
+        (tenant_id, store_id, platform, account_id,
+         access_token_enc, expires_at)
+    VALUES (:tid, :sid, :platform, :account_id,
+            :token_data, NOW() + INTERVAL '1 day')
+""")
 
 
-@pytestmark_integration
-def test_real_pg_rls_cross_tenant_isolation():
-    """tenant_A 设置 app.tenant_id 后查不到 tenant_B 的 token。"""
-    # TODO(CH-01): 在 staging 配 INTEGRATION_PG_DSN 后实现完整反测
-    # 步骤：
-    #   1. alembic upgrade head
-    #   2. 用 service role insert tenant_A token + tenant_B token
-    #   3. SET LOCAL app.tenant_id = tenant_A → SELECT 仅返回 A 的
-    #   4. SET LOCAL app.tenant_id = tenant_B → SELECT 仅返回 B 的
-    #   5. tenant_A 上下文 INSERT WHERE tenant_id = tenant_B → WITH CHECK 拒绝
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — 见 issue #375 follow-up")
+async def test_real_pg_rls_cross_tenant_isolation(
+    integration_pg_session, set_tenant_guc,
+):
+    """tenant_A 设置 app.tenant_id 后查不到 tenant_B 的 token；
+    跨租户 INSERT 被 WITH CHECK 拒绝。
+    """
+    session = integration_pg_session
+    tenant_a, tenant_b = uuid4(), uuid4()
+    store_id = uuid4()
+
+    # tenant_a 上下文写 A 的 token
+    await set_tenant_guc(session, tenant_a)
+    await session.execute(_INSERT_TOKEN_SQL, {
+        "tid": str(tenant_a), "sid": str(store_id),
+        "platform": "meituan", "account_id": "POI_A",
+        "token_data": b"A_encrypted_token",
+    })
+
+    # tenant_b 上下文写 B 的 token
+    await set_tenant_guc(session, tenant_b)
+    await session.execute(_INSERT_TOKEN_SQL, {
+        "tid": str(tenant_b), "sid": str(store_id),
+        "platform": "meituan", "account_id": "POI_B",
+        "token_data": b"B_encrypted_token",
+    })
+
+    # tenant_a 视角只看到 A
+    await set_tenant_guc(session, tenant_a)
+    rows = (await session.execute(
+        text("SELECT account_id FROM channel_oauth_tokens ORDER BY account_id")
+    )).scalars().all()
+    assert rows == ["POI_A"], f"tenant_a 应只看到 POI_A，实际：{rows}"
+
+    # tenant_b 视角只看到 B
+    await set_tenant_guc(session, tenant_b)
+    rows = (await session.execute(
+        text("SELECT account_id FROM channel_oauth_tokens ORDER BY account_id")
+    )).scalars().all()
+    assert rows == ["POI_B"], f"tenant_b 应只看到 POI_B，实际：{rows}"
+
+    # 跨租户写：tenant_a 上下文 INSERT tenant_id=tenant_b → WITH CHECK 拒绝
+    await set_tenant_guc(session, tenant_a)
+    with pytest.raises(Exception) as exc_info:
+        await session.execute(_INSERT_TOKEN_SQL, {
+            "tid": str(tenant_b), "sid": str(store_id),
+            "platform": "eleme", "account_id": "EVADE_001",
+            "token_data": b"evade",
+        })
+    err = str(exc_info.value).lower()
+    assert "policy" in err or "row-level" in err or "with check" in err, (
+        f"应抛 RLS WITH CHECK 错误，实际：{exc_info.value}"
+    )
 
 
-@pytestmark_integration
-def test_real_pg_unique_constraint_enforced():
+async def test_real_pg_unique_constraint_enforced(
+    integration_pg_session, set_tenant_guc,
+):
     """同 (tenant_id, store_id, platform, account_id) 二次 INSERT 抛 UNIQUE 错。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — 见 issue #375 follow-up")
+    session = integration_pg_session
+    tenant = uuid4()
+    store = uuid4()
+
+    await set_tenant_guc(session, tenant)
+    await session.execute(_INSERT_TOKEN_SQL, {
+        "tid": str(tenant), "sid": str(store),
+        "platform": "meituan", "account_id": "POI_DUP",
+        "token_data": b"first",
+    })
+
+    # 二次 INSERT 同业务键
+    with pytest.raises(Exception) as exc_info:
+        await session.execute(_INSERT_TOKEN_SQL, {
+            "tid": str(tenant), "sid": str(store),
+            "platform": "meituan", "account_id": "POI_DUP",
+            "token_data": b"second",
+        })
+    err = str(exc_info.value).lower()
+    assert "unique" in err or "duplicate" in err, (
+        f"应抛 UNIQUE 约束错误，实际：{exc_info.value}"
+    )
 
 
-@pytestmark_integration
-def test_real_pg_platform_check_enforced():
+async def test_real_pg_platform_check_enforced(
+    integration_pg_session, set_tenant_guc,
+):
     """platform 不在 ALLOWED_PLATFORMS 时 CHECK 拒绝 INSERT。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — 见 issue #375 follow-up")
+    session = integration_pg_session
+    tenant = uuid4()
+    store = uuid4()
+
+    await set_tenant_guc(session, tenant)
+    with pytest.raises(Exception) as exc_info:
+        await session.execute(_INSERT_TOKEN_SQL, {
+            "tid": str(tenant), "sid": str(store),
+            "platform": "tiktok_us",  # 不在 ALLOWED_PLATFORMS
+            "account_id": "POI_X", "token_data": b"x",
+        })
+    err = str(exc_info.value).lower()
+    assert "check" in err or "constraint" in err, (
+        f"应抛 platform CHECK 错误，实际：{exc_info.value}"
+    )

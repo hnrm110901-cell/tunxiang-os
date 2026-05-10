@@ -12,11 +12,12 @@ CH-13（issue #393）。覆盖范围：
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
+from sqlalchemy import text
 
 
 def _read_v413_source() -> str:
@@ -204,30 +205,131 @@ def test_downgrade_drops_table():
 
 
 # ─────────────────────────────────────────────────────────────────
-# 4. 真 PG 反测（opt-in via INTEGRATION_PG_DSN）
+# 4. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，fixture 见 conftest.py）
 # ─────────────────────────────────────────────────────────────────
 
 
-_INTEGRATION_PG_DSN = os.environ.get("INTEGRATION_PG_DSN")
-pytestmark_integration = pytest.mark.skipif(
-    not _INTEGRATION_PG_DSN,
-    reason="INTEGRATION_PG_DSN 未配置，跳过真 PG 反测（opt-in）",
-)
+_INSERT_IDENTITY_SQL = text("""
+    INSERT INTO member_identity_map
+        (tenant_id, member_id, identity_type, identity_value_hash,
+         platform, confidence, source)
+    VALUES (:tid, :mid, :itype, :hash, :platform, :conf, :source)
+""")
+
+# UNIQUE NULLS NOT DISTINCT 行为反证：同 (tenant, type, hash, platform=NULL) 二次入
+_INSERT_IDENTITY_UPSERT_SQL = text("""
+    INSERT INTO member_identity_map
+        (tenant_id, member_id, identity_type, identity_value_hash,
+         platform, confidence, source)
+    VALUES (:tid, :mid, :itype, :hash, :platform, :conf, :source)
+    ON CONFLICT (tenant_id, identity_type, identity_value_hash, platform)
+    DO UPDATE SET last_seen_at = NOW()
+    RETURNING member_id
+""")
 
 
-@pytestmark_integration
-def test_real_pg_unique_nulls_not_distinct():
-    """phone 类型 (platform=NULL) 同 hash 二次 INSERT → ON CONFLICT 触发。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — issue #393 follow-up")
+async def test_real_pg_unique_nulls_not_distinct(
+    integration_pg_session, set_tenant_guc,
+):
+    """phone 类型 (platform=NULL) 同 hash 二次 INSERT → ON CONFLICT 触发，
+    保留先到者 member_id（防 #412 race）。
+    """
+    session = integration_pg_session
+    tenant = uuid4()
+    first_member, second_member = uuid4(), uuid4()
+    phone_hash = "a" * 64  # 模拟 SHA256 hex
+
+    await set_tenant_guc(session, tenant)
+    # 首次：first_member
+    first_returned = (await session.execute(_INSERT_IDENTITY_UPSERT_SQL, {
+        "tid": str(tenant), "mid": str(first_member),
+        "itype": "phone", "hash": phone_hash,
+        "platform": None, "conf": 1.0, "source": "test",
+    })).scalar_one()
+    assert first_returned == first_member, "首次 INSERT 应返回新 member_id"
+
+    # 二次：second_member 业务键相同（platform=NULL 也 distinct=NULL）
+    second_returned = (await session.execute(_INSERT_IDENTITY_UPSERT_SQL, {
+        "tid": str(tenant), "mid": str(second_member),
+        "itype": "phone", "hash": phone_hash,
+        "platform": None, "conf": 0.5, "source": "test2",
+    })).scalar_one()
+    assert second_returned == first_member, (
+        f"NULLS NOT DISTINCT 下二次 UPSERT 应保留首者 {first_member}，"
+        f"实际返回 {second_returned}（PR #412 race fix 验证）"
+    )
+
+    # 行数仍是 1
+    count = (await session.execute(text(
+        "SELECT count(*) FROM member_identity_map "
+        "WHERE identity_value_hash = :h"
+    ), {"h": phone_hash})).scalar_one()
+    assert count == 1, f"应只有 1 行，实际：{count}"
 
 
-@pytestmark_integration
-def test_real_pg_concurrent_upsert_no_duplicate():
-    """并发 link 同 (tenant_id, type, hash, platform) → 只产生一行。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — issue #393 follow-up")
+async def test_real_pg_concurrent_upsert_no_duplicate(
+    integration_pg_session, set_tenant_guc,
+):
+    """模拟并发 link 同 (tenant_id, type, hash, platform=meituan) → 只产生 1 行。
+
+    与 unique_nulls_not_distinct 区别：本测试 platform 非 NULL（验证常规 UNIQUE 路径）。
+    """
+    session = integration_pg_session
+    tenant = uuid4()
+    openid_hash = "b" * 64
+
+    await set_tenant_guc(session, tenant)
+    # 三连发同业务键
+    for i in range(3):
+        await session.execute(_INSERT_IDENTITY_UPSERT_SQL, {
+            "tid": str(tenant), "mid": str(uuid4()),
+            "itype": "openid", "hash": openid_hash,
+            "platform": "meituan", "conf": 1.0, "source": f"caller_{i}",
+        })
+    count = (await session.execute(text(
+        "SELECT count(*) FROM member_identity_map "
+        "WHERE identity_value_hash = :h AND platform = 'meituan'"
+    ), {"h": openid_hash})).scalar_one()
+    assert count == 1, f"3 次同业务键 UPSERT 应只产生 1 行，实际：{count}"
 
 
-@pytestmark_integration
-def test_real_pg_rls_cross_tenant():
+async def test_real_pg_rls_cross_tenant(
+    integration_pg_session, set_tenant_guc,
+):
     """tenant_A 设置 GUC 后查不到 tenant_B 的 identity 映射。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — issue #393 follow-up")
+    session = integration_pg_session
+    tenant_a, tenant_b = uuid4(), uuid4()
+    member_a, member_b = uuid4(), uuid4()
+
+    await set_tenant_guc(session, tenant_a)
+    await session.execute(_INSERT_IDENTITY_SQL, {
+        "tid": str(tenant_a), "mid": str(member_a),
+        "itype": "phone", "hash": "a" * 64,
+        "platform": None, "conf": 1.0, "source": "test_a",
+    })
+    await set_tenant_guc(session, tenant_b)
+    await session.execute(_INSERT_IDENTITY_SQL, {
+        "tid": str(tenant_b), "mid": str(member_b),
+        "itype": "phone", "hash": "b" * 64,
+        "platform": None, "conf": 1.0, "source": "test_b",
+    })
+
+    # tenant_a 视角只看 A
+    await set_tenant_guc(session, tenant_a)
+    rows = (await session.execute(text(
+        "SELECT identity_value_hash FROM member_identity_map "
+        "ORDER BY identity_value_hash"
+    ))).scalars().all()
+    assert rows == ["a" * 64], f"tenant_a 应只看到 A 的 hash，实际：{rows}"
+
+    # 跨租户 INSERT WITH CHECK 拒绝
+    with pytest.raises(Exception) as exc_info:
+        await session.execute(_INSERT_IDENTITY_SQL, {
+            "tid": str(tenant_b), "mid": str(member_b),
+            "itype": "phone", "hash": "c" * 64,
+            "platform": None, "conf": 1.0, "source": "evade",
+        })
+    err = str(exc_info.value).lower()
+    assert "policy" in err or "row-level" in err or "with check" in err, (
+        f"应抛 RLS WITH CHECK 错误，实际：{exc_info.value}"
+    )

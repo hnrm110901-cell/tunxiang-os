@@ -12,11 +12,11 @@ CH-02.5（issue #377）。覆盖范围：
 
 from __future__ import annotations
 
-import os
 import re
 from pathlib import Path
 
 import pytest
+from sqlalchemy import text
 
 
 def _read_v412_source() -> str:
@@ -243,24 +243,95 @@ def test_platforms_aligned_with_v411():
 
 
 # ─────────────────────────────────────────────────────────────────
-# 5. 真 PG 反测（opt-in via INTEGRATION_PG_DSN）
+# 5. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，fixture 见 conftest.py）
 # ─────────────────────────────────────────────────────────────────
 
 
-_INTEGRATION_PG_DSN = os.environ.get("INTEGRATION_PG_DSN")
-pytestmark_integration = pytest.mark.skipif(
-    not _INTEGRATION_PG_DSN,
-    reason="INTEGRATION_PG_DSN 未配置，跳过真 PG 反测（opt-in）",
-)
+_INSERT_EVENT_SQL = text("""
+    INSERT INTO raw_channel_events
+        (tenant_id, platform, external_event_id, event_type, payload, signature)
+    VALUES (:tid, :platform, :ext_id, :etype, CAST(:payload AS jsonb), :sig)
+""")
+
+_INSERT_EVENT_DEDUP_SQL = text("""
+    INSERT INTO raw_channel_events
+        (tenant_id, platform, external_event_id, event_type, payload)
+    VALUES (:tid, :platform, :ext_id, :etype, CAST(:payload AS jsonb))
+    ON CONFLICT (tenant_id, platform, external_event_id) DO NOTHING
+""")
 
 
-@pytestmark_integration
-def test_real_pg_dedup_idempotent():
-    """同 (tenant_id, platform, external_event_id) 二次 INSERT → ON CONFLICT 跳过。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — 见 issue #377 follow-up")
+async def test_real_pg_dedup_idempotent(
+    integration_pg_session, set_tenant_guc,
+):
+    """同 (tenant_id, platform, external_event_id) 二次 INSERT WITH ON CONFLICT
+    DO NOTHING → 静默幂等，不重复入表。
+    """
+    from uuid import uuid4
+
+    session = integration_pg_session
+    tenant = uuid4()
+    await set_tenant_guc(session, tenant)
+
+    # 首次 INSERT
+    await session.execute(_INSERT_EVENT_DEDUP_SQL, {
+        "tid": str(tenant), "platform": "meituan",
+        "ext_id": "MT-EVENT-001", "etype": "order_pushed",
+        "payload": '{"order_id":"X1"}',
+    })
+    # 二次 INSERT 同 key — ON CONFLICT 静默
+    await session.execute(_INSERT_EVENT_DEDUP_SQL, {
+        "tid": str(tenant), "platform": "meituan",
+        "ext_id": "MT-EVENT-001", "etype": "order_pushed",
+        "payload": '{"order_id":"X1_dup"}',
+    })
+
+    count = (await session.execute(text(
+        "SELECT count(*) FROM raw_channel_events "
+        "WHERE external_event_id = 'MT-EVENT-001'"
+    ))).scalar_one()
+    assert count == 1, f"幂等去重失败，二次 INSERT 应被跳过，实际行数：{count}"
 
 
-@pytestmark_integration
-def test_real_pg_rls_cross_tenant():
-    """tenant_A 设置 GUC 后查不到 tenant_B 的 events。"""
-    pytest.skip("待 INTEGRATION_PG_DSN fixture 配置后实施 — 见 issue #377 follow-up")
+async def test_real_pg_rls_cross_tenant(
+    integration_pg_session, set_tenant_guc,
+):
+    """tenant_A 设置 GUC 后查不到 tenant_B 的 events；
+    跨租户 INSERT 被 WITH CHECK 拒绝。
+    """
+    from uuid import uuid4
+
+    session = integration_pg_session
+    tenant_a, tenant_b = uuid4(), uuid4()
+
+    await set_tenant_guc(session, tenant_a)
+    await session.execute(_INSERT_EVENT_SQL, {
+        "tid": str(tenant_a), "platform": "meituan",
+        "ext_id": "EVT-A", "etype": "order_pushed",
+        "payload": '{"a":1}', "sig": "sigA",
+    })
+    await set_tenant_guc(session, tenant_b)
+    await session.execute(_INSERT_EVENT_SQL, {
+        "tid": str(tenant_b), "platform": "douyin",
+        "ext_id": "EVT-B", "etype": "order_pushed",
+        "payload": '{"b":2}', "sig": "sigB",
+    })
+
+    # tenant_a 视角只看 A
+    await set_tenant_guc(session, tenant_a)
+    rows = (await session.execute(text(
+        "SELECT external_event_id FROM raw_channel_events ORDER BY external_event_id"
+    ))).scalars().all()
+    assert rows == ["EVT-A"], f"tenant_a 应只看 EVT-A，实际：{rows}"
+
+    # tenant_a 上下文 INSERT tenant_id=tenant_b → WITH CHECK 拒绝
+    with pytest.raises(Exception) as exc_info:
+        await session.execute(_INSERT_EVENT_SQL, {
+            "tid": str(tenant_b), "platform": "eleme",
+            "ext_id": "EVADE", "etype": "order_pushed",
+            "payload": '{"x":1}', "sig": "sigE",
+        })
+    err = str(exc_info.value).lower()
+    assert "policy" in err or "row-level" in err or "with check" in err, (
+        f"应抛 RLS WITH CHECK 错误，实际：{exc_info.value}"
+    )
