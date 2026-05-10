@@ -125,16 +125,17 @@ def _compute_orm_drift() -> dict[str, list[str]]:
 # Phase 4a-3 baseline — 起点 18 处 drift（PR #357 锁定）。
 # Ratchet: 18 (起点) → 15 (PR #360 Class B 命名漂移) → 12 (PR #361 retail_mall revive +
 # Class F SECURITY 修) → 10 (PR #362 distribution_trips/items revive) →
-# 7 (本 PR fund_settlement 三表 revive — split_rules / split_ledgers /
-# settlement_batches，原 v071.disabled chain rescue 路径，三表实为 LIVE — raw SQL
-# 大量 INSERT/SELECT，不 revive 即 runtime 必坏)。
+# 7 (PR #363 fund_settlement 三表 revive) → 4 (本 PR Class C dead ORM 清理 —
+# audit 见 docs/orm-drift-class-c-audit.md，删 banquet_menu_templates_v2 /
+# daily_plans / stored_value_account_transactions 三个 ORM-only 0 引用 dead 类)。
 #
-# 剩余 7 张待修（全部 Class C — ORM-only 无 migration 痕迹）：
-#   banquet_menu_templates_v2 / brand_groups / cook_time_baselines /
-#   daily_plans / delivery_auto_accept_rules / kds_tasks /
-#   stored_value_account_transactions — 需逐个判定 dead/live
+# 剩余 4 张全部 Class C LIVE（待 v410 revive PR 收尾归零）：
+#   brand_groups (tx-member, group_member_service heavy raw SQL) /
+#   cook_time_baselines (tx-trade, cook_time_stats raw SQL) /
+#   delivery_auto_accept_rules (tx-trade, ORM CRUD via Repository) /
+#   kds_tasks (tx-trade, 9+ raw SQL CRUD 跨 5 文件) — 需 v410 单 migration 全部 revive
 # 修一个 drift → ratchet 下调本数值。终态 0：所有 ORM model 都有对应 migration 创建路径。
-_ORM_DRIFT_BASELINE = 7
+_ORM_DRIFT_BASELINE = 4
 
 
 def test_orm_migration_drift_no_new_violations():
