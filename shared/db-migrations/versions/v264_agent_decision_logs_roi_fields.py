@@ -54,12 +54,15 @@ def upgrade() -> None:
         END $$
     """)
 
-    # 3. 覆盖索引：按 tenant + month 查 ROI 聚合（mv_agent_roi_monthly 读此索引）
+    # 3. 覆盖索引：按 tenant + 时间 + agent 查 ROI 聚合（mv_agent_roi_monthly 读此索引）
+    # 修 (PR #346): 原索引含 `DATE_TRUNC('month', decided_at)` — PG 拒（STABLE 不是
+    # IMMUTABLE）。改裸列 (tenant_id, decided_at DESC, agent_id)；查询侧用范围过滤
+    # `decided_at >= start_of_month AND < start_of_next_month` 等价命中索引。
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_decision_logs_roi_monthly
             ON agent_decision_logs (
                 tenant_id,
-                DATE_TRUNC('month', decided_at),
+                decided_at DESC,
                 agent_id
             )
             WHERE is_deleted = false

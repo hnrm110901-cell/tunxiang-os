@@ -57,10 +57,13 @@ def upgrade() -> None:
             IS 'Sprint D2: ROI 证据链（上游事件、算法版本、计算过程、依赖参数）'
     """)
 
-    # ── 2. 部分索引：仅命中存在 ROI 数据的行，按租户+月份快速过滤 ──────
+    # ── 2. 部分索引：仅命中存在 ROI 数据的行 ──────
+    # 修 (PR #346): 原索引 `(tenant_id, (date_trunc('month', created_at)))` PG 拒
+    # （STABLE 不是 IMMUTABLE）。改裸 created_at 列做时间序索引；查询侧用范围过滤
+    # `created_at >= start_of_month AND < start_of_next_month` 等价命中索引。
     op.execute("""
         CREATE INDEX IF NOT EXISTS idx_agent_decision_roi_tenant_month
-            ON agent_decision_logs (tenant_id, (date_trunc('month', created_at)))
+            ON agent_decision_logs (tenant_id, created_at DESC)
             WHERE saved_labor_hours IS NOT NULL
                OR prevented_loss_fen IS NOT NULL
     """)

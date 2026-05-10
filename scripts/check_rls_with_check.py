@@ -82,6 +82,11 @@ _BASELINE_FILES: frozenset[str] = frozenset(
         "v151_crew_schedule_tables.py",
         "v284_payment_nexus.py",
         "v386_subsidy_programs.py",
+        # v402 helper has `with_check=False` branch only called from downgrade()
+        # — script doesn't trace call graph，AST walker 只见 op.execute(f"...FOR UPDATE
+        # USING ({expr})") 单独触发 violation。downgrade 用 USING-only 是 intentional
+        # rollback 行为（恢复 pre-fix state for 回退测试）。Baseline 这一处。
+        "v402_fix_residual_update_policy_with_check.py",
     }
 )
 
