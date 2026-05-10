@@ -108,21 +108,26 @@ exec_sql() {
             psql "$conn_url" -tAc "$sql_or_file" 2>/dev/null
         fi
     else
-        python3 -c "
-import psycopg2, sys
-conn = psycopg2.connect('$conn_url')
+        # 用 env var + heredoc 避免 bash 单引号展开污染 Python 字符串（review fix）
+        FROM_FILE="$from_file" CONN_URL="$conn_url" SQL_OR_FILE="$sql_or_file" \
+        python3 - <<'PYEOF'
+import psycopg2, sys, os
+conn = psycopg2.connect(os.environ['CONN_URL'])
 conn.set_session(autocommit=True)
 cur = conn.cursor()
-sql = '$sql_or_file' if not '$from_file' == 'true' else open('$sql_or_file').read()
+if os.environ.get('FROM_FILE') == 'true':
+    sql = open(os.environ['SQL_OR_FILE']).read()
+else:
+    sql = os.environ['SQL_OR_FILE']
 try:
     cur.execute(sql)
     if cur.description:
         for row in cur.fetchall():
-            print('\\t'.join(str(c) for c in row))
+            print('\t'.join(str(c) for c in row))
 except Exception as e:
     print(f'SQL ERROR: {e}', file=sys.stderr)
     sys.exit(1)
-"
+PYEOF
     fi
 }
 

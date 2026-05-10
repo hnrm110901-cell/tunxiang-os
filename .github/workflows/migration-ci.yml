@@ -61,12 +61,18 @@ jobs:
         env:
           PGPASSWORD: test
         run: |
-          # 注：versions/ 当前为空（Phase 4a-3 骨架阶段），alembic 不建 stamp 表
-          # 是预期行为；Phase 4a-4 baseline 注入后本步骤改 assert 18 表存在
-          # 当前仅 smoke test：确认 init-rls + init-pgvector 应用 + 18 alembic 全跑通无错
+          # ⚠️ KNOWN GAP (Phase 4a-3): versions/ 全为空 → alembic upgrade head 实质 no-op，
+          # 这个 step 当前**只验证脚本不崩溃**，不验证迁移逻辑正确性。Critical bug
+          # （如 v264 MV 与 v265 INDEX 撞 store_id 列）必须在 Phase 4a-4 baseline 注入
+          # 后才会被 fresh-PG-upgrade-test 检出。
+          #
+          # Phase 4a-4 PR checklist 必带项：
+          #   - 改本 step 为 assert `\dt` 输出含 18 个 <svc>_alembic_version 表
+          #   - 改 path filter 触发完整 schema 验证
+          #   - 加 service smoke query (e.g. SELECT count(*) FROM <每 service 关键表>)
           psql -h localhost -U postgres -d tunxiang_os -c "\dt" || true
-          echo "Phase 4a-3 阶段：versions/ 空 → alembic stamp 表不创建（预期）"
-          echo "Phase 4a-4 baseline 入栈后此处改 assert 18 个 <svc>_alembic_version 表存在"
+          echo "[Phase 4a-3] versions/ 空 → alembic stamp 表不创建（预期）"
+          echo "[Phase 4a-4 TODO] 此 step 改为 assert 18 个 <svc>_alembic_version 表存在"
 
   check-migration-chain:
     name: Verify Migration Chain Integrity

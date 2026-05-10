@@ -39,6 +39,10 @@ MODE="parallel"        # parallel | sequential
 INCLUDE_LEGACY="false"
 DRY_RUN="false"
 PARALLEL_JOBS="${PARALLEL_JOBS:-4}"
+if ! [[ "$PARALLEL_JOBS" =~ ^[0-9]+$ ]] || (( PARALLEL_JOBS < 1 )); then
+    echo "[ERROR] PARALLEL_JOBS 必须正整数 >= 1 [current: $PARALLEL_JOBS]" >&2
+    exit 2
+fi
 ALEMBIC="${ALEMBIC:-alembic}"
 
 while [[ $# -gt 0 ]]; do
