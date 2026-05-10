@@ -40,7 +40,11 @@ jobs:
         working-directory: shared/db-migrations
         run: |
           set -euo pipefail
-          heads_count=$(alembic heads | grep -E '^[a-f0-9]+' | wc -l | tr -d ' ')
+          # 修 (PR #346): 原正则 `^[a-f0-9]+` 仅匹配 hash-style revisions；
+          # 屯象 codebase 用 `v406_nlq_reports_views_p3` / `v397` 等 v 前缀格式 —
+          # 永远 0 命中导致 heads_count=0 始终 fail。改用 `(head)` 标记计数，
+          # 与 alembic heads 的输出格式（"<rev_id> (head)"）对齐，与 revision 命名解耦。
+          heads_count=$(alembic heads | grep -cE '\(head\)' | tr -d ' ')
           echo "alembic heads count: $heads_count"
           if [ "$heads_count" != "1" ]; then
             echo "::error::Expected exactly 1 alembic head, found $heads_count (see v397 for merge reference)"
