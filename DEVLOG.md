@@ -1,3 +1,63 @@
+## 2026-05-11 中午 — production codemod 真终态闭环 + 决策 84 第七轮文档化（CI gate 边界）
+
+### 今日完成
+本 session（5/11 上午→中午）押收 production codemod 全链路真终态：6 服务 chain 全 MERGED + 决策 81 second instance 应用清 #370 + 决策 84 第七轮（CI gate 边界）沉淀到 `docs/codemod/namespace-completeness.md` §"Review 流程沉淀 流程 3"。
+
+**核心 2 PR 双 admin-merge：**
+- **#358** `fix(tx-finance, tx-intel, tx-supply)`: production main.py 容器布局 import 修复 — 决策 77 完工 [Tier1]
+  - rebase v1（871c2502 → bbefda66，force-push `044442ef`）
+  - rebase v2（bbefda66 → c6796316，main 又 +5 channel commits，force-push `c9a5bb4f`）
+  - admin-squash merge → `ccaa4375`（13:27Z）
+  - 内含 6 commit chain：conftest 新建 / production codemod 27 文件 54 处 / stub key + setdefault 同步 13 文件 22 处 / tx-intel adapters 5 处补全 / tx-finance conftest models 模块身份别名 / Tier 1 回修 DEVLOG
+  - 本地 pytest 真门禁验证（决策 78）：净 +22 pass / 0 NEW failure
+- **#411** `chore(docs)`: codemod review 流程 2 lesson 沉淀（cherry-pick 自 #370）[T3]
+  - 决策 81 second instance 实例：#370 commit history 与 main 严重 diverge，不死磕 rebase
+  - 提取 #370 unique lessons cherry-pick → 新 PR #411
+  - admin-merge → `93fda2bb`（13:30Z）
+  - audit trail：#411 / #409 / #410 cross-reference
+
+**清理：**
+- **#370 close**（13:05Z）— 走决策 81 second instance，关闭评论指 #411 cherry-pick + #409 / #410 audit trail
+- **worktree 21 → 13**：6 active 完成的 worktree 删除（决策 77 chain 全合并）+ 2 stale 清理
+
+**决策 84 第七轮文档化（本 followup PR）：**
+- `docs/codemod/namespace-completeness.md` §"Review 流程沉淀" 加 流程 3：CI gate false positive → admin-merge 边界
+- 沉淀 4 PR established pattern（#353/#355/#356/#358）+ 5 项 admin-merge 裁决标准 + 不适用场景 + 根治 follow-up（CI infra carve-out 独立 issue）
+- 6 轮漏抓主表保持不动（不同 lesson lane：6 轮 = codemod 工具完整性，流程 3 = process / governance）
+
+### 数据变化
+- main 净 +2 commit（本 session：`ccaa4375`、`93fda2bb`）
+- main HEAD: `ccaa4375` → `93fda2bb`（自上 session `bbefda66` 共 +7 commit，含 5 并发 channel + #412 + #358 + #411）
+- 我侧 OPEN PR：1（#409，5/11 fresh handoff doc，未 merge 留作 canonical reference）+ 本 followup PR
+- worktree：21 → 14（含主 repo 1 + 13 linked，本 followup PR 加 1）
+- 决策 77 完工（test 端 + production 端双闭环），#287 band-aid 撤除路径 100% 闭合
+- 决策 84 第七轮文档化（流程 3）落地
+
+### 战绩
+- **决策 77 真完工**：6 服务 chain（tx-org #353 / tx-growth #355 / tx-member #356 / tx-finance+tx-intel+tx-supply #358）production codemod 全 MERGED；#287 试点 band-aid 已彻底移除
+- **决策 78 应用**：#358 本地 pytest 真门禁验证（净 +22 pass），不依赖 CI 噪音
+- **决策 81 second instance 应用**：#370 commit history 与 main 严重 diverge → close + cherry-pick unique lessons → #411 新 PR；不死磕 rebase 真终态闭环
+- **决策 82 应用**：context >80% 单 session 内押收 #358 + #411 双 admin-merge + 本 followup PR，不拖跨 session
+- **决策 84 第七轮（CI gate 边界）已沉淀**：流程 3 写入 namespace-completeness.md，5 项裁决标准 + 4 PR established pattern + 根治 follow-up 独立 issue 框架
+
+### 遗留问题
+- **CI infra carve-out follow-up**：tier1-gate 加 import-only carve-out 或 `[codemod]` PR title prefix skip — 独立 issue，不在本 codemod chain 主线
+- **#409 等待 admin-merge**：5/11 fresh handoff doc PR，user 决定时机；无业务影响
+- **dev-plan-60d 5/7 计划**：被 27+ commit 推翻，需重写但需 user 输入新 demo 故事核心
+- **DailySummary / Header export**（#351 xfail）：决策 79 follow-up，需 user 创始人 §18 ontology 对齐
+- **5/13 deal-breaker（channel-aggregation 资质）**：3 平台企业资质未启动，倒计时 2 天，user 创始人级别非技术 task
+- **仓库级真 PG 测试基建缺**：docker-compose-pg fixture 让 #323 / S4-02 PR2.D 自动跑（独立调研 issue）
+- **alembic chain integrity**：v310 dangling 自 #128 起，所有 migration PR `Verify Migration Chain Integrity` admin override 合并，本 session 不修
+
+### 明日计划
+- 候选 A（#409 admin-merge，5min，user 一句话决定）
+- 候选 B（dev-plan-60d 重写，需 user 输入方向）
+- 候选 C（DailySummary / Header export，需 user §18 ontology 对齐）
+- 候选 E（backlog 调研挑一开起：#271/#272/#347/#336/S-02 stack/V4/channel CH-02.7a）
+- CI infra carve-out（tier1-gate import-only 检测）独立 issue 立
+
+---
+
 ## 2026-05-11 凌晨 — #353 codex P1 review 落地（决策 84 第六轮沉淀）
 
 ### 今日完成
