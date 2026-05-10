@@ -9,25 +9,55 @@
   roi_evidence        JSONB          —— 证据链（数据源 URL/SQL/事件 ID，便于 audit）
 
 Revision ID: v264_roi
-Revises: v263
+Revises: v264 (chain serialization, see PR #352 - v264 multi-head debt)
 Create Date: 2026-04-23
+
+Chain repair note (PR #352):
+  原 down_revision = "v263"，与 v264_agent_roi_fields.py 形成两个 v263 子分叉，
+  都改同一张 agent_decision_logs 表。两 migration 均用 ADD COLUMN IF NOT EXISTS
+  对相同 4 列幂等添加（v264 用 NULL 默认，本文件用 DEFAULT 0）。Index 不同
+  (v264 索引 created_at / 本文件索引 decided_at + agent_id)，二者互补不冲突，
+  runtime 都需要。
+
+  本次 chain serialization：down_revision 改为 "v264"。序列化后 v264 始终先跑
+  （列无 default），本文件 ADD COLUMN IF NOT EXISTS 子句因列已存在而被 PG 跳过
+  — DEFAULT 0 子句失效。**为修补 default**，本文件 upgrade() 末尾加显式
+  ALTER COLUMN SET DEFAULT，确保 schema 终态符合 ORM 期望（DEFAULT 0 / '{}'::jsonb）。
+
+  链路 deterministic：v263 → v264 → v264_roi → v265_mv_agent_roi_monthly。
+
+  独立 fork 仍保留 (v264b/v264c/v265/v266_mem_evo) — 它们改不同表，是合法 parallel
+  feature。Phase 4a-4 baseline squash 后整链重写时彻底清理。
 """
 from alembic import op
 
 revision = "v264_roi"
-down_revision = "v263"
+down_revision = "v264"  # 原 "v263"，PR #352 chain serialization 见 docstring
 branch_labels = None
 depends_on = None
 
 
 def upgrade() -> None:
-    # 1. 添加 4 列（使用 IF NOT EXISTS 兼容重复迁移）
+    # 1. 添加 4 列（IF NOT EXISTS 兼容；序列化后 v264 已先建无 default 列，这里
+    # ADD COLUMN 整段会被 PG 跳过 — DEFAULT 0 子句失效）
     op.execute("""
         ALTER TABLE agent_decision_logs
             ADD COLUMN IF NOT EXISTS saved_labor_hours   NUMERIC(10,2) DEFAULT 0,
             ADD COLUMN IF NOT EXISTS prevented_loss_fen  BIGINT        DEFAULT 0,
             ADD COLUMN IF NOT EXISTS improved_kpi        JSONB         DEFAULT '{}'::jsonb,
             ADD COLUMN IF NOT EXISTS roi_evidence        JSONB         DEFAULT '{}'::jsonb
+    """)
+
+    # PR #352 fix: chain serialization 后 v264 总先跑（无 default），ADD COLUMN
+    # IF NOT EXISTS 让本文件 DEFAULT 0 子句静默失效。显式 SET DEFAULT 确保 ORM
+    # 期望的 0 / '{}'::jsonb 默认值生效（services/tx-agent/src/models/decision_log.py
+    # 注释明确"v264 用 DEFAULT 0"）。
+    op.execute("""
+        ALTER TABLE agent_decision_logs
+            ALTER COLUMN saved_labor_hours  SET DEFAULT 0,
+            ALTER COLUMN prevented_loss_fen SET DEFAULT 0,
+            ALTER COLUMN improved_kpi       SET DEFAULT '{}'::jsonb,
+            ALTER COLUMN roi_evidence       SET DEFAULT '{}'::jsonb
     """)
 
     # 2. 非负约束（CHECK）

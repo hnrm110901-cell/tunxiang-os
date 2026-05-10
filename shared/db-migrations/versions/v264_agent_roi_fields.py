@@ -1,4 +1,4 @@
-"""v264 — agent_decision_logs 新增 ROI 四字段 + mv_agent_roi_monthly 物化视图
+"""v264 — agent_decision_logs 新增 ROI 四字段（仅列 + 索引，MV 由 v265 负责）
 
 Sprint D2（2026-04-24）：为 Agent 决策留痕注入 ROI 量化能力。
 
@@ -8,8 +8,10 @@ Sprint D2（2026-04-24）：为 Agent 决策留痕注入 ROI 量化能力。
   improved_kpi        JSONB          — 改善 KPI 的结构化证据 {"metric": str, "delta_pct": float}
   roi_evidence        JSONB          — 证据来源/上游事件/算法版本等审计链
 
-新增物化视图：
-  mv_agent_roi_monthly — 按 (tenant_id, agent_id, 月) 聚合 ROI，RLS 保护
+物化视图（PR #352 critical fix）：
+  mv_agent_roi_monthly 已移至 v265_mv_agent_roi_monthly.py 唯一负责
+  （v265 schema 含 store_id 列，与 INDEX 引用对齐）。本文件仅 ADD COLUMN +
+  CREATE INDEX，不创建 MV。
 
 签字提醒：本迁移对应 docs/sprint-plan-2026Q2-unified.md §4 决策点 #1
           （"D2 agent_decision_logs 新增 6 列 = 核心留痕变更 = 需创始人签字"）。
@@ -70,46 +72,16 @@ def upgrade() -> None:
 
     # ── 3. 物化视图：按 (tenant_id, agent_id, month) 聚合 ROI ─────────
     # 注意：
-    #   - WITH NO DATA：视图创建时不立即聚合，避免冷启动失败；
-    #                    首次填充由应用层 REFRESH 或 scripts/refresh_mv_agent_roi.sh 驱动
-    #   - tenant_id IS NOT NULL：双保险，防止任何 RLS 绕过的脏数据进入视图
-    #   - COALESCE(SUM(...), 0)：即便无数据，聚合行也能正常 refresh（NULL 聚合安全）
-    op.execute("""
-        CREATE MATERIALIZED VIEW IF NOT EXISTS mv_agent_roi_monthly AS
-        SELECT
-            tenant_id,
-            agent_id,
-            date_trunc('month', created_at)                               AS month,
-            COUNT(*)                                                      AS decision_count,
-            COALESCE(SUM(saved_labor_hours), 0)::NUMERIC(14, 2)           AS total_saved_labor_hours,
-            COALESCE(SUM(prevented_loss_fen), 0)::BIGINT                  AS total_prevented_loss_fen,
-            jsonb_agg(DISTINCT improved_kpi) FILTER (WHERE improved_kpi IS NOT NULL)
-                                                                          AS kpi_deltas,
-            NOW()                                                         AS refreshed_at
-        FROM agent_decision_logs
-        WHERE tenant_id IS NOT NULL
-          AND is_deleted = false
-        GROUP BY tenant_id, agent_id, date_trunc('month', created_at)
-        WITH NO DATA
-    """)
-
-    # REFRESH MATERIALIZED VIEW CONCURRENTLY 需要唯一索引
-    op.execute("""
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_agent_roi_monthly_pk
-            ON mv_agent_roi_monthly (tenant_id, agent_id, month)
-    """)
-
-    op.execute("""
-        COMMENT ON MATERIALIZED VIEW mv_agent_roi_monthly
-            IS 'Sprint D2: Agent ROI 月度聚合视图，供总部 ROI 看板/签字依据使用。'
-               ' REFRESH 策略见 scripts/refresh_mv_agent_roi.sh'
-    """)
+    # PR #352 critical fix: 原本此处 CREATE MATERIALIZED VIEW mv_agent_roi_monthly
+    # (列 tenant_id/agent_id/month, 无 store_id) — 与 v265_mv_agent_roi_monthly.py 的
+    # `CREATE UNIQUE INDEX ON ... store_id` 冲突（IF NOT EXISTS 让 v264 版本静默胜出，
+    # v265 后续 INDEX 引用 store_id 撞列不存在 → fresh PG 升级必炸）。
+    # 修法：v264 不再创建 MV，由 v265 唯一负责（schema 含 store_id）。v264 只做 ROI 4
+    # 列 + idx_agent_decision_roi_tenant_month 索引。
 
 
 def downgrade() -> None:
-    # 顺序倒序：先视图、再索引、再列
-    op.execute("DROP INDEX IF EXISTS idx_mv_agent_roi_monthly_pk")
-    op.execute("DROP MATERIALIZED VIEW IF EXISTS mv_agent_roi_monthly")
+    # 顺序倒序：先索引、再列（MV 由 v265 负责创建/删除）
     op.execute("DROP INDEX IF EXISTS idx_agent_decision_roi_tenant_month")
     op.execute("""
         ALTER TABLE agent_decision_logs
