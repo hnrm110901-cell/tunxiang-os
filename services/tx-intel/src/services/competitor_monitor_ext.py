@@ -270,8 +270,8 @@ async def _fetch_from_platform(source: str, platform_store_id: str) -> dict[str,
     """
     import os
 
-    from adapters.douyin_adapter import DouyinAdapter
-    from adapters.meituan_adapter import MeituanAdapter
+    from services.tx_intel.src.adapters.douyin_adapter import DouyinAdapter
+    from services.tx_intel.src.adapters.meituan_adapter import MeituanAdapter
 
     if source == "meituan":
         adapter = MeituanAdapter(

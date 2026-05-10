@@ -280,7 +280,7 @@ async def _fetch_reviews_from_platform(
     import os
 
     if source == "meituan":
-        from adapters.meituan_adapter import MeituanAdapter
+        from services.tx_intel.src.adapters.meituan_adapter import MeituanAdapter
 
         adapter = MeituanAdapter(
             app_key=os.environ.get("MEITUAN_APP_KEY", ""),
@@ -302,7 +302,7 @@ async def _fetch_reviews_from_platform(
             await adapter.close()
 
     if source == "douyin":
-        from adapters.douyin_adapter import DouyinAdapter
+        from services.tx_intel.src.adapters.douyin_adapter import DouyinAdapter
 
         adapter = DouyinAdapter(
             client_key=os.environ.get("DOUYIN_CLIENT_KEY", ""),
