@@ -1,3 +1,46 @@
+## 2026-05-11 下午 · CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
+
+### 完成状态
+- [x] **issue #378 sub-PR a2 实施完成**：`MeituanClient` + `MeituanAPIError` + `MeituanAuthError` 内容并入 `shared/adapters/meituan_delivery_adapter.py`，确立 top-level 为 SoT
+- [x] **test commit** `ee4d9dc3`：9 反测（TestMeituanClient 6 + TestMeituanDeliveryAdapterRealApi 3）— 签名规范确定值 / 回调验签 / token cache / HTTP 失败 → AuthError / 业务错误 → APIError / 网络重试耗尽 / USE_REAL_API 默认 false / true 切换调 client.confirm_order / close 释放 lazy 连接池
+- [x] **impl commit** `a2c1e72b`：lazy `_client` + `_use_real_api` env + accept/reject/get_order_detail 三接口真接入分支 + `close()` 释放 client；删除废弃 `_generate_sign` + `_build_auth_params`（无 mock 用户）
+- [x] **签名 SoT 对齐**：`MeituanClient.compute_sign` 严格 `MD5(url + sorted "k=v" + secret)`（美团规范），取代旧 placeholder
+- [x] **顶层 84 tests 全绿**（75 baseline + 9 新反测）；meituan-saas/tests/ 25/49 与 a1 baseline 一致 — 无回归
+- [x] **branch HEAD**：`channel/ch-02-7a-meituan-client-sot` @ `a2c1e72b`（main `5b565fc9` + 2 commit + 本 docs commit）
+
+### 关键决策
+- **完整搬入 client.py 全部接口**（含 upload_food/query_store_info/query_settlement 三个目前外部无用户的方法）— 为 a3 切换 saas/adapter.py 时接口完整性留好，避免回头找
+- **lazy init 而非 eager**：默认 USE_REAL_API=false 时 `_client = None`，零 httpx 连接池开销 + mock 测试无需 mock httpx
+- **签名旧 placeholder 直接删而非保留 wrapper**：`_generate_sign` 与 `_build_auth_params` 互相引用形成 dead code 闭环，本机 mock 路径都不依赖，无回归风险
+- **a2 仅 accept/reject/get_detail 三接口切真接入**：sync_menu/update_stock/pull_orders 等仍 mock，避免 a2 范围爆炸；后续单独 PR 接通其余
+- **TDD red-green 双 commit**：test commit 单 collect 阶段 fail（MeituanClient 未存在），impl commit 后全绿 — 历史留痕清晰，符合 §17/§21 Tier 2 标准
+- **不动 meituan-saas/src/{adapter,reservation,order_webhook_handler}.py + tests**：严格 §18 边界，a3 处理
+
+### 下一步
+- A：本 PR review + merge
+- B：**CH-02.7a a3** — saas/adapter.py 切到 top-level adapter + 删 saas/client.py（含 saas/__init__.py re-export 清理）
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical breaking）
+- D：v301 alembic PK COALESCE 历史债（infra 提速，去 S5 fixture stamp v409 workaround）
+- E：upload_food / sync_menu 真接入接通（独立小 PR）
+
+### 已知风险
+- **MeituanClient 真接入路径仅 fixture-level 反测**：端到端集成测试需要美团 sandbox 凭据 + 网络访问，无 sandbox 时无法验证签名/auth/重试在真服务上的行为；独立 follow-up issue
+- **a3 之前 saas/client.py 与 top-level 双源并存**：两边代码同步性靠 a2 SoT 声明 + DEVLOG cross-reference 维持；a3 必须紧接 a2（不拖太久）避免双源 drift
+- **`_use_real_api` 是构造时一次性读 env**：env 变化后需重建 adapter；factory 单例使用模式下可能 surprise，但 a2 范围内的 factory 用户都是按 request 实例化，无单例风险
+- **签名算法切换为真规范**：mock 路径不受影响，但**一旦 a3 切换** saas/adapter.py 到 top-level + USE_REAL_API=true 时，旧 placeholder 签名预期值会全部失效；a3 必须配套修测试
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch origin
+git log --oneline -5 origin/main
+gh pr list --state open --author "@me" --limit 30
+gh pr view <本PR号> --json state,mergedAt,reviewDecision
+.venv-trackd/bin/python -m pytest shared/adapters/tests/test_delivery_adapters.py -q
+```
+
+---
+
 ## 2026-05-11 中午 · production codemod 真终态闭环 + 决策 84 第七轮（CI gate 边界 → §流程 3）
 
 ### 完成状态
