@@ -30,11 +30,23 @@ CI 用法：
 
 from __future__ import annotations
 
-import os
 from typing import AsyncGenerator, Callable, Coroutine
 from uuid import UUID
 
 import pytest
+
+# D2b' (2026-05-11)：DSN 读取 + skipif 装饰器 + set_tenant_guc helper 抽到
+# shared.test_utils.integration_pg，service-level 测试也共用同一份。
+# 本 conftest 仅保留 channel-aggregation fixture 专属的 role/table GRANT + 两个
+# fixture（与 service-level 多 session 模式不兼容）。
+#
+# 顶层 import：仅取不依赖 sqlalchemy 的 export（常量 + 装饰器）。set_tenant_guc
+# helper 在 shared module 内被 `if _SQLA_AVAILABLE:` 守卫，sqlalchemy 缺失时未定义；
+# 故移到下方 try 块内一起 import，与本 conftest 的 _ASYNC_DEPS_AVAILABLE 守卫对齐。
+from shared.test_utils.integration_pg import (
+    INTEGRATION_PG_DSN,
+    requires_integration_pg,
+)
 
 # pytest_asyncio + sqlalchemy[asyncio] 仅 integration PG 反测需要。
 # migration-ci.yml 等 workflow 仅装 pytest（不带 asyncio extras），import 时
@@ -47,22 +59,11 @@ try:
         AsyncSession,
         create_async_engine,
     )
+    # set_tenant_guc helper 与 sqlalchemy 联绑（shared module 内同样守卫）。
+    from shared.test_utils.integration_pg import set_tenant_guc as _set_tenant_guc_helper
     _ASYNC_DEPS_AVAILABLE = True
 except ImportError:
     _ASYNC_DEPS_AVAILABLE = False
-
-
-INTEGRATION_PG_DSN = os.environ.get("INTEGRATION_PG_DSN")
-
-# 装饰器：未配置 DSN 时跳过，统一 reason 文案。不依赖 async deps。
-requires_integration_pg = pytest.mark.skipif(
-    not INTEGRATION_PG_DSN,
-    reason=(
-        "INTEGRATION_PG_DSN 未配置 — 跳过真 PG 反测（opt-in）。"
-        "本地：docker compose -f infra/compose/test-pg.yml up -d，"
-        "见 docs/integration-pg-fixture.md"
-    ),
-)
 
 
 # 测试 RLS 必须用非 superuser 角色（superuser 即便 FORCE ROW LEVEL SECURITY 也能绕过）。
@@ -167,13 +168,7 @@ if _ASYNC_DEPS_AVAILABLE:
                 await set_tenant_guc(integration_pg_session, tenant_id)
                 # 后续查询自动 RLS 隔离
 
-        第三参数 TRUE = 事务级 GUC（rollback 时自动清理，不污染下个 test）。
-        屯象 init-rls.sql 的 set_tenant_id() 用 FALSE（session 级）— 应用 runtime
-        用法不同。fixture 里必须用 TRUE 才能配合事务隔离。
+        D2b' 后实现已抽到 shared.test_utils.integration_pg.set_tenant_guc；
+        本 fixture 仅做 callable 注入的薄包装，保留 v411/v412/v413 既有签名。
         """
-        async def _set(session: AsyncSession, tenant_id) -> None:
-            await session.execute(
-                text("SELECT set_config('app.tenant_id', :tid, true)"),
-                {"tid": str(tenant_id)},
-            )
-        return _set
+        return _set_tenant_guc_helper

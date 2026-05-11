@@ -8,7 +8,7 @@ issue #291 收尾：mock-based 单测覆盖不了 RLS USING / WITH CHECK / FIFO 
   3. WITH CHECK 反测：app.tenant_id=A 但 INSERT 行 tenant_id=B → IntegrityError
      （v403 INSERT/UPDATE/DELETE 三策略 WITH CHECK 子句生效，防写入端跨租户伪造）
 
-Opt-in 触发（仓库无现成 docker-compose-pg fixture）：
+Opt-in 触发：
   INTEGRATION_PG_DSN=postgresql+asyncpg://user:pass@host/db pytest <this_file>
 
 未设 INTEGRATION_PG_DSN 时全部 skip → CI 自然忽略，本地有库的 dev 可手跑。
@@ -16,22 +16,27 @@ Opt-in 触发（仓库无现成 docker-compose-pg fixture）：
 前置假设：
   - DSN 指向已 alembic upgrade head 的库（v403 dashboard_pinned 表 + RLS 已建）
   - DSN 用户拥有非 BYPASSRLS 角色（否则 RLS 不生效，跨租户测试失效）
-  - 测试前后用 fixture 清空 dashboard_pinned 表（用 BYPASSRLS / 直接 DELETE）
+  - 测试前后用 fixture 清空 dashboard_pinned 表（用 row_security=off / 直接 DELETE）
 
-未来 follow-up（出 issue 单独跟踪）：
-  - 仓库级 docker-compose-pg fixture（让 CI 自动跑这类 RLS 反测）
-  - 跨 service 共享的 pg fixture conftest
+D2b'（2026-05-11）：DSN/skipif/tenant GUC helper 切到 shared.test_utils.integration_pg；
+module-scoped engine + 多 session + cross-tenant commit 模式与 #418 shared fixture
+不兼容，故 engine/session/cleanup 仍滚自己的。
 """
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+from shared.test_utils.integration_pg import (
+    INTEGRATION_PG_DSN,
+    requires_integration_pg,
+    set_tenant_guc,
+)
 
 from ..services.pinned_dashboard import (
     PIN_LIMIT_PER_TENANT,
@@ -40,15 +45,7 @@ from ..services.pinned_dashboard import (
     remove_pin,
 )
 
-_PG_DSN = os.environ.get("INTEGRATION_PG_DSN", "").strip()
-pytestmark = pytest.mark.skipif(
-    not _PG_DSN,
-    reason=(
-        "INTEGRATION_PG_DSN 未设置，跳过真 PG 反测。本地手跑示例："
-        "INTEGRATION_PG_DSN=postgresql+asyncpg://tunxiang:tunxiang@localhost/tunxiang_test "
-        "pytest services/tx-analytics/src/tests/test_pinned_dashboard_integration_tier1.py"
-    ),
-)
+pytestmark = requires_integration_pg
 
 
 _TABLE = "dashboard_pinned"
@@ -73,7 +70,7 @@ _SAMPLE_SURFACE = {
 @pytest.fixture(scope="module")
 def engine():
     """模块级 engine — 复用连接池避开多次 handshake。"""
-    eng = create_async_engine(_PG_DSN, echo=False, future=True)
+    eng = create_async_engine(INTEGRATION_PG_DSN, echo=False, future=True)
     yield eng
     # teardown: dispose 由 pytest-asyncio 间接处理；这里 sync 调用避免 await 嵌套
 
@@ -88,10 +85,7 @@ async def _open_session_with_tenant(
 ) -> AsyncSession:
     """开 session + 注入 app.tenant_id（mimic get_db_with_tenant 行为）。"""
     session = session_factory()
-    await session.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": tenant_id},
-    )
+    await set_tenant_guc(session, tenant_id)
     return session
 
 

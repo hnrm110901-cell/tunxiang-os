@@ -12,7 +12,7 @@ issue #289 收尾：v404/v405/v406 静态扫描覆盖不了视图运行时行为
      a) SET ROLE 后 SELECT FROM mv_daily_settlement → ProgrammingError（REVOKE public 生效）
      b) SET ROLE 后 INSERT INTO reports.daily_revenue → ProgrammingError（仅 SELECT 权限）
 
-Opt-in 触发（仓库无 docker-compose-pg fixture，沿用 #323 模式）：
+Opt-in 触发：
   INTEGRATION_PG_DSN=postgresql+asyncpg://user:pass@host/db pytest <this_file>
 
 未设 INTEGRATION_PG_DSN 时全部 skip → CI 自然忽略，本地有库的 dev 可手跑。
@@ -23,16 +23,15 @@ Opt-in 触发（仓库无 docker-compose-pg fixture，沿用 #323 模式）：
   - tx_nlq_readonly role 已建（v404）+ reports schema + 8 视图（v404/v405/v406）
   - 测试前后用 row_security=off 清空 mv_daily_settlement（避免污染）
 
-未来 follow-up（出 issue 单独跟踪）：
-  - 仓库级 docker-compose-pg fixture（让 CI 自动跑 PR2.D + #323 + 其他 RLS 反测）
-  - sql_generator → run_safe_query 端到端真 LLM 测试（成本控制 + 非确定性）
+D2b'（2026-05-11）：DSN/skipif/tenant GUC helper 切到 shared.test_utils.integration_pg；
+module-scoped engine + 多 session + role 切换模式与 #418 shared fixture 不兼容，故
+engine/session/cleanup 仍滚自己的。
 
 Refs: issue #289
 """
 
 from __future__ import annotations
 
-import os
 import uuid
 
 import pytest
@@ -40,15 +39,13 @@ from sqlalchemy import text
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-_PG_DSN = os.environ.get("INTEGRATION_PG_DSN", "").strip()
-pytestmark = pytest.mark.skipif(
-    not _PG_DSN,
-    reason=(
-        "INTEGRATION_PG_DSN 未设置，跳过真 PG 反测。本地手跑示例："
-        "INTEGRATION_PG_DSN=postgresql+asyncpg://tunxiang:tunxiang@localhost/tunxiang_test "
-        "pytest services/tx-brain/src/tests/test_nlq_pg_integration_tier1.py"
-    ),
+from shared.test_utils.integration_pg import (
+    INTEGRATION_PG_DSN,
+    requires_integration_pg,
+    set_tenant_guc,
 )
+
+pytestmark = requires_integration_pg
 
 
 _SOURCE_TABLE = "mv_daily_settlement"
@@ -67,7 +64,7 @@ _STORE_B1 = str(uuid.uuid4())
 @pytest.fixture(scope="module")
 def engine():
     """模块级 engine — 复用连接池避开多次 handshake。"""
-    return create_async_engine(_PG_DSN, echo=False, future=True)
+    return create_async_engine(INTEGRATION_PG_DSN, echo=False, future=True)
 
 
 @pytest.fixture(scope="module")
@@ -80,10 +77,7 @@ async def _open_session_with_tenant(
 ) -> AsyncSession:
     """开 session + 注入 app.tenant_id（mimic get_db_with_tenant 行为）。"""
     session = session_factory()
-    await session.execute(
-        text("SELECT set_config('app.tenant_id', :tid, true)"),
-        {"tid": tenant_id},
-    )
+    await set_tenant_guc(session, tenant_id)
     return session
 
 
