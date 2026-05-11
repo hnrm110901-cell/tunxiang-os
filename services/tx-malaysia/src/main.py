@@ -8,6 +8,7 @@ SST 税引擎（Sprint 1.3）+ LHDN e-Invoice（Sprint 1.5）
 注：合并到 main 时需同时启用主分支已存在的路由文件。
 """
 
+import os
 from contextlib import asynccontextmanager
 
 import structlog
@@ -41,7 +42,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

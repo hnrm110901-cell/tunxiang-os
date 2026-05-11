@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     )
 
     # CORS
-    cors_allow_origins: str = "*"
+    cors_allow_origins: str = "http://localhost:5173"
 
     @field_validator("database_url")
     @classmethod
