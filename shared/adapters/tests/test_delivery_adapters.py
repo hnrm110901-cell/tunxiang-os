@@ -7,6 +7,7 @@
   - 异常处理：空原因拒单 / 未知平台 / 工厂注册
 """
 
+import time
 from datetime import datetime, timedelta
 
 import pytest
@@ -21,7 +22,13 @@ from shared.adapters.delivery_platform_base import (
 )
 from shared.adapters.douyin_delivery_adapter import DOUYIN_STATUS_MAP, DouyinDeliveryAdapter
 from shared.adapters.eleme_delivery_adapter import ELEME_STATUS_MAP, ElemeDeliveryAdapter
-from shared.adapters.meituan_delivery_adapter import MEITUAN_STATUS_MAP, MeituanDeliveryAdapter
+from shared.adapters.meituan_delivery_adapter import (
+    MEITUAN_STATUS_MAP,
+    MeituanAPIError,
+    MeituanAuthError,
+    MeituanClient,
+    MeituanDeliveryAdapter,
+)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  工厂测试
@@ -219,12 +226,13 @@ class TestMeituanDeliveryAdapter:
         expected_codes = {1, 2, 3, 4, 5, 6, 8}
         assert set(MEITUAN_STATUS_MAP.keys()) == expected_codes
 
-    # ── 签名算法 ─────────────────────────────────────────
+    # ── 签名算法（CH-02.7a a2 起 SoT 由 MeituanClient.compute_sign 提供）─
 
-    def test_generate_sign(self, adapter: MeituanDeliveryAdapter) -> None:
-        """验证 MD5 签名算法基本正确性"""
+    def test_compute_sign_basic(self, adapter: MeituanDeliveryAdapter) -> None:
+        """美团 MD5 签名基本格式（详细规范断言见 TestMeituanClient）"""
+        url = f"{adapter.base_url}/order/confirm"
         params = {"app_key": "test_key", "timestamp": "1700000000"}
-        sign = adapter._generate_sign(params)
+        sign = MeituanClient.compute_sign(url, params, adapter.app_secret)
         assert isinstance(sign, str)
         assert len(sign) == 32  # MD5 hex length
 
@@ -844,3 +852,208 @@ class TestWeChatDeliveryAdapter:
         assert isinstance(adapter, WeChatDeliveryAdapter)
         assert isinstance(adapter, DeliveryPlatformAdapter)
         assert adapter.PLATFORM_NAME == "wechat"
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  MeituanClient — HTTP 客户端 SoT（CH-02.7a a2 真接入路径反测）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class _FakeMeituanResp:
+    """模拟 httpx.Response 子集（仅 raise_for_status + json）"""
+
+    def __init__(self, json_data: dict, status: int = 200) -> None:
+        self._json = json_data
+        self.status_code = status
+
+    def raise_for_status(self) -> None:
+        if self.status_code >= 400:
+            import httpx as _httpx
+
+            req = _httpx.Request("POST", "https://x")
+            resp = _httpx.Response(self.status_code, request=req)
+            raise _httpx.HTTPStatusError(
+                f"HTTP {self.status_code}", request=req, response=resp
+            )
+
+    def json(self) -> dict:
+        return self._json
+
+
+class TestMeituanClient:
+    """美团 HTTP 客户端真接入路径反测（不调真实美团 API，httpx 层 fake）"""
+
+    @pytest.fixture
+    def client(self) -> MeituanClient:
+        return MeituanClient(
+            app_id="test_app",
+            app_secret="test_secret",
+            base_url="https://example.com/api/v2",
+        )
+
+    # ── 签名规范（确定值断言）─────────────────────────────────
+
+    def test_compute_sign_meituan_spec(self) -> None:
+        """compute_sign 严格符合美团规范：MD5(url + sorted "k=v" 拼接 + secret)"""
+        import hashlib as _hashlib
+
+        url = "https://example.com/api/v2/order/confirm"
+        params = {"app_id": "test_app", "timestamp": "1700000000", "order_id": "MT_1"}
+        secret = "test_secret"
+        sign = MeituanClient.compute_sign(url, params, secret)
+
+        # 手算预期：按 key 字典序 → app_id,order_id,timestamp
+        sorted_kv = "app_id=test_apporder_id=MT_1timestamp=1700000000"
+        expected = _hashlib.md5(f"{url}{sorted_kv}{secret}".encode("utf-8")).hexdigest().lower()
+        assert sign == expected
+
+    def test_verify_callback_sign_accept_and_reject(self) -> None:
+        """verify_callback_sign：合法签名接受、非法签名拒绝、'sign' 字段不参与计算"""
+        import hashlib as _hashlib
+
+        params = {"order_id": "MT123", "status": "1", "sign": "should_be_filtered_out"}
+        secret = "secret"
+        sorted_kv = "order_id=MT123status=1"
+        valid_sig = _hashlib.md5(f"{sorted_kv}{secret}".encode("utf-8")).hexdigest().lower()
+
+        assert MeituanClient.verify_callback_sign(params, valid_sig, secret) is True
+        assert MeituanClient.verify_callback_sign(params, "bad_sig", secret) is False
+
+    # ── OAuth2 token ─────────────────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_ensure_token_cache_hit_skips_refresh(self, client: MeituanClient) -> None:
+        """token 未过期前不刷新（_refresh_token 不被调用）"""
+        client._access_token = "cached_token"
+        client._token_expires_at = time.time() + 3600
+
+        refresh_called = []
+
+        async def _spy_refresh() -> str:
+            refresh_called.append(True)
+            return "new_token"
+
+        client._refresh_token = _spy_refresh  # type: ignore[method-assign]
+        token = await client._ensure_token()
+        assert token == "cached_token"
+        assert refresh_called == []
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_refresh_token_http_failure_raises_auth_error(
+        self, client: MeituanClient
+    ) -> None:
+        """token HTTP 失败 → MeituanAuthError（不漏 httpx.HTTPStatusError）"""
+
+        async def _fail_post(*args, **kwargs) -> _FakeMeituanResp:
+            return _FakeMeituanResp({"error": "invalid_grant"}, status=401)
+
+        client._http.post = _fail_post  # type: ignore[method-assign]
+        with pytest.raises(MeituanAuthError):
+            await client._refresh_token()
+        await client.close()
+
+    # ── _request 业务/网络错误 ───────────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_request_business_error_raises_api_error(
+        self, client: MeituanClient
+    ) -> None:
+        """API code != 0/ok 时抛 MeituanAPIError（含 code + message）"""
+        client._access_token = "tok"
+        client._token_expires_at = time.time() + 3600
+
+        async def _post_with_business_error(*args, **kwargs) -> _FakeMeituanResp:
+            return _FakeMeituanResp({"code": 1001, "msg": "门店未授权"})
+
+        client._http.post = _post_with_business_error  # type: ignore[method-assign]
+
+        with pytest.raises(MeituanAPIError) as exc_info:
+            await client.confirm_order("MT_1")
+        assert exc_info.value.code == 1001
+        assert "门店未授权" in exc_info.value.message
+        await client.close()
+
+    @pytest.mark.asyncio
+    async def test_request_network_retry_then_api_error(
+        self, client: MeituanClient
+    ) -> None:
+        """连续 HTTP 5xx 重试耗尽（max_retries=3）后抛 MeituanAPIError"""
+        client.max_retries = 3
+        client._access_token = "tok"
+        client._token_expires_at = time.time() + 3600
+
+        call_count = []
+
+        async def _post_always_500(*args, **kwargs) -> _FakeMeituanResp:
+            call_count.append(True)
+            return _FakeMeituanResp({}, status=500)
+
+        client._http.post = _post_always_500  # type: ignore[method-assign]
+
+        with pytest.raises(MeituanAPIError) as exc_info:
+            await client.confirm_order("MT_1")
+        assert exc_info.value.code == -1
+        assert "3次重试后" in exc_info.value.message
+        assert len(call_count) == 3
+        await client.close()
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  MeituanDeliveryAdapter — USE_REAL_API 切换反测（CH-02.7a a2）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class TestMeituanDeliveryAdapterRealApi:
+    """USE_REAL_API 环境变量切换 mock ↔ 真接入"""
+
+    def test_default_keeps_mock_mode(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """未设 MEITUAN_DELIVERY_USE_REAL_API 时默认 mock"""
+        monkeypatch.delenv("MEITUAN_DELIVERY_USE_REAL_API", raising=False)
+        adapter = MeituanDeliveryAdapter(app_key="k", app_secret="s")
+        assert adapter._use_real_api is False
+        assert adapter._client is None
+
+    @pytest.mark.asyncio
+    async def test_real_api_true_accept_calls_client_confirm(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """USE_REAL_API=true 时 accept_order 走 client.confirm_order，传入 order_id"""
+        monkeypatch.setenv("MEITUAN_DELIVERY_USE_REAL_API", "true")
+        adapter = MeituanDeliveryAdapter(app_key="k", app_secret="s")
+        assert adapter._use_real_api is True
+
+        called: list[str] = []
+
+        async def _fake_confirm(order_id: str) -> dict:
+            called.append(order_id)
+            return {"ok": True}
+
+        client = await adapter._ensure_client()
+        client.confirm_order = _fake_confirm  # type: ignore[method-assign]
+
+        result = await adapter.accept_order("MT_REAL_1")
+        assert result is True
+        assert called == ["MT_REAL_1"]
+        await adapter.close()
+
+    @pytest.mark.asyncio
+    async def test_close_releases_lazy_client(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """close() 必须关掉 lazy-init 的 MeituanClient 连接池（防 httpx 泄漏）"""
+        monkeypatch.setenv("MEITUAN_DELIVERY_USE_REAL_API", "true")
+        adapter = MeituanDeliveryAdapter(app_key="k", app_secret="s")
+        client = await adapter._ensure_client()
+        assert adapter._client is client
+
+        closed = []
+
+        async def _spy_close() -> None:
+            closed.append(True)
+
+        client.close = _spy_close  # type: ignore[method-assign]
+
+        await adapter.close()
+        assert closed == [True]
+        assert adapter._client is None

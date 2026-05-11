@@ -1,3 +1,42 @@
+## 2026-05-11 下午 — CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
+
+### 今日完成
+本 session（5/11 下午）实施 CH-02.7a (issue #378) sub-PR a2 — 美团 HTTP 客户端层（`MeituanClient` + 两个异常类）从 `shared/adapters/meituan-saas/src/client.py` 内容并入 top-level `shared/adapters/meituan_delivery_adapter.py`，确立 top-level 为 SoT。
+
+**双 commit 留痕（§17/§21 Tier 2）：**
+- **test commit** `ee4d9dc3` — TestMeituanClient（6）+ TestMeituanDeliveryAdapterRealApi（3）= 9 反测，覆盖签名规范确定值 / 回调签名验证 / token cache / token HTTP 失败 / API 业务错误 / 网络重试耗尽 / USE_REAL_API 默认 false + true 切换 / close 释放 lazy 连接池
+- **impl commit** `a2c1e72b` — `MeituanClient` + `MeituanAPIError` + `MeituanAuthError` 并入 top-level；`MeituanDeliveryAdapter.__init__` 加 `_use_real_api` + lazy `_client`；accept/reject/get_order_detail 三个公共方法加真接入分支（USE_REAL_API=true 时调 client.confirm_order/cancel_order/query_order）；`close()` 释放 lazy client；删除废弃 `_generate_sign` + `_build_auth_params`（旧 placeholder 算法 secret 包夹 + 无 URL，无本机 mock 用户）
+
+**签名算法 SoT 对齐：**
+- 旧 `_generate_sign`：`MD5(secret + sorted "kv" + secret)` — placeholder
+- 新 SoT `MeituanClient.compute_sign`：`MD5(url + sorted "k=v" + secret)` — 美团开放平台规范
+- mock 路径不依赖任何签名计算 → 切换无回归
+
+### 数据变化
+- branch `channel/ch-02-7a-meituan-client-sot` HEAD: `a2c1e72b`（main `5b565fc9` + 2 commit）
+- adapter.py: +273 / -38；test_delivery_adapters.py: +218 / -5
+- 顶层 test_delivery_adapters.py 75 baseline → 84（+9 反测）全绿
+- meituan-saas/tests/ 25/49（a1 baseline 不动）— 无回归
+
+### 关键决策
+- **完整搬入 client.py 全部接口**（含 confirm/cancel/query/upload_food/query_store_info/query_settlement）而非只搬被外部用的子集 — 为 a3 切换 saas/adapter.py 留好接口完整性，避免 a3 再回头找
+- **lazy init 而非 eager**：默认 USE_REAL_API=false 时根本不实例化 httpx.AsyncClient，零连接池开销 + mock 测试不需要 mock httpx
+- **签名旧 placeholder 直接删而非保留 wrapper**：`_generate_sign` 仅被同样未被调用的 `_build_auth_params` 引用，两者皆死代码，无回归风险
+- **TDD red-green 双 commit**：test commit 单看 collect 阶段 fail（MeituanClient 未存在），impl commit 后全绿 — 历史留痕清晰
+
+### 遗留问题
+- **CH-02.7a a3 接续**：把 saas/adapter.py + saas/reservation.py + saas/order_webhook_handler.py 切到 top-level adapter，删 saas/client.py（含 saas/__init__.py re-export）
+- **真 API 端到端集成测试**：MeituanClient 真接入路径目前 fixture-level 覆盖；端到端测试需要美团 sandbox 凭据，独立 follow-up
+- **upload_food / sync_menu 真接入接通**：a2 仅 accept/reject/get_detail 三接口分支接通，sync_menu 真调可后续单独 PR
+
+### 明日计划
+- A：等 PR review + merge
+- B：CH-02.7a a3（saas/adapter.py 切换 + saas/client.py 删除）
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical）
+- D：v301 alembic PK COALESCE 历史债（infra 提速）
+
+---
+
 ## 2026-05-11 中午 — production codemod 真终态闭环 + 决策 84 第七轮文档化（CI gate 边界）
 
 ### 今日完成
