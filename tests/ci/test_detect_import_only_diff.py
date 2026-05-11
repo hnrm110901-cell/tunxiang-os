@@ -281,6 +281,36 @@ def test_no_changes_returns_false(tmp_repo: Path) -> None:
     assert out == "false"
 
 
+def test_semicolon_compound_from_returns_false(tmp_repo: Path) -> None:
+    """``from X import Y; side_effect()`` 复合语句 → carve-out 不通过（PR #419 P0 attack vector）。
+
+    code review 发现 ``IMPORT_LINE_RE`` 的 from 分支用 ``\\S.*`` 贪婪匹配吞 ``;
+    side_effect()``，让伪 import 行假装是纯 import。修复改为 ``[^;\\n]+`` 排除分号。
+    """
+    base = _commit(tmp_repo, {"a.py": "from foo import bar\n"}, "init")
+    head = _commit(
+        tmp_repo,
+        {"a.py": "from foo.x import bar; _register(bar)\n"},
+        "compound statement disguised as from-import",
+    )
+    out, rc = _run_script(base, head, tmp_repo)
+    assert rc == 0
+    assert out == "false"
+
+
+def test_semicolon_compound_import_returns_false(tmp_repo: Path) -> None:
+    """``import X; side_effect()`` 复合语句 → carve-out 不通过（import 分支天然拒绝，补显式覆盖）。"""
+    base = _commit(tmp_repo, {"a.py": "import foo\n"}, "init")
+    head = _commit(
+        tmp_repo,
+        {"a.py": "import foo; foo.initialize()\n"},
+        "compound statement disguised as import",
+    )
+    out, rc = _run_script(base, head, tmp_repo)
+    assert rc == 0
+    assert out == "false"
+
+
 def test_stub_key_setdefault_change_returns_false(tmp_repo: Path) -> None:
     """conftest stub key setdefault 改 → 非 import-only（决策 84 第 3 轮 stub key 是单独 lesson lane，不计入 carve-out）。"""
     base = _commit(
