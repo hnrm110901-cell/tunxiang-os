@@ -375,9 +375,9 @@ async def run_tiancai_migration(
     """
     import importlib
 
-    _menu_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.menu_sync")
+    _menu_mod = importlib.import_module("shared.adapters.tiancai_shanglong.src.menu_sync")
     TiancaiMenuSync = _menu_mod.TiancaiMenuSync
-    _member_mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.member_sync")
+    _member_mod = importlib.import_module("shared.adapters.tiancai_shanglong.src.member_sync")
     TiancaiMemberSync = _member_mod.TiancaiMemberSync
 
     summary: dict = {

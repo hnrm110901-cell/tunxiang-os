@@ -24,11 +24,7 @@ POS_REGISTRY: Dict[str, Optional[str]] = {
     "aoqiwei": "shared.adapters.aoqiwei.src.adapter.AoqiweiAdapter",
     "pinzhi": "shared.adapters.pinzhi_pos.src.adapter.PinzhiAdapter",
     "meituan": "shared.adapters.meituan_saas_adapter.MeituanSaasAdapter",
-    # TODO: tiancai-shanglong/ 目录名含 `-`，importlib 调用 `replace("-","_")` 后
-    # 找不到目录（fs 为 tiancai-shanglong/，import 名为 tiancai_shanglong）。
-    # 需独立目录重命名 PR（`git mv tiancai-shanglong tiancai_shanglong` +
-    # 同步改 services/gateway 下两处 importlib.import_module 引用）后启用。
-    "tiancai": "shared.adapters.tiancai-shanglong.src.adapter.TiancaiShanglongAdapter",
+    "tiancai": "shared.adapters.tiancai_shanglong.src.adapter.TiancaiShanglongAdapter",
     "keruyun": "shared.adapters.keruyun.src.adapter.KeruyunAdapter",
 }
 

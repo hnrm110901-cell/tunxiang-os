@@ -98,7 +98,7 @@ def test_no_replace_tzinfo_none_with_aware_now_anywhere() -> None:
     """
     scan_dirs = ("services", "shared/events", "edge", "scripts")
     allowlist = {
-        "shared/adapters/tiancai-shanglong/src/adapter.py",  # OrderSchema 兼容旧适配器
+        "shared/adapters/tiancai_shanglong/src/adapter.py",  # OrderSchema 兼容旧适配器
         "services/tx-trade/src/tests/test_codemod_tzinfo_residue_pj3_tier1.py",  # 测试文件自身含字面字符串模式
     }
 

@@ -2,7 +2,7 @@
 
 ## 基本信息
 - 对接系统：天财商龙（连锁餐饮 ERP/POS）
-- 主文件：`shared/adapters/tiancai-shanglong/src/adapter.py`
+- 主文件：`shared/adapters/tiancai_shanglong/src/adapter.py`
 - 代码行数：923 行
 - Tier：T1（交易链路）
 - 负责 Squad：Channel-A
