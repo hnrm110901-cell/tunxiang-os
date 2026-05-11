@@ -1,3 +1,52 @@
+## 2026-05-11 傍晚 — #434 决策 79 follow-up 三连 dead path 清理（CH-02.7a 真终态收尾）
+
+### 今日完成
+承接 a3（PR #432 已 admin-squash-merge → main `1d5a0c70`，07:24Z）和 #434 follow-up issue 立（07:30Z），实施 #434 三项 dead path 清理 — 走方案 A（合并 1 PR / 4 commit）。
+
+**4 commit chain（§17 Tier 2 + §21 原子化 + §16 docs）：**
+- **commit 1 (`969b9c17`)**：删 `MeituanSaasAdapter.to_order` + `to_staff_action` dead method（依赖 `apps/api-gateway/src/schemas/restaurant_standard_schema` 全 repo 不存在的 dead path）+ 清理无用 import (`os` / `sys` / `timezone` / `Decimal`)。-127 行 / +1 行
+- **commit 2 (`edd05837`)**：补 query/confirm/cancel 三方法 mock 反测，用正确的 `adapter.api_client.<method>` mock 形式（修正 a1 baseline 24 failed 中 3 个 mock 错位问题）。+65 行 / -1 行 / 4 个新测试
+- **commit 3 (`2d1bcc2e`)**：registry POS/RES/DEL/MEM/FIN 5 表共 10 项字符串路径切到 `shared.adapters.*`（原 `packages.api-adapters.*` 全 repo 不存在）。+17 行 / -10 行 / 1 项 tiancai 标 TODO
+- **commit 4 (本 commit)**：DEVLOG + progress.md 沉淀
+
+### 数据变化
+- branch `fix/decision-79-meituan-adapter-deadpath` HEAD: `<本 commit>`（main `1d5a0c70` + 4 commit）
+- meituan_saas_adapter.py: -127 / +1
+- test_meituan_saas_adapter.py: -1 / +65（25 → 29 tests）
+- shared/adapters/base/src/registry.py: -10 / +17（10 项路径切换）
+- DEVLOG.md + progress.md: 本段
+- 净：~ -50 / +130
+
+### 战绩
+- **#434 三连 dead path 全闭环**：删 dead method（第 1 项）+ 补 mock 反测（第 2 项）+ registry 路径切换（第 3 项）一次性收尾
+- **真门禁 113 passed 零回归**（决策 78）：test_delivery_adapters 84 + test_meituan_saas_adapter 29
+- **registry smoke 8/10 OK**：aoqiwei / pinzhi / meituan / keruyun / eleme / douyin / weishenghuo / nuonuo 真 importable；tiancai TODO（目录名 `-`）；yiding env-level miss（aiohttp 缺失，非 registry 路径问题）
+- **CH-02.7a (#378) 真终态闭环**：a1 #421 → a2 #431 → a3 #432 → #434 follow-up，meituan adapter 全链路 SoT + dead path 清理完工
+
+### 关键决策
+- **方案 A 合并 1 PR**（不拆 3 PR）— 总范围小（3 文件 + 1 docs），单 PR review 一轮，audit trail 在 4 commit 内分离
+- **第 1 项激进删除 to_order/to_staff_action**（不保留 stub） — dead code 移除，未来若需要再加回
+- **第 2 项补 4 mock test**（含 test_query_order_by_day_seq）— 填补 a1 baseline 24 failed 中 3 个 mock 错位缺口；query/confirm/cancel 真接入路径未来回归可被反测捕获
+- **第 3 项 tiancai 保留 + TODO 标注** — 目录名含 `-` 是独立目录重命名工作，本 PR 不扩范围（决策 79：surgical）
+- **registry.py 仍 dead infrastructure** — 全 repo 无 `from registry import get_transformer/get_adapter` 调用方；修对让未来潜在消费者真能 work（不是为 P0 业务路径修）
+
+### 遗留问题
+- **tiancai-shanglong/ 目录重命名独立 PR**：`git mv tiancai-shanglong tiancai_shanglong` + 同步改 `services/gateway/src/api/migration_routes.py:487` + `services/gateway/src/migration/tiancai_config_mapper.py:378-380` 两处 importlib 引用。范围 ~3 文件 / T2
+- **yiding adapter aiohttp 依赖** 缺失（venv-trackd 未装）— 不阻塞 registry 路径，但 adapter 实例化时会 ImportError，需要 `pip install aiohttp` 或在 adapter 内 lazy import
+- **#378 close + 总结评论**：CH-02.7a 长跑（a1/a2/a3 + #434）全闭环后关闭 issue
+- **本 PR review + merge**：等 user 决定 admin-merge 时机
+- **dev-plan-60d 重写**：5/7 旧计划被 30+ commit 推翻，需 user 输入新 demo 故事核心
+- **5/13 deal-breaker** 倒计时 < 2 天：channel-aggregation 3 平台企业资质（user 创始人级别）
+
+### 明日计划
+- A：等本 PR review + merge → #378 close → CH-02.7a 完美收尾
+- B：tiancai-shanglong/ 目录重命名独立 PR（如优先级高）
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical）
+- D：v301 alembic PK COALESCE 历史债（infra 提速）
+- E：dev-plan-60d 重写（阻塞，需 user 输入）
+
+---
+
 ## 2026-05-11 下午（续）— CH-02.7a a3 saas/ 整目录 cutover（top-level SoT 完工）
 
 ### 今日完成
