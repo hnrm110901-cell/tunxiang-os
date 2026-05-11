@@ -1,3 +1,66 @@
+## 2026-05-11 夜 — D1 + ~~D3~~ false alarm + D2b' 三连 fix（#434 follow-up + 技术债梳理）
+
+### 今日完成
+承接傍晚 #434/#435 merge（main `76024244`）的 starter prompt 五选一 D 候选清单，依次走 **C > D3 > D1 > D2 > D4** 优先级。C 创始人级别非技术，D3 调研后发现是 memory stale（实际 5/9 (B') 已修复），D1 + D2b' 完成。
+
+**D1 (PR #436 → squash `6592829a`, 08:53Z) — tiancai-shanglong/ 目录重命名 + fix importlib 路径**
+- `git mv shared/adapters/tiancai-shanglong → tiancai_shanglong`（8 文件 R100 rename）
+- 3 处 importlib 真路径修：`registry.py:31` + `migration_routes.py:487` + `tiancai_config_mapper.py:378,380`
+- 4 处 doc/test path 同步：`test_codemod_tzinfo_residue_pj3_tier1.py:101` + `INTEGRATION_GUIDE.md:44,507` + `docs/adapters/review/{README,tiancai-shanglong}.md`
+- code-reviewer 独立 APPROVE（0 BUG / 2 非阻塞建议）
+- Tier1 真 required 14/14 ✅ → squash merge
+
+**~~D3a~~ alembic chain audit — false alarm，memory 修正**
+- 第一次手写 regex 误报 "511 文件 / 426 unique / 8 dangling"（multi-line tuple down_revision 漏抓 → 假性 dangling）
+- 跑官方 `scripts/check_alembic_chain.py` → `Chain integrity OK (0 pre-existing warnings, 511 revisions checked)`
+- `docs/migration-chain-debt.md` 顶部明示 "✅ 2026-05-09 (B') — 全部 3 处历史断链修复完毕"
+- memory `Latest Session Handoff §持续技术债` alembic 那条整条 stale → 修正为"5/9 已修复 + 自写 regex 易误报警告"
+- worktree 清干净，**未生成 PR**（D3 不存在了）
+
+**D2b' (PR #440 → squash `786eddf1`, 13:12Z) — #418 fixture 公共子集抽取 DRY**
+- 调研：#418 shared fixture（function-scoped + 单事务 + 仅 channel-aggregation 3 表 + 禁 commit）与 tx-analytics / tx-brain service-level 测试模式（module-scoped + 多 session + 跨表 + 强依赖 commit + role 切换）**结构性不兼容**
+- 抽**公共最小子集**（不是整个 fixture）：`shared/test_utils/integration_pg.py` 持 `INTEGRATION_PG_DSN` + `requires_integration_pg` + `set_tenant_guc(session, tenant_id)`
+- 3 处 consumer DRY：`shared/db-migrations/tests/conftest.py`（fixture 形式向后兼容包装）+ tx-analytics + tx-brain
+- code-reviewer APPROVE 附 2 建议（`_SQLA_AVAILABLE` 守卫真生效 + 类型注解）→ amend + force-push-with-lease 全修
+- round-2 CI 16/16 真 required ✅ + `Integration PG — channel-aggregation 真 PG 反测` 实证 v411/v412/v413 真跑 PASSED → squash merge
+
+### 数据变化
+- main: `76024244` → `6592829a` (D1) → `1408fd1a` (#437 CSO 并发) → `bd3b2fe4` → `786eddf1` (D2b')
+- D1：15 files / +9 / -13（8 R100 rename + 7 content edits）
+- D2b'：5 files / +116 / -61（amend 最终版含 review fixup）
+- memory：`feedback_concurrent_pr_race.md` 新增（PR #432/#433 撞车实例）/ alembic 条目修正
+- 并发 session 撞车 3 次：#437 在 D2b' 写代码时推入；同期 main worktree 另 session 跑 channel/ch-02-7a-meituan-client-cleanup 全程不动
+
+### 战绩
+- **#434 第 3 项 dead path 全闭环**：傍晚 squash `76024244` 后 dead infrastructure 升级为真可 import（registry.py + 2 处 importlib 真接通）
+- **memory 自净化首例**：D3 false alarm → 主动核 ground truth → 修 stale 条目 → 留"自写 regex 警告"防再踩坑（pattern 可复用：未来 memory 中遇到具体文件:行号 / 数字断言先 grep 验证）
+- **#418 fixture 真公用闭环**：v411/v412/v413 migration 测试 + tx-analytics / tx-brain service 测试共用同一份 DSN/skipif/GUC helper；fixture 设计假设差异原文沉淀在 shared module docstring + DEVLOG
+- **code-reviewer 模式两次实战 APPROVE**：D1（0 BUG / 2 OK）+ D2b'（0 BUG / 2 fixup）— `feedback_self_review_blind_spots.md` T2 explicit ask 模式有效
+
+### 关键决策
+- **C 创始人级别 5/13 deal-breaker 倒计时 < 2 天** — 写明在 memory 不代写资质材料，但起手时刻提醒 user 优先级
+- **D3 false alarm 暴露：memory 内容会过期** — Latest Session Handoff §持续技术债条目时效性低，遇具体技术债务"先核 ground truth 再决方向"，省了一个本不存在的 issue
+- **D2b' 不"无脑套" shared fixture** — 三选项（D2b 直接套 / D2b' 抽公共子集 / D2c 新写跨 N 表）经精读两 target 后判定 D2b 必失败（GRANT 缺失 + commit-rollback 冲突 + role 写死），D2b' 是真"surgical DRY"
+- **D2b' commit 走 amend + force-push-with-lease**（非新 fixup commit）— user 显式说 "force-push 再 merge"，与 CLAUDE.md global "Always create NEW commits" 默认冲突但 user 显式覆盖；rebase 走 explicit-SHA `--force-with-lease=branch:expected-sha` 形式才过（默认 stale info）
+- **并发 session 撞车 pattern**：D2b' 在写代码时 #437 推 main，commit 完成后 rebase 干净（无文件 overlap），sequence 是"fetch 起手 → 本地工作 → 推前再 fetch → rebase → push"
+
+### 遗留问题
+- **D4 (flow 3 `[codemod]` PR title skip 主路径)** — 唯一未起 follow-up 候选，T2 infra 改 .github/workflows/，需 explicit ask reviewer
+- **F1 PR #436 reviewer 非阻塞建议 1**：`tiancai_shanglong/README.md:39` 引用不存在的 `packages/api-adapters/tiancai-shanglong` 安装路径 — 1 行 / T3，独立小 PR
+- **F2 PR #440 reviewer 非阻塞建议 2 的 follow-up 思考**：本次 amend 已修，无遗留
+- **本 session 关闭 / 拆 session**：context 累 ~50% 跨 2 PR 真 merge + 1 false alarm，按 `feedback_proactive_session_split.md` 用户可选自然结束
+- **5/13 deal-breaker** 倒计时 < 2 天（channel-aggregation 3 平台企业资质 — 创始人级别非技术）
+- **B / E 阻塞**：dev-plan-60d 重写需新 demo 故事 / DailySummary export 需 §18 ontology 对齐
+- **持续技术债（独立 issue 候选）**：仓库级 docker-compose-pg fixture 扩面到所有 *_rls_*_tier1.py / main 无 branch protection / D2c 全 N 表 RLS 真 PG 反测
+
+### 明日计划
+- A：D4（flow 3 `[codemod]` skip 主路径，若 user 选）
+- B：F1 顺手清 tiancai_shanglong/README.md:39 stale 安装路径
+- C：fresh session — handoff 已留在本 DEVLOG + 下条 progress.md，必读项 `docs/migration-chain-debt.md`（5/9 闭环）+ `feedback_carveout_admin_merge_pattern.md`（admin-merge 5 项裁决）+ 本段
+- D：5/13 deal-breaker 资质（user 创始人级别）
+
+---
+
 ## 2026-05-11 傍晚 — #434 决策 79 follow-up 三连 dead path 清理（CH-02.7a 真终态收尾）
 
 ### 今日完成
