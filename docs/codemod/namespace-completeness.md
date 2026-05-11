@@ -189,10 +189,22 @@ vs 业务改动 → false positive。
   - 方案 1 的实际价值：未来若有**单文件 + 单行 import 切换**的小型 codemod PR（如
     个别服务少量 lazy import 修），可自动通过；当前 4 PR 规模不适用。
 
-- 🔜 **方案 2 主路径配套（未实施）**：PR title prefix `[codemod]` 显式 skip —
-  实测后**应作为方案 1 之外的主要 escape hatch**，覆盖多行括号 / stub setdefault /
-  conftest body / mock binding fix 等本 chain 真实形态。当前仍走 admin-merge bypass
-  并按本节 §裁决标准 5 项自验；future issue 实施 PR title prefix 后改走自动 skip。
+- ✅ **方案 2 主路径配套（2026-05-11 落地）**：PR title prefix `[codemod]` 显式 skip。
+  实施在 `.github/workflows/tier1-gate.yml` `source-test-pairing` job 头部 —
+  `[codemod]` 开头的 PR title 即跳过 `源改动必须配对测试改动` gate（其他 Tier 1 gate
+  不豁免，Run Tier 1 系列照跑）。覆盖 4 PR 实测形态：多行括号 import / stub
+  setdefault / conftest body / mock binding fix。
+  - **PR title 经 `env:` 注入**（非直插 `${{ }}` 表达式），防御 title 内引号 / 反引号 /
+    `$()` 等 shell 元字符 escape 出 command injection（GitHub Actions security
+    best practice）。
+  - **严格 prefix 匹配** `[codemod]` 大小写敏感、严格首字符匹配（`[[ "$PR_TITLE" ==
+    \[codemod\]* ]]`），避免 "fix(channel): [codemod] integration" 这类中嵌触发。
+  - **Reviewer 仍负责 5 项自验**（本节 §裁决标准），prefix 不豁免审查质量；流程：
+    `[codemod] title → 跳过 source-test-pairing → **必须** reviewer 手动 5/5 通过后
+    merge（Tier 1 测试失败仍 block）` ↔ `非 [codemod] title → 走 carve-out 检测 →
+    失败要求配对测试`。
+  - 未来若收紧（如检出"PR title 假冒"行为），可加 `git diff --name-only` 二次校验
+    或 require approval；当前 4 PR 实测均可信场景，不预防御。
 
 - 📋 **AST 升级（独立 issue 候选）**：用 `ast.parse` 解析 added/removed 行，识别多行
   括号 import 续行 + 区分真 import-only。复杂度比正则高一档，但能把覆盖率从单行扩到
