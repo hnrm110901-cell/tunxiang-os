@@ -347,8 +347,7 @@ docker compose -f infra/compose/base.yml -f infra/compose/envs/gray.yml up -d   
 | [DEVLOG.md](./DEVLOG.md) | 每日开发进度日志 |
 | [docs/progress.md](./docs/progress.md) | 会话防漂移进度表（CLAUDE.md §18）|
 | [门店终端架构](./docs/architecture-store-terminals-stable-ai.md) | 门店端硬件拓扑与数据流 |
-| [V6 审计修复](./docs/development-plan-v6-remediation.md) | 安全审计修复计划 |
-| [安全审计报告](./docs/security-audit-report.md) | RLS/Nginx/端口/租户安全审计 |
+| [安全审计索引](./docs/security/INDEX.md) | 安全审计 SoT（当前 CSO 2026-05-11 + v6 历史 closed 锚点）|
 | [徐记 23 系统替换](./docs/xuji-23-system-replacement-analysis.md) | 23 套系统替换对照表 |
 | [差距分析 v3](./docs/gap-analysis-enterprise-benchmark-2026Q1-v3.md) | 企业级差距分析（75+ 功能项对比）|
 

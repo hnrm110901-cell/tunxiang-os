@@ -473,7 +473,7 @@ const printReceipt = async (data: OrderData) => {
 
 ## 十四、审计修复期特别约束（2026-03 至 2026-06）
 
-> 基于 v6 代码审计结果，以下约束在修复期间强制执行。详见 `docs/security-audit-report.md` 和 `docs/development-plan-v6-remediation.md`。
+> 基于 v6 代码审计结果，以下约束在修复期间强制执行。审计活历史 SoT：[`docs/security/INDEX.md`](./docs/security/INDEX.md)（v6 审计已 closed 2026-04-12，原报告 `docs/security-audit-report.md` + `docs/development-plan-v6-remediation.md` 在 commit `9e6f99d7` 删除；当前活跃审计 CSO 2026-05-11）。
 
 ### 异常处理
 - 新代码禁止使用 `except Exception`（最外层兜底除外，且必须加 `exc_info=True`）
