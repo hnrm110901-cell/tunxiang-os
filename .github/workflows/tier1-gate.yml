@@ -194,7 +194,11 @@ jobs:
           if echo "$CHANGED" | grep -qE '^(scripts/ci/detect_import_only_diff\.py|tests/ci/test_detect_import_only_diff\.py)$'; then
               echo "carve-out 自身被改，跑单测验证回归..."
               pip install --quiet pytest
-              python -m pytest tests/ci/test_detect_import_only_diff.py -v --tb=short
+              # --confcutdir=tests/ci 限定 conftest.py 加载范围，避免根 tests/conftest.py
+              # 依赖（httpx / fastapi 等）未装导致 ImportError。carve-out 的单测全内联
+              # fixture，不需要任何 conftest 支持。
+              python -m pytest tests/ci/test_detect_import_only_diff.py \
+                  --confcutdir=tests/ci -v --tb=short
           else
               echo "carve-out 未被改，跳过自测"
           fi
