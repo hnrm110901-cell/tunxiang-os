@@ -1,3 +1,45 @@
+## 2026-05-11 傍晚 · #434 决策 79 follow-up 三连 dead path 清理（CH-02.7a 真终态收尾）
+
+### 完成状态
+- [x] **#434 issue 三项 dead path 清理完工**（方案 A 合并 1 PR / 4 commit）
+- [x] **第 1 项**：删 MeituanSaasAdapter.to_order/to_staff_action dead method（依赖 `apps/api-gateway/src/schemas/` 全 repo 不存在）— `969b9c17`
+- [x] **第 2 项**：补 query/confirm/cancel 三方法 mock 反测，用 `adapter.api_client.<method>` 正确 mock 形式 — `edd05837`
+- [x] **第 3 项**：registry POS/RES/DEL/MEM/FIN 5 表共 10 项字符串切到 `shared.adapters.*`（原 `packages.api-adapters.*` 全废），tiancai TODO 标注 — `2d1bcc2e`
+- [x] **真门禁 113 passed 零回归**（决策 78）
+- [x] **registry smoke 8/10 真 importable**
+- [x] **branch HEAD**：`fix/decision-79-meituan-adapter-deadpath`（main `1d5a0c70` + 4 commit）
+
+### 关键决策
+- **方案 A 合并 1 PR** — 单 PR review 一轮，3 文件 + 1 docs 总范围小，audit trail 在 4 commit 内分离
+- **第 1 项激进删除（不保留 stub）** — dead code 移除符合 §3 surgical，未来若需要再加回
+- **第 3 项 tiancai 保留 + TODO** — 目录名含 `-` 是独立目录重命名工作，本 PR 不扩范围
+- **registry.py 仍 dead infrastructure** — 修对让未来潜在消费者真能 work，不是为 P0 业务路径修
+
+### 下一步
+- A：本 PR review + merge → CH-02.7a (#378) 真终态闭环 → close #378
+- B：tiancai-shanglong/ 目录重命名独立 PR（如优先级高）— `git mv` + `services/gateway` 两处 import 改
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical）
+- D：v301 alembic PK COALESCE 历史债（infra 提速）
+- E：dev-plan-60d 重写（阻塞，需 user 输入）
+
+### 已知风险
+- **registry.py 整个 dead infrastructure** — 即使本 PR 修对路径，仍无生产消费者，本质上"修对了 academic 的 dead code"
+- **yiding aiohttp 缺失** — 不在 #434 范围，但需要后续 follow-up `pip install aiohttp` 或 yiding adapter 内 lazy import
+- **tiancai-shanglong/ 目录含 `-`** 是 fs-level 问题，无法在本 PR 内修
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch origin
+git log --oneline -5 origin/main
+gh pr list --state open --author "@me" --limit 30
+gh pr view <decision-79 PR号> --json state,mergedAt,reviewDecision
+cd /Users/lichun/.tunxiang-p0-worktrees/decision-79-followup
+/Users/lichun/tunxiang-os/.venv-trackd/bin/python -m pytest shared/adapters/tests/test_delivery_adapters.py shared/adapters/tests/test_meituan_saas_adapter.py -q
+```
+
+---
+
 ## 2026-05-11 下午（续）· CH-02.7a a3 saas/ 整目录 cutover（top-level SoT 完工）
 
 ### 完成状态

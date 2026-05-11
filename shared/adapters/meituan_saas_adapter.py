@@ -13,11 +13,8 @@ HTTP 客户端 SoT（MeituanClient / MeituanAPIError / MeituanAuthError）
 
 import hashlib
 import json as _json
-import os
-import sys
 import uuid
-from datetime import datetime, timezone
-from decimal import Decimal
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -547,129 +544,6 @@ class MeituanSaasAdapter:
         """关闭适配器，释放资源"""
         logger.info("关闭美团SAAS适配器")
         await self.api_client.close()
-
-    # ==================== 标准化数据总线接口 ====================
-
-    def to_order(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
-        """
-        将美团SAAS原始订单字段映射到标准 OrderSchema
-
-        美团SAAS订单字段参考：
-          order_id, day_seq, create_time, status, total_price,
-          food_list (food_id, food_name, count, price),
-          app_poi_code, operator_id
-        """
-        _here = os.path.dirname(__file__)
-        _repo_root = os.path.abspath(os.path.join(_here, "../.."))
-        _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
-        if _gateway_src not in sys.path:
-            sys.path.insert(0, _gateway_src)
-
-        from schemas.restaurant_standard_schema import (
-            DishCategory,
-            OrderItemSchema,
-            OrderSchema,
-            OrderStatus,
-            OrderType,
-        )
-
-        # 状态映射（美团：1=待接单, 2=已接单, 3=配送中, 4=已完成, 5=已取消, 8=退款）
-        _STATUS_MAP = {
-            1: OrderStatus.PENDING,
-            2: OrderStatus.CONFIRMED,
-            3: OrderStatus.CONFIRMED,
-            4: OrderStatus.COMPLETED,
-            5: OrderStatus.CANCELLED,
-            8: OrderStatus.CANCELLED,
-        }
-        order_status = _STATUS_MAP.get(int(raw.get("status", 1)), OrderStatus.PENDING)
-
-        items = []
-        for idx, item in enumerate(raw.get("food_list", raw.get("detail_items", [])), start=1):
-            unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 → 元
-            qty = int(item.get("count", item.get("quantity", 1)))
-            items.append(
-                OrderItemSchema(
-                    item_id=str(item.get("cart_id", f"{raw.get('order_id', '')}_{idx}")),
-                    dish_id=str(item.get("food_id", item.get("app_food_code", ""))),
-                    dish_name=str(item.get("food_name", "")),
-                    dish_category=DishCategory.MAIN_COURSE,
-                    quantity=qty,
-                    unit_price=unit_price,
-                    subtotal=unit_price * qty,
-                    special_requirements=item.get("remark"),
-                )
-            )
-
-        total = Decimal(str(raw.get("total_price", raw.get("order_total_price", 0)))) / 100
-        discount = Decimal(str(raw.get("discount_price", raw.get("poi_discount", 0)))) / 100
-        subtotal = total + discount
-
-        create_time_raw = raw.get("create_time", raw.get("order_create_time", ""))
-        try:
-            if isinstance(create_time_raw, (int, float)) and create_time_raw > 1e9:
-                created_at = datetime.fromtimestamp(create_time_raw)
-            else:
-                created_at = datetime.fromisoformat(str(create_time_raw).replace("T", " "))
-        except (ValueError, TypeError, OSError):
-            created_at = datetime.now(timezone.utc)
-
-        return OrderSchema(
-            order_id=str(raw.get("order_id", raw.get("mt_order_id", ""))),
-            order_number=str(raw.get("day_seq", raw.get("order_id", ""))),
-            order_type=OrderType.TAKEOUT,
-            order_status=order_status,
-            store_id=store_id,
-            brand_id=brand_id,
-            table_number=None,
-            customer_id=str(raw.get("user_id", "")) or None,
-            items=items,
-            subtotal=subtotal,
-            discount=discount,
-            service_charge=Decimal("0"),
-            total=total,
-            created_at=created_at,
-            waiter_id=None,
-            notes=raw.get("caution"),
-        )
-
-    def to_staff_action(self, raw: Dict[str, Any], store_id: str, brand_id: str) -> Any:
-        """
-        将美团SAAS原始操作数据映射为标准 StaffAction
-
-        原始字段参考（后台操作日志）：
-          action_type, operator_id, amount, reason, approved_by, action_time
-        """
-        _here = os.path.dirname(__file__)
-        _repo_root = os.path.abspath(os.path.join(_here, "../.."))
-        _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
-        if _gateway_src not in sys.path:
-            sys.path.insert(0, _gateway_src)
-
-        from schemas.restaurant_standard_schema import StaffAction
-
-        action_time_raw = raw.get("action_time", raw.get("create_time", ""))
-        try:
-            if isinstance(action_time_raw, (int, float)) and action_time_raw > 1e9:
-                created_at = datetime.fromtimestamp(action_time_raw)
-            else:
-                created_at = datetime.fromisoformat(str(action_time_raw).replace("T", " "))
-        except (ValueError, TypeError, OSError):
-            created_at = datetime.now(timezone.utc)
-
-        amount_raw = raw.get("amount", raw.get("discount_price"))
-        amount = Decimal(str(amount_raw)) / 100 if amount_raw is not None else None
-
-        return StaffAction(
-            action_type=str(raw.get("action_type", raw.get("type", "unknown"))),
-            brand_id=brand_id,
-            store_id=store_id,
-            operator_id=str(raw.get("operator_id", raw.get("user_id", ""))),
-            amount=amount,
-            reason=raw.get("reason"),
-            approved_by=raw.get("approved_by"),
-            created_at=created_at,
-        )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
