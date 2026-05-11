@@ -264,13 +264,77 @@ class TestReservationMixin:
 
 
 class TestOrderManagement:
-    """订单管理接口测试（仅迁 baseline passed 用例）"""
+    """订单管理接口测试
+
+    #434 第 2 项 — query/confirm/cancel 三方法走 `self.api_client.*` 路径，
+    a1 baseline 24 pre-existing failed 中 3 个（test_query_order_by_id /
+    test_confirm_order / test_cancel_order）因 mock 错位（mock `adapter.client.*`
+    httpx 层而非 `adapter.api_client.*` MeituanClient 层）失败。本次补反测使用
+    正确的 `adapter.api_client.<method>` mock。
+    """
 
     @pytest.mark.asyncio
     async def test_query_order_requires_id_or_seq(self, adapter):
         """未提供order_id和day_seq时抛出ValueError"""
         with pytest.raises(ValueError, match="order_id和day_seq至少提供一个"):
             await adapter.query_order()
+
+    @pytest.mark.asyncio
+    async def test_query_order_by_id(self, adapter):
+        """通过订单ID查询订单详情（走 api_client.query_order）"""
+        mock_result = {
+            "order_id": "MT001",
+            "status": 4,
+            "total_price": 8800,
+            "food_list": [
+                {"food_id": "F001", "food_name": "宫保鸡丁", "count": 1, "price": 3800},
+            ],
+        }
+        adapter.api_client.query_order = AsyncMock(return_value=mock_result)
+
+        result = await adapter.query_order(order_id="MT001")
+
+        adapter.api_client.query_order.assert_called_once_with("MT001")
+        assert result["order_id"] == "MT001"
+        assert result["status"] == 4
+        assert result["total_price"] == 8800
+
+    @pytest.mark.asyncio
+    async def test_query_order_by_day_seq(self, adapter):
+        """通过日流水号查询订单（order_id 缺省时 fallback 到 day_seq）"""
+        mock_result = {"order_id": "MT002", "status": 1}
+        adapter.api_client.query_order = AsyncMock(return_value=mock_result)
+
+        result = await adapter.query_order(day_seq="20240301001")
+
+        adapter.api_client.query_order.assert_called_once_with("20240301001")
+        assert result["order_id"] == "MT002"
+
+    @pytest.mark.asyncio
+    async def test_confirm_order(self, adapter):
+        """确认订单（走 api_client.confirm_order）"""
+        mock_result = {"order_id": "MT001", "status": "confirmed"}
+        adapter.api_client.confirm_order = AsyncMock(return_value=mock_result)
+
+        result = await adapter.confirm_order(order_id="MT001")
+
+        adapter.api_client.confirm_order.assert_called_once_with("MT001")
+        assert result["status"] == "confirmed"
+
+    @pytest.mark.asyncio
+    async def test_cancel_order(self, adapter):
+        """取消订单（走 api_client.cancel_order，含 reason_code + reason）"""
+        mock_result = {"order_id": "MT001", "status": "cancelled"}
+        adapter.api_client.cancel_order = AsyncMock(return_value=mock_result)
+
+        result = await adapter.cancel_order(
+            order_id="MT001",
+            reason_code=1,
+            reason="商家缺货",
+        )
+
+        adapter.api_client.cancel_order.assert_called_once_with("MT001", 1, "商家缺货")
+        assert result["status"] == "cancelled"
 
 
 # ============================================================
