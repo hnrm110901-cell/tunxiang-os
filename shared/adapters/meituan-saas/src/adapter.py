@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import structlog
 
-from .client import MeituanAPIError, MeituanClient
+from shared.adapters.meituan_delivery_adapter import MeituanAPIError, MeituanClient
 
 logger = structlog.get_logger()
 
