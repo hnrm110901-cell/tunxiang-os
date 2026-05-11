@@ -204,7 +204,22 @@ jobs:
           fi
 
       - name: 检查 Tier 1 源改动是否配对 tier1 测试改动
+        env:
+          # 经 env 注入 PR title，避免 ${{ ... }} 直插表达式被作者 title 中引号 / 反引号
+          # 等 shell 元字符 escape 出 injection（GitHub Actions security best practice）
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
+          # 流程 3 §"根治 follow-up" 方案 2：PR title prefix `[codemod]` 显式 escape hatch
+          # 实测覆盖：多行括号 import / stub setdefault / conftest body / mock binding fix
+          # 等本 chain 真实形态（方案 1 import-only carve-out 4 PR 实测覆盖率 = 0/4）。
+          # Reviewer 仍负责 5 项自验（流程 3 §裁决标准），prefix 不豁免审查质量。
+          # 详见 docs/codemod/namespace-completeness.md §"Review 流程沉淀 流程 3"。
+          if [[ "$PR_TITLE" == \[codemod\]* ]]; then
+              echo "::notice title=Codemod escape hatch::PR title 以 [codemod] 开头 — 显式跳过 源改动必须配对测试改动 检查（流程 3 §根治 follow-up 方案 2）。Reviewer 注意：codemod PR 仍按 §裁决标准 5 项自验，本 prefix 不豁免审查质量。"
+              echo "✅ 源/测试改动配对检查通过（[codemod] title escape hatch）"
+              exit 0
+          fi
+
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
 
