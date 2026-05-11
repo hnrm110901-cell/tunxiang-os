@@ -1,13 +1,11 @@
 """pytest path + env setup for meituan-saas tests.
 
-修自 aab1a5b9 起的 import collection 失败：
-  原 test 用 `sys.path.insert(meituan-saas/src) + from adapter import ...`，
-  但 adapter.py 内部用 `from .client import ...` 相对 import — 一致性矛盾。
+历史：aab1a5b9 修复 import collection 失败 — 把 `meituan-saas/`（src 的父目录）
+放 sys.path，让 src 作为 package 加载；test 用 `from src.adapter import ...`。
 
-修法：把 `meituan-saas/`（src 的父目录）放 sys.path，让 src 作为 package 加载。
-test 改用 `from src.adapter import ...`，adapter.py 的 `.client` 相对 import 自然生效。
-
-CH-02.7a 真正 SoT 迁移到 top-level 后本 conftest 与整个 meituan-saas/ 子目录一并删除。
+CH-02.7a a3 起 saas/src/client.py 已删，adapter.py 直接 import 顶层
+`shared.adapters.meituan_delivery_adapter`；本 conftest 仍负责 src 作为 package
+加载，但相对 `.client` 不再存在。整个 meituan-saas/ 子目录在 a4 移除。
 """
 
 from __future__ import annotations

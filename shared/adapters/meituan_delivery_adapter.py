@@ -1,9 +1,9 @@
 """
 美团外卖平台适配器（DeliveryPlatformAdapter 实现）
 
-CH-02.7a a2 起本文件是美团 HTTP 客户端（MeituanClient）的 SoT — 真接入路径
+CH-02.7a a2 起本文件是美团 HTTP 客户端（MeituanClient）的唯一 SoT — 真接入路径
 （签名/OAuth2/底层请求）从原 shared/adapters/meituan-saas/src/client.py 并入。
-shared/adapters/meituan-saas/src/client.py 留作过渡（a3 与 saas/adapter.py 同删）。
+a3 已删除 saas/src/client.py 并把 saas/adapter.py 切到本文件 import。
 
 配置（环境变量）：
   MEITUAN_DELIVERY_APP_KEY
@@ -60,7 +60,8 @@ class MeituanClient:
     """美团外卖开放平台 HTTP 客户端（基于 httpx.AsyncClient 连接池）
 
     支持：MD5 签名计算 / OAuth2 token 自动刷新 / 订单确认-取消-查询 / 菜品上传 / 结算对账。
-    SoT 自 CH-02.7a a2 起为本文件（原 meituan-saas/src/client.py 过渡保留至 a3）。
+    SoT 自 CH-02.7a a2 起为本文件；a3 删除 saas/src/client.py、saas/adapter.py
+    切本文件 import，双源 drift 风险窗口关闭。
     """
 
     def __init__(

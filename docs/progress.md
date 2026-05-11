@@ -1,3 +1,43 @@
+## 2026-05-11 晚 · CH-02.7a a3 saas 模块切顶层 SoT + 删 client.py
+
+### 完成状态
+- [x] **issue #378 sub-PR a3 实施完成**：`saas/src/adapter.py` 对 `MeituanClient/MeituanAPIError` 的 import 切到顶层 `shared.adapters.meituan_delivery_adapter`；删除 dead duplicate `saas/src/client.py`（329 LOC）；`saas/__init__.py` 砍 client/Error re-export
+- [x] **test commit** `802e2503`：3 parity 反测（identity check + importlib find_spec 防重生）— red phase 3/3 FAIL
+- [x] **impl commit** `4ce06e34`：adapter.py:16 / __init__.py / 删 client.py — green phase parity 3/3 PASS
+- [x] **docs commit**（本 commit）：DEVLOG + progress + 4 处 stale docstring 清理（conftest.py / meituan_delivery_adapter.py docstring 提及已删 client.py 的注释更新）
+- [x] **顶层 84 baseline 全绿**（绝不退化锁定 ✓）
+- [x] **saas/tests/ 25 pass / 24 fail → 28 pass / 24 fail**（+3 parity，24 fail a1 既有不动）
+- [x] **双重 grep 自检**：内部 `from .client` 0 真实 import / 全仓 deep path 0 真实 import / 外部唯一 user `omni_channel_service.py:738` 走 deep path 取 `MeituanSaasAdapter`，与本 PR 0 交集
+- [x] **CH-02.7a 链路 a1→a2→a3 收尾**：双源 drift 风险窗口关闭
+- [x] **branch HEAD**：`channel/ch-02-7a-meituan-client-cleanup` @ docs commit（main `4504de6e` + 3 commit）
+
+### 关键决策
+- **__init__.py 砍 re-export 而非保 shim**：grep 全仓 services/apps/shared 0 外部依赖证据充分，直接删；外部唯一 user (`omni_channel_service.py:738`) 走 deep path 取 `MeituanSaasAdapter` 不经 __init__.py，与 client/Error re-export 无交集
+- **saas/tests/ 49 用例整体保留不重组**：25 passing 测 `MeituanSaasAdapter`（saas-specific 字段映射），与顶层 84 测 `MeituanDeliveryAdapter/MeituanClient` 是不同类无覆盖重叠 — starter prompt "去重" 前提不成立
+- **24 fail 不修**：a1 既有缺陷，与本 PR 正交，严守外科原则
+- **3 parity 反测专注 identity check**：未来 a4 删整个 meituan-saas/ 时此文件随子目录一并删，反测仅守护 a3→a4 过渡窗口
+- **stale docstring 一并清理（4 处）**：conftest.py:5 + 顶层 adapter.py docstring line 5-6/63 — 引用已删 client.py 的注释更新为事实陈述
+- **事实证据更正 vs starter prompt**：reservation.py / order_webhook_handler.py 完全不引用 `.client`（grep 证实），全仓只有 2 处真实 import，工作量比 starter 想的小很多
+
+### 下一步
+- A：本 PR review + merge
+- B：**§19 第三 session 独立验证**（CLAUDE.md 模板，徐记海鲜收银员视角，3+ files 改动强制）
+- C：CSO 5 findings 排单（独立 PR 链路）
+  - F#1+F#2 CORS 三服务合并（T2 security，CRIT+HIGH）
+  - F#4 ModelRouter bypass W1 tx-trade shift_summary（T1 资金路径，TDD 强制）
+  - F#3 Dockerfile USER（HIGH，分批 staged rollout）
+  - F#5 .gstack/ gitignore（搭车 chore PR）
+- D：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical breaking）
+- E：a4 评估 — 整个 `shared/adapters/meituan-saas/` 子目录删除可能性（先迁移 omni_channel_service.py:738 唯一外部 user）
+
+### 已知风险
+- **§19 验证未做就 merge 的窗口**：本 PR 触发 §19（3+ files：adapter.py + __init__.py + client.py 删 + tests/conftest.py docstring + 顶层 adapter.py docstring），收银员视角重检在 PR 描述明确标注"待第三 session 完成"；merge 与 §19 验证之间存在风险窗口
+- **a4 计划越晚越被动**：本 PR 后 `meituan-saas/` 子目录仍存活但已是壳子（adapter.py 真实业务 + 49 tests），a4 迁移成本随调用方增加而上升；建议 a3 merge 后 1-2 周内排期 a4
+- **3 parity 反测的生命周期**：a4 删整个 meituan-saas/ 时本反测文件一并删；提醒 a4 PR 同步移除，避免遗留死代码
+- **顶层 adapter.py docstring 改动违反 starter prompt "公共 API 0 触" 严格解释**：但 docstring 修订**不动接口签名/行为**，是事实更新，已在 impl commit 之外的 docs commit 隔离处理
+
+---
+
 ## 2026-05-11 下午 · CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
 
 ### 完成状态

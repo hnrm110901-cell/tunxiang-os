@@ -1,3 +1,48 @@
+## 2026-05-11 晚 — CH-02.7a a3 saas 模块切顶层 SoT + 删 client.py
+
+### 今日完成
+本 session（5/11 晚）实施 CH-02.7a (issue #378) sub-PR a3 — channel/ch-02-7a-meituan-client-cleanup branch — 把 `shared/adapters/meituan-saas/src/adapter.py` 对 `MeituanClient` / `MeituanAPIError` 的 import 切到顶层 SoT `shared/adapters/meituan_delivery_adapter.py`，删除 dead duplicate `saas/src/client.py`（329 LOC），CH-02.7a 链路 a1→a2→a3 收尾。
+
+**§17 双 commit 留痕（T2）：**
+- **test commit** `802e2503` — 3 parity 反测覆盖：(1) saas.adapter.MeituanClient identity == top-level SoT；(2) MeituanAPIError 同上；(3) saas/src/client.py 删除后 importlib find_spec 必须返回 None（防 stub 重生）。 commit 时 3/3 FAIL（red phase）。
+- **impl commit** `4ce06e34` — adapter.py:16 改 import 指向顶层；__init__.py 删除 MeituanClient/Error re-export + 缩减 __all__ 到 saas-specific 3 项；删除 saas/src/client.py 329 LOC。 commit 后 parity 3/3 PASS（green phase）。
+
+**事实证据更正 vs starter prompt：**
+- `reservation.py` / `order_webhook_handler.py` 实际**完全不引用** `.client`（grep 全仓证实）— starter prompt 描述不准
+- 全仓只有 2 处 `from .client` 真实 import：`saas/src/adapter.py:16` + `saas/src/__init__.py:4`
+- 外部唯一引用是 `services/tx-trade/.../omni_channel_service.py:738` 走 deep path 取 `MeituanSaasAdapter`（不经 __init__.py，与本 PR 无交集）
+
+### 数据变化
+- branch `channel/ch-02-7a-meituan-client-cleanup` HEAD: docs commit 后约 `~xxxxx`（main `4504de6e` + 3 commit）
+- 净 LOC：+12 / -335 = -323（满足 ≤500 约束）
+- 顶层 84 baseline 全绿（绝不退化锁定 ✓）
+- saas/tests/ 25 pass / 24 fail → **28 pass / 24 fail**（+3 parity green，a1 既有 24 fail 不动）
+
+### 关键决策
+- **__init__.py 砍 re-export 而非保 shim**：grep 全仓 services/apps/shared 0 处 `from shared.adapters.meituan_saas import MeituanClient/Error`，证据充分允许直接删；外部唯一用户走 deep path 不受影响
+- **saas/tests/ 49 用例整体保留不重组**：25 passing 测的是 `MeituanSaasAdapter`（saas-specific 字段映射 to_order/to_staff_action/error/init），与顶层 84 测的 `MeituanDeliveryAdapter/MeituanClient` 是不同类，**无真实覆盖重叠**，starter prompt 提的"去重"前提不成立
+- **24 fail 不修**：a1 既有缺陷，与本 PR 正交，scope 严守外科原则
+- **3 parity 反测命名 `test_top_level_sot_parity.py`**：未来 a4 删整个 meituan-saas/ 时此文件随子目录一并删，反测 identity 守护仅在 a3→a4 过渡窗口生效
+- **stale docstring 一并清理（4 处）**：conftest.py:5 + meituan_delivery_adapter.py:5-6/63 — 引用已删 client.py 的注释更新为事实陈述，否则未来读者困惑
+
+### 遗留问题
+- **§19 独立验证：第三 session 待开**（CLAUDE.md 模板，徐记海鲜收银员视角）
+  - 200 桌并发下 saas 模块切顶层后 P99 是否退化
+  - 断网 4h saas adapter 数据完整性
+  - 是否意外修改 Tier 1 路径行为
+  - RLS 跨租户隔离仍有效性
+- **a4 follow-up（未列入本 PR）**：整个 `shared/adapters/meituan-saas/` 子目录评估删除可能性 — services/tx-trade/omni_channel_service.py:738 唯一外部 user 需先迁移至顶层 MeituanDeliveryAdapter
+- **upload_food / sync_menu / pull_orders 真接入**：a2 仅 accept/reject/get_detail 接通；其余仍 mock，独立小 PR 候选
+
+### 明日计划
+- A：本 PR review + merge（依赖 reviewer 节奏）
+- B：§19 第三 session 验证（独立 task）
+- C：CSO 5 findings 排单 — F#1+F#2 CORS 三服务（T2 security）或 F#4 ModelRouter bypass W1 tx-trade（T1 资金路径）
+- D：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical breaking）
+- E：a4 评估（删 meituan-saas/ 子目录 + omni_channel_service 迁移）
+
+---
+
 ## 2026-05-11 下午 — CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
 
 ### 今日完成
