@@ -1,3 +1,43 @@
+## 2026-05-11 夜 · D1 + ~~D3~~ false alarm + D2b' 三连 fix
+
+### 完成状态
+- [x] **D1 (PR #436 squash `6592829a` @ 08:53Z)**：`tiancai-shanglong/` 目录重命名 + 3 处 importlib 真路径修 + 4 处 doc/test path 同步（15 files / +9 / -13）
+- [x] **~~D3a~~ false alarm**：alembic chain audit — 调研后发现 5/9 (B') 已修复，memory `Latest Session Handoff §持续技术债` 整条 stale 已修正；worktree 清，**无 PR**
+- [x] **D2b' (PR #440 squash `786eddf1` @ 13:12Z)**：#418 fixture 公共最小子集抽到 `shared/test_utils/integration_pg.py`，3 处 consumer DRY；reviewer 2 建议 amend + force-push 全修；round-2 CI 16/16 真 required ✅ + integration-pg 实证 v411/v412/v413 真跑 PASSED
+- [x] **code-reviewer 两次独立 APPROVE**：D1 (0 BUG / 2 OK) + D2b' (0 BUG / 2 fixup)
+- [x] **memory 修正 2 条**：alembic stale 条目 + `feedback_concurrent_pr_race.md` 新增（PR #432/#433 撞车实例）
+- [x] **DEVLOG.md + progress.md 沉淀**：本段
+
+### 关键决策
+- **C 创始人级别 5/13 deal-breaker 不代写资质** — 倒计时 < 2 天提醒
+- **D3 false alarm pattern**：memory 中具体技术债条目（具体文件:行号 / 数字断言）先核 ground truth 再决方向 — 省了一个本不存在的 issue + 一个 audit PR
+- **D2b 三选项判定**：精读 tx-analytics / tx-brain 后 D2b 直接套必失败（GRANT 缺失 + commit-rollback 冲突 + role 写死）→ 改 D2b' 抽公共子集
+- **D2b' commit 走 amend + force-push-with-lease**（非 fixup commit）— user 显式 "force-push 再 merge"，与 CLAUDE.md global "Always create NEW commits" 默认冲突但 user 显式覆盖；rebase 走 `--force-with-lease=branch:expected-sha` 显式 SHA 形式（默认 stale info）
+
+### 下一步
+- A：D4 — flow 3 `[codemod]` PR title skip 主路径（T2 infra，需 explicit ask reviewer），若 user 选
+- B：F1 PR #436 reviewer 非阻塞建议 1 — `tiancai_shanglong/README.md:39` stale 安装路径（1 行 / T3）
+- C：fresh session — handoff 已留 DEVLOG 顶 + 本段；必读：`docs/migration-chain-debt.md`（5/9 已闭环，警惕 memory stale）+ `feedback_carveout_admin_merge_pattern.md`（admin-merge 5 项裁决）
+
+### 已知风险
+- **持续技术债（独立 issue 候选未起）**：仓库级 docker-compose-pg fixture 扩面到所有 *_rls_*_tier1.py / D2c 全 N 表 RLS 真 PG 反测 / main 无 branch protection
+- **5/13 deal-breaker 倒计时 < 2 天**：channel-aggregation 3 平台企业资质（创始人级别非技术）
+- **B / E 阻塞**：dev-plan-60d 重写需新 demo 故事 / DailySummary export 需 §18 ontology 对齐
+- **memory stale**：本 session 已暴露一个（alembic），未来遇 memory 中具体数字 / 文件:行号断言主动核
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 786eddf1 或更新（含 D2b' #440）
+gh pr list --state open --author "@me" --limit 30   # 20 个 backlog OPEN
+git worktree list                   # 应 13-14 个（本 session 3 个独立 worktree 已清）
+head -200 DEVLOG.md                 # 5/11 夜 + 傍晚 + 下午（续）+ 下午 + 中午 + 凌晨 段
+gh pr view 436 440 --json mergedAt,mergeCommit   # 验本 session 2 merge
+```
+
+---
+
 ## 2026-05-11 傍晚 · #434 决策 79 follow-up 三连 dead path 清理（CH-02.7a 真终态收尾）
 
 ### 完成状态
