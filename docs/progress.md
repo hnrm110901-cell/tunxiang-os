@@ -1,3 +1,49 @@
+## 2026-05-11 夜深 · B + D1 收尾（清理 + 沉淀 session）
+
+### 完成状态
+- [x] **B (4 issue) 拆持续技术债独立追踪**：`#448` D2c Tier1 真 PG 扩面 / `#449` docker-compose-pg fixture 扩面 / `#450` AST 升级 方案 3 / `#451` tiancai README 4 stale path 清理
+- [x] **D1 (PR #452 admin-squash `b92eb0e1` @ 14:27:14Z)**：`shared/adapters/tiancai_shanglong/README.md` 4 处 grep-verified dead path 清理（1 file / +1 / -78 / T3 docs-only）；PR merge 自动 close `#451` @ 14:27:16Z
+- [x] **D1 worktree (`tiancai-readme-cleanup-2026-05-11`) + branch (`docs/tiancai-readme-stale-paths-cleanup`, was `37bedfdb`) 已清**
+- [x] **DEVLOG.md + 本段沉淀**
+- [ ] **DEVLOG 沉淀 PR (第 6 PR)** — 本段写完后另开 branch / push / PR
+
+### 本 session 终态
+- 4 issue OPEN backlog（截至 14:30Z）：`#448` Tier1 / `#449` Tier2 / `#450` Tier3 — 等未来 session pick
+- 1 PR MERGED (`#452`) + 1 issue auto-closed (`#451`，PR merge 联动)
+- 1 worktree 清 / 1 branch 删
+- admin-merge 累积 5 次 → 6 次（#353/#355/#356/#358/#370/#452）
+
+### 关键决策
+- **Handoff vs SoT 矛盾首例 — 不脑补，先核 SoT** — user 写 handoff 时说"#452 MERGED + #451 auto-closed + origin/main 推进"，本 session 起手核验发现全部 OPEN / main 仍 `1d3d8d66`；按 `feedback_handoff_finding_ids.md` 列差异 + 3 选项让 user 拍板，user 选 admin-merge；pattern 可复用：handoff 中"已 MERGED / 已 close / origin/main 应 X" 断言必须 SoT 校验
+- **admin-merge 第 6 次累积 — carve-out pattern 延伸到 docs-only 单文件 README** — T3 / Tier 1 门禁未触发 / CodeRabbit ✅ / CI 失败全是 known drift（`project_tunxiang_ci_gates.md` 记录）；`main` 仍无 branch protection
+- **§3 surgical 边界 — 4 处 grep-verified dead path only** — 不顺手扩"整段重写 / 安装说明刷新"；与 F1 PR #446 surgical 边界同款
+- **决策 82 应用 — 拆 4 issue 不炸 1 PR** — 持续技术债各自独立优先级/Tier/范围，open issue 低成本 backlog tracker
+
+### 下一步
+- A：fresh session — handoff 留 DEVLOG 顶 + 本段；起手必跑 `gh pr view 452 --json state,mergedAt` + `gh issue list --state open --search "448 449 450"` 核 SoT
+- B：5/13 deal-breaker 资质（创始人级别）
+- C：3 issue backlog pick（Tier 1→2→3 优先 / 或新 demo 故事方向后再选）
+- D：dev-plan-60d 重写（B 阻塞）
+
+### 已知风险
+- **5/13 deal-breaker 倒计时 < 30h**：channel-aggregation 3 平台企业资质（创始人级别，连续 5+ session 未起手）
+- **`main` 无 branch protection / admin-merge 累积 6 次** — 风险归操作者；后续非 codemod / 非 docs-only 主题重评是否再 admin-merge
+- **Memory 中"5/11 中午 6 服务 codemod 全 MERGED + admin-merge 5 次"** 数字需更新为 6 次（#452 已合）
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 b92eb0e1 或更新（含 D1 #452 + 第 6 PR DEVLOG 沉淀）
+gh pr view 452 --json state,mergedAt,mergeCommit   # 验 MERGED + b92eb0e1
+gh issue list --state open --author "@me" --search "448 449 450"   # 3 OPEN backlog
+gh issue view 451 --json state,closedAt   # CLOSED via #452
+git worktree list | grep -i tiancai || echo "D1 worktree 已清"
+head -200 DEVLOG.md   # 5/11 夜深 + 5/11 夜（续）+ 5/11 夜 + 5/11 傍晚 段
+```
+
+---
+
 ## 2026-05-11 夜（续）· D4 + F1 收尾
 
 ### 完成状态
