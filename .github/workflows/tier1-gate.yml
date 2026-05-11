@@ -183,6 +183,26 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 自测 carve-out 检测器（若 carve-out 自身被改）
+        # 检测 PR 是否动了 carve-out 源码或测试。若是则跑单测验证回归；否则零开销跳过。
+        # 必要性：tier1-gate 的 `run` job 用 *tier1*.py glob 不会发现 tests/ci/，
+        # 不加这一步则 carve-out 自身漂移无 CI 兜底（PR #419 review P1-A）。
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" "$HEAD")
+          if echo "$CHANGED" | grep -qE '^(scripts/ci/detect_import_only_diff\.py|tests/ci/test_detect_import_only_diff\.py)$'; then
+              echo "carve-out 自身被改，跑单测验证回归..."
+              pip install --quiet pytest
+              # --confcutdir=tests/ci 限定 conftest.py 加载范围，避免根 tests/conftest.py
+              # 依赖（httpx / fastapi 等）未装导致 ImportError。carve-out 的单测全内联
+              # fixture，不需要任何 conftest 支持。
+              python -m pytest tests/ci/test_detect_import_only_diff.py \
+                  --confcutdir=tests/ci -v --tb=short
+          else
+              echo "carve-out 未被改，跳过自测"
+          fi
+
       - name: 检查 Tier 1 源改动是否配对 tier1 测试改动
         run: |
           BASE="${{ github.event.pull_request.base.sha }}"

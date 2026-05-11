@@ -25,8 +25,11 @@ import sys
 # 匹配 `from X import Y` 或 `import X`，允许任意前导 whitespace。
 # 同时覆盖 PEP 328 相对 import (`from .x import y`、`from ..x import y`)
 # 和 import-as 形式 (`import x as y`、`from x import y as z`)。
+#
+# from 分支的尾段用 `[^;\n]+` 而非 `\S.*` — 排除分号（复合语句分隔符）。
+# 防止 `from X import Y; side_effect()` 类伪 import 行被误判为纯 import。
 IMPORT_LINE_RE = re.compile(
-    r"^\s*(?:from\s+\.*\S+\s+import\s+\S.*|import\s+\S+(?:\s+as\s+\S+)?(?:\s*,\s*\S+(?:\s+as\s+\S+)?)*)\s*$"
+    r"^\s*(?:from\s+\.*\S+\s+import\s+[^;\n]+|import\s+\S+(?:\s+as\s+\S+)?(?:\s*,\s*\S+(?:\s+as\s+\S+)?)*)\s*$"
 )
 
 
