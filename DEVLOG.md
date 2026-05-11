@@ -1,3 +1,49 @@
+## 2026-05-11 夜（续）— D4 + F1（流程 3 §方案 2 + tiancai install path 收尾）
+
+### 今日完成
+#442 (DEVLOG) merge 后继续做 D4 + F1，本 session 总 **5 PR merged**（D1/D2b'/DEVLOG/D4/F1）+ ~~D3~~ false alarm + memory 净化。
+
+**D4 (PR #443 → squash `15be6df9`, 13:40Z) — 流程 3 §"根治 follow-up" 方案 2：[codemod] PR title prefix escape hatch [T2]**
+- `.github/workflows/tier1-gate.yml` `source-test-pairing` job 头部加 `[codemod]` 显式 skip — `env:` 注入 PR title 防 shell injection，严格 prefix 匹配 `[[ "$PR_TITLE" == \[codemod\]* ]]` 大小写敏感
+- `docs/codemod/namespace-completeness.md:192-207` 状态 🔜 → ✅ + impl 细节 + reviewer 5 项自验流程图
+- code-reviewer 独立 review：**Shell injection P0 详细分析**（6 攻击向量逐个静态推理 + bash `[[ ]]` 关键字语义） + 8/8 prefix-match 实测 + gate 依赖结构 trace + 1 P1 文档措辞 → amend force-push 全修后 APPROVE
+- round-2 真 required 14/14 ✅（含本 PR 自己**不触发** escape hatch 的真证据：title 中嵌 `[codemod]` 不命中 prefix）
+
+**F1 (PR #446 → squash `f4826c00`, 13:49Z) — tiancai_shanglong/README.md install path 修复 [T3]**
+- PR #436 code-reviewer 非阻塞建议 1 follow-up — `README.md:39` `cd packages/api-adapters/tiancai-shanglong` → `cd shared/adapters/tiancai_shanglong`（D1 重命名后真实路径）
+- 1 line 改动；surgical 边界保留 `pip install -r requirements.txt` 行（dir 实际无 requirements.txt，全段 stale，但 reviewer 仅 flag 路径）
+- Markdown-only path filter 跳过 Tier 1 gate，仅 `Analyze Changes & Label` ✅ 触发
+
+### 数据变化
+- main: `998b6eea` (#442) → `15be6df9` (D4 #443) → `f4826c00` (F1 #446)
+- D4: 2 files / +31 / -4（amend 含 review fixup 后；YAML 真改 +15 行 / docs +20 -4）
+- F1: 1 file / +1 / -1
+- 并发 session 撞车 2 次（D4 起手时 #437 + #441 已落，rebase 干净；F1 worktree base 是 D4 merge 后）
+
+### 战绩
+- **本 session 5 PR 真终态**：D1 / D2b' / DEVLOG / D4 / F1 全部 squash + ~~D3~~ false alarm + memory 修正
+- **code-reviewer 模式 3 次实战 APPROVE 全部 0 BUG**：D1（0 BUG / 2 OK） + D2b'（0 BUG / 2 fixup） + D4（0 BUG / 1 P1 doc fixup）
+- **D4 流程 3 §方案 2 ✅ 沉淀**：admin-merge bypass 自动化 — 未来 codemod PR 标 `[codemod]` 即跳过 source-test-pairing gate，reviewer 仍走 5 项自验
+- **Shell injection P0 静态推理实战**：reviewer 列 6 攻击向量逐个 `bash [[ ]]` 关键字语义证伪，是 `feedback_self_review_blind_spots.md` T2 infra explicit ask 模式的标杆 audit trail
+
+### 关键决策
+- **D4 force-push 走 explicit-SHA `--force-with-lease=branch:expected-sha`** — 与 D2b' 同款，默认 stale info 不过；与 CLAUDE.md global "Always create NEW commits" 默认冲突但 user 显式 "force-push 再 merge" 覆盖
+- **F1 surgical 边界保留 `pip install` 行不动** — reviewer 仅 flag 路径，不顺手清理"全段 stale 安装步骤"；若需进一步 cleanup 独立 PR
+- **D4 严格 prefix 匹配**（不模糊匹配中嵌） — 防 `fix(channel): [codemod] integration` 这类意外触发；本 PR 自己 title `feat(ci): D4 ... [codemod] prefix escape hatch` 中嵌不触发，正是这个设计的实证
+
+### 遗留问题
+- **5/13 deal-breaker** 倒计时 < 36h（channel-aggregation 3 平台企业资质 — 创始人级别非技术）
+- **本 session 真终态闭环** — 按 `feedback_proactive_session_split.md` 建议拆 session
+- **持续技术债（独立 issue 候选）**：D2c 全 N 表 RLS 真 PG / docker-compose-pg 扩面 / AST 升级（方案 3） / `tiancai_shanglong/README.md` 安装段整段 stale（含 `requirements.txt` 不存在）
+
+### 明日计划
+- A：fresh session — handoff 已留 DEVLOG 顶 + docs/progress.md 顶；起手命令含 `gh pr view 436 440 442 443 446`
+- B：5/13 deal-breaker 资质（创始人级别）
+- C：backlog 20 OPEN PR 协同调研
+- D：拆独立 issue 跟踪 D2c / docker-compose-pg 扩面 / AST 升级
+
+---
+
 ## 2026-05-11 夜 — D1 + ~~D3~~ false alarm + D2b' 三连 fix（#434 follow-up + 技术债梳理）
 
 ### 今日完成

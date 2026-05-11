@@ -1,3 +1,45 @@
+## 2026-05-11 夜（续）· D4 + F1 收尾
+
+### 完成状态
+- [x] **D4 (PR #443 squash `15be6df9` @ 13:40Z)**：流程 3 §"根治 follow-up" 方案 2 — `tier1-gate.yml` 加 `[codemod]` PR title prefix escape hatch + docs 状态 🔜 → ✅；reviewer 1 P1 doc 措辞 amend + force-push 全修后 APPROVE
+- [x] **F1 (PR #446 squash `f4826c00` @ 13:49Z)**：PR #436 reviewer 非阻塞建议 1 follow-up — `tiancai_shanglong/README.md:39` stale install path `packages/api-adapters/` → `shared/adapters/`（1 line / T3）
+- [x] **本段 (DEVLOG/progress 补 D4 + F1 to PR #442 baseline)**
+
+### 本 session 全部 5 PR 真终态闭环
+- PR #436 (D1) `6592829a` — tiancai-shanglong/ rename
+- PR #440 (D2b') `786eddf1` — integration-pg fixture DRY
+- PR #442 (DEVLOG) `998b6eea` — 5/11 夜 sessions 日志（含 D1 + ~~D3~~ + D2b'）
+- PR #443 (D4) `15be6df9` — 流程 3 §方案 2 [codemod] escape hatch
+- PR #446 (F1) `f4826c00` — tiancai install path 收尾
+
+### 关键决策
+- **D4 严格 prefix 匹配 + env: 注入** — 防 shell injection + 防中嵌触发；reviewer 6 攻击向量静态推理实战
+- **F1 surgical 边界保留 `pip install` 行** — reviewer 仅 flag 路径，不顺手清理"整段 stale 安装步骤"
+- **拆 session 决策** — 5 PR + context 累，按 `feedback_proactive_session_split.md` 自然结点
+
+### 下一步
+- A：fresh session — handoff 已留 DEVLOG 顶（5/11 夜（续）+ 5/11 夜 两段覆盖全 session）+ 本段
+- B：5/13 deal-breaker 资质（创始人级别）
+- C：backlog 20 OPEN PR 协同调研
+- D：拆独立 issue 跟踪 D2c / docker-compose-pg 扩面 / AST 升级 / tiancai README 安装段全段 stale
+
+### 已知风险
+- **5/13 deal-breaker 倒计时 < 36h**：channel-aggregation 3 平台企业资质（创始人级别非技术）
+- **持续技术债**：D2c 全 N 表 RLS 真 PG / main 无 branch protection / D2b' 设计假设未来若变更则需重写
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 f4826c00 或更新（本 session 5 PR merged）
+gh pr list --state open --author "@me" --limit 30
+git worktree list                   # ~15-17（本 session 4 worktree 已清；其他 session 可能新增）
+head -300 DEVLOG.md                 # 5/11 夜（续）+ 5/11 夜 两段
+gh pr view 436 440 442 443 446 --json mergedAt,mergeCommit   # 验本 session 5 merge
+```
+
+---
+
 ## 2026-05-11 夜 · D1 + ~~D3~~ false alarm + D2b' 三连 fix
 
 ### 完成状态
