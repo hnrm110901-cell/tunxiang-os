@@ -1,3 +1,30 @@
+## 2026-05-18 早段 η — #776 P0 复活 ship PR-C F#10 omni_channel fail-closed (Tier 1 邻接 explicit-ask 第 39 例)
+
+### 今日完成 (本 session η, 1 PR + #776 sub-2 闭合)
+
+- **#776 sub-2 复活**: `fix/tx-trade-omni-channel-fail-closed` 分支 (5/11 创建) rebase + ship; 上游同 G1 链路 (5/11 reviewer 双轮 + 5/17 周末 cleanup audit + 5/18 守门会取消 → user 直接授权; G1 #814 09:49 merge 后串行启动)
+- **F#10 修核心**: `services/tx-trade/src/api/omni_channel_routes.py:43-45` `MEITUAN_WEBHOOK_SECRET` / `ELEME_WEBHOOK_SECRET` / `DOUYIN_WEBHOOK_SECRET` 默认 `""` 时 4 处验签路径全部 fail-OPEN → fail-closed; 外卖三家 (美团/饿了么/抖音) 攻击向量关闭
+- **rebase 模式**: 5/11 base 7 天演化后 ship; src 2 文件 (omni_channel_routes.py + tier1 test) clean 3-way merge apply ✅; DEVLOG/progress 走 `git checkout --ours` + 重 prepend
+- **§19 reviewer round-1**: 资金/认证安全触发器 (本 PR ship 流程内 spawn)
+
+### 安全收益
+
+- P0 攻击向量关闭: 外卖三家 (美团/饿了么/抖音) webhook 空 secret 即绕过的路径不再可达
+- prod fail-loud: 三平台 secret env 漏配 = 503 阻断, 不再静默接收伪造 webhook
+- 与 G1 (booking webhook) + 待 ship G3 (gateway whitelist) 构成完整安全链: handler 层 fail-closed 全就位后才放 gateway 白名单
+
+### 下一步
+
+- G3 PR-A F gateway whitelist (#776 sub-3) — G2 merge 后 ship (handler 层 fail-closed 已就位, §19 reviewer 重申顺序约束满足)
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 38 → **39**
+- #776 P0: sub-2 / 3 闭合
+- 5/18 早段 PR 数: 6 (ε 收官 4 + G1 #814 + 本 PR-C)
+
+---
+
 ## 2026-05-18 早段 ζ — #776 P0 复活 ship PR-B F#7 webhook secret fail-closed (Tier 1 邻接 explicit-ask 第 38 例)
 
 ### 今日完成 (本 session ζ, 1 PR + #776 sub-1 闭合)

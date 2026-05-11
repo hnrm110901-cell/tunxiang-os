@@ -207,8 +207,13 @@ def test_endpoint_empty_secret_returns_503_via_meituan_webhook():
 # ─── 不回归: secret 有值 + 缺签名 → 既有 401 路径不变 ──────────────────────
 
 
-def test_endpoint_valid_secret_missing_signature_still_returns_401():
-    """MEITUAN_WEBHOOK_SECRET 有值 + 缺 X-Meituan-Signature header → 既有 401 路径不回归"""
+def test_endpoint_valid_secret_missing_signature_returns_401_dict_format():
+    """MEITUAN_WEBHOOK_SECRET 有值 + 缺 X-Meituan-Signature → 401 + detail dict format (F#12)
+
+    F#12 reviewer follow-up: 401 detail 从 str "签名验证失败" 改为 dict
+    {"ok": False, "data": None, "error": {"code": "INVALID_SIGNATURE"}} —
+    与 503 fail-closed dict format 统一, API 消费者无需 type-check 4xx/5xx 错误体。
+    """
     app = _make_app()
     client = TestClient(app)
 
@@ -223,4 +228,32 @@ def test_endpoint_valid_secret_missing_signature_still_returns_401():
 
     assert resp.status_code == 401, (
         f"secret 有值 + 缺签名应 401 (既有签名验证失败路径)，实际 {resp.status_code} body={resp.text}"
+    )
+    # F#12 契约: detail 必须是 dict 含 error.code
+    body = resp.json()
+    detail = body.get("detail")
+    assert isinstance(detail, dict), (
+        f"401 detail 必须是 dict (与 503 fail-closed 一致), 实际 type={type(detail)} value={detail}"
+    )
+    assert detail.get("error", {}).get("code") == "INVALID_SIGNATURE", (
+        f"401 error code 必须为 INVALID_SIGNATURE, 实际 detail={detail}"
+    )
+
+
+# ─── F#11: PLATFORMS / _SIGNATURE_VERIFIERS 同步性 startup check ───────────
+
+
+def test_platforms_and_verifiers_in_sync():
+    """F#11 reviewer follow-up: PLATFORMS 与 _SIGNATURE_VERIFIERS 必须严格同步
+
+    防御场景: 未来加新 platform 时若忘记注册 verifier, _verify_platform_signature
+    走 `return False` 静默回 401, secret check 已通过 = 验签被悄然绕过。
+    Module-level startup check (omni_channel_routes.py) 强制不一致时 RuntimeError。
+    """
+    from src.api.omni_channel_routes import _SIGNATURE_VERIFIERS
+    from src.services.omni_channel_service import OmniChannelService
+
+    assert set(OmniChannelService.PLATFORMS) == set(_SIGNATURE_VERIFIERS.keys()), (
+        f"PLATFORMS {sorted(OmniChannelService.PLATFORMS)} 与 _SIGNATURE_VERIFIERS keys "
+        f"{sorted(_SIGNATURE_VERIFIERS.keys())} 不同步 — 加新 platform 时必须同时注册 verifier"
     )
