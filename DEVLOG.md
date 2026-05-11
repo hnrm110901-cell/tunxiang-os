@@ -1,3 +1,38 @@
+## 2026-05-18 早段 θ — #776 P0 复活 ship PR-A F gateway 第三方回调白名单 + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
+
+### 今日完成 (本 session θ, 1 PR + #776 P0 全闭合)
+
+- **#776 sub-3 收官**: `fix/gateway-pay-callback-whitelist` 分支 (5/11 创建) rebase + ship; 上游同 G1/G2 链路 (5/11 reviewer 双轮 + 5/17 周末 cleanup audit + 5/18 守门会取消 → user 直接授权 + G1 #814 09:49 + G2 #817 10:03 串行 merge 后)
+- **F gateway 修核心**: `services/gateway/src/middleware/auth_middleware.py` `AUTH_EXEMPT_PREFIXES` 加 3 prefix:
+  - `/api/v1/pay/callback` (4 支付渠道: 微信/支付宝/拉卡拉/收钱吧)
+  - `/api/v1/webhook` (3 外卖: 美团/饿了么/抖音)
+  - `/api/v1/booking/webhook` (3 预订: 美团/点评/微信)
+- **顺序约束满足**: handler 层 fail-closed 全就位 (G1 #814 booking + G2 #817 omni_channel), 攻击面闭合, 安全开放 gateway 白名单
+- **rebase 模式**: 5/11 base 7 天演化后 ship; src 3 文件 (auth_middleware.py + 2 新 tier1 test 21 案例) clean 3-way merge apply ✅; DEVLOG/progress 走 `git checkout --ours` + 重 prepend
+- **§19 reviewer round-1**: 权限/认证逻辑触发器 (本 PR ship 流程内 spawn)
+
+### 安全收益 (#776 P0 全链)
+
+- **完整安全链就位**:
+  - Gateway: 3 prefix 白名单 (本 PR) → 合法第三方回调请求能 reach handler
+  - Handler 层 fail-closed (G1+G2): 空 secret 一律 503 不静默放行
+- **业务恢复**: 4 支付 + 3 外卖 + 3 预订 webhook prod 不再被 JWT 401 拒收
+- **零回归**: prefix 精确收窄 (booking 用 `/webhook` 子路径避免暴露 `/mock`/`/ws`, 5/11 reviewer round-1 原发现)
+
+### #776 P0 全闭合 (5/11 残留全部清零)
+
+- ✅ G1 PR-B F#7 webhook secret (#814) — booking_webhook handler 层
+- ✅ G2 PR-C F#10 omni_channel (#817) — 外卖三家 handler 层
+- ✅ G3 PR-A F gateway whitelist (本 PR) — gateway 白名单
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 39 → **40** (#776 完整 3 例 38/39/40)
+- #776 P0: sub-3 / 3 闭合 → #776 整体 CLOSE
+- 5/18 早段 PR 数: 7 (ε 收官 4 + G1 #814 + G2 #817 + 本 PR-A)
+
+---
+
 ## 2026-05-18 早段 η — #776 P0 复活 ship PR-C F#10 omni_channel fail-closed (Tier 1 邻接 explicit-ask 第 39 例)
 
 ### 今日完成 (本 session η, 1 PR + #776 sub-2 闭合)
