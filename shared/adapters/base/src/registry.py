@@ -17,12 +17,19 @@ logger = structlog.get_logger()
 
 # POS 系统注册表（pos_type → 适配器类路径）
 # None 表示尚未实现，调用时会返回 NotImplementedError（有明确错误提示）
+#
+# 路径切换（#434 第 3 项）：原 `packages.api-adapters.*` 全 repo 不存在
+# （packages/ 下仅 tx-tokens/ + tx-touch/），切到真实路径 `shared.adapters.*`。
 POS_REGISTRY: Dict[str, Optional[str]] = {
-    "aoqiwei": "packages.api-adapters.aoqiwei.src.adapter.AoqiweiAdapter",
-    "pinzhi": "packages.api-adapters.pinzhi.src.adapter.PinzhiAdapter",
-    "meituan": "packages.api-adapters.meituan-saas.src.adapter.MeituanSaasAdapter",
-    "tiancai": "packages.api-adapters.tiancai-shanglong.src.adapter.TiancaiShanglongAdapter",
-    "keruyun": "packages.api-adapters.keruyun.src.adapter.KeruyunAdapter",
+    "aoqiwei": "shared.adapters.aoqiwei.src.adapter.AoqiweiAdapter",
+    "pinzhi": "shared.adapters.pinzhi_pos.src.adapter.PinzhiAdapter",
+    "meituan": "shared.adapters.meituan_saas_adapter.MeituanSaasAdapter",
+    # TODO: tiancai-shanglong/ 目录名含 `-`，importlib 调用 `replace("-","_")` 后
+    # 找不到目录（fs 为 tiancai-shanglong/，import 名为 tiancai_shanglong）。
+    # 需独立目录重命名 PR（`git mv tiancai-shanglong tiancai_shanglong` +
+    # 同步改 services/gateway 下两处 importlib.import_module 引用）后启用。
+    "tiancai": "shared.adapters.tiancai-shanglong.src.adapter.TiancaiShanglongAdapter",
+    "keruyun": "shared.adapters.keruyun.src.adapter.KeruyunAdapter",
 }
 
 
@@ -98,7 +105,7 @@ def list_implemented_pos_types() -> list:
 # ============================================
 
 RESERVATION_REGISTRY: Dict[str, Optional[str]] = {
-    "yiding": "packages.api-adapters.yiding.src.adapter.YiDingAdapter",
+    "yiding": "shared.adapters.yiding.src.adapter.YiDingAdapter",
     "kebide": None,
     "yanmishu": None,
 }
@@ -109,8 +116,8 @@ RESERVATION_REGISTRY: Dict[str, Optional[str]] = {
 
 DELIVERY_REGISTRY: Dict[str, Optional[str]] = {
     "meituan_delivery": None,
-    "eleme": "packages.api-adapters.eleme.src.adapter.ElemeAdapter",
-    "douyin": "packages.api-adapters.douyin.src.adapter.DouyinAdapter",
+    "eleme": "shared.adapters.eleme_open_platform.src.adapter.ElemeAdapter",
+    "douyin": "shared.adapters.douyin_open_platform.src.adapter.DouyinAdapter",
 }
 
 # ============================================
@@ -124,7 +131,7 @@ SUPPLY_CHAIN_REGISTRY: Dict[str, Optional[str]] = {}
 # ============================================
 
 MEMBER_REGISTRY: Dict[str, Optional[str]] = {
-    "weishenghuo": "packages.api-adapters.weishenghuo.src.adapter.WeishenghuoAdapter",
+    "weishenghuo": "shared.adapters.weishenghuo.src.adapter.WeishenghuoAdapter",
 }
 
 # ============================================
@@ -132,7 +139,7 @@ MEMBER_REGISTRY: Dict[str, Optional[str]] = {
 # ============================================
 
 FINANCE_REGISTRY: Dict[str, Optional[str]] = {
-    "nuonuo": "packages.api-adapters.nuonuo.src.adapter.NuonuoAdapter",
+    "nuonuo": "shared.adapters.nuonuo.src.adapter.NuonuoAdapter",
 }
 
 
