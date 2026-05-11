@@ -1,3 +1,55 @@
+## 2026-05-11 夜深 — B + D1 收尾（清理 + 沉淀 session，admin-merge 第 6 次累积）
+
+### 今日完成
+承接 5/11 夜（续）5 PR merged 终态后的清理 + 沉淀 session。**起手发现 handoff 与 SoT 矛盾**（user 写的 handoff 说"#452 MERGED + #451 auto-closed"，实际 SoT 显示 PR #452 OPEN / #451 OPEN / `origin/main` 仍 `1d3d8d66`）— 先按 `feedback_handoff_finding_ids.md` 校验落盘事实而非脑补继续，等 user 决策方向。User 选 admin-merge。
+
+**B (4 issue) — 持续技术债拆独立追踪 issue（决策 82）**
+- `#448` [infra][Tier1] D2c — 全 N 表 RLS docker-compose-pg 真 PG 反测扩面
+- `#449` [infra][Tier2] docker-compose-pg fixture 扩面到所有 `*_rls_*_tier1.py`
+- `#450` [infra][Tier3] AST 升级 方案 3 — codemod source-test pairing 检测重构
+- `#451` [docs][Tier3] tiancai_shanglong/README.md 4 处 stale path 清理（D1 #436 follow-up）
+- 仍 OPEN（截至 14:30Z）：`#448` / `#449` / `#450`；`#451` 已 auto-close（PR #452 merge 联动）
+
+**D1 (PR #452 → admin-squash `b92eb0e1` @ 14:27:14Z) — tiancai_shanglong/README.md 4 处 stale path 清理 [T3]**
+- 单文件 docs-only：`shared/adapters/tiancai_shanglong/README.md` 1 file / +1 / -78
+- 4 处 grep-verified dead path 删除（安装段 / 集成段 / API 段 / docs 引用），保留 1 行 import 路径修正
+- CI 失败全是 `project_tunxiang_ci_gates.md` 记录的预存漂移噪音（`python-lint-test (*)` / `frontend-build` / `TypeScript Check (*)` / `ESLint (*)` / `pnpm audit (high+)`）— `Analyze Changes & Label` ✅ + `edge-mac-station` ✅ + `CodeRabbit` ✅
+- **Tier 1 门禁完全未触发**（README-only diff，预期）— admin-merge 走 carve-out pattern 第 6 次累积
+- PR merge 自动 close `#451`（GitHub linked-issue 联动 @ 14:27:16Z）
+- D1 worktree（`/Users/lichun/.tunxiang-p0-worktrees/tiancai-readme-cleanup-2026-05-11`）+ branch (`docs/tiancai-readme-stale-paths-cleanup`, was `37bedfdb`) 已删
+
+### 数据变化
+- main: `1d3d8d66` (5/11 夜（续）F1 末) → `b92eb0e1` (D1 #452)
+- 1 issue 新开后秒 close（#451 D1 → 同 commit 闭环）/ 3 issue OPEN 留 backlog
+- D1 worktree 清 1 / branch 删 1
+- handoff vs SoT 矛盾 1 次（user 写 handoff 时预期合并，实际未合，本 session 起手才合）
+
+### 战绩
+- **Handoff vs SoT 矛盾首例落盘** — `feedback_handoff_finding_ids.md` "handoff 引用抽象 finding ID 必须验证落盘" 模式直接命中：起手 5 条核验命令（`gh pr view 452` / `gh issue list` / `git rev-parse origin/main`）发现 handoff 描述与 SoT 不符 → 不脑补继续 → 列出真实状态 + 3 选项让 user 拍板 → user 选 admin-merge → 真实执行。Pattern 可复用：handoff 中"已 MERGED / 已 close / origin/main 应是 X" 这类断言必须先核 SoT
+- **决策 79（B 拆 issue 跟踪持续技术债）+ 决策 82（admin-merge 5 项裁决标准 / carve-out pattern）双应用** — B 拆 4 issue 不在 PR 内炸 / D1 走 admin-merge 第 6 次
+- **§3 surgical 边界一致性** — D1 仅删 grep-verified dead path（4 处），不顺手扩"安装段说明更新 / 整段重写"；与 5/11 夜（续）F1 PR #446"保留 `pip install` 行不动"surgical 边界同款
+- **本 session 真终态**：4 issue 新开（1 auto-close + 3 OPEN backlog）+ 1 PR merged（#452）+ 1 worktree 清 / 1 branch 删 + 1 handoff 修正
+
+### 关键决策
+- **admin-merge #452 第 6 次累积** — 性质：T3 docs-only README 单文件 / Tier 1 门禁未触发 / CodeRabbit ✅ / CI 失败全是 known drift；与 `feedback_carveout_admin_merge_pattern.md` 中"小型单文件单行 import 切换"邻近，本质是 docs 清理非 codemod；admin-merge 累积 5 次（#353/#355/#356/#358/#370）→ 6 次（#452）；`main` 仍无 branch protection
+- **不脑补 handoff 终态，先核 SoT 再决策** — handoff 是 user 写的 cold-start prompt，但事实可能与 user 写时预期不一致（user 写 handoff 时假设 #452 会在本 session 起前已 merge，实际未合）；遇此先列差异 + 让 user 拍板，不擅自合并/关 PR
+- **拆 4 issue 而非一次性炸 PR** — 决策 82 应用：持续技术债（D2c / docker-compose-pg 扩面 / AST 升级）各自独立优先级/Tier/范围，open issue 是低成本 backlog tracker；未来 session 可按优先级 pick
+
+### 遗留问题
+- **`#448` / `#449` / `#450` 3 issue OPEN backlog** — 等未来 session 按优先级 pick；`#448` Tier1 优先（真 PG 反测扩面）/ `#449` Tier2 / `#450` Tier3
+- **5/13 deal-breaker 倒计时 < 30h** — channel-aggregation 3 平台企业资质（创始人级别非技术，连续 5+ session 提醒未起手）
+- **`main` 无 branch protection** — admin-merge 累积 6 次（#353/#355/#356/#358/#370/#452），风险归操作者；后续非 codemod / 非 docs-only 主题须重新评估是否再开 admin-merge
+- **本 session 拆 session 闭环** — context 短 + 5 PR merged 长 session 已 burn-out 后清理性 session，按 `feedback_proactive_session_split.md` 自然终结
+- **DEVLOG 沉淀 PR (PR #6) 独立开** — 本段写完后另开 branch / push / PR（T3 docs-only，markdown-only path filter，不触发 Tier 1 gate）
+
+### 明日计划
+- A：fresh session — handoff 已留在 DEVLOG 顶（本段）+ docs/progress.md 顶；起手命令含 `gh pr view 452 --json state` + `gh issue list --state open --search "448 449 450"` 核 SoT
+- B：5/13 deal-breaker 资质（创始人级别非技术）
+- C：3 issue backlog pick（按 Tier 1→2→3 优先级 / 或拼 demo 故事方向后再选）
+- D：dev-plan-60d 重写（B 阻塞，需 user 输入新 demo 故事核心方向）
+
+---
+
 ## 2026-05-11 夜（续）— D4 + F1（流程 3 §方案 2 + tiancai install path 收尾）
 
 ### 今日完成
