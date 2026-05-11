@@ -87,3 +87,25 @@ networkPolicy:
   enabled: false
   ingress: []
   egress: []
+
+# F#2 安全上下文（CSO 2026-05-11 整改 — Helm 层兜底）
+# nginx:1.25-alpine 绑端口 80 需要 root，本 chart PR-1 阶段 enabled:false。
+# PR-2 将 Dockerfile 切到 nginxinc/nginx-unprivileged（绑 8080）后翻 enabled:true。
+# 字段保持齐全（runAsUser:101 即 unprivileged 镜像的 nginx 用户）便于 PR-2 仅一行翻 true。
+podSecurityContext:
+  enabled: false
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  fsGroup: 101
+
+containerSecurityContext:
+  enabled: false
+  runAsNonRoot: true
+  runAsUser: 101
+  runAsGroup: 101
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
