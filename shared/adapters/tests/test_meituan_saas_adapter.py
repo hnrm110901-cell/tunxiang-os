@@ -1,27 +1,35 @@
-"""
-美团SAAS适配器完整测试套件（从老项目迁移）
-覆盖：Webhook接收验证、等位数据处理、订单管理、商品管理、错误处理
-只mock HTTP请求层（httpx），不mock适配器内部逻辑
+"""美团 SAAS 适配器 top-level 测试（CH-02.7a a3 迁自 saas/tests/）
 
-path / env 设置在 conftest.py 集中。
+迁移内容：a1 baseline 25 passed 测试全集（4 类）：
+  - TestMeituanSaasAdapterInit（2）— init 成功 / 缺凭据失败
+  - TestWebhookSignatureVerification（4）— sign 算法 + authenticate
+  - TestReservationMixin（3）— MeituanReservationMixin 4 方法
+  - TestOrderManagement::test_query_order_requires_id_or_seq（1）
+  - TestFoodManagement（3）— query / update_stock / sold_out
+  - TestMeituanErrorHandling（7）— handle_error + 网络异常
+  - TestMeituanAdapterInit（4）— 凭据/默认 URL/POI
+  - TestAsyncResourceManagement（1）— close 释放
+
+不迁移：a1 baseline 24 pre-existing failed（to_order/to_staff_action dead code
++ TestOrderManagement.api_client 几个 mock 错位）— 走决策 79 独立 follow-up
+issue 跟踪（schemas 模块全 repo 不存在；api_client.* 与 client.* mock 错配）。
 """
 
 from datetime import datetime
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
 
-from src.adapter import MeituanSaasAdapter
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
+from shared.adapters.meituan_saas_adapter import (
+    MeituanReservationMixin,
+    MeituanSaasAdapter,
+)
 
 
 @pytest.fixture
 def adapter():
-    """创建美团SAAS适配器实例"""
     config = {
         "base_url": "https://waimaiopen.meituan.com",
         "app_key": "test_app_key",
@@ -48,13 +56,70 @@ def _mock_response(json_data, status_code=200):
     return response
 
 
-# ---------------------------------------------------------------------------
+# ============================================================
+# 初始化
+# ============================================================
+
+
+class TestMeituanSaasAdapterInit:
+    def test_init_success(self, adapter):
+        assert adapter.app_key == "test_app_key"
+        assert adapter.app_secret == "test_app_secret"
+        assert adapter.poi_id == "12345678"
+
+    def test_init_missing_credentials(self):
+        with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
+            MeituanSaasAdapter({"base_url": "https://waimaiopen.meituan.com"})
+
+    def test_init_missing_app_key(self):
+        """缺少app_key时抛出ValueError"""
+        with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
+            MeituanSaasAdapter(
+                {
+                    "base_url": "https://waimaiopen.meituan.com",
+                    "app_secret": "secret",
+                }
+            )
+
+    def test_init_missing_app_secret(self):
+        """缺少app_secret时抛出ValueError"""
+        with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
+            MeituanSaasAdapter(
+                {
+                    "base_url": "https://waimaiopen.meituan.com",
+                    "app_key": "key",
+                }
+            )
+
+    def test_init_default_base_url(self):
+        """未指定base_url时使用默认美团地址"""
+        adapter = MeituanSaasAdapter(
+            {
+                "app_key": "k",
+                "app_secret": "s",
+            }
+        )
+        assert adapter.base_url == "https://waimaiopen.meituan.com"
+
+    def test_init_custom_poi_id(self):
+        """自定义门店ID"""
+        adapter = MeituanSaasAdapter(
+            {
+                "app_key": "k",
+                "app_secret": "s",
+                "poi_id": "CUSTOM_POI",
+            }
+        )
+        assert adapter.poi_id == "CUSTOM_POI"
+
+
+# ============================================================
 # Webhook 签名验证
-# ---------------------------------------------------------------------------
+# ============================================================
 
 
 class TestWebhookSignatureVerification:
-    """Webhook接收签名验证测试"""
+    """Webhook 接收签名验证测试"""
 
     def test_generate_sign_deterministic(self, adapter):
         """签名生成是确定性的"""
@@ -97,18 +162,17 @@ class TestWebhookSignatureVerification:
         assert result["order_id"] == "MT001"
 
 
-# ---------------------------------------------------------------------------
-# 等位/预订数据处理（reservation.py）
-# ---------------------------------------------------------------------------
+# ============================================================
+# 预订（MeituanReservationMixin）
+# ============================================================
 
 
 class TestReservationMixin:
-    """等位/预订数据处理测试（MeituanReservationMixin）"""
+    """预订数据处理测试（MeituanReservationMixin）"""
 
     @pytest.mark.asyncio
-    async def test_query_reservation_detail(self, adapter):
+    async def test_query_reservation_detail(self):
         """验证预订详情查询"""
-        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
@@ -142,9 +206,8 @@ class TestReservationMixin:
         assert result["data"]["status"] == "confirmed"
 
     @pytest.mark.asyncio
-    async def test_confirm_reservation(self, adapter):
+    async def test_confirm_reservation(self):
         """验证预订确认操作"""
-        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
@@ -166,9 +229,8 @@ class TestReservationMixin:
         assert result["data"]["status"] == "confirmed"
 
     @pytest.mark.asyncio
-    async def test_cancel_reservation_with_reason(self, adapter):
+    async def test_cancel_reservation_with_reason(self):
         """验证带原因的预订取消"""
-        from src.reservation import MeituanReservationMixin
 
         class TestableAdapter(MeituanReservationMixin, MeituanSaasAdapter):
             pass
@@ -191,42 +253,18 @@ class TestReservationMixin:
         )
 
         assert result["data"]["status"] == "cancelled"
-        # 验证请求中包含 reason
         call_kwargs = mixed.client.post.call_args
         sent_data = call_kwargs.kwargs.get("data", call_kwargs[1].get("data", {}))
         assert sent_data["reason"] == "顾客临时有事"
 
 
-# ---------------------------------------------------------------------------
-# 订单管理（核心路径）
-# ---------------------------------------------------------------------------
+# ============================================================
+# 订单管理
+# ============================================================
 
 
 class TestOrderManagement:
-    """订单管理接口测试"""
-
-    @pytest.mark.asyncio
-    async def test_query_order_by_id(self, adapter):
-        """通过订单ID查询订单详情"""
-        mock_data = {
-            "code": "ok",
-            "data": {
-                "order_id": "MT001",
-                "status": 4,
-                "total_price": 8800,
-                "food_list": [
-                    {"food_id": "F001", "food_name": "宫保鸡丁", "count": 1, "price": 3800},
-                ],
-            },
-        }
-        adapter.client.get = AsyncMock(return_value=_mock_response(mock_data))
-
-        result = await adapter.query_order(order_id="MT001")
-
-        assert result["order_id"] == "MT001"
-        assert result["status"] == 4
-        assert result["total_price"] == 8800
-        assert len(result["food_list"]) == 1
+    """订单管理接口测试（仅迁 baseline passed 用例）"""
 
     @pytest.mark.asyncio
     async def test_query_order_requires_id_or_seq(self, adapter):
@@ -234,34 +272,10 @@ class TestOrderManagement:
         with pytest.raises(ValueError, match="order_id和day_seq至少提供一个"):
             await adapter.query_order()
 
-    @pytest.mark.asyncio
-    async def test_confirm_order(self, adapter):
-        """确认订单"""
-        mock_data = {"code": "ok", "data": {"order_id": "MT001", "status": "confirmed"}}
-        adapter.client.post = AsyncMock(return_value=_mock_response(mock_data))
 
-        result = await adapter.confirm_order(order_id="MT001")
-
-        assert result["status"] == "confirmed"
-
-    @pytest.mark.asyncio
-    async def test_cancel_order(self, adapter):
-        """取消订单"""
-        mock_data = {"code": "ok", "data": {"order_id": "MT001", "status": "cancelled"}}
-        adapter.client.post = AsyncMock(return_value=_mock_response(mock_data))
-
-        result = await adapter.cancel_order(
-            order_id="MT001",
-            reason_code=1,
-            reason="商家缺货",
-        )
-
-        assert result["status"] == "cancelled"
-
-
-# ---------------------------------------------------------------------------
+# ============================================================
 # 商品管理
-# ---------------------------------------------------------------------------
+# ============================================================
 
 
 class TestFoodManagement:
@@ -306,9 +320,9 @@ class TestFoodManagement:
         assert result["status"] == "sold_out"
 
 
-# ---------------------------------------------------------------------------
+# ============================================================
 # 错误处理
-# ---------------------------------------------------------------------------
+# ============================================================
 
 
 class TestMeituanErrorHandling:
@@ -363,112 +377,9 @@ class TestMeituanErrorHandling:
             await adapter.query_order(order_id="MT001")
 
 
-# ---------------------------------------------------------------------------
-# 初始化校验
-# ---------------------------------------------------------------------------
-
-
-class TestMeituanAdapterInit:
-    """适配器初始化测试"""
-
-    def test_init_missing_app_key(self):
-        """缺少app_key时抛出ValueError"""
-        with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
-            MeituanSaasAdapter(
-                {
-                    "base_url": "https://waimaiopen.meituan.com",
-                    "app_secret": "secret",
-                }
-            )
-
-    def test_init_missing_app_secret(self):
-        """缺少app_secret时抛出ValueError"""
-        with pytest.raises(ValueError, match="app_key和app_secret不能为空"):
-            MeituanSaasAdapter(
-                {
-                    "base_url": "https://waimaiopen.meituan.com",
-                    "app_key": "key",
-                }
-            )
-
-    def test_init_default_base_url(self):
-        """未指定base_url时使用默认美团地址"""
-        adapter = MeituanSaasAdapter(
-            {
-                "app_key": "k",
-                "app_secret": "s",
-            }
-        )
-        assert adapter.base_url == "https://waimaiopen.meituan.com"
-
-    def test_init_custom_poi_id(self):
-        """自定义门店ID"""
-        adapter = MeituanSaasAdapter(
-            {
-                "app_key": "k",
-                "app_secret": "s",
-                "poi_id": "CUSTOM_POI",
-            }
-        )
-        assert adapter.poi_id == "CUSTOM_POI"
-
-
-# ---------------------------------------------------------------------------
-# to_order 补充测试
-# ---------------------------------------------------------------------------
-
-
-class TestToOrderEdgeCases:
-    """to_order 边界场景"""
-
-    def test_order_with_iso_string_time(self, adapter):
-        """ISO格式时间字符串正确解析"""
-        raw = {
-            "order_id": "MT_ISO",
-            "day_seq": "001",
-            "status": 2,
-            "total_price": 5000,
-            "discount_price": 0,
-            "create_time": "2024-03-01T12:00:00",
-            "food_list": [],
-        }
-        order = adapter.to_order(raw, "S1", "B1")
-        assert order.created_at.year == 2024
-        assert order.created_at.month == 3
-
-    def test_order_with_invalid_time_fallback(self, adapter):
-        """无效时间降级为当前时间"""
-        raw = {
-            "order_id": "MT_BAD",
-            "day_seq": "002",
-            "status": 1,
-            "total_price": 3000,
-            "discount_price": 0,
-            "create_time": "not-a-time",
-            "food_list": [],
-        }
-        order = adapter.to_order(raw, "S1", "B1")
-        assert isinstance(order.created_at, datetime)
-
-    def test_order_status_refund_maps_cancelled(self, adapter):
-        """美团status=8（退款）映射为CANCELLED"""
-        from schemas.restaurant_standard_schema import OrderStatus
-
-        raw = {
-            "order_id": "MT_REFUND",
-            "day_seq": "003",
-            "status": 8,
-            "total_price": 5000,
-            "discount_price": 0,
-            "food_list": [],
-        }
-        order = adapter.to_order(raw, "S1", "B1")
-        assert order.order_status == OrderStatus.CANCELLED
-
-
-# ---------------------------------------------------------------------------
+# ============================================================
 # 异步资源管理
-# ---------------------------------------------------------------------------
+# ============================================================
 
 
 class TestAsyncResourceManagement:

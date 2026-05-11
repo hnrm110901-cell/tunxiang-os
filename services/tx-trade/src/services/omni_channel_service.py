@@ -735,7 +735,7 @@ class OmniChannelService:
         import os
 
         if platform == "meituan":
-            from shared.adapters.meituan_saas.src.adapter import MeituanSaasAdapter
+            from shared.adapters.meituan_saas_adapter import MeituanSaasAdapter
 
             return MeituanSaasAdapter(
                 config={

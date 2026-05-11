@@ -1,11 +1,21 @@
-"""
-美团餐饮SAAS平台API适配器
-提供订单管理、门店管理、商品管理、配送管理等功能。
+"""美团餐饮 SAAS 平台适配器（top-level SoT）
 
-v2: 注入 MeituanClient 替换 mock，真实 API 调用。
+CH-02.7a a3 起本文件是 MeituanSaasAdapter + MeituanReservationMixin +
+MeituanOrderWebhookHandler 的 SoT — 原 shared/adapters/meituan-saas/src/
+{adapter.py, reservation.py, order_webhook_handler.py} 三个文件并入。
+HTTP 客户端 SoT（MeituanClient / MeituanAPIError / MeituanAuthError）
+在 a2（PR #431）已搬到 shared/adapters/meituan_delivery_adapter.py，
+本文件从那里 import 复用，不重复定义。
+
+业务消费者：services/tx-trade/src/services/omni_channel_service.py（外卖渠道聚合）。
+注册表入口：shared/adapters/base/src/registry.py POS_REGISTRY["meituan"]。
 """
 
 import hashlib
+import json as _json
+import os
+import sys
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
@@ -13,7 +23,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 import structlog
 
-from .client import MeituanAPIError, MeituanClient
+from .meituan_delivery_adapter import MeituanAPIError, MeituanClient
 
 logger = structlog.get_logger()
 
@@ -106,14 +116,11 @@ class MeituanSaasAdapter:
         Returns:
             签名字符串
         """
-        # 按key排序
         sorted_params = sorted(params.items())
-        # 拼接字符串
         sign_str = self.app_secret
         for k, v in sorted_params:
             sign_str += f"{k}{v}"
         sign_str += self.app_secret
-        # MD5加密
         return hashlib.md5(sign_str.encode()).hexdigest().lower()
 
     def authenticate(self, params: Dict[str, Any]) -> Dict[str, Any]:
@@ -132,7 +139,6 @@ class MeituanSaasAdapter:
             "timestamp": timestamp,
             **params,
         }
-        # 生成签名
         auth_params["sign"] = self._generate_sign(auth_params)
         return auth_params
 
@@ -160,7 +166,6 @@ class MeituanSaasAdapter:
         for attempt in range(self.retry_times):
             try:
                 request_data = data or {}
-                # 添加认证参数
                 auth_data = self.authenticate(request_data)
 
                 headers = {"Content-Type": "application/x-www-form-urlencoded"}
@@ -315,8 +320,6 @@ class MeituanSaasAdapter:
         Returns:
             标准化订单字典，可直接传给 DeliveryPlatformAdapter.receive_order()
         """
-        import json as _json
-
         detail_str = raw.get("detail", "[]")
         try:
             food_list = _json.loads(detail_str) if isinstance(detail_str, str) else detail_str
@@ -556,12 +559,9 @@ class MeituanSaasAdapter:
           food_list (food_id, food_name, count, price),
           app_poi_code, operator_id
         """
-        import os as _os
-        import sys
-
-        _src_dir = _os.path.dirname(__file__)
-        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
-        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
+        _here = os.path.dirname(__file__)
+        _repo_root = os.path.abspath(os.path.join(_here, "../.."))
+        _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
         if _gateway_src not in sys.path:
             sys.path.insert(0, _gateway_src)
 
@@ -584,7 +584,6 @@ class MeituanSaasAdapter:
         }
         order_status = _STATUS_MAP.get(int(raw.get("status", 1)), OrderStatus.PENDING)
 
-        # 订单项映射
         items = []
         for idx, item in enumerate(raw.get("food_list", raw.get("detail_items", [])), start=1):
             unit_price = Decimal(str(item.get("price", 0))) / 100  # 分 → 元
@@ -608,7 +607,6 @@ class MeituanSaasAdapter:
 
         create_time_raw = raw.get("create_time", raw.get("order_create_time", ""))
         try:
-            # 美团时间戳可能是 unix epoch（秒）
             if isinstance(create_time_raw, (int, float)) and create_time_raw > 1e9:
                 created_at = datetime.fromtimestamp(create_time_raw)
             else:
@@ -642,12 +640,9 @@ class MeituanSaasAdapter:
         原始字段参考（后台操作日志）：
           action_type, operator_id, amount, reason, approved_by, action_time
         """
-        import os as _os
-        import sys
-
-        _src_dir = _os.path.dirname(__file__)
-        _repo_root = _os.path.abspath(_os.path.join(_src_dir, "../../../.."))
-        _gateway_src = _os.path.join(_repo_root, "apps", "api-gateway", "src")
+        _here = os.path.dirname(__file__)
+        _repo_root = os.path.abspath(os.path.join(_here, "../.."))
+        _gateway_src = os.path.join(_repo_root, "apps", "api-gateway", "src")
         if _gateway_src not in sys.path:
             sys.path.insert(0, _gateway_src)
 
@@ -675,3 +670,282 @@ class MeituanSaasAdapter:
             approved_by=raw.get("approved_by"),
             created_at=created_at,
         )
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  MeituanReservationMixin — 预订操作（搬自 saas/reservation.py）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+class MeituanReservationMixin:
+    """美团预订操作混入类，用于扩展 MeituanSaasAdapter"""
+
+    async def confirm_reservation(self, external_reservation_id: str) -> Dict[str, Any]:
+        """确认预订"""
+        params = {
+            "reservation_id": external_reservation_id,
+            "status": "confirmed",
+        }
+        result = await self._request("POST", "/api/reservation/confirm", data=params)
+        logger.info("meituan_confirm_reservation", external_id=external_reservation_id)
+        return result
+
+    async def cancel_reservation(self, external_reservation_id: str, reason: str = "") -> Dict[str, Any]:
+        """取消预订"""
+        params = {
+            "reservation_id": external_reservation_id,
+            "status": "cancelled",
+            "reason": reason,
+        }
+        result = await self._request("POST", "/api/reservation/cancel", data=params)
+        logger.info("meituan_cancel_reservation", external_id=external_reservation_id)
+        return result
+
+    async def update_reservation_status(
+        self,
+        external_reservation_id: str,
+        status: str,
+    ) -> Dict[str, Any]:
+        """更新预订状态（no_show/arrived/completed）"""
+        params = {
+            "reservation_id": external_reservation_id,
+            "status": status,
+        }
+        result = await self._request("POST", "/api/reservation/update-status", data=params)
+        logger.info("meituan_update_reservation_status", external_id=external_reservation_id, status=status)
+        return result
+
+    async def query_reservation(self, external_reservation_id: str) -> Dict[str, Any]:
+        """查询预订详情"""
+        params = {"reservation_id": external_reservation_id}
+        result = await self._request("GET", "/api/reservation/detail", data=params)
+        return result
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  MeituanOrderWebhookHandler — Webhook 事件处理（搬自 saas/order_webhook_handler.py）
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# 美团核销状态码（order_verified 对应 status=5 已完成 / 自定义核销事件）
+_VERIFIED_STATUSES = {5, 9}  # 5=已完成, 9=核销（部分平台用此值）
+
+
+class MeituanOrderWebhookHandler:
+    """处理美团外卖推送事件，核销时调用 PlatformBindingService
+
+    事件类型：
+      - order_paid      顾客下单并支付（通知接单，支持自动接单）
+      - order_verified  到店核销（触发 Golden ID 绑定）
+    """
+
+    def __init__(
+        self,
+        binding_service: Any,
+        tenant_id: uuid.UUID,
+        store_id: Optional[str] = None,
+    ) -> None:
+        """
+        Args:
+            binding_service: PlatformBindingService 实例
+            tenant_id: 租户 UUID
+            store_id: 门店 ID（传入时启用自动接单功能）
+        """
+        self._svc = binding_service
+        self._tenant_id = tenant_id
+        self._store_id = store_id
+
+    async def handle(
+        self,
+        payload: dict[str, Any],
+        db: Any,  # AsyncSession
+        current_hour_count: int = 0,
+    ) -> dict[str, Any]:
+        """统一事件入口
+
+        Args:
+            payload: 美团推送的原始 JSON 字典
+            db: AsyncSession
+            current_hour_count: 当前小时已自动接单数（由调用方统计后传入，用于上限判断）
+
+        Returns:
+            {"ok": True, "event_type": str, "data": dict}
+        """
+        event_type: str = payload.get("event_type", "")
+        log = logger.bind(
+            platform="meituan",
+            event_type=event_type,
+            order_id=payload.get("order_id"),
+            tenant_id=str(self._tenant_id),
+        )
+        log.info("meituan_webhook_received")
+
+        if event_type == "order_paid":
+            data = await self._handle_order_paid(payload, db, log, current_hour_count)
+        elif event_type == "order_verified":
+            data = await self._handle_order_verified(payload, db, log)
+        else:
+            status = int(payload.get("status", 0))
+            if status in _VERIFIED_STATUSES:
+                data = await self._handle_order_verified(payload, db, log)
+            else:
+                log.info("meituan_webhook_ignored", reason="unknown_event_type")
+                data = {"action": "ignored"}
+
+        return {"ok": True, "event_type": event_type, "data": data}
+
+    async def _handle_order_paid(
+        self,
+        payload: dict[str, Any],
+        db: Any,
+        log: Any,
+        current_hour_count: int = 0,
+    ) -> dict[str, Any]:
+        """下单支付事件：判断是否自动接单，若是则调用美团接单 API。
+
+        自动接单逻辑：
+          1. 需要 store_id 已在构造时传入
+          2. 调用 DeliveryOpsService.should_auto_accept() 判断（考虑开关+每小时上限）
+          3. 若应自动接单，调用美团接单 API（携带当前出餐时间）
+          4. 不影响手动接单流程 —— 若不满足自动接单条件，返回 action=pending_manual
+        """
+        order_id = str(payload.get("order_id", ""))
+        store_id = self._store_id or str(payload.get("app_poi_code", ""))
+
+        log.info(
+            "meituan_order_paid",
+            order_id=order_id,
+            amount_fen=payload.get("order_total_price"),
+            store_id=store_id,
+        )
+
+        if store_id:
+            try:
+                from services.tx_trade.src.services.delivery_ops_service import (  # noqa: PLC0415
+                    DeliveryOpsService,
+                )
+
+                ops_svc = DeliveryOpsService()
+                should_accept = await ops_svc.should_auto_accept(
+                    store_id=store_id,
+                    platform="meituan",
+                    tenant_id=self._tenant_id,
+                    current_hour_count=current_hour_count,
+                    db=db,
+                )
+
+                if should_accept:
+                    prep_time_min = await ops_svc.get_current_prep_time(
+                        store_id=store_id,
+                        platform="meituan",
+                        tenant_id=self._tenant_id,
+                        db=db,
+                    )
+                    accept_result = await self._call_meituan_accept_api(
+                        order_id=order_id,
+                        prep_time_min=prep_time_min,
+                        log=log,
+                    )
+                    log.info(
+                        "meituan_order_auto_accepted",
+                        order_id=order_id,
+                        prep_time_min=prep_time_min,
+                    )
+                    return {
+                        "action": "auto_accepted",
+                        "order_id": order_id,
+                        "prep_time_min": prep_time_min,
+                        "meituan_accept_result": accept_result,
+                    }
+                else:
+                    log.info(
+                        "meituan_order_pending_manual",
+                        order_id=order_id,
+                        reason="auto_accept_disabled_or_limit_reached",
+                    )
+            except ImportError:
+                log.warning(
+                    "meituan_auto_accept_unavailable",
+                    reason="DeliveryOpsService import failed — fallback to manual",
+                )
+            except Exception as exc:  # noqa: BLE001 — 自动接单失败不阻断主流程
+                log.error(
+                    "meituan_auto_accept_error",
+                    error=str(exc),
+                    exc_info=True,
+                )
+
+        return {
+            "action": "pending_manual",
+            "order_id": order_id,
+        }
+
+    async def _call_meituan_accept_api(
+        self,
+        order_id: str,
+        prep_time_min: int,
+        log: Any,
+    ) -> dict[str, Any]:
+        """调用美团接单 API（通知美团已接单并设置出餐时间）。
+
+        TODO: 配置真实 API Key 后替换此 mock 实现。
+              美团接单接口文档：
+              https://developer.meituan.com/openapi/docs/food/order/accept
+        """
+        log.info(
+            "meituan_accept_api_mock",
+            order_id=order_id,
+            prep_time_min=prep_time_min,
+            note="TODO: replace with real Meituan accept API call",
+        )
+        return {
+            "mock": True,
+            "order_id": order_id,
+            "prep_time_min": prep_time_min,
+            "status": "accepted",
+        }
+
+    async def _handle_order_verified(
+        self,
+        payload: dict[str, Any],
+        db: Any,
+        log: Any,
+    ) -> dict[str, Any]:
+        """核销事件：解析订单字段，调用 PlatformBindingService 绑定 Golden ID"""
+        detail_raw = payload.get("detail", "[]")
+        try:
+            items = _json.loads(detail_raw) if isinstance(detail_raw, str) else detail_raw
+        except (_json.JSONDecodeError, TypeError):
+            items = []
+
+        order_data = {
+            "order_no": str(payload.get("order_id", payload.get("day_seq", ""))),
+            "amount_fen": int(payload.get("order_total_price", 0)),
+            "store_id": str(payload.get("app_poi_code", "")),
+            "phone": str(payload.get("recipient_phone", "")) or None,
+            "meituan_user_id": str(payload.get("meituan_user_id", "")) or None,
+            "meituan_openid": str(payload.get("openid", "")) or None,
+            "items": [
+                {
+                    "sku_id": str(item.get("app_food_code", "")),
+                    "name": str(item.get("food_name", "")),
+                    "quantity": int(item.get("quantity", 1)),
+                    "price_fen": int(item.get("price", 0)),
+                }
+                for item in items
+            ],
+        }
+
+        log.info(
+            "meituan_order_verified",
+            order_no=order_data["order_no"],
+            amount_fen=order_data["amount_fen"],
+            has_phone=bool(order_data["phone"]),
+            has_meituan_id=bool(order_data["meituan_user_id"]),
+        )
+
+        result = await self._svc.bind_meituan_order(
+            order_data=order_data,
+            tenant_id=self._tenant_id,
+            db=db,
+        )
+        return result
