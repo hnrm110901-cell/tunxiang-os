@@ -94,6 +94,29 @@ def _make_app(db):
     return app
 
 
+# ─── 默认绕过 webhook 签名验证 ─────────────────────────────────────────────────
+# 本文件 8 用例只测 endpoint 业务逻辑（路由 / payload normalize / DB upsert 等），
+# webhook 签名 + WEBHOOK_SECRET fail-closed 行为由独立文件覆盖：
+#   test_booking_webhook_secret_fail_closed_tier1.py
+
+
+@pytest.fixture(autouse=True)
+def _bypass_signature_verification():
+    """全局绕过 webhook 签名验证（仅本文件有效）。
+
+    本文件 8 用例只测 endpoint 业务逻辑（路由 / payload normalize / DB upsert），
+    签名/fail-closed 行为由 test_booking_webhook_secret_fail_closed_tier1.py 独立覆盖。
+
+    警告: 未来本文件新增测试不得依赖 `_verify_webhook_signature` 的真实行为
+    （包括签名验证 / 防重放 / fail-closed） — 它已被全局 mock 成 always-pass。
+    """
+    with patch(
+        "src.api.booking_webhook_routes._verify_webhook_signature",
+        new_callable=AsyncMock,
+    ):
+        yield
+
+
 # ─── 公用美团 Payload ──────────────────────────────────────────────────────────
 
 

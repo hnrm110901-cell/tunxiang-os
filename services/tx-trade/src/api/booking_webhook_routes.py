@@ -78,20 +78,35 @@ async def _verify_webhook_signature(
     platform: str,
     signature_header: str,
 ) -> None:
-    """通用签名验证流程，验证失败抛出 HTTP 403。
+    """通用签名验证流程，验证失败抛出 HTTP 403 或 503。
 
-    - WEBHOOK_SECRET 未设置（空字符串）时 → 跳过（开发环境）
-    - 签名缺失或验证失败 → 403
-    - timestamp 超出 5 分钟窗口 → 403
+    - WEBHOOK_SECRET 未设置（空字符串）时 → 503 fail-closed (运维配置缺失)
+    - 签名缺失或验证失败 → 403 INVALID_SIGNATURE
+    - timestamp 超出 5 分钟窗口 → 403 INVALID_SIGNATURE
+
+    fail-closed 设计（F#7）：
+    - gateway 将 /api/v1/booking/webhook 加入 AUTH_EXEMPT_PREFIXES 后，若 prod
+      漏配 WEBHOOK_SECRET，下游 skip 验签 = 任意公网请求可写 customer_bookings。
+    - 用 503 而非 403 区分"配置缺失"(运维问题, 触发告警) vs "签名错"(请求问题)。
+    - 附 Retry-After: 300 header — 显式告知第三方推迟 5 分钟（与防重放窗口对齐），
+      防止 prod 漏配 secret 期间第三方按自身策略高频重试致 storm。
     """
     secret = os.getenv("WEBHOOK_SECRET", "")
     if not secret:
-        _structlog.warning(
-            "webhook_signature_skipped",
+        _structlog.error(
+            "webhook_secret_not_configured",
             platform=platform,
-            reason="WEBHOOK_SECRET not set, dev/test env assumed",
+            reason="WEBHOOK_SECRET not set — fail-closed (deployment misconfiguration)",
         )
-        return
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "ok": False,
+                "data": None,
+                "error": {"code": "WEBHOOK_SECRET_NOT_CONFIGURED"},
+            },
+            headers={"Retry-After": "300"},
+        )
 
     body = await request.body()
     signature = request.headers.get(signature_header, "")
@@ -467,7 +482,7 @@ async def webhook_meituan(
 
     验签：HMAC-SHA256(WEBHOOK_SECRET, body)，签名来自 X-Meituan-Signature header。
     防重放：X-Timestamp 需在 5 分钟窗口内。
-    WEBHOOK_SECRET 未设置时跳过验证（dev/test 环境）。
+    WEBHOOK_SECRET 未设置时 raise 503 fail-closed（强制运维配置 secret）。
     """
     await _verify_webhook_signature(request, platform="meituan", signature_header="X-Meituan-Signature")
 
@@ -498,7 +513,7 @@ async def webhook_dianping(
 
     验签：HMAC-SHA256(WEBHOOK_SECRET, body)，签名来自 X-Meituan-Signature header（美团/点评共享体系）。
     防重放：X-Timestamp 需在 5 分钟窗口内。
-    WEBHOOK_SECRET 未设置时跳过验证（dev/test 环境）。
+    WEBHOOK_SECRET 未设置时 raise 503 fail-closed（强制运维配置 secret）。
     """
     await _verify_webhook_signature(request, platform="dianping", signature_header="X-Meituan-Signature")
 
@@ -529,7 +544,7 @@ async def webhook_wechat(
 
     验签：SHA256(WEBHOOK_SECRET + X-Timestamp + body)，签名来自 X-Wechat-Signature header。
     防重放：X-Timestamp 需在 5 分钟窗口内。
-    WEBHOOK_SECRET 未设置时跳过验证（dev/test 环境）。
+    WEBHOOK_SECRET 未设置时 raise 503 fail-closed（强制运维配置 secret）。
     """
     await _verify_webhook_signature(request, platform="wechat", signature_header="X-Wechat-Signature")
 

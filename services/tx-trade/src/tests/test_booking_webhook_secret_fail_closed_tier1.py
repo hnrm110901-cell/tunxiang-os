@@ -240,6 +240,11 @@ def test_endpoint_empty_secret_returns_503_via_meituan_webhook():
         f"error code 应为 WEBHOOK_SECRET_NOT_CONFIGURED，实际 {body}"
     )
 
+    # Retry-After header 防第三方 storm（与防重放 5min 窗口对齐）
+    assert resp.headers.get("Retry-After") == "300", (
+        f"503 必须附 Retry-After=300 (防第三方 storm)，实际 headers={dict(resp.headers)}"
+    )
+
     # 关键：DB 不得被写入（fail-closed 在 DB 之前）
     mock_svc.create_reservation.assert_not_awaited()
 
