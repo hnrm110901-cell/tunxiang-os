@@ -41,7 +41,7 @@
 - **类型**: 餐饮管理系统
 - **功能**: 订单管理、菜品管理、会员管理、库存管理
 - **适配器**: `TiancaiShanglongAdapter`
-- **文档**: [天财商龙适配器文档](../tiancai-shanglong/README.md)
+- **文档**: [天财商龙适配器文档](../tiancai_shanglong/README.md)
 
 ### 2. 美团SAAS (Meituan SAAS)
 - **类型**: 外卖平台
@@ -504,7 +504,7 @@ async def tiancai_order_webhook(request: Request):
 
 ## 参考资料
 
-- [天财商龙适配器文档](../tiancai-shanglong/README.md)
+- [天财商龙适配器文档](../tiancai_shanglong/README.md)
 - [美团SAAS适配器文档](../meituan-saas/README.md)
 - [奥琦韦适配器文档](../aoqiwei/README.md)
 - [智链OS神经系统文档](../../apps/api-gateway/docs/NEURAL_SYSTEM.md)

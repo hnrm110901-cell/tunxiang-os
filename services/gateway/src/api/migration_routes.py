@@ -484,7 +484,7 @@ def _build_adapter(tenant_id: str, config: Optional[dict] = None):
     import importlib
     import os
 
-    _mod = importlib.import_module("shared.adapters.tiancai-shanglong.src.adapter")
+    _mod = importlib.import_module("shared.adapters.tiancai_shanglong.src.adapter")
     TiancaiShanglongAdapter = _mod.TiancaiShanglongAdapter
 
     final_config = {

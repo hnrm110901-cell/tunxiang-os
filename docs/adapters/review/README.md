@@ -30,7 +30,7 @@ Sprint F1（W3-4）交付门槛：**14 个非品智适配器**逐一通过 7 维
 | 代号 | 主目录 | 行数 | 评分 | Tier | 负责 Squad | 状态 | ETA | fix-PR |
 |---|---|---|---|---|---|---|---|---|
 | aoqiwei | shared/adapters/aoqiwei/ | 2679 | ?/28 | T1 | Channel-A | 待评 | W3 |  |
-| tiancai-shanglong | shared/adapters/tiancai-shanglong/ | 923 | ?/28 | T1 | Channel-A | 待评 | W3 |  |
+| tiancai-shanglong | shared/adapters/tiancai_shanglong/ | 923 | ?/28 | T1 | Channel-A | 待评 | W3 |  |
 | keruyun | shared/adapters/keruyun/ | 564 | ?/28 | T1 | Channel-A | 待评 | W3 |  |
 | weishenghuo | shared/adapters/weishenghuo/ | 800 | ?/28 | T1 | Channel-A | 待评 | W3 |  |
 | meituan (-saas + 单文件) | shared/adapters/meituan-saas/ + meituan_adapter.py | 1991+320 | ?/28 | T1 | Channel-B | 待评 | W3 |  |
