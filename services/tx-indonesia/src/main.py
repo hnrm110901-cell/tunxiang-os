@@ -4,6 +4,7 @@ PPN 税引擎（Sprint 3.4）+ e-Faktur 电子发票
 + GoPay/DANA 本地支付 + GoFood/ShopeeFood Indonesia
 """
 
+import os
 from contextlib import asynccontextmanager
 
 import structlog
@@ -34,7 +35,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
