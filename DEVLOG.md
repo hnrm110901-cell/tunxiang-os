@@ -1,3 +1,57 @@
+## 2026-05-11 下午（续）— CH-02.7a a3 saas/ 整目录 cutover（top-level SoT 完工）
+
+### 今日完成
+承接 a2（PR #431 已 admin-squash-merge → main `4504de6e`，06:56Z），实施 CH-02.7a sub-PR a3 — 把原 `shared/adapters/meituan-saas/src/{adapter,reservation,order_webhook_handler}.py` 三个文件内容并入新建的 `shared/adapters/meituan_saas_adapter.py`，确立 top-level 为 MeituanSaasAdapter + MeituanReservationMixin + MeituanOrderWebhookHandler 的 SoT，删 saas/ 整目录。
+
+**5 commit chain（§17/§21 Tier 2 + §16 docs）：**
+- **test commit**（TDD red）— 新建 `shared/adapters/tests/test_meituan_saas_adapter.py`（25 tests），迁 a1 baseline 25 passed 全集；不迁 24 pre-existing failed（决策 79 独立 follow-up）。单看本 commit 因 meituan_saas_adapter.py 未存在导致 import error
+- **impl commit**（TDD green）— 新建 `shared/adapters/meituan_saas_adapter.py`（~990 行），承接 saas/adapter/reservation/order_webhook_handler；`MeituanClient/MeituanAPIError/MeituanAuthError` 从 `.meituan_delivery_adapter` import 复用（a2 已搬 SoT）；`_repo_root` 路径计算从 4 层 `../../../..` 改 2 层 `../..`（搬迁路径深度差），其余行为 100% surgical 不变
+- **consumer cutover commit** — `services/tx-trade/src/services/omni_channel_service.py:738` 唯一业务消费者 lazy import 切换：`shared.adapters.meituan_saas.src.adapter` → `shared.adapters.meituan_saas_adapter`（1 行 mechanical）
+- **delete commit** — 删除 saas/ 整目录（11 文件 / ~1500 行）：src/{__init__,adapter,client,reservation,order_webhook_handler}.py + tests/* + README.md + package.json
+- **docs commit**（本 commit）— DEVLOG + progress.md 更新
+
+**Pre-existing dead path 双确认（决策 79 follow-up，不在本 PR 范围）：**
+- `apps/api-gateway/src/schemas/restaurant_standard_schema` 全 repo 不存在 → `to_order/to_staff_action` 16 个测试是 dead code（ModuleNotFoundError）
+- `packages/api-adapters/` 整目录不存在 → `shared/adapters/base/src/registry.py:23` POS_REGISTRY["meituan"] / aoqiwei / pinzhi / tiancai / keruyun 5 项字符串路径全废
+- 24 pre-existing failed saas tests：16 来自 dead path + 8 来自 api_client/.client mock 错位（实际接口面错配）
+
+### 数据变化
+- branch `channel/ch-02-7a-a3-saas-cutover` HEAD: `<本 commit>`（main `4504de6e` + 5 commit）
+- 新增：meituan_saas_adapter.py（+951）、test_meituan_saas_adapter.py（+393）
+- 修改：omni_channel_service.py（+1/-1）
+- 删除：saas/ 整目录（11 文件 / -1531 行）
+- 净：+1345 / -1532
+
+### 战绩
+- **CH-02.7a (#378) 长跑收尾**：a1 baseline (#421) → a2 MeituanClient SoT (#431) → a3 saas 整目录 cutover（本 PR）。meituan adapter SoT 闭环完成，唯一业务消费者 omni_channel_service 切到 top-level，零回归
+- **决策 78 真门禁验证**：top-level adapter tests 84 + 新 saas adapter tests 25 = **109 passed**；tx-trade test_takeaway 16 passed 零回归；test_omni_entity_alignment_static 6 passed；test_trade_delivery 3 failed / 9 passed（3 failed 是 origin/main `4504de6e` pre-existing，stash 双向验证一致，与 a3 无关）
+- **决策 79 应用**：24 pre-existing failed + registry dead path + to_order dead code 不混入本 PR，独立 follow-up issue 跟踪
+- **§3 surgical 严守**：a3 仅做"搬入 + cutover + 删旧"，不修任何 pre-existing BUG
+
+### 关键决策
+- **完整搬入 reservation.py + order_webhook_handler.py**（即使生产无消费者，仅 test 用）— 用户选 B 选项"完整 SoT 搬入"，保持 saas/ 整目录单源迁移完整性，避免 a4/a5 再回头
+- **单文件 meituan_saas_adapter.py 容纳 3 class**（不拆 meituan_saas_adapter.py + meituan_saas_reservation.py + meituan_saas_webhook.py）— saas/ 原本 3 文件一个 namespace，搬到 top-level 保持单文件单 namespace，结构变更最小
+- **不修 registry.py POS_REGISTRY 死路径** — 5 项 dead path 是 pre-existing，决策 79 独立 follow-up
+- **TDD red-green 双 commit 留痕**：test commit 单看 import error，impl commit 全绿（与 a2 一致风格）
+- **新文件路径 `shared/adapters/meituan_saas_adapter.py` 而非合并入 meituan_delivery_adapter.py**：DeliveryAdapter（外卖统一抽象）vs SaasAdapter（美团 SaaS 完整接口）职责面不同，合并会让 delivery adapter 接口爆炸
+
+### 遗留问题
+- **本 PR review + merge**：等 user 决定 admin-merge 时机；按 a2 (#431) 模式预计 admin-squash
+- **决策 79 follow-up 独立 issue（3 项）**：to_order/to_staff_action dead code、registry POS_REGISTRY 5 项 dead path、24 pre-existing failed saas tests 接口错配 — 三个可合一 follow-up issue "meituan adapter 系列 pre-existing dead path 清理"
+- **CH-02.7a (#378) closing 标记**：a1/a2/a3 三 sub-PR 全 merged 后 #378 issue close + 总结评论
+- **真 API 端到端集成测试**：MeituanClient 真接入路径仅 fixture-level，端到端需美团 sandbox（独立 follow-up）
+- **dev-plan-60d 重写**：5/7 旧计划被 30+ commit 推翻，需 user 给新 demo 故事核心方向
+- **5/13 deal-breaker** 倒计时 2 天：channel-aggregation 3 平台企业资质（user 创始人级别）
+
+### 明日计划
+- A：等本 a3 PR review + merge → CH-02.7a 长跑收尾
+- B：决策 79 follow-up 独立 issue 立（registry dead path + to_order dead code + 24 failed mock 错位三合一）
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical）
+- D：v301 alembic PK COALESCE 历史债（infra 提速）
+- E：dev-plan-60d 重写（阻塞，需 user 输入）
+
+---
+
 ## 2026-05-11 下午 — CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
 
 ### 今日完成

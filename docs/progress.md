@@ -1,3 +1,45 @@
+## 2026-05-11 下午（续）· CH-02.7a a3 saas/ 整目录 cutover（top-level SoT 完工）
+
+### 完成状态
+- [x] **issue #378 sub-PR a3 实施完成**：原 `shared/adapters/meituan-saas/src/{adapter,reservation,order_webhook_handler}.py` 三文件并入新建的 `shared/adapters/meituan_saas_adapter.py`；saas/ 整目录删除；唯一业务消费者 omni_channel_service.py 切到 top-level
+- [x] **5 commit chain**（§17 Tier 2 + §21 原子化）：test red → impl green → consumer cutover → delete saas/ → docs
+- [x] **109 passed 真门禁**（决策 78）：top-level adapter 84 + 新 saas adapter 25
+- [x] **零业务消费者回归**：tx-trade test_takeaway 16 / test_omni_entity_alignment_static 6 / test_trade_delivery 3 failed（origin/main pre-existing，stash 双向验证）
+- [x] **branch HEAD**：`channel/ch-02-7a-a3-saas-cutover`（main `4504de6e` + 5 commit）
+
+### 关键决策
+- **B 选项完整搬入**（含 reservation/webhook 生产无消费者部分）— 保持 saas/ 整目录单源迁移完整性，避免 a4/a5 回头
+- **单文件 meituan_saas_adapter.py 容纳 3 class** — saas/ 原本 3 文件单 namespace，搬到 top-level 保持单文件单 namespace
+- **新文件 meituan_saas_adapter.py 而非合并入 meituan_delivery_adapter.py** — DeliveryAdapter vs SaasAdapter 职责面不同，合并会让接口面爆炸
+- **决策 79 严守**：24 pre-existing failed + registry POS_REGISTRY 5 项 dead path + to_order/to_staff_action dead code 全部 follow-up，不修
+- **§3 surgical**：a3 仅做"搬入 + cutover + 删旧"，行为 100% 不变（除 _repo_root 路径深度差从 4 层 → 2 层）
+
+### 下一步
+- A：本 PR review + merge → CH-02.7a (#378) 长跑收尾
+- B：决策 79 follow-up 独立 issue 立（registry dead path + to_order dead code + 24 failed mock 错位三合一）
+- C：CH-14 (#394) + #414 hash salt 拼 tenant_id（demo critical breaking）
+- D：v301 alembic PK COALESCE 历史债（infra 提速，去 S5 fixture stamp v409 workaround）
+- E：dev-plan-60d 重写（阻塞，需 user 输入）
+
+### 已知风险
+- **pre-existing 3 failed test_trade_delivery** 在 origin/main 已存在（disable_busy_mode_config / get_config_ops_error / accept_order_omni_error）— 与 a3 无关，但 review 时需明示
+- **新增 dead code 残留**：a3 搬入的 to_order/to_staff_action 仍是 dead code（`apps/api-gateway/src/schemas/` 不存在），不在 a3 范围
+- **registry.py POS_REGISTRY["meituan"] 字符串路径** 仍指向已删的 `packages.api-adapters.meituan-saas.src.adapter.MeituanSaasAdapter` — 但因 packages/api-adapters/ 整目录本就不存在（pre-existing dead path），a3 不动；决策 79 follow-up 修正
+- **未做仓库级 explicit ask review**（codex/architect）— §19 触发条件"修改了 3 个以上文件"满足，理论上应配套独立验证 pass，但 a3 范围属 T2（非 T1），且 109 passed 真门禁 + tx-trade 反测全绿可作替代证据
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch origin
+git log --oneline -5 origin/main
+gh pr list --state open --author "@me" --limit 30
+gh pr view <a3-PR号> --json state,mergedAt,reviewDecision
+cd /Users/lichun/.tunxiang-p0-worktrees/ch-02-7a-a3-saas-cutover
+/Users/lichun/tunxiang-os/.venv-trackd/bin/python -m pytest shared/adapters/tests/test_delivery_adapters.py shared/adapters/tests/test_meituan_saas_adapter.py -q
+```
+
+---
+
 ## 2026-05-11 下午 · CH-02.7a a2 美团 client.py SoT 搬入 top-level adapter
 
 ### 完成状态
