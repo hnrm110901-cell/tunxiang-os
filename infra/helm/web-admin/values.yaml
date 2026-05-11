@@ -105,7 +105,7 @@ containerSecurityContext:
   runAsUser: 101
   runAsGroup: 101
   allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: false
+  readOnlyRootFilesystem: false  # FastAPI/uvicorn/nginx 需写 /tmp；切 true 前需先挂 emptyDir 到 /tmp
   capabilities:
     drop:
       - ALL
