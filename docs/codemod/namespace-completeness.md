@@ -172,14 +172,31 @@ vs 业务改动 → false positive。
 
 **根治 follow-up**：
 
-- ✅ **方案 1 已落地（issue #417）**：`tier1-gate` 加 import-only carve-out。
-  `scripts/ci/detect_import_only_diff.py` 扫 PR diff，所有改动行必须为 from/import / 注释 /
-  空白，且至少有一行真 import 改动；满足则跳过 `源改动必须配对测试改动` 校验。17 单测覆盖：
-  纯 from/import 切换 / 缩进 lazy import / PEP 328 相对 import / import 删除 / 多文件混合 /
-  业务改 / docstring / 注释 / stub key setdefault / 非 .py 文件 / 多行括号续行（保守 false）/
-  无效 SHA。
-- 🔜 **方案 2 兜底（未实施）**：PR title prefix `[codemod]` 显式 skip — 留作未来逃生通道，
-  当方案 1 检测漏（如 AST 解析能力不足）时人工干预
+- ⚠️ **方案 1 已落地但覆盖窄**（issue #417 / PR #419 + review fix）：`tier1-gate`
+  加 import-only carve-out — `scripts/ci/detect_import_only_diff.py` 扫 PR diff，所有
+  改动行必须为单行 `from X import Y` / `import X` / 注释 / 空白，且至少有一行真 import
+  改动；满足则跳过 `源改动必须配对测试改动` 校验。19 单测覆盖（含 P0 分号复合语句攻击
+  向量回归）。
+  - **实际覆盖范围**：仅单行 import 形式的纯 import 切换。
+  - **不覆盖**：多行括号 import `from x import (\n    a,\n    b,\n)` 续行 / stub key
+    `setdefault("services.x", mod)` / conftest body 改动（模块身份别名段等） / 任何非
+    `.py` 文件改动 / `from X import Y; side_effect()` 复合语句（攻击向量已阻断）。
+  - **实测 5/10-5/11 4 PR 真终态覆盖率 = 0/4**：#353 (120 .py add: 118 imp + 1 close
+    paren + 1 ident-cont → fail) / #355 (168 add: 93 imp + 75 stub/conftest other →
+    fail) / #356 (120 add: 56 imp + 64 other → fail) / #358 (199 add: 66 imp + 2
+    ident-cont + 131 other → fail)。**触发本流程沉淀的 4 个原型 PR 本 carve-out 全部
+    不通过**。
+  - 方案 1 的实际价值：未来若有**单文件 + 单行 import 切换**的小型 codemod PR（如
+    个别服务少量 lazy import 修），可自动通过；当前 4 PR 规模不适用。
+
+- 🔜 **方案 2 主路径配套（未实施）**：PR title prefix `[codemod]` 显式 skip —
+  实测后**应作为方案 1 之外的主要 escape hatch**，覆盖多行括号 / stub setdefault /
+  conftest body / mock binding fix 等本 chain 真实形态。当前仍走 admin-merge bypass
+  并按本节 §裁决标准 5 项自验；future issue 实施 PR title prefix 后改走自动 skip。
+
+- 📋 **AST 升级（独立 issue 候选）**：用 `ast.parse` 解析 added/removed 行，识别多行
+  括号 import 续行 + 区分真 import-only。复杂度比正则高一档，但能把覆盖率从单行扩到
+  通用 import 形式。立 issue 前需先看是否有真实 codemod PR 触发频次足以 Justify。
 
 ## 历史 PR 链
 
