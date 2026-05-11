@@ -36,7 +36,7 @@
 
 ```bash
 # 在项目根目录
-cd packages/api-adapters/tiancai-shanglong
+cd shared/adapters/tiancai_shanglong
 pip install -r requirements.txt
 ```
 
