@@ -32,14 +32,6 @@
 - ⏳ 库存预警
 - ⏳ 库存报表
 
-## 安装
-
-```bash
-# 在项目根目录
-cd shared/adapters/tiancai_shanglong
-pip install -r requirements.txt
-```
-
 ## 配置
 
 ```python
@@ -58,7 +50,7 @@ config = {
 ### 初始化适配器
 
 ```python
-from packages.api_adapters.tiancai_shanglong.src import TiancaiShanglongAdapter
+from shared.adapters.tiancai_shanglong.src import TiancaiShanglongAdapter
 
 # 创建适配器实例
 adapter = TiancaiShanglongAdapter(config)
@@ -148,75 +140,6 @@ result = await adapter.update_inventory(
     quantity=50.5,
     operation_type=1  # 入库
 )
-```
-
-## 与智链OS集成
-
-### 通过集成服务使用
-
-```python
-from apps.api_gateway.src.services.adapter_integration_service import AdapterIntegrationService
-from apps.api_gateway.src.services.neural_system import neural_system
-
-# 初始化集成服务
-integration_service = AdapterIntegrationService(neural_system=neural_system)
-
-# 注册天财商龙适配器
-adapter = TiancaiShanglongAdapter(config)
-integration_service.register_adapter("tiancai", adapter, config)
-
-# 同步订单到智链OS
-result = await integration_service.sync_order_from_tiancai(
-    order_id="ORD20240001",
-    store_id="STORE001"
-)
-
-# 同步菜品到智链OS
-result = await integration_service.sync_dishes_from_tiancai(
-    store_id="STORE001"
-)
-
-# 全量同步
-result = await integration_service.sync_all_from_tiancai(
-    store_id="STORE001"
-)
-```
-
-### 通过API接口使用
-
-```bash
-# 注册适配器
-curl -X POST http://localhost:8000/api/adapters/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "adapter_name": "tiancai",
-    "config": {
-      "base_url": "https://api.tiancai.com",
-      "app_id": "your-app-id",
-      "app_secret": "your-app-secret",
-      "store_id": "STORE001"
-    }
-  }'
-
-# 同步订单
-curl -X POST http://localhost:8000/api/adapters/sync/order \
-  -H "Content-Type: application/json" \
-  -d '{
-    "order_id": "ORD20240001",
-    "store_id": "STORE001",
-    "source_system": "tiancai"
-  }'
-
-# 同步菜品
-curl -X POST http://localhost:8000/api/adapters/sync/dishes \
-  -H "Content-Type: application/json" \
-  -d '{
-    "store_id": "STORE001",
-    "source_system": "tiancai"
-  }'
-
-# 全量同步
-curl -X POST http://localhost:8000/api/adapters/sync/all/tiancai/STORE001
 ```
 
 ## 数据类型约定
