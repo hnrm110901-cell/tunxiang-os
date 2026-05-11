@@ -112,3 +112,26 @@ networkPolicy:
 configMap:
   enabled: false
   data: {}
+
+# F#2 安全上下文（CSO 2026-05-11 整改 — Helm 层兜底）
+# pod 级：UID/GID 10001，禁 root；fsGroup 自动 chown 挂载卷
+# container 级：禁权限提升 + drop ALL cap（PSA restricted 基线）
+# 前置：镜像 USER 须为 10001（PR-2 Dockerfile USER 整改将逐镜像落地）
+# 若部署后某 chart 因镜像未配 USER 而 admission 失败，临时设 enabled: false 并开 follow-up issue
+podSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+containerSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false  # FastAPI/uvicorn/nginx 需写 /tmp；切 true 前需先挂 emptyDir 到 /tmp
+  capabilities:
+    drop:
+      - ALL
