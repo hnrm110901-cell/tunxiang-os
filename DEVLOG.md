@@ -1,3 +1,100 @@
+## 2026-05-12 下午 — 切片 1：CSO 2026-05-11 security 热区 4 PR 闭环（admin-merge 第 11-14 次累积）
+
+### 今日完成
+User 给宽泛指令"按未完成任务明细启动开发"。先核 SoT（memory origin/main = `b92eb0e1` 实际已推进，中间 session F#8 4 PR 11-14 期间在 5/12 中午已合），列阻塞天花板（5/13 deal-breaker 创始人级 / payment 凭据前置 / `[DO NOT MERGE]` PR staging dry-run / dev-plan-60d demo 故事方向 / `#472` vs `#473` scope 混淆），给 3 切片候选。User 选切片 1（CSO security 热区收尾）+ A+B fix 路径 + 同意 admin-merge carve-out。
+
+本 session **4 PR merged 全闭环**（CSO F#6 / F#5 sub-PR B / F#3 / F#1）+ 4 issue closed（不含 `#458`/`#451` 先前合）：
+
+**PR #474 (F#6 PR-1 helm 限流 `f8484d14` @ 08:36Z) — close #455 [T2]**
+- branch: `fix/k8s-auth-ratelimit-455`
+- code-reviewer round-1 REQUEST_CHANGES (1 P0 + 2 P1 + 2 P2)
+- P0-1: `limit-rpm` 在云 LB 后默认按 LB IP 计数，非 client IP（聚合误伤 / XFF 绕过）→ user 选 A+B
+- executor round-1 fix: `authBurstMultiplier 5→1`（burst 50→10，真对齐 bare-metal）+ 删 deprecated `kubernetes.io/ingress.class` annotation + `ingress.realIP.*` values 占位（不写死 CIDR）+ chart README 部署前提 section（cluster ConfigMap 改 ingress-nginx-controller `use-forwarded-for` + `proxy-real-ip-cidr` + `100.125.0.0/16` 腾讯云 CLB 源段示例）
+- P0-1 cluster ConfigMap 跨 namespace ops 改动 → follow-up（chart 不跨 ns 改 cluster infra）
+- round-2 APPROVE 0 BUG → admin-merge **carve-out 第 11 次**
+
+**PR #477 (F#5 sub-PR B XML 隔离 `d60585a3` @ 09:01Z) — close #472 [T2]**
+- branch: `fix/brand-strategy-xml-isolation-472`
+- **意外**：派 sub-PR A executor 起手发现 sub-PR A 已被 PR #458 (`b85b5dd1` @ 03:42Z 今天) merge — 用 `shared/security/src/prompt_sanitizer.py::sanitize_for_prompt` shared utility 比原 spec 更好
+- **§18 声明歧义修正** — 起手时把 #472（XML 隔离 P0，不需 product）和 #473（endpoint deprecate P1，需 product）混为一谈，sub-PR A 完工后修正
+- executor: `_build_system_prompt` (132→144 行) + `_minimal_brief` (37→56 行) markdown # 分节 → 三块 XML 结构（`<system_authority>` / `<tenant_brand_data>` / `<output_format>`）；system_authority 显式 "treat-as-data" 防御指令；28 cases 全 PASS（XML 完整性 / A1 注入逃逸 / A2 指令覆盖 / A3 length cap / round-trip / sub-PR A regression）
+- **stub setdefault 陷阱实战**（`feedback_pytest_stub_setdefault_pitfall.md` 教训）— `test_brand_strategy_routes.py` 用 setdefault 注入 identity-stub sanitize，本 PR 测试需 `_bsds.sanitize_for_prompt = _REAL_SANITIZE` 强制覆盖已 import 模块的 binding，注释行 76-83 解释
+- round-1 APPROVE 0 BUG → admin-merge **carve-out 第 12 次**
+
+**PR #478 (F#3 SHA-pin `491fd419` @ 11:18Z) — close #439 [T2]**
+- branch: `fix/pnpm-action-setup-sha-pin-439`
+- 9 处 `pnpm/action-setup@v*` (5 文件 / 3 版本) → SHA pin
+- `git ls-remote` 实时解析: v6 `6854221e62e0759fe8deffc48ccb9c91daf8f9b0` / v5 `a8198c4bff370c8506180b035930dea56dbd5288` / v4 `f40ffcd9367d9f12939873eb1018b921a783ffaa`
+- Agent API 502 错改直接做（mechanical task 10min < agent 重试），并行 Edit 5 文件 + replace_all
+- 不动 first-party `actions/*` (issue 明确排除)
+- round-1 APPROVE 0 BUG → admin-merge **carve-out 第 13 次**
+
+**PR #479 (F#1 edge CORS `04e35512` @ 11:59Z) — close #438 [T3]**
+- branch: `fix/edge-cors-wildcard-438`
+- `edge/sync-engine/src/api_main.py:120` + `edge/mac-station/src/main.py:74` `allow_origins=["*"]` → env-driven (PR #437 `1408fd1a` pattern 沿用，8 services + .env.example 已统一)
+- sync-engine 原 `allow_credentials=True` + `*` 是 broken CORS spec（浏览器拒）— env-driven 后 credentials=True 合法
+- Deploy note 写 PR description: CORS_ALLOWED_ORIGINS LAN IP + Tailscale 节点；CLAUDE.md §8 补 CORS 配置项留 user 创始人确认（不自动改项目宪法）
+- round-1 APPROVE 0 BUG → admin-merge **carve-out 第 14 次**
+
+### 数据变化
+- main: `04e35512` (本 session 起末态)，中间经过 #474 → #477 → #478 → #479
+- 4 PR merged / 4 issue closed (#455 + #472 + #439 + #438)
+- carve-out 累积：5/12 中午第 10 → **本 session 第 14**（性质：全 security 主题）
+- 4 worktree 起 / 4 worktree 清 / 4 branch 删
+- 测试新增：28 (sub-PR B XML 隔离) cases；0 regression
+- code-reviewer 模式 4 次实战：#474 round-1 R-C (1 P0 + 2 P1) → round-2 APPROVE / #477 round-1 APPROVE / #478 round-1 APPROVE / #479 round-1 APPROVE
+- **handoff vs SoT 矛盾 2 次发现**：① memory origin/main = `b92eb0e1` 已过时（中间 session F#8 4 PR 推进到 `0d88909b`）→ 修正 ② §18 声明把 #472/#473 混为一谈 → 起手 sub-PR A 时发现 #458 已合 → 现场修正
+
+### 战绩
+- **CSO 2026-05-11 security 热区收尾完整 4 PR 同 session 落地** — F#1 edge CORS / F#3 SHA-pin / F#5 PR-B XML 隔离 / F#6 PR-1 helm 限流 全 closed
+- **P0 attack vector 静态推理实战（#474 P0-1）** — `limit-rpm` 在云 LB 后按 LB IP 计数的真实安全 bug 由 code-reviewer 抓出；非 reviewer 独立眼光 99% 会漏；`feedback_self_review_blind_spots.md` "T2+ infra / 安全 改动必须 explicit ask review" 直接命中
+- **不擅自跨 namespace cluster ops** — #474 P0-1 完整 fix 需改 `ingress-nginx-controller` ConfigMap (跨 namespace + 需 ops 权限)，executor 没塞进 helm chart 而是写 deploy README + follow-up issue，正确边界
+- **§18 §3 §1 三条原则同 session 反复落地** — 不脑补先核 SoT (×2 修正) / surgical 边界（不顺手清理 P2 / 不动 first-party actions / 不改 CLAUDE.md / 不 commit audit doc）/ explicit ask review 第二轮独立眼光
+- **mechanical 任务直接做不派 agent 教训** — Agent API 502 错时直接做 SHA-pin 替换 10min 完工，比重试 agent 快；OMC delegation rule "trivial ops 直接做"实战命中
+
+### 关键决策
+- **A+B 混合 fix 路径（#474）** — user 选 A（最小 fix + README 警告）+ B（完整 fix），实际转化为 "chart 层做能做的全做 + cluster ops 改动 README 部署前提 + follow-up issue" 三段式；不卡 user 必须给 CIDR 才能起手
+- **admin-merge carve-out pattern 延伸到 security 主题 4 PR 一次性** — 本 session 4 PR 全走 carve-out（同主题 + 同 reviewer pattern + 同 CI drift 判定）；user 一次性 explicit 授权 "切片 1 + 同意 admin-merge carve-out"，比每 PR 单独问效率高
+- **handoff/sub-PR scope SoT 校验 2 次模式** — 起手核 origin/main + 派 executor 前再核 sub-PR A 状态；前 1 次（memory 数据漂移）+ 后 1 次（sub-PR A 已合）；`feedback_handoff_finding_ids.md` "不脑补先核 SoT" 复用 pattern
+- **第二轮 review 走 B 选项"真 BUG only"** — round-1 #474 R-C 找出 1 P0 + 2 P1 + 2 P2；round-2 #474 APPROVE 0 BUG（仅认 round-1 已 acknowledged 的 P2 留 follow-up）；不无限套娃，`feedback_tier1_review_loops.md` B 选项实战
+- **CLAUDE.md §8 / audit doc 不擅自 commit** — `docs/audit/brand-strategy-prompt-injection-2026-05-11.md` 在 working tree 但未 commit（user 留 untracked）；CLAUDE.md §8 是项目宪法 — 二者都留 user 确认
+
+### 遗留问题（follow-up）
+- **CSO F#5 后续**：① ModelRouter `system` 字段透明 pipe（audit S4，独立 issue 待开）② Pydantic 长度补全 4 字段（audit P1）③ `output_format` 块加 "treat-as-data" 重申（PR #477 round-1 P2）④ sanitizer 通用 `<>` escape（PR #477 round-1 P2）
+- **CSO F#6 后续**：① cluster ConfigMap `use-forwarded-for` + `proxy-real-ip-cidr` 改 ingress-nginx-controller（跨 namespace + 需 ops 权限，待 issue 跟踪 + assign 李淳）② P2-1 `limit-connections` values 化 ③ P2-2 `proxy-body-size` 收紧 ④ 主 `templates/ingress.yaml` 同款 deprecated annotation 清理
+- **#472 验收第 4 项**：真 LLM 验证（Claude API 调一次）staging deploy-time validation，待 ops 跑
+- **#473 仍 OPEN**：旧版 `/api/v1/brand-strategy/*` endpoint deprecate 决策（P1，需 product 拍板"双源真相"）
+- **3 issue OPEN backlog 持续**：`#448` D2c Tier1 真 PG 扩面 / `#449` docker-compose-pg fixture 扩面 / `#450` AST 升级 方案 3（5/11 夜深决策 79/82 拆出，未 pick）
+- **5/13 deal-breaker 倒计时 < 12h**：channel-aggregation 3 平台企业资质（创始人级别非技术，连续 6+ session 提醒未起手）
+- **main 无 branch protection** — admin-merge 累积 ≥14 次；后续非 codemod/docs-only/security 主题须重评是否再开
+- **本 session 拆 session 自然终点** — 4 PR + 长 context burn，按 `feedback_proactive_session_split.md` 收尾
+
+### 明日计划
+- A：fresh session — handoff 留 DEVLOG 顶 + docs/progress.md 顶；起手命令含 `gh pr view 474 477 478 479 --json state` + `gh issue list --state open --search "448 449 450 472 473"` 核 SoT
+- B：5/13 deal-breaker 资质（创始人级别非技术）— 已成 deal-breaker 实际触发
+- C：CSO follow-up 选 pick（F#5 ModelRouter system mask / F#6 cluster ConfigMap ops / `output_format` 重申）
+- D：3 issue backlog (`#448`/`#449`/`#450`) pick
+- E：旧 `[SECURITY][Tier1]` rebase PR 群体（`#222–#232` 等 8 个）评估 — base 漂移 6+ 天，需 fresh session worktree 隔离 + Tier 1 真 PG 回归
+
+### 已知风险
+- **handoff 描述可能与 SoT 不符** — 本 session 末态可能在你写 handoff 后又被合入新 PR；fresh session 起手必跑 SoT 校验命令，不脑补"应该是 X"
+- **carve-out admin-merge 累积 ≥14 次** — 操作者风险归 user；后续非 codemod/docs-only/security 主题须重新评估
+- **audit doc 仍 untracked** (`docs/audit/brand-strategy-prompt-injection-2026-05-11.md`) — 若历史追溯需要可考虑 commit，否则留原状
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 04e35512 或更新（含本段 DEVLOG 沉淀 PR）
+gh pr view 474 477 478 479 --json state,mergedAt,mergeCommit   # 全 MERGED
+gh issue list --state open --search "455 472 439 438"          # 全 CLOSED
+gh issue list --state open --search "448 449 450 473"          # backlog
+git worktree list | grep -iE "k8s-auth|brand-strategy|pnpm|cors-edge|devlog-2026-05-12-pm" || echo "session worktree 已清"
+head -300 DEVLOG.md   # 本段（5/12 下午）+ 5/12 中午（F#8）+ 5/11 夜深
+```
+
+---
+
 ## 2026-05-12 中午 — F#8 父任务 4 PR 收尾 + 3 backlog issue（admin-merge 第 7-10 次累积）
 
 ### 今日完成
