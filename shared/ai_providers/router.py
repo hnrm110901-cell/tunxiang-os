@@ -417,10 +417,14 @@ class MultiProviderRouter:
         chain = self._strategy.resolve_chain(task_type, urgency)
 
         # -- 数据安全：脱敏 + 权限检测 --
+        # 闭环 CSO F#5 audit S4：messages + system 共用同一 mask_ctx，
+        # 防止 brand_strategy 等模块拼接的 system_prompt 透明 pipe 敏感字段。
         mask_ctx: MaskContext | None = None
         work_messages = messages
+        work_system = system
         if self._security is not None:
             work_messages, mask_ctx = self._security.mask_messages(messages, tenant_id)
+            work_system = self._security.mask_system(system, mask_ctx)
 
         # 调用方手动指定敏感级别时，覆盖自动检测结果
         if data_sensitivity is not None and mask_ctx is not None:
@@ -470,7 +474,7 @@ class MultiProviderRouter:
                     adapter=adapter,
                     model_id=model_id,
                     messages=work_messages,
-                    system=system,
+                    system=work_system,
                     max_tokens=max_tokens,
                     timeout_s=timeout_s,
                     breaker=breaker,
@@ -601,8 +605,10 @@ class MultiProviderRouter:
 
         mask_ctx: MaskContext | None = None
         work_messages = messages
+        work_system = system
         if self._security is not None:
             work_messages, mask_ctx = self._security.mask_messages(messages, tenant_id)
+            work_system = self._security.mask_system(system, mask_ctx)
 
         last_exc: Exception | None = None
 
@@ -625,7 +631,7 @@ class MultiProviderRouter:
                 gen = adapter.stream(
                     messages=work_messages,
                     model=model_id,
-                    system=system,
+                    system=work_system,
                     max_tokens=max_tokens,
                 )
                 async for chunk in gen:
