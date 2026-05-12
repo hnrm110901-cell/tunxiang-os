@@ -99,7 +99,10 @@ def sanitize_for_prompt(value: Any, max_chars: int = 500) -> Any:
 
     Behavior:
         - strip silently：不 raise，安全 fallback 为正常字符串
-        - dict 的 keys 不 sanitize（schema 定义，非用户可控）
+        - dict 的 str keys 也 sanitize — jsonb 字段（如 brand_voice / template_hints）
+          的 keys 是租户管理员输入，不是 schema 定义。round-1 review 发现
+          template_hints dict key 漏过 sanitize 是真 BUG（issue #457 PR #458）
+        - dict 的 non-str keys（int / tuple 等）保留原样
         - 中英文混合可同时过滤
         - 过滤后再 truncate（避免 cap 让 attack pattern 漏过）
     """
@@ -110,7 +113,10 @@ def sanitize_for_prompt(value: Any, max_chars: int = 500) -> Any:
     if isinstance(value, list):
         return [sanitize_for_prompt(item, max_chars) for item in value]
     if isinstance(value, dict):
-        return {k: sanitize_for_prompt(v, max_chars) for k, v in value.items()}
+        return {
+            (sanitize_for_prompt(k, max_chars) if isinstance(k, str) else k): sanitize_for_prompt(v, max_chars)
+            for k, v in value.items()
+        }
     # int / float / bool — 不可能携带 prompt injection，原样返回
     return value
 
