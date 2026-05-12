@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from typing import Optional
 
 import structlog
@@ -107,12 +108,21 @@ class AlipayChannel(BasePaymentChannel):
 
         trade_status = params.get("trade_status", "")
         status = _TRADE_STATUS_MAP.get(trade_status, PayStatus.PENDING)
+        if trade_status and trade_status not in _TRADE_STATUS_MAP:
+            # P1-3: 未知状态降级 PENDING 是保守安全的（不会误触发资金确认），
+            # 但需要观测发现意外状态值用于扩展映射。
+            logger.warning(
+                "alipay_unknown_trade_status",
+                trade_status=trade_status,
+                out_trade_no=params.get("out_trade_no"),
+            )
 
-        # 元 → 分（支付宝唯一返回元单位，其他渠道是分）
+        # P1-2: 元 → 分用 Decimal 避免浮点精度问题（如 2.675 * 100 = 267.49999...）
+        # 支付宝 total_amount 是元单位字符串（如 "88.00"），其他渠道全是分。
         total_yuan = params.get("total_amount", "0")
         try:
-            amount_fen = int(round(float(total_yuan) * 100))
-        except (ValueError, TypeError) as exc:
+            amount_fen = int(Decimal(total_yuan) * 100)
+        except (InvalidOperation, ValueError, TypeError) as exc:
             raise ValueError(f"支付宝回调 total_amount 非法：{total_yuan}") from exc
 
         return CallbackPayload(

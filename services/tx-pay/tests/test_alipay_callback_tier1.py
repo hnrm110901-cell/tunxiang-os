@@ -236,3 +236,54 @@ class TestAlipayCallbackTier1:
         body = _build_signed_callback(private_pem, fields)
         with pytest.raises(ValueError, match="seller"):
             await alipay_channel.verify_callback(headers={}, body=body)
+
+    @pytest.mark.asyncio
+    async def test_seller_id_field_absent_rejected_when_configured(
+        self,
+        alipay_channel: AlipayChannel,
+        alipay_keypair: tuple[bytes, bytes],
+    ) -> None:
+        """场景（reviewer P0-A 防回归）：商户已配置 seller_id 但 notify 中字段缺失。
+        不能因字段缺失而静默豁免 — 攻击者可能用别商户合法私钥构造缺 seller_id 的 notify
+        来绕过收款方校验。
+        """
+        private_pem, _ = alipay_keypair
+        fields = _valid_fields()
+        del fields["seller_id"]
+        body = _build_signed_callback(private_pem, fields)
+        with pytest.raises(ValueError, match="seller"):
+            await alipay_channel.verify_callback(headers={}, body=body)
+
+    @pytest.mark.asyncio
+    async def test_duplicate_key_in_body_rejected(
+        self,
+        alipay_channel: AlipayChannel,
+        alipay_keypair: tuple[bytes, bytes],
+    ) -> None:
+        """场景（reviewer P1-1 防回归）：body 含重复 key（sign=X&...&sign=Y）。
+        parse_qsl 默认后者覆盖前者，可被注入噪声字段绕过签名范围 — 必须直接拒。
+        """
+        private_pem, _ = alipay_keypair
+        body = _build_signed_callback(private_pem, _valid_fields())
+        # 注入一个重复的 app_id 字段
+        tampered_body = body + b"&app_id=evil_extra"
+        with pytest.raises(ValueError, match="重复"):
+            await alipay_channel.verify_callback(headers={}, body=tampered_body)
+
+    @pytest.mark.asyncio
+    async def test_decimal_precision_at_boundary(
+        self,
+        alipay_channel: AlipayChannel,
+        alipay_keypair: tuple[bytes, bytes],
+    ) -> None:
+        """场景（reviewer P1-2 防回归）：金额在浮点边界（2.85 元 = 285 分）。
+        改用 Decimal 后边界必须精确转换为分整数。
+        """
+        private_pem, _ = alipay_keypair
+        fields = _valid_fields()
+        fields["total_amount"] = "2.85"
+        body = _build_signed_callback(private_pem, fields)
+        payload = await alipay_channel.verify_callback(headers={}, body=body)
+        assert payload.amount_fen == 285, (
+            "2.85 元必须精确转 285 分（不能因 float 精度变成 284）"
+        )
