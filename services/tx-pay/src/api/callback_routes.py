@@ -267,7 +267,6 @@ async def shouqianba_callback(request: Request) -> Response:
         payment_id=payload.payment_id,
         trade_no=payload.trade_no,
     )
-    return Response(
-        content='{"result_code": "200"}',
-        media_type="application/json",
-    )
+    # R1: 收钱吧官方规范要求成功响应为纯文本 "success"（非 JSON），
+    # 否则服务器认为通知失败会进入重试，造成 callback 风暴 + 重复处理风险
+    return Response(content="success", media_type="text/plain")
