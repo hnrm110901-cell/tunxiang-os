@@ -51,6 +51,40 @@ sys.modules.setdefault("shared.ontology", _shared_ontology)
 sys.modules.setdefault("shared.ontology.src", _shared_ontology_src)
 sys.modules.setdefault("shared.ontology.src.database", _shared_ontology_src_db)
 
+# F#5: stub shared.security 子模块（CI 单独跑本 test 时 `shared` 已被上面 stub 成
+# 空 ModuleType，下游 shared.security.src.* 找不到。补 stub 让 import 链通过）
+# - prompt_sanitizer：_build_system_prompt 调用 sanitize_for_prompt（identity stub
+#   保留 max_chars 截断行为，sanitize 逻辑由独立 test_prompt_sanitizer.py 覆盖）
+# - error_handler：brand_strategy_routes.py 调用 safe_http_exception
+_shared_security = types.ModuleType("shared.security")
+_shared_security_src = types.ModuleType("shared.security.src")
+_shared_security_src_sanitizer = types.ModuleType("shared.security.src.prompt_sanitizer")
+_shared_security_src_errors = types.ModuleType("shared.security.src.error_handler")
+
+
+def _identity_sanitize(value, max_chars: int = 500):  # type: ignore[no-untyped-def]
+    if isinstance(value, str):
+        return value[:max_chars]
+    if isinstance(value, list):
+        return [_identity_sanitize(x, max_chars) for x in value]
+    if isinstance(value, dict):
+        return {k: _identity_sanitize(v, max_chars) for k, v in value.items()}
+    return value
+
+
+def _stub_safe_http_exception(status_code, detail, exc=None):  # type: ignore[no-untyped-def]
+    from fastapi import HTTPException
+
+    return HTTPException(status_code=status_code, detail=detail)
+
+
+_shared_security_src_sanitizer.sanitize_for_prompt = _identity_sanitize  # type: ignore[attr-defined]
+_shared_security_src_errors.safe_http_exception = _stub_safe_http_exception  # type: ignore[attr-defined]
+sys.modules.setdefault("shared.security", _shared_security)
+sys.modules.setdefault("shared.security.src", _shared_security_src)
+sys.modules.setdefault("shared.security.src.prompt_sanitizer", _shared_security_src_sanitizer)
+sys.modules.setdefault("shared.security.src.error_handler", _shared_security_src_errors)
+
 # Stub structlog
 _structlog = types.ModuleType("structlog")
 _structlog.get_logger = lambda *a, **kw: MagicMock()
