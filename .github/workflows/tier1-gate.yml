@@ -149,11 +149,13 @@ jobs:
       - name: 安装依赖
         run: |
           # 核心依赖（按 service requirements 最小化）
+          # cryptography 为 Tier1 支付 verify_callback 真实依赖（RSA2 验签 / AES-GCM 解密）
           pip install --quiet \
             pytest pytest-asyncio \
             pydantic fastapi httpx \
             sqlalchemy structlog asyncpg \
-            pyyaml aiosqlite
+            pyyaml aiosqlite \
+            cryptography
 
       - name: Run ${{ matrix.group }}
         run: |
