@@ -6,7 +6,11 @@
 四类 attack vector：
 1. 中文 prompt-injection 关键词（忽略上述/系统/指令）
 2. 英文 prompt-injection 关键词（IGNORE PREVIOUS/SYSTEM PROMPT/disregard）
-3. XML 隔离绕过（</tenant_brand_data> / <system_authority> 等）
+3. XML 隔离绕过 — 含两层防护：
+   a) 6 个 fixed prompt-injection 边界标签（</tenant_brand_data> /
+      <system_authority> 等）
+   b) F#5 PR #477 round-1 P2.1：generic `<` / `>` 字符直接 strip，防止
+      未来 LLM 把未列出的 tag 名（<script> / <my_custom>）当 prompt 边界
 4. Unicode 隐藏字符（ZWSP/RLO/BOM 等）
 
 加上：
@@ -80,6 +84,13 @@ _XML_ISOLATION_PATTERNS = [
 ]
 _XML_ISOLATION_RE = re.compile("|".join(_XML_ISOLATION_PATTERNS), re.IGNORECASE)
 
+# F#5 PR #477 round-1 P2.1：剩余 generic `<` / `>` 字符
+# 6 个 fixed XML tag strip 后，仍可能有未列出的 tag 名（<script> / <my_custom>
+# 等）。它们不属于当前 prompt-injection 风险，但属于 XML well-formedness 风险
+# —— 未来 LLM 可能把它们当 tag 边界。直接 strip `<` / `>`（不替换为 HTML
+# entity）保持文本可读，同时杜绝任何 angle-bracket-based tag injection。
+_GENERIC_ANGLE_RE = re.compile(r"[<>]")
+
 
 # ---------------------------------------------------------------------------
 # 公开 API
@@ -131,8 +142,14 @@ def _sanitize_str(value: str, max_chars: int) -> str:
     1. 剥离 Unicode 隐藏字符（避免后续 regex 被绕过）
     2. 剥离控制字符（保留 \\n \\t \\r）
     3. 剥离中英文 prompt-injection 关键词整行
-    4. 剥离 XML 隔离 tag
-    5. 截断到 max_chars
+    4. 剥离 6 个 fixed XML 隔离 tag（命中专门的 prompt-injection 边界标签）
+    5. F#5 PR #477 round-1 P2.1：strip 剩余 generic `<` `>` 字符（防止未来
+       LLM 把未列出的 tag 名 — `<script>` / `<my_custom>` — 当 prompt 边界）
+    6. 截断到 max_chars
+
+    顺序注意：generic `<` `>` strip 必须在 6 个 fixed tag strip 之后，
+    否则 fixed-tag regex 会因 `<` 已被 strip 而失效；本步骤天然幂等
+    （strip 不像 entity escape 不会双重转义）。
     """
     if max_chars <= 0:
         return ""
@@ -141,4 +158,5 @@ def _sanitize_str(value: str, max_chars: int) -> str:
     cleaned = _ZH_INJECTION_RE.sub("", cleaned)
     cleaned = _EN_INJECTION_RE.sub("", cleaned)
     cleaned = _XML_ISOLATION_RE.sub("", cleaned)
+    cleaned = _GENERIC_ANGLE_RE.sub("", cleaned)
     return cleaned[:max_chars]

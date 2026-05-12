@@ -12,6 +12,34 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
+# F#5 audit P1：jsonb 嵌套字段（list[dict] / dict）的长度上限。Pydantic 拒绝
+# 在 write 路径就阻断超长 payload；read 路径仍由 sanitize_for_prompt 兜底（已
+# 落盘旧数据）。具体值与 brand_strategy_db_service._build_system_prompt 的
+# sanitize_for_prompt max_chars 参数对齐。
+_TARGET_SEGMENT_DESC_MAX = 500  # F#5 audit P1：target_segments[].description
+_TEMPLATE_HINTS_FLAT_MAX = 2000  # F#5 audit P1：template_hints 整体 flat 总长
+_CAMPAIGN_THEME_MAX = 200  # F#5 audit row 67：campaign_theme
+_MARKETING_FOCUS_MAX = 200  # F#5 audit row 67：marketing_focus
+
+
+def _flat_str_len(value: Any) -> int:
+    """递归累加 dict / list / str 中所有 str 字符总长度（含 key 和 value）
+
+    用于 jsonb 嵌套字段（如 template_hints）的"展平后总长度"上限校验。
+    """
+    if value is None:
+        return 0
+    if isinstance(value, str):
+        return len(value)
+    if isinstance(value, dict):
+        return sum(
+            (_flat_str_len(k) if isinstance(k, str) else 0) + _flat_str_len(v)
+            for k, v in value.items()
+        )
+    if isinstance(value, list):
+        return sum(_flat_str_len(item) for item in value)
+    return 0
+
 # ---------------------------------------------------------------------------
 # 嵌套结构体（JSONB 字段的类型声明，用于文档/验证）
 # ---------------------------------------------------------------------------
@@ -78,6 +106,20 @@ class BrandProfileCreate(BaseModel):
             raise ValueError(f"price_tier 必须是 {allowed} 之一，收到: {v!r}")
         return v
 
+    @field_validator("target_segments")
+    @classmethod
+    def validate_target_segments_description(
+        cls, v: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        """F#5 audit P1：每条 segment 的 description 字段 ≤500 字符"""
+        for item in v:
+            desc = item.get("description")
+            if isinstance(desc, str) and len(desc) > _TARGET_SEGMENT_DESC_MAX:
+                raise ValueError(
+                    f"target_segments[].description 长度 {len(desc)} 超出上限 {_TARGET_SEGMENT_DESC_MAX}"
+                )
+        return v
+
 
 class BrandProfileUpdate(BaseModel):
     brand_name: Optional[str] = Field(default=None, max_length=100)
@@ -101,6 +143,22 @@ class BrandProfileUpdate(BaseModel):
         allowed = {"budget", "mid", "upscale", "luxury"}
         if v not in allowed:
             raise ValueError(f"price_tier 必须是 {allowed} 之一，收到: {v!r}")
+        return v
+
+    @field_validator("target_segments")
+    @classmethod
+    def validate_target_segments_description(
+        cls, v: Optional[list[dict[str, Any]]]
+    ) -> Optional[list[dict[str, Any]]]:
+        """F#5 audit P1：每条 segment 的 description 字段 ≤500 字符"""
+        if v is None:
+            return v
+        for item in v:
+            desc = item.get("description")
+            if isinstance(desc, str) and len(desc) > _TARGET_SEGMENT_DESC_MAX:
+                raise ValueError(
+                    f"target_segments[].description 长度 {len(desc)} 超出上限 {_TARGET_SEGMENT_DESC_MAX}"
+                )
         return v
 
 
@@ -136,11 +194,17 @@ class BrandSeasonalCalendarCreate(BaseModel):
     period_name: str = Field(..., max_length=100, description="节点名称，如「春节」")
     start_date: date = Field(..., description="开始日期")
     end_date: date = Field(..., description="结束日期")
-    campaign_theme: Optional[str] = Field(default=None, description="营销主题")
+    # F#5 audit row 67 length cap
+    campaign_theme: Optional[str] = Field(
+        default=None, max_length=_CAMPAIGN_THEME_MAX, description="营销主题"
+    )
     recommended_dishes: list[dict[str, Any]] = Field(
         default_factory=list, description="推荐菜品：[{dish_name, reason, discount_pct}]"
     )
-    marketing_focus: Optional[str] = Field(default=None, description="主推内容方向")
+    # F#5 audit row 67 length cap
+    marketing_focus: Optional[str] = Field(
+        default=None, max_length=_MARKETING_FOCUS_MAX, description="主推内容方向"
+    )
     target_segments: list[dict[str, Any]] = Field(
         default_factory=list, description="本次活动目标人群：[{segment_name, priority}]"
     )
@@ -167,9 +231,11 @@ class BrandSeasonalCalendarUpdate(BaseModel):
     period_name: Optional[str] = Field(default=None, max_length=100)
     start_date: Optional[date] = None
     end_date: Optional[date] = None
-    campaign_theme: Optional[str] = None
+    # F#5 audit row 67 length cap
+    campaign_theme: Optional[str] = Field(default=None, max_length=_CAMPAIGN_THEME_MAX)
     recommended_dishes: Optional[list[dict[str, Any]]] = None
-    marketing_focus: Optional[str] = None
+    # F#5 audit row 67 length cap
+    marketing_focus: Optional[str] = Field(default=None, max_length=_MARKETING_FOCUS_MAX)
     target_segments: Optional[list[dict[str, Any]]] = None
 
 
@@ -222,6 +288,16 @@ class BrandContentConstraintsCreate(BaseModel):
             raise ValueError(f"channel 必须是 {allowed} 之一，收到: {v!r}")
         return v
 
+    @field_validator("template_hints")
+    @classmethod
+    def validate_template_hints_flat_length(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """F#5 audit P1：template_hints flatten 后总长度 ≤2000 字符"""
+        if _flat_str_len(v) > _TEMPLATE_HINTS_FLAT_MAX:
+            raise ValueError(
+                f"template_hints flat 总长度超出上限 {_TEMPLATE_HINTS_FLAT_MAX}"
+            )
+        return v
+
 
 class BrandContentConstraintsUpdate(BaseModel):
     constraint_type: Optional[str] = None
@@ -230,6 +306,20 @@ class BrandContentConstraintsUpdate(BaseModel):
     required_elements: Optional[list[Any]] = None
     forbidden_elements: Optional[list[Any]] = None
     template_hints: Optional[dict[str, Any]] = None
+
+    @field_validator("template_hints")
+    @classmethod
+    def validate_template_hints_flat_length(
+        cls, v: Optional[dict[str, Any]]
+    ) -> Optional[dict[str, Any]]:
+        """F#5 audit P1：template_hints flatten 后总长度 ≤2000 字符"""
+        if v is None:
+            return v
+        if _flat_str_len(v) > _TEMPLATE_HINTS_FLAT_MAX:
+            raise ValueError(
+                f"template_hints flat 总长度超出上限 {_TEMPLATE_HINTS_FLAT_MAX}"
+            )
+        return v
 
 
 class BrandContentConstraintsResponse(BaseModel):
