@@ -32,8 +32,8 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/limit-rpm: "{{ .Values.ingress.rateLimit.authPathRpm }}"
     nginx.ingress.kubernetes.io/limit-burst-multiplier: "{{ .Values.ingress.rateLimit.authBurstMultiplier }}"
-    nginx.ingress.kubernetes.io/limit-connections: "10"
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/limit-connections: "{{ .Values.ingress.rateLimit.authConnections }}"
+    nginx.ingress.kubernetes.io/proxy-body-size: "{{ .Values.ingress.rateLimit.authProxyBodySize }}"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
     {{- if .Values.ingress.tls }}

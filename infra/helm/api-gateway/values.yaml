@@ -28,6 +28,9 @@ ingress:
     # multiplier=0 在 controller 接受但 burst=0 会让所有非匀速请求 429，过严不取
     # 默认 multiplier=5（=> burst=50 r/m，等价 bare-metal × 10，过松）→ 此处显式覆盖为 1
     authBurstMultiplier: 1
+    authConnections: 10        # 同时并发连接上限（per IP），防 long-poll 堆积
+    # auth path 实际 body 一般 < 1KB（user+password+captcha+token），收紧 10m → 64k 减 DoS 慢攻击面
+    authProxyBodySize: "64k"
   # ingress-nginx 限流默认按 $binary_remote_addr（直连 socket peer）计数。
   # 云 LB（腾讯云 CLB / 阿里云 SLB / AWS NLB 等）部署时，所有 client 共享 LB 源 NAT IP →
   # limit-rpm 全租户聚合误伤 + 攻击者控连接源路由获 N× 桶。
