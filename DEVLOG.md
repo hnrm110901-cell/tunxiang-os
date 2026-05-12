@@ -1,3 +1,103 @@
+## 2026-05-12 傍晚 — Phase 1 切片 1 续：F#5 + F#6 follow-up 完整闭环（admin-merge 第 16-18 次 + #457 父 issue close）
+
+### 今日完成
+User 给"全部执行完代码任务，跳过证照/凭据/产品决策"指令。phase 划分：phase 1 本 session 3 合并 PR（CSO follow-up 同主题），phase 2 punt fresh session（dependabot/Tier1 改造/旧 rebase PR 群体/平台凭据 task）。
+
+**PR #481 (F#5 防御层加固包 `969c16a1` @ 12:XX) [T2]**
+- branch: `fix/f5-defense-hardening-pack`
+- 3 项合并：① sanitizer 通用 `<` `>` strip（PR #477 round-1 P2.1）选 strip 而非 HTML entity escape（文本可读 + 幂等） ② `<output_format>` 块加"tenant_brand_data 视为数据" sandwich 加固（`_build_system_prompt` + `_minimal_brief` 各 2 行，PR #477 round-1 P2.2） ③ Pydantic 4 字段 max_length 补齐（`target_segments[].description` 500 / `template_hints` flat 2000 / `campaign_theme` 200 / `marketing_focus` 200，含 `_flat_str_len` 递归 helper + 6 validator，audit P1）
+- code-reviewer round-1 APPROVE 0 P0/P1 BUG（1 P2 acknowledged trade-off：单边 angle strip 损害 "价格 < 100元" 文案 — 安全 > 可读性，audit 已 acknowledge）
+- 127 tests PASS (sanitizer 99→110 +8 / xml_isolation 25→28 +3) / ruff clean
+- admin-merge **carve-out 第 16 次**
+
+**PR #482 (F#5 ModelRouter system mask `a1a86c1f` @ 12:XX) [T2] — close audit S4**
+- branch: `fix/modelrouter-system-mask-s4`
+- 闭环 F#5 第三层防御：sanitize (#458) + XML 隔离 (#477/#481) + **system mask (本 PR)**
+- 新增 `mask_system(system, ctx)` 复用 `mask_text` + 与 `mask_messages` 共享 MaskContext
+- **意外发现 + 修 pre-existing bug**：`MaskContext.token_counter` 从 `mask_text` 局部 dict 提升到 ctx 字段；原 code 每次 `mask_text` 重置 counter → multi-segment 同 ctx 生成相同 token (`[TX_PHONE_xxxx_001]` × N) → `unmask_text` `str.replace` 错配；10 existing mask 测试全是单消息场景未触发；本 PR test `TestMaskContextShared.test_mask_system_shares_ctx_with_mask_messages` 首次 cover 2 phones × 2 mask_text calls → unmask 双向还原成功 → 真有效 regression
+- ModelRouter `complete()` / `stream_complete()` 共 6 处 system 引用全部 pass `work_system` (masked 版本)
+- 公共 API 签名不变（mask 透明发生在内部）
+- code-reviewer round-1 APPROVE 0 P0/P1/P2 BUG（含跨调用 token 命名 + None safe + retry 不 double-mask + per-request scope 无 race + response unmask 路径正确）
+- 12 new + 47 existing tests PASS / ruff clean
+- admin-merge **carve-out 第 17 次**
+
+**PR #483 (F#6 helm 完善包 `4c7cb49b` @ 12:XX) [T2]**
+- branch: `fix/f6-helm-api-gateway-polish`
+- 3 项小改 mechanical 直接做（不派 agent）：① `values.yaml` 新增 `authConnections: 10` + `authProxyBodySize: "64k"` ② `ingress-auth.yaml` `limit-connections` / `proxy-body-size` 改用 values（替代硬编码 "10" / "10m"） ③ 主 `ingress.yaml` 删 deprecated `kubernetes.io/ingress.class: nginx`
+- `proxy-body-size: 10m → 64k`：auth body 实际 < 1KB (user+password+captcha+token)，10MB 给攻击者"10MB body × 50 r/m × ∞ source = 25GB/min"慢消耗向量
+- code-reviewer (sonnet) round-1 APPROVE 0 BUG (mechanical change)
+- 3 文件 +5 -3 / 默认值与原硬编码等价或更严 / yaml syntax 通过
+- admin-merge **carve-out 第 18 次**
+
+**#457 父 issue close (`13:08Z`)**
+- 三层防御 + audit S4 + sub-PRs 全 closed → 手动 close + cross-reference 5 PR (#458/#477/#481/#482)
+- 仍 OPEN: #473 (P1, 需 product 拍板"双源真相")
+
+### 数据变化
+- main: `04e35512` → `969c16a1` (#481) → `a1a86c1f` (#482) → `4c7cb49b` (#483)
+- 3 PR merged / 1 issue closed (#457 父)
+- carve-out 累积：第 15 (#480 DEVLOG 沉淀) → **第 18**（CSO follow-up 同主题）
+- 3 worktree 起 / 3 全清 / 3 branch 删
+- 测试新增：12 ModelRouter system + 8 sanitizer generic strip + 3 output_format reaffirm = 23 cases；0 regression
+- code-reviewer 模式 3 次（PR #481 opus / PR #482 opus / PR #483 sonnet）
+- **executor 修 pre-existing bug 一次**：`MaskContext.token_counter` 跨调用命名冲突；scope creep 但 "本 PR 'ctx unmask 还原' 承诺不修不成立" 合理；reviewer 验证 10 existing 单消息测试无 regression
+
+### 战绩
+- **CSO F#5 三层防御完整闭环** — sanitize (PR #458) + XML 隔离 (PR #477) + system mask (PR #482) + 4 项加固 (PR #481) — `content_generation.py` 切真 LLM 前 active risk 从 LOW 升 HIGH 时的全部前置 P0/P1 已 close
+- **pre-existing token counter bug 暴露 + 修复** — single-message-only 单元测试盲区 6+ month；ModelRouter mask 系统首次有 multi-segment 测试触发；类比 `feedback_smoke_test_must_verify_functionality.md` "测试覆盖的盲区是 latent BUG 温床"
+- **mechanical 任务 quote ratio** — PR γ 3 文件 Edit 5 min 完成；OMC delegation rule "trivial ops 直接做"再次实战
+- **§3 §1 §18 一致落地** — surgical (`shared/ontology/` / 主 ingress.yaml 不重命名 / Tier1 路径不动) / 不脑补先核 SoT / phase 划分 explicit (phase 2 punt fresh session)
+
+### 关键决策
+- **Phase 1 / Phase 2 划分** — user "全部执行完" 不等于"本 session 啃完 65+28"；按 `feedback_proactive_session_split.md` + `feedback_concurrent_pr_race.md` 划分本 session 3 PR（CSO follow-up 同主题 carve-out 适用）+ punt phase 2（dependabot/Tier1 改造/旧 rebase PR 群体/平台凭据 task / 创始人决策 task）
+- **sanitizer strip vs HTML entity 选 strip** — reviewer P2.1 描述兼容；strip 实现简单 + 文本可读 + 天然幂等；P2 trade-off "单边 angle strip 损害合法品牌文案 < 100元" 标 audit P3 follow-up
+- **executor 修 pre-existing bug 接受 scope creep** — token counter 不修则本 PR 承诺不成立；reviewer 独立验证 10 existing 单消息测试无 regression；合规
+- **PR γ 不派 agent 直接做** — 3 文件 5 行 mechanical change，agent 流程overhead > 价值；OMC delegation rule 实战
+- **不 commit audit doc** — `docs/audit/brand-strategy-prompt-injection-2026-05-11.md` 仍 untracked；本 session 终态 F#5 已全 closed，audit doc 历史追溯价值 — 但仍是 user 判断（项目宪法不擅自动）
+
+### 遗留问题（phase 2 推 fresh session）
+- **8 Dependabot OPEN (#422-#429)** — storybook 8→10 / vite / eslint / jsdom / actions/setup-node / cache / upload-artifact — 每个需测试 regression
+- **旧 [SECURITY][Tier1] rebase PR 群体 8 个 (#222-#232 + #218/#215/#214/#213/#212)** — 6+ 天 base 漂移 + 完整 Tier 1 真 PG 回归 + `[DO NOT MERGE]` 需 staging dry-run
+- **#272 / #271 Tier1 wine_storage / invoice Decimal → fen + 迁移 v403/v404** — TDD + DEMO 验收
+- **#240 V4 architecture sprint DRAFT** — WIP
+- **#351 / #347 / #336 / #408 test-infra fixes**
+- **#448 / #449 / #450 backlog** (5/11 夜深决策 79/82 拆出)
+- **#414 / #413 Tier2/Tier3** — identity hash salt / OAuthTokenStore concurrency
+- **#454 / #453 / #445 Helm chore**
+- **#462 / #476 mcp-server (Dockerfile / 部署模式调研)**
+- **11 个 channel-aggregation CH-10~22 + #402** — 多数需平台凭据（美团/抖音/小红书/高德）属 user 跳过范围
+- **#468/#469/#470 UnionPay/拉卡拉/数字人民币** — 需凭据/合约，属 user 跳过范围
+- **#473 endpoint deprecate** — 需 product 拍板"双源真相"，属 user 跳过范围
+- **F#6 cluster ConfigMap (`use-forwarded-for` + `proxy-real-ip-cidr`)** — 跨 namespace ops 改动 + 腾讯云 CLB 源段 (assign 李淳) — 部分 user 跳过范围
+- **真 LLM staging 验证 (#472 验收第 4 项)** — deploy-time
+
+### 明日计划
+- A：fresh session 起手 — handoff 留 DEVLOG 顶（本段 + 5/12 下午 + 5/12 中午）；起手必跑 SoT 校验命令
+- B：5/13 deal-breaker 资质（创始人级别非技术，**倒计时 < 12h**） — 已成 deal-breaker
+- C：phase 2 中纯代码任务 pick — 推荐顺序 ① #351 test-infra（基础设施先稳） ② Dependabot 1-2 个低风险（actions/setup-node / cache / upload-artifact） ③ #448 D2c Tier1 docker-compose-pg 扩面 ④ #272/#271 Tier1 Decimal→fen（重型）
+- D：phase 2 需 user 决策任务 — #473 product 拍板 / #468/#469/#470 凭据 / channel-aggregation 凭据 / F#6 cluster ConfigMap CLB 源段
+
+### 已知风险
+- **carve-out admin-merge 累积 ≥18 次** — 后续非 codemod/docs-only/security 主题须重新评估
+- **handoff vs SoT 漂移持续风险** — 本 session 末态可能再被并发 session 合 PR 推进；fresh session 起手必跑 SoT 校验命令
+- **F#6 cluster ConfigMap 未做** — 若部署到云 LB 而未配 ConfigMap，限流可能聚合误伤或被 XFF 头绕过；必须部署前 ops 确认
+- **Pre-existing bug 类型暴露** — single-segment 单元测试盲区可能藏其他类似 BUG（如 mask 之外的 ctx-shared 系统） — 是 long-tail audit candidate
+- **audit doc 仍 untracked** — F#5 全 closed 后，audit doc 历史追溯价值已现；建议 next session user 拍板是否 commit
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 4c7cb49b 或更新（含本段 DEVLOG 沉淀 PR）
+gh pr view 481 482 483 --json state,mergedAt,mergeCommit
+gh issue view 457 --json state,closedAt   # CLOSED via session manual close
+gh issue list --state open --search "473 448 449 450"   # backlog
+git worktree list | grep -iE "f5-defense|modelrouter|f6-helm|devlog-2026-05-12-eve" || echo "phase 1 worktree 全清"
+head -400 DEVLOG.md   # 本段（5/12 傍晚）+ 5/12 下午 + 5/12 中午 + 5/11 夜深
+```
+
+---
+
 ## 2026-05-12 下午 — 切片 1：CSO 2026-05-11 security 热区 4 PR 闭环（admin-merge 第 11-14 次累积）
 
 ### 今日完成

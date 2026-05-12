@@ -1,3 +1,35 @@
+## 2026-05-12 13:00Z · Phase 1：F#5 + F#6 follow-up 完整闭环（傍晚 session）
+
+### 完成状态
+- [x] **PR #481 (F#5 防御层加固包 `969c16a1`)** [T2] — sanitizer generic strip + output_format reaffirm + Pydantic 4 字段 → round-1 APPROVE 0 BUG (1 P2 acknowledged) → admin-merge 第 16 次
+- [x] **PR #482 (F#5 ModelRouter system mask `a1a86c1f`)** [T2] — close audit S4，新增 mask_system + 修 pre-existing token counter bug → 12+47 PASS → round-1 APPROVE 0 BUG → admin-merge 第 17 次
+- [x] **PR #483 (F#6 helm 完善包 `4c7cb49b`)** [T2] — limit-connections / proxy-body-size values 化 + 主 ingress deprecated annotation 清理 (mechanical, sonnet review) → APPROVE 0 BUG → admin-merge 第 18 次
+- [x] **#457 父 issue close** (`13:08Z`) — F#5 三层防御 + audit S4 + 4 项加固全 closed，cross-reference 5 PR
+- [x] **DEVLOG.md + docs/progress.md 沉淀**（本段）
+- [ ] **DEVLOG 沉淀 PR (第 4 PR phase 1)** — 本段后开 branch / push
+
+### 关键决策
+- **Phase 1 / Phase 2 显式划分** — user "全部执行完代码任务" 不等于"本 session 啃完 65+28 OPEN"；phase 1 本 session 3 PR CSO follow-up 同主题（carve-out 适用），phase 2 punt fresh session (dependabot/Tier1 改造/旧 rebase PR/平台凭据/创始人决策)
+- **sanitizer strip vs HTML entity 选 strip** — 文本可读 + 幂等 + reviewer P2.1 兼容；P2 单边 angle 损害合法品牌文案 "价格 < 100元" 标 audit P3 follow-up
+- **executor 接受 scope creep 修 pre-existing bug** — `MaskContext.token_counter` 跨调用命名冲突；不修则本 PR 'ctx unmask 还原' 承诺不成立；reviewer 独立验证 10 existing 单消息无 regression
+- **PR γ 不派 agent 直接做** — 3 文件 5 行 mechanical；OMC delegation rule "trivial ops 直接做"实战
+- **不擅自 commit audit doc / CLAUDE.md §8** — 项目宪法 + audit history 留 user 决策
+
+### 下一步
+- A：fresh session 起手 — handoff 留 DEVLOG 顶（本段 + 5/12 下午 + 5/12 中午）；起手必跑 SoT 校验
+- B：5/13 deal-breaker 资质（创始人级别非技术，倒计时 < 12h）
+- C：phase 2 纯代码 pick — ① #351 test-infra ② Dependabot 1-2 低风险 ③ #448 D2c Tier1 docker-compose-pg 扩面 ④ #272/#271 Tier1 Decimal→fen（重型）
+- D：phase 2 需 user 决策 — #473 product / #468/#469/#470 凭据 / channel-aggregation 凭据 / F#6 cluster ConfigMap CLB 源段
+
+### 已知风险
+- **carve-out admin-merge 累积 ≥18 次** — 后续非 codemod/docs-only/security 主题须重评
+- **handoff vs SoT 漂移持续风险** — fresh session 起手必跑 SoT 校验
+- **F#6 cluster ConfigMap 未做** — 部署到云 LB 必须前置 ops 配 `use-forwarded-for` + `proxy-real-ip-cidr`，否则限流聚合误伤或 XFF 绕过
+- **Pre-existing bug 类型暴露** — single-segment 测试盲区可能藏其他类似 BUG (long-tail audit candidate)
+- **audit doc 仍 untracked** — F#5 全 closed 后历史追溯价值已现，建议 next session user 拍板
+
+---
+
 ## 2026-05-12 12:00Z · 切片 1：CSO 2026-05-11 security 热区 4 PR 闭环（下午 session）
 
 ### 完成状态
