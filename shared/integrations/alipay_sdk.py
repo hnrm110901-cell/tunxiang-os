@@ -75,9 +75,13 @@ class AlipayService:
     """
 
     def __init__(self) -> None:
-        self._mock_mode = not _is_configured()
+        # Cross-fix PR #461 reviewer P0: _mock_mode 不固化在实例属性，每次
+        # 调用 _is_mock_mode() 重读 env，防止 K8s init container 竞态导致
+        # 单例固化 mock 模式后静默绕过验签。
+        # _public_key 仍需在 init 时加载（PEM IO 操作），但若启动时未配置，
+        # _is_mock_mode() 在 verify_callback 入口仍会拦下避免走真实验签路径。
         self._public_key: Any = None
-        if self._mock_mode:
+        if not _is_configured():
             if _is_production_env() and not _mock_explicitly_allowed():
                 raise RuntimeError(
                     "生产环境禁止支付宝 Mock：请配置 ALIPAY_APP_ID / ALIPAY_PUBLIC_KEY_PATH；"
@@ -88,6 +92,10 @@ class AlipayService:
             )
         else:
             self._public_key = _load_public_key(_public_key_path())
+
+    def _is_mock_mode(self) -> bool:
+        """P0 cross-fix: 每次重读 env，避免单例快照与热更新矛盾。"""
+        return not _is_configured()
 
     # ─── 验证异步通知（notify）签名 ───
 
@@ -103,8 +111,12 @@ class AlipayService:
           6. 业务校验 app_id（必）；若配置了 _seller_id() 则 seller_id 必须存在且匹配
              （reviewer P0-A：禁止字段缺失时静默豁免）
         """
-        if self._mock_mode:
+        if self._is_mock_mode():
             return self._mock_callback_response(body)
+
+        # 若 init 时未加载公钥但运行时 env 已注入，懒加载
+        if self._public_key is None:
+            self._public_key = _load_public_key(_public_key_path())
 
         from cryptography.exceptions import InvalidSignature
         from cryptography.hazmat.primitives import hashes

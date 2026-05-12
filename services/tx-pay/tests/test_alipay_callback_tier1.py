@@ -271,6 +271,40 @@ class TestAlipayCallbackTier1:
             await alipay_channel.verify_callback(headers={}, body=tampered_body)
 
     @pytest.mark.asyncio
+    async def test_mock_mode_disengages_after_env_configured(
+        self,
+        monkeypatch,
+        tmp_path,
+        alipay_keypair: tuple[bytes, bytes],
+    ) -> None:
+        """场景（cross-fix PR #461 reviewer P0 防回归）：启动时 env 未配置 →
+        service 进入 mock；运行时 K8s/docker 注入 env 完成 → 后续 callback 必须
+        走真实验签，不能因 _mock_mode 单例固化而继续放行 mock 假数据。
+        """
+        from shared.integrations.alipay_sdk import AlipayService
+
+        # 启动：未配置（mock 模式）
+        monkeypatch.delenv("ALIPAY_APP_ID", raising=False)
+        monkeypatch.delenv("ALIPAY_PUBLIC_KEY_PATH", raising=False)
+        service = AlipayService()
+        assert service._is_mock_mode() is True
+
+        # 运行时注入 env（模拟 sidecar 异步配置完成）
+        _, public_pem = alipay_keypair
+        pub_path = tmp_path / "alipay_public_key_runtime.pem"
+        pub_path.write_bytes(public_pem)
+        monkeypatch.setenv("ALIPAY_APP_ID", "2021000000000001")
+        monkeypatch.setenv("ALIPAY_PUBLIC_KEY_PATH", str(pub_path))
+        assert service._is_mock_mode() is False, (
+            "env 注入后 _is_mock_mode() 必须返回 False，不能因单例快照继续 mock"
+        )
+
+        # 注入后必须真实验签：错误签名抛 ValueError 而不是 mock 假数据
+        body = b"app_id=2021000000000001&out_trade_no=X&trade_status=TRADE_SUCCESS"
+        with pytest.raises(ValueError, match="缺少签名|sign"):
+            await service.verify_callback({}, body)
+
+    @pytest.mark.asyncio
     async def test_decimal_precision_at_boundary(
         self,
         alipay_channel: AlipayChannel,
