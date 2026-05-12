@@ -21,7 +21,9 @@ spec:
       annotations:
         # 配置变更时自动触发Pod滚动更新
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
-        {{- toYaml .Values.podAnnotations | nindent 8 }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
       {{- if .Values.podAntiAffinity.enabled }}
       affinity:
