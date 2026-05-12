@@ -16,6 +16,12 @@ Exports:
   INTEGRATION_PG_DSN   — env var 值（已 strip whitespace），None 当未配置
   requires_integration_pg — pytest.mark.skipif 装饰器（统一 reason 文案）
   set_tenant_guc(session, tenant_id) — 在 session 上设事务级 app.tenant_id GUC
+
+扩面调研结论（2026-05-12 issue #449 closed）:
+  调研 6 个 `*_rls_*_tier1.py` 候选 + 4 个真 INTEGRATION_PG_DSN consumer 全集，
+  结论：**0 in-place 残留**。所有真 PG consumer 已统一使用本模块。新加 *_tier1.py
+  真 PG 反测直接 `from shared.test_utils.integration_pg import …` 即可。
+  详 docs/integration-pg-fixture-audit-2026-05-12.md。
 """
 from __future__ import annotations
 
