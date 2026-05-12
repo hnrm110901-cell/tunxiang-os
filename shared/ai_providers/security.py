@@ -52,12 +52,18 @@ class MaskToken:
 
 @dataclass
 class MaskContext:
-    """脱敏上下文：保存单次请求的所有脱敏映射，用于响应还原。"""
+    """脱敏上下文：保存单次请求的所有脱敏映射，用于响应还原。
+
+    ``token_counter`` 跨多次 ``mask_text`` 调用累计，保证同一 ``ctx`` 内
+    多段文本（messages + system）生成的脱敏 token 不冲突，``unmask_text`` 可
+    正确还原。修复 CSO F#5 S4 副发现暴露的跨 mask_text 调用 token 命名冲突。
+    """
 
     request_id: str
     tokens: list[MaskToken] = field(default_factory=list)
     sensitivity_level: DataSensitivity = DataSensitivity.PUBLIC
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    token_counter: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         # 确保 request_id 至少 4 字符，用于生成唯一脱敏 token
@@ -148,7 +154,9 @@ class DataSecurityGateway:
             脱敏后的文本
         """
         masked = text
-        counter: dict[str, int] = {}
+        # counter 持久化到 ctx，保证同一上下文内多次 mask_text 调用（如 messages
+        # 多条 + system 字段）token 编号连续且唯一，unmask_text 才能正确还原。
+        counter = ctx.token_counter
 
         all_patterns = self.MASK_PATTERNS + self._custom_rules
 
@@ -223,6 +231,26 @@ class DataSecurityGateway:
         )
 
         return masked_messages, ctx
+
+    def mask_system(self, system: Optional[str], ctx: MaskContext) -> Optional[str]:
+        """对 LLM ``system`` 字段执行脱敏，复用 ``mask_messages`` 产生的上下文。
+
+        闭环 CSO 2026-05-11 F#5 audit S4 副发现：``mask_messages`` 仅覆盖 ``messages``
+        数组，``system`` 字段过去直接 pipe 给 adapter。当 brand_strategy / 其他模块把
+        租户输入拼进 system_prompt 时（已由 sanitize + XML 隔离做前置防御），若仍漏过
+        敏感字段（手机号 / 身份证 / 大额 / 地址），此方法保证 Provider 看到的是
+        脱敏 token，且与 messages 共享同一 ``ctx``，``unmask_text`` 可统一还原。
+
+        Args:
+            system: 原始 system_prompt（可为 None）。
+            ctx:    脱敏上下文（来自 ``mask_messages``；会被追加令牌，敏感级别自动升级）。
+
+        Returns:
+            脱敏后的 system_prompt；``system is None`` 时透传 None。
+        """
+        if system is None:
+            return None
+        return self.mask_text(system, ctx)
 
     # ── 核心：还原 ──────────────────────────────────────────────────────────
 
