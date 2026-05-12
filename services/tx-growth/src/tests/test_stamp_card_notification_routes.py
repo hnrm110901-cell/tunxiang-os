@@ -69,10 +69,10 @@ sys.modules["structlog"] = _fake_structlog
 # Load routes
 # ---------------------------------------------------------------------------
 
-from api.notification_routes import get_db as notif_get_db
-from api.notification_routes import router as notif_router
-from api.stamp_card_routes import get_db as stamp_get_db
-from api.stamp_card_routes import router as stamp_router
+from services.tx_growth.src.api.notification_routes import get_db as notif_get_db
+from services.tx_growth.src.api.notification_routes import router as notif_router
+from services.tx_growth.src.api.stamp_card_routes import get_db as stamp_get_db
+from services.tx_growth.src.api.stamp_card_routes import router as stamp_router
 
 stamp_app = FastAPI()
 stamp_app.include_router(stamp_router)

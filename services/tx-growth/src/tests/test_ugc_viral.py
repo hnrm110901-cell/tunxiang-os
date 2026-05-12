@@ -84,9 +84,9 @@ _httpx_mod.HTTPStatusError = type(
 )
 sys.modules.setdefault("httpx", _httpx_mod)
 
-from services.photo_reviewer import PhotoReviewer, PhotoReviewError
-from services.ugc_service import POINTS_APPROVED, POINTS_FEATURED, UGCError, UGCService
-from services.viral_tracker import ViralTracker, ViralTrackerError
+from services.tx_growth.src.services.photo_reviewer import PhotoReviewer, PhotoReviewError
+from services.tx_growth.src.services.ugc_service import POINTS_APPROVED, POINTS_FEATURED, UGCError, UGCService
+from services.tx_growth.src.services.viral_tracker import ViralTracker, ViralTrackerError
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -648,7 +648,7 @@ _viral_mod.ViralTracker = MagicMock(return_value=MagicMock())
 _viral_mod.ViralTrackerError = ViralTrackerError
 sys.modules["services.tx_growth.src.services.viral_tracker"] = _viral_mod
 
-from api.ugc_routes import _ugc_svc, _viral_tracker, router  # noqa: E402
+from services.tx_growth.src.api.ugc_routes import _ugc_svc, _viral_tracker, router  # noqa: E402
 from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 

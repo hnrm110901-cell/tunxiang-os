@@ -119,8 +119,8 @@ _fastapi.Query = MagicMock(side_effect=lambda *a, **kw: None)
 sys.modules.setdefault("fastapi", _fastapi)
 
 # Import after stubs
-from services.content_factory import CHANNEL_REQUIREMENTS, ContentFactory
-from services.poster_generator import PosterGenerator
+from services.tx_growth.src.services.content_factory import CHANNEL_REQUIREMENTS, ContentFactory
+from services.tx_growth.src.services.poster_generator import PosterGenerator
 
 # ChannelEngine stub for publisher
 _channel_engine_mock = MagicMock()
@@ -471,7 +471,7 @@ class TestContentPublisher:
         """12. tick 查找到期内容并逐个发布"""
         # Import with channel_engine stubbed
         with patch.dict(sys.modules, {}):
-            from workers.content_publisher import ContentPublisher
+            from services.tx_growth.src.workers.content_publisher import ContentPublisher
 
         publisher = ContentPublisher()
         db = _make_db()
@@ -494,7 +494,7 @@ class TestContentPublisher:
     @pytest.mark.asyncio
     async def test_publish_single_success(self):
         """13. publish_single 成功 → status=published"""
-        from workers.content_publisher import ContentPublisher
+        from services.tx_growth.src.workers.content_publisher import ContentPublisher
 
         publisher = ContentPublisher()
         db = _make_db()
@@ -515,7 +515,7 @@ class TestContentPublisher:
             AsyncMock(return_value=None)(),  # update published
         ]
 
-        with patch("workers.content_publisher._channel_engine") as mock_ce:
+        with patch("services.tx_growth.src.workers.content_publisher._channel_engine") as mock_ce:
             mock_ce.send_message = AsyncMock(return_value={"message_id": "m1"})
             result = await publisher.publish_single(TID, CONTENT_ID, db)
 
@@ -524,7 +524,7 @@ class TestContentPublisher:
     @pytest.mark.asyncio
     async def test_publish_single_not_found(self):
         """14. publish_single 内容不存在 → failed"""
-        from workers.content_publisher import ContentPublisher
+        from services.tx_growth.src.workers.content_publisher import ContentPublisher
 
         publisher = ContentPublisher()
         db = _make_db()
@@ -553,7 +553,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_list_content(self):
         """15. GET / → 200 + items列表"""
-        from api.content_calendar_routes import list_content
+        from services.tx_growth.src.api.content_calendar_routes import list_content
 
         db = _make_db()
         count_result = MagicMock()
@@ -611,7 +611,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_create_content(self):
         """16. POST / → 200 + 创建成功"""
-        from api.content_calendar_routes import CreateContentRequest, create_content
+        from services.tx_growth.src.api.content_calendar_routes import CreateContentRequest, create_content
 
         db = _make_db()
         now = datetime(2026, 4, 25, tzinfo=timezone.utc)
@@ -639,7 +639,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_update_content(self):
         """17. PUT /{id} → 200 + 更新成功"""
-        from api.content_calendar_routes import UpdateContentRequest, update_content
+        from services.tx_growth.src.api.content_calendar_routes import UpdateContentRequest, update_content
 
         db = _make_db()
         now = datetime(2026, 4, 25, tzinfo=timezone.utc)
@@ -664,7 +664,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_delete_content(self):
         """18. DELETE /{id} → 200 + 软删除"""
-        from api.content_calendar_routes import delete_content
+        from services.tx_growth.src.api.content_calendar_routes import delete_content
 
         db = _make_db()
         delete_row = _make_row({"id": uuid.UUID(CONTENT_ID)})
@@ -680,7 +680,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_auto_generate_auto_mode(self):
         """19. POST /auto-generate (auto) → 200"""
-        from api.content_calendar_routes import AutoGenerateRequest, auto_generate_content
+        from services.tx_growth.src.api.content_calendar_routes import AutoGenerateRequest, auto_generate_content
 
         db = _make_db()
 
@@ -707,7 +707,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_auto_generate_weekly_plan(self):
         """20. POST /auto-generate (weekly_plan) → 200"""
-        from api.content_calendar_routes import AutoGenerateRequest, auto_generate_content
+        from services.tx_growth.src.api.content_calendar_routes import AutoGenerateRequest, auto_generate_content
 
         db = _make_db()
 
@@ -725,7 +725,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_schedule_content_route(self):
         """21. POST /{id}/schedule → 200"""
-        from api.content_calendar_routes import ScheduleRequest, schedule_content
+        from services.tx_growth.src.api.content_calendar_routes import ScheduleRequest, schedule_content
 
         db = _make_db()
 
@@ -746,7 +746,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_publish_content_route(self):
         """22. POST /{id}/publish → 200"""
-        from api.content_calendar_routes import publish_content
+        from services.tx_growth.src.api.content_calendar_routes import publish_content
 
         db = _make_db()
 
@@ -766,7 +766,7 @@ class TestContentCalendarRoutes:
     @pytest.mark.asyncio
     async def test_calendar_view(self):
         """23. GET /calendar-view → 200 + 按日期分组"""
-        from api.content_calendar_routes import calendar_view
+        from services.tx_growth.src.api.content_calendar_routes import calendar_view
 
         db = _make_db()
         now = datetime(2026, 4, 25, 10, 0, tzinfo=timezone.utc)

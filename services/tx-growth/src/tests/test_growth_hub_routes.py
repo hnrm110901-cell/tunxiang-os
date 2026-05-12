@@ -355,7 +355,7 @@ _offer_seeds_mod.GROWTH_OFFER_PACKS = [
 sys.modules["services.tx_growth.src.seeds.growth_offer_seeds"] = _offer_seeds_mod
 
 # ── 导入被测路由 ──────────────────────────────────────────────────────────────
-from api.growth_hub_routes import router  # noqa: E402
+from services.tx_growth.src.api.growth_hub_routes import router  # noqa: E402
 
 # ── 构建测试 App ──────────────────────────────────────────────────────────────
 app = FastAPI()

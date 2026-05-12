@@ -97,7 +97,7 @@ with patch("services.tx_growth.src.engine.journey_engine.JourneyEngine", return_
     engine_jm.JourneyEngine = MagicMock(return_value=_fake_engine)
     sys.modules["services.tx_growth.src.engine.journey_engine"] = engine_jm
 
-    from api.journey_routes import router
+    from services.tx_growth.src.api.journey_routes import router
 
 app = FastAPI()
 app.include_router(router)

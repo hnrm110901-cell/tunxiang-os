@@ -72,8 +72,8 @@ _sqla_ext_asyncio.AsyncSession = MagicMock()
 sys.modules.setdefault("sqlalchemy.ext", _sqla_ext)
 sys.modules.setdefault("sqlalchemy.ext.asyncio", _sqla_ext_asyncio)
 
-from services.live_coupon_engine import LiveCouponEngine, LiveCouponError
-from services.live_streaming_service import LiveStreamingError, LiveStreamingService
+from services.tx_growth.src.services.live_coupon_engine import LiveCouponEngine, LiveCouponError
+from services.tx_growth.src.services.live_streaming_service import LiveStreamingError, LiveStreamingService
 
 # ---------------------------------------------------------------------------
 # Helpers

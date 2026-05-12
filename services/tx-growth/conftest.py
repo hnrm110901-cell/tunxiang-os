@@ -41,7 +41,7 @@ def _ensure_ns(name: str, path: str) -> None:
 _ensure_ns("services.tx_growth", SVC_DIR)
 _ensure_ns("services.tx_growth.src", SRC_DIR)
 
-for _sub in ("api", "models", "services", "repositories", "tests", "routers", "workers", "engine", "templates", "seeds"):
+for _sub in ("api", "models", "services", "repositories", "tests", "routers", "workers", "engine", "templates", "seeds", "campaigns", "tasks"):
     _sub_path = os.path.join(SRC_DIR, _sub)
     if os.path.isdir(_sub_path):
         _ensure_ns(f"services.tx_growth.src.{_sub}", _sub_path)

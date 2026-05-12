@@ -147,7 +147,7 @@ sys.modules.setdefault("sqlalchemy", _sa)
 
 # ── 导入被测路由 ────────────────────────────────────────────────────────────
 
-from api.approval_routes import router  # noqa: E402
+from services.tx_growth.src.api.approval_routes import router  # noqa: E402
 
 # ── 构建测试 App，使用 middleware 注入 mock_db ──────────────────────────────
 
@@ -758,7 +758,7 @@ def test_batch_approve_partial_failure():
 
 def test_evaluate_conditions_gt():
     """gt 操作符：大于阈值时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -767,7 +767,7 @@ def test_evaluate_conditions_gt():
 
 def test_evaluate_conditions_not_met():
     """条件不满足时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 3000}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -776,7 +776,7 @@ def test_evaluate_conditions_not_met():
 
 def test_evaluate_conditions_in_operator():
     """in 操作符：值在列表中时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"campaign_type": "lottery"}
     conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
@@ -785,7 +785,7 @@ def test_evaluate_conditions_in_operator():
 
 def test_evaluate_conditions_in_operator_not_found():
     """in 操作符：值不在列表中时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"campaign_type": "birthday"}
     conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
@@ -794,7 +794,7 @@ def test_evaluate_conditions_in_operator_not_found():
 
 def test_evaluate_conditions_multiple_and():
     """多条件 AND：所有条件均满足时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000, "target_count": 600}
     conditions = [
@@ -806,7 +806,7 @@ def test_evaluate_conditions_multiple_and():
 
 def test_evaluate_conditions_multiple_and_partial_fail():
     """多条件 AND：部分条件不满足时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000, "target_count": 100}
     conditions = [
@@ -818,14 +818,14 @@ def test_evaluate_conditions_multiple_and_partial_fail():
 
 def test_evaluate_conditions_empty():
     """空条件列表返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     assert _evaluate_conditions([], {"any": "data"}) is False
 
 
 def test_evaluate_conditions_missing_field():
     """数据中缺少条件字段时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"other_field": 100}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -834,7 +834,7 @@ def test_evaluate_conditions_missing_field():
 
 def test_evaluate_conditions_eq():
     """eq 操作符"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"status": "active"}
     conditions = [{"field": "status", "op": "eq", "value": "active"}]
@@ -843,7 +843,7 @@ def test_evaluate_conditions_eq():
 
 def test_evaluate_conditions_lt_lte():
     """lt 和 lte 操作符"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"amount": 100}
     assert _evaluate_conditions([{"field": "amount", "op": "lt", "value": 200}], data) is True

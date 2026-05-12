@@ -52,7 +52,7 @@ def _make_db(*execute_results):
 
 # ── 加载路由 ────────────────────────────────────────────────────────────────
 
-from api.offer_routes import get_db, router
+from services.tx_growth.src.api.offer_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)
