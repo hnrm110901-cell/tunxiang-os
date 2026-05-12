@@ -68,7 +68,7 @@ class WechatPayChannel(BasePaymentChannel):
             )
 
         # JSAPI 场景：创建预支付订单
-        result = await self._service.create_jsapi_order(
+        result = await self._service.create_prepay(
             out_trade_no=payment_id,
             total_fen=request.amount_fen,
             description=request.description or "屯象OS订单",
