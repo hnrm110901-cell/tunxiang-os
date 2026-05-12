@@ -49,11 +49,13 @@ class ColorPalette(BaseModel):
 
 class BrandProfileCreate(BaseModel):
     brand_name: str = Field(..., max_length=100, description="品牌名称")
-    brand_slogan: Optional[str] = Field(default=None, description="品牌口号")
-    brand_story: Optional[str] = Field(default=None, description="品牌故事")
+    # F#5：max_length 与 sanitize_for_prompt 单字段 cap 对齐 — write 路径拒绝超长，
+    # read 路径 sanitize 兜底（已落盘的旧数据可能超长）
+    brand_slogan: Optional[str] = Field(default=None, max_length=200, description="品牌口号")
+    brand_story: Optional[str] = Field(default=None, max_length=2000, description="品牌故事")
     cuisine_type: Optional[str] = Field(default=None, max_length=50, description="菜系")
     price_tier: str = Field(default="mid", description="价格带：budget/mid/upscale/luxury")
-    core_value_proposition: Optional[str] = Field(default=None, description="核心价值主张")
+    core_value_proposition: Optional[str] = Field(default=None, max_length=200, description="核心价值主张")
     target_segments: list[dict[str, Any]] = Field(
         default_factory=list, description="目标客群列表，每项包含 segment_name/description/proportion"
     )
@@ -79,11 +81,12 @@ class BrandProfileCreate(BaseModel):
 
 class BrandProfileUpdate(BaseModel):
     brand_name: Optional[str] = Field(default=None, max_length=100)
-    brand_slogan: Optional[str] = None
-    brand_story: Optional[str] = None
+    # F#5：与 BrandProfileCreate 对齐
+    brand_slogan: Optional[str] = Field(default=None, max_length=200)
+    brand_story: Optional[str] = Field(default=None, max_length=2000)
     cuisine_type: Optional[str] = Field(default=None, max_length=50)
     price_tier: Optional[str] = None
-    core_value_proposition: Optional[str] = None
+    core_value_proposition: Optional[str] = Field(default=None, max_length=200)
     target_segments: Optional[list[dict[str, Any]]] = None
     key_scenarios: Optional[list[dict[str, Any]]] = None
     brand_voice: Optional[dict[str, Any]] = None

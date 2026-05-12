@@ -24,6 +24,8 @@ from services.tx_growth.src.models.brand_strategy import (
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.security.src.prompt_sanitizer import sanitize_for_prompt
+
 log = structlog.get_logger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -561,7 +563,15 @@ def _jsonb(value: Any) -> str:
 
 
 def _minimal_brief(tenant_id: uuid.UUID, channel: str, target_segment: str, purpose: str) -> ContentBrief:
-    """未配置品牌档案时返回最小化简报（带通用 system prompt）"""
+    """未配置品牌档案时返回最小化简报（带通用 system prompt）
+
+    F#5：URL query param 三字段（target_segment / channel / purpose）经
+    sanitize_for_prompt 过滤后才进入 system_prompt，防止租户管理员或上游
+    调用方通过 query string 注入 prompt 指令。
+    """
+    safe_segment = sanitize_for_prompt(target_segment, max_chars=100)
+    safe_channel = sanitize_for_prompt(channel, max_chars=50)
+    safe_purpose = sanitize_for_prompt(purpose, max_chars=100)
     return ContentBrief(
         tenant_id=tenant_id,
         channel=channel,
@@ -584,7 +594,7 @@ def _minimal_brief(tenant_id: uuid.UUID, channel: str, target_segment: str, purp
         segment_description=None,
         system_prompt=(
             f"你是一位专业的餐饮品牌文案撰写专家。\n"
-            f"请为目标客群「{target_segment}」撰写一则{channel}渠道的{purpose}内容。\n"
+            f"请为目标客群「{safe_segment}」撰写一则{safe_channel}渠道的{safe_purpose}内容。\n"
             f"风格：温暖亲切，简洁明了。请直接输出文案正文，不要附加说明。"
         ),
         generated_at=datetime.now(timezone.utc),
@@ -611,7 +621,32 @@ def _build_system_prompt(
     purpose: str,
     season_ctx: dict[str, Any],
 ) -> str:
-    """组装注入 LLM 的 system message"""
+    """组装注入 LLM 的 system message
+
+    F#5：所有用户可控字段（brand_*, tone/style, *_words, *_elements,
+    template_hints, target_*, purpose, season_ctx 内字段）必须经
+    sanitize_for_prompt 剥离 prompt-injection pattern 后才能拼进 prompt。
+    price_tier 是枚举（Pydantic 校验），不可注入；price_tier_zh 来自
+    hardcoded mapping，不需 sanitize。
+    """
+    # 字段级 sanitize（max_chars 按字段语义紧化）
+    safe_brand_name = sanitize_for_prompt(brand_name, max_chars=100)
+    safe_brand_slogan = sanitize_for_prompt(brand_slogan, max_chars=200)
+    safe_cuisine_type = sanitize_for_prompt(cuisine_type, max_chars=50)
+    safe_core_value = sanitize_for_prompt(core_value, max_chars=200)
+    safe_tone = sanitize_for_prompt(tone, max_chars=100)
+    safe_style = sanitize_for_prompt(style, max_chars=100)
+    safe_forbidden_words = sanitize_for_prompt(forbidden_words, max_chars=50)
+    safe_preferred_words = sanitize_for_prompt(preferred_words, max_chars=50)
+    safe_channel = sanitize_for_prompt(channel, max_chars=50)
+    safe_target_segment = sanitize_for_prompt(target_segment, max_chars=100)
+    safe_segment_description = sanitize_for_prompt(segment_description, max_chars=500)
+    safe_purpose = sanitize_for_prompt(purpose, max_chars=100)
+    safe_required_elements = sanitize_for_prompt(required_elements, max_chars=100)
+    safe_forbidden_elements = sanitize_for_prompt(forbidden_elements, max_chars=100)
+    safe_template_hints = sanitize_for_prompt(template_hints, max_chars=500)
+    safe_season_ctx = sanitize_for_prompt(season_ctx, max_chars=200)
+
     price_tier_zh = {
         "budget": "经济实惠（人均50元以下）",
         "mid": "中等消费（人均50-150元）",
@@ -620,58 +655,58 @@ def _build_system_prompt(
     }.get(price_tier, price_tier)
 
     lines = [
-        f"你是「{brand_name}」品牌的专业文案撰写专家。",
+        f"你是「{safe_brand_name}」品牌的专业文案撰写专家。",
         "",
         "# 品牌基础信息",
-        f"- 品牌名称：{brand_name}",
+        f"- 品牌名称：{safe_brand_name}",
     ]
-    if brand_slogan:
-        lines.append(f"- 品牌口号：{brand_slogan}")
-    if cuisine_type:
-        lines.append(f"- 菜系：{cuisine_type}")
+    if safe_brand_slogan:
+        lines.append(f"- 品牌口号：{safe_brand_slogan}")
+    if safe_cuisine_type:
+        lines.append(f"- 菜系：{safe_cuisine_type}")
     lines.append(f"- 价格带：{price_tier_zh}")
-    if core_value:
-        lines.append(f"- 核心价值主张：{core_value}")
+    if safe_core_value:
+        lines.append(f"- 核心价值主张：{safe_core_value}")
 
     lines += [
         "",
         "# 品牌语气要求",
-        f"- 语气风格：{tone}",
-        f"- 写作风格：{style}",
+        f"- 语气风格：{safe_tone}",
+        f"- 写作风格：{safe_style}",
     ]
-    if preferred_words:
-        lines.append(f"- 推荐使用词汇：{'、'.join(preferred_words)}")
-    if forbidden_words:
-        lines.append(f"- 禁止使用词汇：{'、'.join(forbidden_words)}")
+    if safe_preferred_words:
+        lines.append(f"- 推荐使用词汇：{'、'.join(safe_preferred_words)}")
+    if safe_forbidden_words:
+        lines.append(f"- 禁止使用词汇：{'、'.join(safe_forbidden_words)}")
 
     lines += [
         "",
         "# 本次内容生成任务",
-        f"- 发布渠道：{channel}",
-        f"- 目标客群：{target_segment}",
+        f"- 发布渠道：{safe_channel}",
+        f"- 目标客群：{safe_target_segment}",
     ]
-    if segment_description:
-        lines.append(f"- 客群描述：{segment_description}")
-    lines.append(f"- 内容目的：{purpose}")
+    if safe_segment_description:
+        lines.append(f"- 客群描述：{safe_segment_description}")
+    lines.append(f"- 内容目的：{safe_purpose}")
     if max_length:
         lines.append(f"- 最大字数限制：{max_length} 字")
 
-    if required_elements:
-        lines.append(f"- 必须包含：{'、'.join(str(e) for e in required_elements)}")
-    if forbidden_elements:
-        lines.append(f"- 禁止出现：{'、'.join(str(e) for e in forbidden_elements)}")
+    if safe_required_elements:
+        lines.append(f"- 必须包含：{'、'.join(str(e) for e in safe_required_elements)}")
+    if safe_forbidden_elements:
+        lines.append(f"- 禁止出现：{'、'.join(str(e) for e in safe_forbidden_elements)}")
 
-    if template_hints:
+    if safe_template_hints:
         lines += ["", "# 内容模板参考"]
-        for k, v in template_hints.items():
+        for k, v in safe_template_hints.items():
             if isinstance(v, list):
                 lines.append(f"- {k}：{'、'.join(str(i) for i in v)}")
             else:
                 lines.append(f"- {k}：{v}")
 
     # 节气/节日上下文
-    active_campaigns = season_ctx.get("active_campaigns", [])
-    nearest_term = season_ctx.get("nearest_solar_term", {})
+    active_campaigns = safe_season_ctx.get("active_campaigns", [])
+    nearest_term = safe_season_ctx.get("nearest_solar_term", {})
 
     if active_campaigns:
         camp = active_campaigns[0]
