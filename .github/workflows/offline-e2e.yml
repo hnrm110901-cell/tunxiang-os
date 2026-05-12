@@ -37,7 +37,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@6854221e62e0759fe8deffc48ccb9c91daf8f9b0  # v6 (CSO F#3 follow-up #439)
         with:
           version: 10
 
