@@ -54,3 +54,14 @@ repos:
         types: [python]
         files: '^services/|^edge/|^shared/'
         pass_filenames: true
+
+      # 服务冻结令（W1-T4，12 周升级战略）
+      # 配置 SoT：.omc/policy/service-freeze.yml
+      # 拦截：禁止新建 services/tx-*/src/main.py（diff-filter=A）
+      # 例外：TX_ALLOW_NEW_SERVICE=1 git commit ...（记入 .omc/state/freeze-bypass-log.txt）
+      - id: service-freeze
+        name: 服务冻结令 (W1-T4，until 2026-06-11)
+        language: system
+        entry: bash scripts/check_service_freeze.sh
+        pass_filenames: false
+        stages: [pre-commit]
