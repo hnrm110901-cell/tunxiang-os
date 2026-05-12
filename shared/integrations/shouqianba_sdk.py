@@ -72,8 +72,11 @@ class ShouqianbaService:
     """
 
     def __init__(self) -> None:
-        self._mock_mode = not _is_configured()
-        if self._mock_mode:
+        # P0 fix: 启动时检查生产环境配置（早 fail），但**不固化 _mock_mode**。
+        # _mock_mode 改为方法 _is_mock_mode() 每次访问重读 env，与 _terminal_key()
+        # 热更新设计一致；防止 K8s init container 竞态 / docker-compose 启动顺序
+        # 导致单例固化 mock 模式后静默绕过验签。
+        if not _is_configured():
             if _is_production_env() and not _mock_explicitly_allowed():
                 raise RuntimeError(
                     "生产环境禁止收钱吧 Mock：请配置 SHOUQIANBA_TERMINAL_SN / "
@@ -85,6 +88,10 @@ class ShouqianbaService:
                 "SHOUQIANBA_TERMINAL_KEY"
             )
 
+    def _is_mock_mode(self) -> bool:
+        """P0 fix: 每次调用重读 env，避免单例快照与热更新矛盾。"""
+        return not _is_configured()
+
     async def verify_callback(self, headers: dict, body: bytes) -> dict:
         """验证收钱吧终端通知签名并返回 body JSON dict。
 
@@ -95,7 +102,7 @@ class ShouqianbaService:
           4. 常量时间比较 expected_sign vs 收到的 sign
           5. 解析 JSON body 返回（业务字段校验由上层 Saga 处理）
         """
-        if self._mock_mode:
+        if self._is_mock_mode():
             return self._mock_callback_response(body)
 
         auth = _get_authorization(headers)
@@ -110,9 +117,8 @@ class ShouqianbaService:
 
         expected_sn = _terminal_sn()
         if sn != expected_sn:
-            raise ValueError(
-                f"收钱吧回调 terminal_sn 不匹配：expected={expected_sn} got={sn}"
-            )
+            # P1-B fix: 不在错误消息中暴露本商户 expected_sn（密钥管理）
+            raise ValueError(f"收钱吧回调 terminal_sn 与本商户不匹配 got={sn}")
 
         body_bytes = body if isinstance(body, bytes) else body.encode("utf-8")
         expected_sign = hashlib.md5(

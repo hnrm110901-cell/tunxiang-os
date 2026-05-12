@@ -182,3 +182,55 @@ class TestShouqianbaCallbackTier1:
             await shouqianba_channel.verify_callback(
                 {"authorization": "no_space_separator"}, body
             )
+
+    @pytest.mark.asyncio
+    async def test_mock_mode_disengages_after_env_configured(
+        self,
+        monkeypatch,
+    ) -> None:
+        """场景（reviewer P0 防回归）：启动时环境变量未配置 → service 进入 mock；
+        运行时 K8s/docker 注入 env 完成（如 sidecar 异步加载密钥）→ 后续 callback
+        必须走真实验签，不能因 _mock_mode 固化而继续放行 mock 假数据。
+
+        修复前 self._mock_mode 在 __init__ 固化，注入后 callback 仍走 mock。
+        修复后 _is_mock_mode() 每次重读 env，自动切换到真实验签。
+        """
+        from shared.integrations.shouqianba_sdk import ShouqianbaService
+
+        # 启动：未配置（mock 模式）
+        monkeypatch.delenv("SHOUQIANBA_TERMINAL_SN", raising=False)
+        monkeypatch.delenv("SHOUQIANBA_TERMINAL_KEY", raising=False)
+        service = ShouqianbaService()
+        assert service._is_mock_mode() is True
+
+        # 运行时注入 env（模拟 sidecar 异步配置完成）
+        monkeypatch.setenv("SHOUQIANBA_TERMINAL_SN", _TEST_TERMINAL_SN)
+        monkeypatch.setenv("SHOUQIANBA_TERMINAL_KEY", _TEST_TERMINAL_KEY)
+        assert service._is_mock_mode() is False, (
+            "env 注入后 _is_mock_mode() 必须返回 False，不能因单例快照而继续 mock"
+        )
+
+        # 注入后必须真实验签：错误签名应抛 ValueError 而不是 mock 假数据
+        body = b'{"client_sn":"X","order_status":"PAID"}'
+        with pytest.raises(ValueError, match="Authorization"):
+            await service.verify_callback({}, body)
+
+    @pytest.mark.asyncio
+    async def test_error_msg_does_not_leak_expected_terminal_sn(
+        self,
+        shouqianba_channel: ShouqianbaChannel,
+    ) -> None:
+        """场景（reviewer P1-B 防回归）：sn 不匹配的错误消息不能暴露本商户的
+        expected terminal_sn（密钥管理），否则攻击者可从 4xx 日志中嗅探本商户 sn。
+        """
+        headers, body = _make_signed_callback(
+            _valid_callback_dict(), terminal_sn="99999999999999999999"
+        )
+        try:
+            await shouqianba_channel.verify_callback(headers, body)
+            pytest.fail("应抛 ValueError")
+        except ValueError as exc:
+            err_msg = str(exc)
+            assert _TEST_TERMINAL_SN not in err_msg, (
+                f"错误消息不能暴露本商户 expected terminal_sn，got: {err_msg!r}"
+            )
