@@ -79,7 +79,7 @@ class UnionPayChannel(BasePaymentChannel):
                 status=PayStatus.SUCCESS,
                 method=PayMethod.UNIONPAY,
                 amount_fen=0,
-                trade_no=trade_no,
+                trade_no=trade_no or f"MOCK_UP_{uuid.uuid4().hex[:16]}",
                 channel_data={"mock": True, "provider": "unionpay"},
             )
 
