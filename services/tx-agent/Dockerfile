@@ -11,4 +11,7 @@ RUN pip install --no-cache-dir \
 COPY shared/ ./shared/
 COPY services/tx-agent/src/ ./services/tx_agent/src/
 ENV PYTHONPATH=/app
+# F#2 PR-2: 以非 root 用户运行（PR #444 Helm 已 enforce runAsUser:10001）
+RUN useradd --uid 10001 --no-create-home --shell /sbin/nologin app
+USER 10001
 CMD ["uvicorn", "services.tx_agent.src.main:app", "--host", "0.0.0.0", "--port", "8008"]

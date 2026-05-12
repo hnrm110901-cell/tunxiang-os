@@ -20,8 +20,11 @@ COPY services/tx-predict/src/ ./src/
 ENV PATH=/root/.local/bin:$PATH
 ENV PYTHONPATH=/app
 
-RUN addgroup --system txuser && adduser --system --ingroup txuser txuser
-USER txuser
+# F#2 PR-2: 以非 root 用户运行（PR #444 Helm 已 enforce runAsUser:10001）
+# UID 10001 与 CSO 2026-05-11 Option A 对齐
+RUN useradd --uid 10001 --no-create-home --shell /sbin/nologin app \
+ && chmod -R go+rX /root/.local
+USER 10001
 
 EXPOSE 8013
 
