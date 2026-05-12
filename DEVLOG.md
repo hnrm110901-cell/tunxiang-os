@@ -74,6 +74,66 @@
 
 ---
 
+## 2026-05-12 凌晨 — D2c (#448) Tier 1 真 PG RLS 反测 vertical slice + 第 8 次 admin-merge
+
+### 今日完成
+承接 5/11 夜深 cold-start handoff 的 3 issue OPEN backlog（#448 Tier1 / #449 Tier2 / #450 Tier3）中**优先级最高**的 #448 — Tier 1 真 PG RLS runtime 反测扩面。按 A+α 校准做 vertical slice（7 P0 业务域 / 不补 v500）。
+
+**D2c (PR #460 → admin-squash `af6f57cf`, 04:00:26Z) — 真 PG RLS runtime 反测 7 P0 业务域 [Tier1]**
+- **新增 1 文件 / 413 行**：`tests/tier1/test_rls_runtime_p0_tier1.py`
+- 7 P0 业务域 × 2 scenarios = **14 tests**（cross-tenant isolation + same-tenant visibility）
+- 表覆盖：orders / payments / customers / ingredients / store_daily_settlements / dishes / employees + FK target stores
+- **opt-in via `INTEGRATION_PG_DSN`** — 未配置时全 skip（CI 自然忽略；本地 / nightly 手跑）
+- 复用 D2b' (#440) `shared/test_utils/integration_pg.py` helpers（DSN / skipif / `set_tenant_guc`），engine / session / cleanup 自滚（service-level 多 session 模式与 shared conftest function-scoped 单事务不兼容，D2b' 设计承继）
+- 本地真 PG **14/14 PASSED in 98s** 实证（amend round 后）
+- **2 轮独立 code-reviewer APPROVE / 0 BUG**：
+  - Round-1：5 关注点（role/cleanup/WITH CHECK/commit 模型/UUID cast）全 ✓ + 1 medium suggestion (RLS-ENABLED guard) + 2 nit (f-string 注释)
+  - Round-2：amend 仅看 19 行（guard 5 行查询 + assert + f-string 注释） — guard 逻辑正确 / 无误触漏触 / 注释合理
+- **TDD red→green iteration（落盘在 PR body）**：
+  1. ❌ `:p::uuid` SQLAlchemy text() 与 PG `::` cast 语法冲突 → `CAST(:p AS uuid)` 全替换
+  2. ❌ 5 表 FK→stores 缺 prereq → 新增 `_insert_store` helper，5 dependent insert 同 tenant 先插 store
+- Force-push 走 explicit-SHA `--force-with-lease=branch:expected-sha`（`feedback_pr_rebase_worktree_pattern.md`）
+
+### 数据变化
+- main: `109d21de` (#444 helm F#2) → ... → `af6f57cf` (D2c #460)
+- 8 dep installed via uv: pytest / pytest-asyncio / sqlalchemy / asyncpg + greenlet / psycopg2-binary / httpx / fastapi / pydantic / structlog / alembic / mako / markupsafe / typing-inspection
+- test-pg boot：`infra/compose/test-pg.yml` 起 pgvector:pg16 → `db-bootstrap.sh --skip-create` + `migrate-all.sh --include-legacy` → 493 tables（legacy chain v300+ 后续某表 fail 但 v001-v003 P0 7 表完整可用）
+- Local venv `.venv-trackd` 已损坏（lib/ 存在但无 bin/） — 改用 uv-managed `.venv` (8 dev deps quick-install) 跑 TDD
+- 第 **8 次** admin-merge 累积（#353/#355/#356/#358/#370 → #411 + 5/11 夜深 #452 #456 + 5/12 #460）
+- Memory MEMORY.md：admin-merge 7→8 + 含本次特性标注 "test-only / 2 轮 reviewer 0 BUG APPROVE / 14/14 真 PG 实证"
+- Issue #448 仍 OPEN（intentional — vertical slice 只闭部分），新加进度评论
+
+### 战绩
+- **#448 Tier 1 vertical slice 真闭环** — 解决 memory 警示 "全 N 表 RLS 真行为 CI 从未验证" 的**核心 risk**（7 P0 业务表覆盖 Tier 1 真业务路径：订单/支付/会员/库存/结算/菜品/员工）
+- **2 轮独立 code-reviewer APPROVE 沉淀** — 与 5/11 夜 D1 (0 BUG/2 OK) + D2b' (0 BUG/2 fixup) + D4 (0 BUG/1 P1 doc) 累积，`feedback_self_review_blind_spots.md` T1 explicit ask 模式实证 4 次
+- **TDD red→green 完整迭代落盘** — `:p::uuid` SQL syntax 冲突 + FK chain 缺 prereq 两个真坑在 PR body + commit message 双沉淀，未来 service-level RLS 反测可参考
+- **§3 surgical 边界严格** — 不顺手扩 long-tail 90+ 表 / 不补 v500 migration / 不顺手 fixture 重构；vertical slice 1 PR / 1 文件 / 14 test
+- **本地 broken venv 应急方案** — `.venv-trackd` 死了，用 `uv pip install <小集>` 在 worktree 跑 TDD，~2 分钟搞定（无 system 污染 / 无 invasive 重建）
+
+### 关键决策
+- **A+α 校准** — 不要 100+ 表 mega fixture（B），不要纯 audit（C）；用 vertical slice 解决核心 risk + 留 long-tail backlog；α 不补 v500（PR #223 dry-run pending 在飞）
+- **D2b' 设计承继** — 不重写 shared fixture / 不追求统一；多 session 模式（mimic production runtime "一次请求一个 session"）滚自己的 engine / session / cleanup
+- **Round-2 amend 走 5 行 guard + 3 行注释** — reviewer round-1 medium suggestion 不阻塞但**真有价值**（防 false-positive 调试误导）；与 5/11 夜 D2b' (#440) reviewer 2 建议 amend 全修同款 pattern；force-push-with-lease 用 explicit-SHA 形式
+- **第 8 次 admin-merge** — T1 改动但**仅添加测试文件 / 无业务改动 / 无 migration / 无 source**；14/14 实证 + 2 轮 reviewer 0 BUG；user 显式拍板第 8 次走（红线警告已给）
+- **DEVLOG 沉淀 PR 留 OPEN 不 admin-merge** — 不再追加第 9 次累积；user 后续 session 手动 merge 或合并到下批沉淀
+
+### 遗留问题
+- **Scenario 3 NULL rejection** — 需 v500 FORCE RLS（PR #223 staging dry-run pending），未来 merge 后 follow-up 补
+- **Long-tail 90+ RLS 表覆盖** — 非 P0 业务域，独立 issue 候选（issue #448 仍 OPEN tracker）
+- **CI 自动跑真 PG 反测 workflow** — 需 `.github/workflows/integration-pg-tests.yml`（涉及 #449，未起手）
+- **本地 `.venv-trackd` 损坏** — `lib/` 存在但 `bin/` 全删；本 session 用 uv 应急；user 决定要不要重建（不影响 CI / 不影响其他 worktree）
+- **本主题 DEVLOG 沉淀 PR 留 OPEN** — 等下一 session 或 user 自行决定 merge 时机
+- **3 issue OPEN backlog 还剩 2** — #449 Tier2 docker-compose-pg fixture 扩面 / #450 Tier3 AST 升级方案 3（#448 仍 OPEN tracker long-tail）
+- **5/13 deal-breaker** 倒计时 < 14h（channel-aggregation 3 平台企业资质 — 创始人级别非技术，5+ session 连续提醒未起手）
+
+### 明日计划
+- A：fresh session — handoff 已留 DEVLOG 顶（本段）+ docs/progress.md 顶；起手命令含 SoT 校验
+- B：5/13 deal-breaker 资质（创始人级别）— **倒计时 < 14h 必须起手**
+- C：#449 / #450 backlog 按优先级 pick
+- D：DEVLOG 沉淀 PR（本段对应）何时 merge — user 自决
+
+---
+
 ## 2026-05-11 夜深 — B + D1 收尾（清理 + 沉淀 session，admin-merge 第 6 次累积）
 
 ### 今日完成

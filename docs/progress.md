@@ -28,6 +28,56 @@
 
 ---
 
+## 2026-05-12 凌晨 · D2c (#448) Tier 1 vertical slice + 第 8 次 admin-merge
+
+### 完成状态
+- [x] **#448 D2c vertical slice (PR #460 admin-squash `af6f57cf` @ 04:00:26Z)**：A+α 校准 — 7 P0 业务域 × 2 scenarios = 14 tests，新增 1 文件 / 413 行 `tests/tier1/test_rls_runtime_p0_tier1.py`
+- [x] **本地真 PG 14/14 PASSED in 98s**（amend round 后）
+- [x] **2 轮独立 code-reviewer APPROVE / 0 BUG**：round-1 5 关注点全 ✓ / round-2 amend 19 行 guard + 注释通过
+- [x] **TDD red→green 完整迭代**：`:p::uuid` SQL 冲突 + FK chain prereq 两个真坑落盘
+- [x] **D2c worktree + branch 已清**
+- [x] **DEVLOG + 本段沉淀**
+- [ ] **DEVLOG 沉淀 PR 留 OPEN** — 本段写完后另开 branch / push / PR，不 admin-merge（不再加第 9 次累积）
+
+### 本 session 终态
+- 1 PR MERGED (#460) — D2c Tier1 P0 vertical slice
+- 1 issue 保持 OPEN (#448 — vertical slice 只闭部分，long-tail + scenario 3 留 tracker)
+- 1 worktree 清 / 1 branch 删（test/d2c-rls-runtime-p0-tier1）
+- admin-merge 累积 7 → 8 次（#460 特性：test-only / 2 轮 reviewer 0 BUG / 14/14 真 PG 实证）
+
+### 关键决策
+- **A+α 校准** — vertical slice 7 P0 表覆盖核心 risk，long-tail 90+ 表留 backlog；不补 v500 (PR #223 dry-run pending 在飞)
+- **D2b' 设计承继** — service-level 多 session 模式滚自己的 engine/session/cleanup，仅 import shared helpers
+- **2 轮 reviewer + amend pattern** — round-1 0 BUG/3 suggestion → amend 2 minor (guard + f-string 注释) → round-2 0 BUG APPROVE；与 5/11 夜 D2b' 同款
+- **第 8 次 admin-merge 显式拍板** — T1 但 test-only / 无 source / 无 migration；user 显式拍 (8th 红线 warning 已给)
+- **沉淀 PR 留 OPEN 不 admin-merge** — 不加第 9 次累积；user 后续合并
+
+### 下一步
+- A：fresh session — handoff 留 DEVLOG 顶 + 本段；起手必跑 SoT 校验
+- B：5/13 deal-breaker 资质（创始人级别）— **倒计时 < 14h 必须起手**
+- C：#449 Tier2 / #450 Tier3 backlog pick
+- D：本沉淀 PR 何时 merge — user 自决（或合并到下批沉淀）
+
+### 已知风险
+- **5/13 deal-breaker 倒计时 < 14h**：channel-aggregation 3 平台企业资质（创始人级别）
+- **admin-merge 累积 8 次 / main 无 branch protection** — 后续非 codemod / 非 docs-only / 非 test-only 主题须重评
+- **本地 `.venv-trackd` 损坏** — 用 uv 应急已通；不影响 CI / 不影响其他 worktree；user 决定要不要重建
+- **Memory MEMORY.md 中 admin-merge 计数实时维护**：当前 8 次（本 session 已更新）
+
+### 起手命令（fresh session 必跑）
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 af6f57cf 或更新（含 D2c #460）
+gh pr view 460 --json state,mergedAt,mergeCommit   # 验 MERGED + af6f57cf
+gh pr list --state open --search "DEVLOG OR sediment OR D2c" --author "@me" --limit 5  # 本沉淀 PR 状态
+gh issue list --state open --author "@me" --search "448 449 450" --limit 5  # 3 backlog
+git worktree list | grep -i devlog-d2c    # 本沉淀 worktree（未清）
+head -300 DEVLOG.md                 # 5/12 凌晨 + 5/11 夜深 + 5/11 夜（续）+ ... 段
+```
+
+---
+
 ## 2026-05-11 夜深 · B + D1 收尾（清理 + 沉淀 session）
 
 ### 完成状态
