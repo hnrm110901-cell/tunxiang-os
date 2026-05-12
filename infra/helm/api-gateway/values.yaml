@@ -16,6 +16,14 @@ ingress:
   host: api.tunxiangos.cn
   tls: true
   tlsSecretName: api-tunxiangos-cn-tls
+  # F#6 (issue #455 P0-1) — nginx ingress rate-limit for /api/v1/auth/* (per-IP brute-force 防护)
+  # 实现：拆 ingress-auth.yaml 第二个 Ingress 专限 /api/v1/auth/*，主 ingress 业务路径不受影响
+  # 与 bare-metal infra/nginx/nginx-tls-hardened.conf:130 (10 r/m + burst 5) 对齐
+  # 紧急关闭：rateLimit.enabled: false（仅 ops 临时使用，恢复需 follow-up issue 跟踪）
+  rateLimit:
+    enabled: true
+    authPathRpm: 10            # /api/v1/auth/* per-IP rate ceiling (req/min)
+    authBurstMultiplier: 5     # short-spike burst = rpm × multiplier = 50 r/m
 
 resources:
   limits:
