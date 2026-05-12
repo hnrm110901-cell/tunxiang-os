@@ -218,46 +218,36 @@ async def shouqianba_callback(request: Request) -> Response:
     body = await request.body()
     headers = dict(request.headers)
 
+    # P1-A fix: 错误响应也用纯文本（fail），避免收钱吧将 JSON 错误响应判为
+    # "通知失败"进入无限重试（仅成功响应必须是 "success"，错误响应文档未严格要求
+    # 但纯文本可避免重试风暴）。
     if _MOCK_MODE:
         logger.warning("shouqianba_callback_mock_mode_active")
-        return Response(
-            content='{"result_code": "FAIL", "error_code": "MOCK_MODE"}',
-            media_type="application/json",
-            status_code=400,
-        )
+        return Response(content="fail", media_type="text/plain", status_code=400)
 
     try:
         channel = registry.get("shouqianba_direct")
         if channel is None:
             logger.error("shouqianba_channel_not_available")
-            return Response(
-                content='{"result_code": "200", "error_code": "CHANNEL_UNAVAILABLE"}',
-                media_type="application/json",
-                status_code=500,
-            )
+            return Response(content="fail", media_type="text/plain", status_code=500)
         payload = await channel.verify_callback(headers, body)
     except NotImplementedError:
         logger.error(
             "shouqianba_callback_verify_not_implemented",
             note="收钱吧SDK未配置或verify_callback未启用",
         )
-        return Response(
-            content='{"result_code": "FAIL", "error_code": "VERIFY_NOT_READY"}',
-            media_type="application/json",
-            status_code=400,
-        )
-    except Exception as exc:
+        return Response(content="fail", media_type="text/plain", status_code=400)
+    except (ValueError, RuntimeError) as exc:
+        # P1-C fix: 不再用 broad except；ValueError = 验签失败 / 格式错；
+        # RuntimeError = SDK 配置错（生产 mock）。其他异常向上冒泡触发 500
+        # 兜底，不再静默吞并误报"签名失败"。
         logger.error(
             "shouqianba_callback_verify_failed",
             error=str(exc),
             error_type=type(exc).__name__,
             exc_info=True,
         )
-        return Response(
-            content='{"result_code": "FAIL", "error_code": "VERIFY_FAILED"}',
-            media_type="application/json",
-            status_code=400,
-        )
+        return Response(content="fail", media_type="text/plain", status_code=400)
 
     from ..events import emit_payment_confirmed
 
@@ -267,7 +257,6 @@ async def shouqianba_callback(request: Request) -> Response:
         payment_id=payload.payment_id,
         trade_no=payload.trade_no,
     )
-    return Response(
-        content='{"result_code": "200"}',
-        media_type="application/json",
-    )
+    # R1: 收钱吧官方规范要求成功响应为纯文本 "success"（非 JSON），
+    # 否则服务器认为通知失败会进入重试，造成 callback 风暴 + 重复处理风险
+    return Response(content="success", media_type="text/plain")

@@ -19,6 +19,7 @@ import structlog
 
 from .base import (
     BasePaymentChannel,
+    CallbackPayload,
     PaymentRequest,
     PaymentResult,
     PayMethod,
@@ -30,15 +31,41 @@ from .base import (
 logger = structlog.get_logger(__name__)
 
 
+# 收钱吧 order_status → 内部 PayStatus 映射
+_ORDER_STATUS_MAP = {
+    "PAID": PayStatus.SUCCESS,
+    "PAY_SUCCESS": PayStatus.SUCCESS,
+    "IN_PROGRESS": PayStatus.PENDING,
+    "CREATED": PayStatus.PENDING,
+    "PAY_CANCELED": PayStatus.CLOSED,
+    "CANCELED": PayStatus.CLOSED,
+    "REFUNDED": PayStatus.REFUNDED,
+    "PARTIAL_REFUNDED": PayStatus.PARTIAL_REFUND,
+}
+
+
 class ShouqianbaChannel(BasePaymentChannel):
     """收钱吧聚合支付渠道"""
 
-    channel_name = "shouqianba"
+    # E2: 必须与 callback_routes.py `registry.get("shouqianba_direct")` 对齐，
+    # 否则 callback 永远走 None → 500 不可达。
+    channel_name = "shouqianba_direct"
     supported_methods = [PayMethod.WECHAT, PayMethod.ALIPAY, PayMethod.UNIONPAY]
     supported_trade_types = [TradeType.B2C, TradeType.C2B]
 
     def __init__(self, client: object = None) -> None:
         self._client = client
+        # 委托真实 SDK 做 verify_callback（pay/query/refund 仍走 client mock 路径）
+        try:
+            from shared.integrations.shouqianba_sdk import ShouqianbaService
+
+            self._service = ShouqianbaService()
+        except ImportError:
+            self._service = None
+            logger.warning(
+                "shouqianba_channel_mock_mode",
+                reason="shared.integrations.shouqianba_sdk not available",
+            )
 
     async def pay(self, request: PaymentRequest) -> PaymentResult:
         payment_id = f"SQB{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:6].upper()}"
@@ -145,4 +172,41 @@ class ShouqianbaChannel(BasePaymentChannel):
             status="success" if result.get("result_code") == "SUCCESS" else "pending",
             amount_fen=refund_amount_fen,
             refund_trade_no=result.get("sn"),
+        )
+
+    async def verify_callback(self, headers: dict, body: bytes) -> CallbackPayload:
+        """收钱吧终端通知验签 + 业务字段提取。
+
+        签名机制：Authorization: `<sn> <sign>`，sign = MD5(body + terminal_key)。
+        body 为 JSON，total_amount 单位为**分**（无需元转分，与其他渠道一致）。
+        未知 order_status 降级 PENDING（保守安全，不会误触发资金确认）。
+        """
+        if self._service is None:
+            raise NotImplementedError("ShouqianbaService 未初始化，无法验签")
+
+        data = await self._service.verify_callback(headers, body)
+
+        order_status = data.get("order_status", "")
+        status = _ORDER_STATUS_MAP.get(order_status, PayStatus.PENDING)
+        if order_status and order_status not in _ORDER_STATUS_MAP:
+            logger.warning(
+                "shouqianba_unknown_order_status",
+                order_status=order_status,
+                client_sn=data.get("client_sn"),
+            )
+
+        # 收钱吧 total_amount 已是分字符串
+        try:
+            amount_fen = int(data.get("total_amount", "0"))
+        except (ValueError, TypeError) as exc:
+            raise ValueError(
+                f"收钱吧回调 total_amount 非法：{data.get('total_amount')!r}"
+            ) from exc
+
+        return CallbackPayload(
+            payment_id=data.get("client_sn", ""),
+            trade_no=data.get("sn", ""),
+            status=status,
+            amount_fen=amount_fen,
+            raw=data,
         )
