@@ -1,3 +1,79 @@
+## 2026-05-12 中午 — F#8 父任务 4 PR 收尾 + 3 backlog issue（admin-merge 第 7-10 次累积）
+
+### 今日完成
+承接 5/11 夜深 D1 收尾后 F#8（3 支付渠道 verify_callback 未实现）父任务 + 用户追加 4 渠道扩展。本 session 经过 1 次 context compaction，继续推完 4 PR + 3 backlog issue + 1 workflow CI 修。
+
+**F#8 alipay (PR #459 → admin-squash `a56948fe` @ 04:25:55Z) [Tier1]**
+- `shared/integrations/alipay_sdk.py` 新建 — RSA2 验签（SHA-256+RSA / 拒绝 RSA1 降级 / 字典序排序拼接 / app_id+seller_id 业务校验 / 重复 key 拒绝）
+- `services/tx-pay/src/channels/alipay.py` override `verify_callback`（_TRADE_STATUS_MAP / Decimal 元→分精度 / 未知状态降级 PENDING）
+- `services/tx-pay/tests/test_alipay_callback_tier1.py` 12 个 Tier1 反测（合法 / TRADE_FINISHED / WAIT_BUYER_PAY / 篡改 / 缺 sign / RSA1 降级 / app_id 不匹配 / seller_id 不匹配 / seller_id 缺失 P0-A / 重复 key P1-1 / Decimal 精度 P1-2 / _mock_mode 单例快照 cross-fix P0）
+- reviewer 2 轮 0 BUG APPROVE：P0-A seller_id 静默 bypass 修 / P0-B env 模块快照 修 / P1-1 重复 key 防御 / P1-2 Decimal 精度
+- **`.github/workflows/tier1-gate.yml` cryptography deps 漏装** — `Run Tier 1 services/tx-pay/tests` 永久 fail 真根因（不是预存漂移噪音）：alipay test 顶层 `from cryptography.hazmat.primitives import hashes, serialization` collection 即 `ModuleNotFoundError`；shouqianba (hashlib.md5) / wechat (AsyncMock) 不触发同款。1 行修 pip install 列表追加 `cryptography`（commit `01f0bc05`），reviewer 1 轮 APPROVE
+- **cross-fix _mock_mode 单例快照 P0**（`cb1fe347`）— alipay 同款问题：`__init__` 时 `self._mock_mode = not _is_configured()` 永久锁，K8s init container 异步注入凭据后单例继续 mock 静默绕过验签；改为 `_is_mock_mode()` 方法每次重读 env
+
+**F#8 shouqianba (PR #461 → admin-squash `04a0d218` @ 04:19:55Z) [Tier1]**
+- `shared/integrations/shouqianba_sdk.py` 新建 — `Authorization: <sn> <sign>` 头解析（`MD5(body_bytes + terminal_key)` 对称密钥 / `hmac.compare_digest` 常量时间比对）
+- `services/tx-pay/src/channels/shouqianba.py` override `verify_callback` + `_ORDER_STATUS_MAP`（PAID/PAY_SUCCESS→SUCCESS / IN_PROGRESS/CREATED→PENDING / PAY_CANCELED→CLOSED / REFUNDED→REFUNDED / PARTIAL_REFUNDED→PARTIAL_REFUND）
+- **同 PR 修两枚 silent bug**：
+  - `channel_name="shouqianba"` → `"shouqianba_direct"`（callback_routes.py registry.get key 漂移 — 即便签名实现对了 lookup 失败 500，E2 inline 修）
+  - callback success 响应 JSON `{"result_code":"200"}` → 纯文本 `success`（收钱吧规范要求，原响应触发无限重试，R1 修）
+  - 错误响应同步改纯文本 `fail`（P1-A）
+  - `except Exception` → `except (ValueError, RuntimeError)` 符合 §14（P1-C）
+- `services/tx-pay/tests/test_shouqianba_callback_tier1.py` 11 个 Tier1 反测
+- reviewer 1 轮 0 BUG APPROVE（reviewer 揭露 _mock_mode P0 → cross-fix alipay PR / P1-A 响应格式不一致 / P1-B terminal_sn 错误消息泄露 / P1-C broad except）
+
+**F#8 wechat bug fix (PR #465 → admin-squash `8bbd2c50` @ 04:20:14Z) [Tier1]**
+- 顺手揭露 wechat `pay()` 真实模式 1 行预存 bug：`wechat.py:71` 调 `self._service.create_jsapi_order(...)`，但 `shared/integrations/wechat_pay.py:219` 真实只有 `create_prepay`。收银员一旦在生产环境扫顾客微信付款码 → 立即 `AttributeError` → 顾客付不了款 → 订单无法推进
+- 只有 `_service is None` Mock 路径走通过 `pay()`，真实模式从未在 unit test 覆盖过 → 漂移积累
+- 1 行修 + 1 Tier1 反测（AsyncMock 注入 `create_jsapi_order.side_effect = AttributeError` + `create_prepay.assert_awaited_once()` + `create_jsapi_order.assert_not_called()` 双断言）
+- reviewer 1 轮 APPROVE（P1 mock spec 误导但 assert_not_called 真守护，非阻塞）
+
+**PR4 unionpay skeleton (PR #467 → admin-squash `2c4633b4` @ 04:48:29Z) [Tier1]**
+- 决策 B（document-specialist GO Mock 占位 + NotImplementedError）— 公开文档分裂（UPOP / OpenAPI / 控件 3 套算法 SHA-1 vs SHA-256）+ certId+PKIX 三证链不可绕过 + 无商户证书+测试 merId → Mock 与生产不等价 → 基于公开 PDF 自造验签 = 把伪造 callback 静默通过的风险带进 Tier1
+- `services/tx-pay/src/channels/unionpay.py` UnionPayChannel skeleton — channel_name='unionpay' / Mock 模式 pay/query/refund 返 success / 真实模式 pay/query/refund 抛 NotImplementedError / verify_callback 显式抛 NotImplementedError 含"证书/凭据/PKIX 三证"明确 audit signal
+- `services/tx-pay/src/main.py` registry.register(UnionPayChannel())
+- `services/tx-pay/tests/test_unionpay_skeleton_tier1.py` 6 个 Tier1 反测（channel_name 对齐 / registry 注册 / supports UNIONPAY / Mock pay 成功 / verify_callback NotImplementedError + 含"证书/凭据" / message 不含 success/paid/已收款/ok 防 except 误判）
+- reviewer 1 轮 P1 修 → APPROVE：query() Mock trade_no fallback `MOCK_UP_<uuid>` 避免下游 NPE
+- **不在本 PR**：`shared/integrations/unionpay_sdk.py` / callback_routes.py /unionpay endpoint / PaymentRoutingEngine 优先级 — 全留凭据 PR
+
+**3 backlog issue（凭据前置）**
+- `#468` [Tier1] UnionPay 全套接入 — 商户 .pfx + middle/root .cer + 测试 merId + product line 合约确认前置
+- `#469` [Tier1] 拉卡拉 verify_callback — 公开文档不足，需创始人 raw spec / SDK / 历史代码 / 商户证书
+- `#470` [Tier1] 数字人民币 channel — 13 家运营机构选定 + 商户协议签订前置（路径 A 直连 / 路径 B 聚合服务商）
+
+### 数据变化
+- main: `b92eb0e1` (5/11 夜深 D1 末) → `2c4633b4` (PR #467 unionpay skeleton)
+- 4 PR MERGED（#459 / #461 / #465 / #467）— admin-merge 第 7-10 次累积（历史 6 → 现 10）
+- 3 backlog issue OPEN（#468 / #469 / #470）
+- 30 个新 Tier1 测试（alipay 12 / shouqianba 11 / wechat 1 / unionpay 6）— 全 PG 真验签 + 真签名构造 + AsyncMock spec 守护
+- 5 个 reviewer pass（#459×2 / #461×1 / #465×1 / #467×1）— 全 1-2 轮真 BUG only APPROVE
+- 5 个新建文件：`alipay_sdk.py` / `shouqianba_sdk.py` / `unionpay.py` / 3 个 tier1 test 文件
+- 4 个 worktree（alipay/shouqianba/wechat-app-h5/unionpay-skeleton）+ 4 个 branch（fix/tx-pay-alipay-verify-callback / fix/tx-pay-shouqianba-verify-callback / fix/tx-pay-wechat-app-h5-prepay / feat/tx-pay-unionpay-skeleton）
+- workflow 改动 1 次：tier1-gate.yml pip install 加 `cryptography`（真根因，非噪音）
+
+### 战绩
+- **F#8 父任务从 NotImplementedError 到 4 渠道 Tier1 真验签 1 session 推完** — 5/13 deal-breaker < 24h 前 surgical 收尾。alipay 真 RSA2 / shouqianba 真 MD5 / wechat 真实模式入口修复 / unionpay 安全占位 + audit-friendly NotImplementedError
+- **2 枚 silent bug 顺手揭露 + 修**：shouqianba channel_name 漂移（registry lookup 永久 500）/ shouqianba 响应格式（无限重试风险）/ wechat 真实模式 AttributeError（顾客付不了款）— 这些都不在原 F#8 spec 范围，是写测试时 reviewer-style 触发的 deep coverage 发现
+- **cross-fix _mock_mode 单例快照 P0 跨 PR 同款修**：shouqianba PR #461 reviewer 揭露 → 识别 alipay PR #459 同款 → 1 commit 跨 PR 修。pattern: reviewer 在 PR-A 找到的 P0 antipattern 必须立即 grep 兄弟 PR / 兄弟模块 是否同款
+- **Tier1 CI 真根因 vs 预存漂移噪音正确分辨**：按 `project_tunxiang_ci_gates.md` `python-lint-test (*)` 全 PR 一律 fail 是噪音可忽略；但本次 `Run Tier 1 services/tx-pay/tests` fail **不是**噪音 — alipay test 顶层 cryptography import collection 即炸是真 bug。1 行修 workflow pip install 列表
+- **决策 B 应用：spec NO-GO 全套实现 → skeleton + 显式 NotImplementedError + audit signal** — 不基于公开 PDF 在 Tier1 资金链路写未联调验签代码。pattern 沉淀：未来再遇 spec 分裂 + 无凭据 + 无测试环境 三角 → 同款 skeleton + backlog issue 处理（vs 拉卡拉 spec 不公开 同款 backlog，不同根因）
+- **reviewer stop-line "B 选项 真 BUG only"实战**：5 个 reviewer pass 全 1-2 轮，无一进入"越审越深"循环。surgical fix 不主动暴露 P2 nitpick 给 reviewer，按 reviewer 反馈线性修不展开
+
+### 遗留问题
+- **5/13 deal-breaker（channel-aggregation 资质）< 24h**：3 平台**企业资质**（创始人级别非技术 task）— 连续 7+ session 提醒未起手。本 session 4 PR 全合也走不通（资质未办则 callback 无法联调）。建议 user 今晚做资质决定
+- **持续阻塞 B（dev-plan-60d 故事核心方向）**：5/7 旧计划被 30+ commit 推翻，需 user 新 demo 故事方向
+- **持续阻塞 C（DailySummary / Header export #351 xfail）**：需 user 创始人 §18 ontology 对齐
+- **拆 session 边界**：本 session compaction 后继续，密度仍属可控（4 PR + 30 测试 + 3 backlog issue + 1 workflow 修），但已超越 "高密度 4-PR 拆 session" 经验线，下次类似密度建议主动拆
+
+### 明日计划
+1. 等 user 完成 channel-aggregation 3 平台资质决定（非技术 task，但前置一切技术 PR）
+2. user 提供 UnionPay / 拉卡拉 / 数字人民币 凭据后另起凭据 PR（#468 / #469 / #470 任一启动）
+3. 5/13 demo 路径 walkthrough — alipay / wechat / shouqianba / unionpay skeleton 走通端到端（含 callback 联调）
+4. wechat APP/H5/Native 三种 trade_type 补完（PR #465 surgical scope 外的 follow-up）
+5. 持续阻塞 B/C user 决策
+
+---
+
 ## 2026-05-11 夜深 — B + D1 收尾（清理 + 沉淀 session，admin-merge 第 6 次累积）
 
 ### 今日完成

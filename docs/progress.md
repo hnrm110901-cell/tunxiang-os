@@ -1,3 +1,33 @@
+## 2026-05-12 12:55Z · F#8 父任务 4 PR 收尾 + 3 backlog issue
+
+### 完成状态
+- [x] **PR #459 alipay verify_callback (admin-squash `a56948fe`)**：RSA2 + 业务字段校验 + 12 Tier1 测试 + reviewer 2 轮 0 BUG + cross-fix _mock_mode P0
+- [x] **PR #461 shouqianba verify_callback (admin-squash `04a0d218`)**：MD5(body+terminal_key) + 11 Tier1 测试 + 同 PR 修 channel_name 漂移 + 响应格式 silent bug + reviewer 1 轮 0 BUG
+- [x] **PR #465 wechat pay() 真实模式 1 行预存 bug 修 (admin-squash `8bbd2c50`)**：`create_jsapi_order` → `create_prepay` + 1 Tier1 反测（AsyncMock 双断言）
+- [x] **PR #467 unionpay skeleton (admin-squash `2c4633b4`)**：决策 B（Mock 占位 + NotImplementedError）+ 6 Tier1 测试 + reviewer P1 query trade_no fallback 修
+- [x] **`.github/workflows/tier1-gate.yml` cryptography deps 漏装真根因修**（commit `01f0bc05` 含在 PR #459 内）
+- [x] **3 backlog issue OPEN**：#468 UnionPay 全套接入 / #469 拉卡拉 verify_callback / #470 数字人民币 channel
+
+### 关键决策
+- **决策 B（unionpay skeleton 不全套）**：document-specialist NO-GO 全套实现 — 公开文档分裂（UPOP/OpenAPI/控件 3 套算法） + certId+PKIX 三证链不可绕过 + 无商户证书+测试 merId → Mock 与生产不等价 → 基于公开 PDF 写未联调验签 = 把伪造 callback 静默通过的风险带进 Tier1 资金链路。选 audit-friendly skeleton + NotImplementedError，凭据到位另起 PR
+- **cross-fix pattern 沉淀**：reviewer 在 PR-A 找到的 P0 antipattern（如 _mock_mode 单例快照）立即 grep 兄弟 PR 是否同款 → 1 commit 跨 PR 修。shouqianba reviewer 揭露 → alipay cross-fix P0
+- **CI 真根因 vs 预存漂移噪音分辨**：按 memory `project_tunxiang_ci_gates.md` `python-lint-test (*)` 噪音可忽略；但 `Run Tier 1 services/tx-pay/tests` fail 是真 bug（cryptography deps 漏装）— alipay test 顶层 import 即炸。判断标准：fail 在 base.yml `pip install` 列表范围内 vs 不可避免依赖 → 后者必须修 workflow
+- **silent bug 顺手揭露 vs surgical scope 平衡**：shouqianba channel_name 漂移 + 响应格式 + wechat pay() AttributeError 不在原 F#8 spec，但写测试时 deep coverage 触发 → 同 PR 修（不外溢独立 PR 避免连环 reviewer cycle）
+
+### 下一步
+1. **(user 决策)** 5/13 channel-aggregation 3 平台**企业资质**（创始人级别非技术 task）— 连续 7+ session 提醒未起手，所有 callback 联调前置
+2. **(user 决策)** 凭据 PR 启动顺序：#468 UnionPay / #469 拉卡拉 / #470 数字人民币 — 任一前置凭据齐备先启
+3. 5/13 demo 路径端到端 walkthrough — alipay / wechat / shouqianba 真验签 + unionpay Mock skeleton + 持续阻塞 B（demo 故事方向）user 决策
+4. wechat APP/H5/Native 三 trade_type 补完（PR #465 surgical scope 外 follow-up）
+
+### 已知风险
+- **5/13 deal-breaker < 24h**：技术 PR 全 merge 也走不通（企业资质未办 = 联调走不通） — 创始人级别非技术 task 是真前置
+- **admin-merge 累积 10 次**：本 session +4（#459 #461 #465 #467）+ 即将开 docs 沉淀 PR = 11。main 无 branch protection，风险归操作者；本批全是 Tier1 真门禁 SUCCESS + reviewer 1-2 轮 APPROVE + 红绿双 commit + 真 PG 验签 → admin-merge 5 项裁决标准全过
+- **拆 session 边界**：本 session 累计 4 PR + 30 测试 + 3 backlog issue + 1 workflow fix + 1 cross-fix + 5 reviewer pass，超越 "高密度 4-PR 拆 session" 经验线，下次同密度主动拆
+- **unionpay skeleton 已在 main**：channel registry 有 unionpay channel name，但 verify_callback NotImplementedError；若有人误以为已实现并触发真实 callback 流量 → 立即抛错（audit 友好）。message 含"证书/凭据"显式标识 deliberate 占位 vs 漏改
+
+---
+
 ## 2026-05-11 夜深 · B + D1 收尾（清理 + 沉淀 session）
 
 ### 完成状态
