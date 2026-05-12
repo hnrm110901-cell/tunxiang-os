@@ -684,7 +684,7 @@ class TestContentCalendarRoutes:
 
         db = _make_db()
 
-        with patch("api.content_calendar_routes._factory") as mock_factory:
+        with patch("services.tx_growth.src.api.content_calendar_routes._factory") as mock_factory:
             mock_factory.auto_generate = AsyncMock(
                 return_value={
                     "content": "AI生成的文案",
@@ -711,7 +711,7 @@ class TestContentCalendarRoutes:
 
         db = _make_db()
 
-        with patch("api.content_calendar_routes._factory") as mock_factory:
+        with patch("services.tx_growth.src.api.content_calendar_routes._factory") as mock_factory:
             mock_factory.generate_weekly_plan = AsyncMock(
                 return_value=[{"day": f"周{d}", "content": "内容"} for d in "一二三四五六日"]
             )
@@ -729,7 +729,7 @@ class TestContentCalendarRoutes:
 
         db = _make_db()
 
-        with patch("api.content_calendar_routes._factory") as mock_factory:
+        with patch("services.tx_growth.src.api.content_calendar_routes._factory") as mock_factory:
             mock_factory.schedule_content = AsyncMock(
                 return_value={
                     "id": CONTENT_ID,
@@ -750,7 +750,7 @@ class TestContentCalendarRoutes:
 
         db = _make_db()
 
-        with patch("api.content_calendar_routes._publisher") as mock_pub:
+        with patch("services.tx_growth.src.api.content_calendar_routes._publisher") as mock_pub:
             mock_pub.publish_single = AsyncMock(
                 return_value={
                     "id": CONTENT_ID,
