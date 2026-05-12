@@ -4,6 +4,7 @@ Master Agent 编排 + 9 个 Skill Agent + 三条硬约束
 """
 
 import asyncio
+import importlib
 import os
 from contextlib import asynccontextmanager
 
@@ -47,71 +48,62 @@ from .api.voice_routes import router as voice_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
-# P0 新路由 — 部分可能尚未创建，用 try/except 避免阻止服务启动
-try:
-    from .api.agent_registry_routes import router as agent_registry_router
-except ImportError:
-    agent_registry_router = None
+# ── W1-T2 改造（2026-05-12）：silent failure → fail-loud ───────────
+# 旧版（V3.0）用 14 个 try/except ImportError 静默吞错：service 启动看似成功
+# 但任一路由 import 失败 → 路由变 None → 功能缺失，运维不可见。
+# 新版（V3.1）：显式 AGENT_API_ROUTES 清单 + importlib + fail-loud。
+# - 任一路由 import 失败 → 抛 ImportError → service 启动失败 → k8s 不接流量
+# - 启动 log 输出加载清单；GET /health 暴露 loaded_routes + pending_impl
+# checkpoint_routes 是已知缺失（W20 baseline 实测），显式列入 pending_impl
+# 而不是 try/except 隐藏。实现后再加入 AGENT_API_ROUTES。
+AGENT_API_ROUTES = [
+    "agent_registry_routes",
+    "session_routes",
+    "event_binding_routes",
+    "agent_memory_routes",
+    "agent_message_routes",
+    "memory_evolution_routes",
+    "sop_routes",
+    "im_sop_routes",
+    "coaching_routes",
+    "feedback_routes",
+    "budget_forecast_routes",
+    "customer_journey_routes",
+]
+# 已知缺失路由（W20 baseline 实测，待实现后从此清单移入 AGENT_API_ROUTES）
+AGENT_API_PENDING_IMPL = [
+    "checkpoint_routes",
+]
 
-try:
-    from .api.session_routes import router as session_router
-except ImportError:
-    session_router = None
+_loaded_routes: list[str] = []
 
-try:
-    from .api.event_binding_routes import router as event_binding_router
-except ImportError:
-    event_binding_router = None
 
-try:
-    from .api.checkpoint_routes import router as checkpoint_router
-except ImportError:
-    checkpoint_router = None
+def _register_agent_api_routes(app: FastAPI) -> None:
+    """显式注册 AGENT_API_ROUTES — W1-T2 fail-loud 改造.
 
-try:
-    from .api.agent_memory_routes import router as agent_memory_router
-except ImportError:
-    agent_memory_router = None
+    任一路由 import 失败 → 抛 ImportError → service 启动失败。
+    替换原 14 个 try/except ImportError 隐藏失败的反模式。
 
-try:
-    from .api.agent_message_routes import router as agent_message_router
-except ImportError:
-    agent_message_router = None
-
-try:
-    from .api.memory_evolution_routes import router as memory_evolution_router
-except ImportError:
-    memory_evolution_router = None
-
-try:
-    from .api.sop_routes import router as sop_router
-except ImportError:
-    sop_router = None
-
-try:
-    from .api.im_sop_routes import router as im_sop_router
-except ImportError:
-    im_sop_router = None
-
-try:
-    from .api.coaching_routes import router as coaching_router
-except ImportError:
-    coaching_router = None
-
-try:
-    from .api.feedback_routes import router as feedback_router
-except ImportError:
-    feedback_router = None
-
-try:
-    from .api.budget_forecast_routes import router as budget_forecast_router
-except ImportError:
-    budget_forecast_router = None
-
-try:
-    from .api.customer_journey_routes import router as customer_journey_router
-except ImportError:
-    customer_journey_router = None
+    可观测性:
+      - 启动 log: agent_api_routes_loaded（含 count / routes / pending_impl）
+      - GET /health: 返回 loaded_routes + pending_impl
+    """
+    log = structlog.get_logger(__name__)
+    for module_name in AGENT_API_ROUTES:
+        module = importlib.import_module(f".api.{module_name}", package=__package__)
+        if not hasattr(module, "router"):
+            raise ImportError(
+                f"Module .api.{module_name} loaded but has no 'router' attribute. "
+                f"W1-T2 fail-loud: refusing to start to avoid silent functionality loss."
+            )
+        app.include_router(module.router)
+        _loaded_routes.append(module_name)
+    log.info(
+        "agent_api_routes_loaded",
+        count=len(_loaded_routes),
+        routes=_loaded_routes,
+        pending_impl=AGENT_API_PENDING_IMPL,
+    )
 
 
 async def get_db_with_tenant_factory(
@@ -276,38 +268,28 @@ app.include_router(knowledge_router)  # /api/v1/knowledge/* — 知识库管理
 app.include_router(tool_router)  # /api/v1/tools/* — Tool Bus 统一工具注册与调用（P1-4）
 app.include_router(edge_router)  # /api/v1/edge/* — 边缘推理状态/代理（P1-5）
 
-# P0 新路由（条件注册）
-if agent_registry_router is not None:
-    app.include_router(agent_registry_router)
-if session_router is not None:
-    app.include_router(session_router)
-if event_binding_router is not None:
-    app.include_router(event_binding_router)
-if checkpoint_router is not None:
-    app.include_router(checkpoint_router)
-if agent_memory_router is not None:
-    app.include_router(agent_memory_router)
-if agent_message_router is not None:
-    app.include_router(agent_message_router)
-if memory_evolution_router is not None:
-    app.include_router(memory_evolution_router)
-if sop_router is not None:
-    app.include_router(sop_router)
-if im_sop_router is not None:
-    app.include_router(im_sop_router)
-if coaching_router is not None:
-    app.include_router(coaching_router)
-if feedback_router is not None:
-    app.include_router(feedback_router)
-if customer_journey_router is not None:
-    app.include_router(customer_journey_router)  # /api/v1/agent/customer-journey/* — 客户触达SOP旅程
-if budget_forecast_router is not None:
-    app.include_router(budget_forecast_router)  # /api/v1/agent/budget/* — D4c AI预算预测
+# W1-T2 改造：显式注册 AGENT_API_ROUTES（fail-loud）
+# 替换原 14 个 if router is not None 的条件注册块
+_register_agent_api_routes(app)
 
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "data": {"service": "tx-agent", "version": "3.0.0"}}
+    """tx-agent 健康检查 — W1-T2 改造后暴露 loaded_routes / pending_impl.
+
+    运维可通过 /health 直接看到 service 实际加载了哪些 API 路由，
+    替代旧版 silent failure 模式下"启动看似成功但功能缺失"的盲区。
+    """
+    return {
+        "ok": True,
+        "data": {
+            "service": "tx-agent",
+            "version": "3.0.0",
+            "loaded_routes": _loaded_routes,
+            "loaded_count": len(_loaded_routes),
+            "pending_impl": AGENT_API_PENDING_IMPL,
+        },
+    }
 
 
 @app.get("/api/v1/agent/agents")
