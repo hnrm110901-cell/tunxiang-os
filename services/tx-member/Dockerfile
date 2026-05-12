@@ -8,4 +8,7 @@ RUN pip install --no-cache-dir --retries 5 --timeout 120 -i https://mirrors.aliy
 COPY shared/ ./shared/
 COPY services/tx-member/src/ ./services/tx_member/src/
 ENV PYTHONPATH=/app
+# F#2 PR-2: 以非 root 用户运行（PR #444 Helm 已 enforce runAsUser:10001）
+RUN useradd --uid 10001 --no-create-home --shell /sbin/nologin app
+USER 10001
 CMD ["uvicorn", "services.tx_member.src.main:app", "--host", "0.0.0.0", "--port", "8003"]

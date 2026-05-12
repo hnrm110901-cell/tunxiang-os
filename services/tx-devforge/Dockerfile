@@ -5,9 +5,10 @@ RUN pip install --no-cache-dir --retries 5 --timeout 120 -i https://mirrors.aliy
 COPY shared/ ./shared/
 COPY services/tx-devforge/src/ ./services/tx_devforge/src/
 ENV PYTHONPATH=/app
-# Trivy DS-0002：以非 root 用户运行 FastAPI，降低进程被入侵后的横向风险
-RUN useradd --system --no-create-home --shell /usr/sbin/nologin --uid 1001 txuser \
- && chown -R txuser:txuser /app
-USER txuser
+# F#2 PR-2: 以非 root 用户运行（PR #444 Helm 已 enforce runAsUser:10001）
+# UID 10001 与 CSO 2026-05-11 Option A 对齐（原 1001 偏离 Helm chart 值）
+RUN useradd --uid 10001 --no-create-home --shell /sbin/nologin app \
+ && chown -R 10001:10001 /app
+USER 10001
 EXPOSE 8017
 CMD ["uvicorn", "services.tx_devforge.src.main:app", "--host", "0.0.0.0", "--port", "8017"]
