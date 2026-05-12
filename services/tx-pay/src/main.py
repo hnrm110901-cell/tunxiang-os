@@ -28,6 +28,7 @@ async def lifespan(app: FastAPI):
     from .channels.registry import ChannelRegistry
     from .channels.shouqianba import ShouqianbaChannel
     from .channels.stored_value import StoredValueChannel
+    from .channels.unionpay import UnionPayChannel
     from .channels.wechat import WechatPayChannel
     from .deps import init_globals
     from .routing.engine import PaymentRoutingEngine
@@ -45,6 +46,10 @@ async def lifespan(app: FastAPI):
     # 聚合支付（拉卡拉 + 收钱吧）
     registry.register(LakalaChannel())
     registry.register(ShouqianbaChannel())
+
+    # 云闪付（skeleton 占位，凭据前置 — verify_callback 显式 NotImplementedError，
+    # 等创始人提供商户 .pfx + middle/root .cer + 测试环境 merId 后另起 PR 落地真验签）
+    registry.register(UnionPayChannel())
 
     # 内部渠道
     registry.register(CashChannel())
