@@ -1,3 +1,37 @@
+## 2026-05-12 12:00Z · 切片 1：CSO 2026-05-11 security 热区 4 PR 闭环（下午 session）
+
+### 完成状态
+- [x] **PR #474 (F#6 PR-1 helm 限流 `f8484d14` @ 08:36Z)** — close #455 [T2]，code-reviewer round-1 R-C (1 P0 + 2 P1 + 2 P2) → round-1 fix (authBurstMultiplier 5→1 + 删 deprecated annotation + realIP values 占位 + chart README cluster ConfigMap 部署前提) → round-2 APPROVE → admin-merge carve-out 第 11 次
+- [x] **PR #477 (F#5 sub-PR B XML 隔离 `d60585a3` @ 09:01Z)** — close #472 [T2]，`_build_system_prompt` + `_minimal_brief` markdown # → 3 块 XML (system_authority/tenant_brand_data/output_format) + treat-as-data 防御指令 + 28 cases PASS + sub-PR A regression 0 → round-1 APPROVE → admin-merge 第 12 次
+- [x] **PR #478 (F#3 SHA-pin `491fd419` @ 11:18Z)** — close #439 [T2]，9 处 pnpm/action-setup@v* (5 文件 / 3 版本) → SHA pin (`ls-remote` 实时解析) → round-1 APPROVE → admin-merge 第 13 次
+- [x] **PR #479 (F#1 edge CORS `04e35512` @ 11:59Z)** — close #438 [T3]，edge/sync-engine + edge/mac-station `allow_origins=["*"]` → env-driven (PR #437 pattern) → round-1 APPROVE → admin-merge 第 14 次
+- [x] **DEVLOG.md + docs/progress.md 沉淀**（本段）
+- [ ] **DEVLOG 沉淀 PR (第 5 PR)** — 本段写完后另开 branch / push / PR
+
+### 关键决策
+- **A+B 混合 fix 路径（#474 P0-1）** — user 选 A+B；helm 层做能做的全做（authBurstMultiplier 真对齐 + deprecated annotation 删 + realIP values 占位 + 部署前提 README），cluster ConfigMap (跨 namespace + ops 权限) follow-up；不卡 user 必须给腾讯云 CLB CIDR
+- **第二轮 review B 选项实战** — round-1 R-C (1 P0 + 2 P1 + 2 P2) → round-2 仅评估 round-1 是否修对 + 是否引入新 BUG，认 round-1 acknowledged 的 P2 留 follow-up，不无限套娃
+- **同 session 4 PR 一次性 admin-merge carve-out** — user 一次性 explicit 授权（"同意 admin-merge carve-out"），4 PR 均同主题 security + 同 reviewer pattern + 同 CI drift 判定，比每 PR 单独问效率高
+- **handoff/sub-PR SoT 不脑补先核 2 次** — ① 起手发现 memory origin/main = `b92eb0e1` 已被中间 session F#8 4 PR 推进到 `0d88909b` ② sub-PR A 派 executor 起手发现 #458 (`b85b5dd1`) 已合（用 shared utility 比原 spec 设计更好）
+- **§18 声明歧义现场修正** — 起手把 #472 (XML 隔离 P0，不需 product) 和 #473 (endpoint deprecate P1，需 product) 混为一谈；sub-PR A 完工后修正
+- **mechanical 任务直接做** — Agent API 502 错时改直接做 SHA-pin 替换 10min 完工，OMC delegation rule "trivial ops 直接做"
+
+### 下一步
+- A：fresh session — handoff 留 DEVLOG 顶 + 本段；起手必跑 SoT 校验命令
+- B：5/13 deal-breaker 资质（创始人级别非技术，倒计时 < 12h）
+- C：CSO follow-up 选 pick (F#5 ModelRouter system mask / F#6 cluster ConfigMap ops / `output_format` 重申 / sanitizer 通用 `<>` escape)
+- D：3 issue backlog (#448/#449/#450) pick
+- E：旧 `[SECURITY][Tier1]` rebase PR 群体 (#222-#232 等 8 个) 评估
+
+### 已知风险
+- **5/13 deal-breaker 倒计时 < 12h** — channel-aggregation 3 平台企业资质（创始人级别）
+- **`main` 无 branch protection / admin-merge 累积 14 次** — 后续非 codemod/docs-only/security 主题须重评
+- **CSO F#6 P0-1 仅 helm 层闭环** — cluster ConfigMap (`use-forwarded-for` + `proxy-real-ip-cidr`) 跨 namespace ops 改动未做；若部署到云 LB 而未配 ConfigMap，限流可能聚合误伤或被 XFF 绕过 — 必须部署前确认
+- **#472 验收第 4 项**：真 LLM 验证待 ops staging 跑
+- **handoff 末态可能再被合 PR 推进** — fresh session 起手必跑 SoT 校验
+
+---
+
 ## 2026-05-12 12:55Z · F#8 父任务 4 PR 收尾 + 3 backlog issue
 
 ### 完成状态
