@@ -1,0 +1,62 @@
+{{- if and .Values.ingress.enabled .Values.ingress.rateLimit.enabled -}}
+{{- /*
+F#6 (issue #455 P0-1) — 专限 /api/v1/auth/* 的第二个 Ingress
+
+设计：nginx-ingress 同 host 多 Ingress 会按 path 合并，更具体 path 优先匹配。
+本 Ingress 仅声明 /api/v1/auth Prefix，因此对该前缀生效 limit-rpm，
+主 ingress.yaml 的 / 通配规则覆盖其余业务路径不受影响。
+
+annotation 选型（ingress-nginx 原生限流）：
+- limit-rpm:                         每 IP 每分钟请求上限（默认 10）
+- limit-burst-multiplier:            burst = rpm × multiplier（默认 1 → burst=10 r/m，
+                                     与 bare-metal nginx-tls-hardened.conf:130 burst=5 差 2×）
+- limit-connections:                 同时并发连接上限（10，与 rpm 对齐避免 long-poll 堆积）
+
+⚠️ Client real IP 前提（部署 ops 必读）：
+ingress-nginx limit-rpm 计数键为 $binary_remote_addr（直连 nginx 的 socket peer IP）。
+云 LB 部署（腾讯云 CLB / 阿里云 SLB / AWS NLB 等）时 $binary_remote_addr = LB 源 NAT IP，
+所有 client 共享同一桶 → ① 限流聚合误伤 ② 攻击者控连接源路由获 N× 桶绕过。
+修复需在 ingress-nginx-controller ConfigMap 设 use-forwarded-for=true + proxy-real-ip-cidr，
+这是 ConfigMap-only 设置，per-Ingress annotation 不存在 → 本模板无法自动注入。
+values.yaml `ingress.realIP` 节仅用于 ops 部署时显式确认 cluster ConfigMap 已就绪。
+详见 infra/helm/api-gateway/README.md "部署前提"。
+
+切换：values.yaml `ingress.rateLimit.enabled: false` → 整 Ingress 不渲染。
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "api-gateway.fullname" . }}-auth
+  labels:
+    {{- include "api-gateway.labels" . | nindent 4 }}
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rpm: "{{ .Values.ingress.rateLimit.authPathRpm }}"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "{{ .Values.ingress.rateLimit.authBurstMultiplier }}"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    {{- if .Values.ingress.tls }}
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tlsSecretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "api-gateway.fullname" . }}
+                port:
+                  number: {{ .Values.service.port }}
+{{- end }}

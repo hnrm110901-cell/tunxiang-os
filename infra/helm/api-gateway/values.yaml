@@ -16,6 +16,29 @@ ingress:
   host: api.tunxiangos.cn
   tls: true
   tlsSecretName: api-tunxiangos-cn-tls
+  # F#6 (issue #455 P0-1) — nginx ingress rate-limit for /api/v1/auth/* (per-IP brute-force 防护)
+  # 实现：拆 ingress-auth.yaml 第二个 Ingress 专限 /api/v1/auth/*，主 ingress 业务路径不受影响
+  # 对照 bare-metal: infra/nginx/nginx-tls-hardened.conf:130 → rate=10r/m + burst=5
+  # 紧急关闭：rateLimit.enabled: false（仅 ops 临时使用，恢复需 follow-up issue 跟踪）
+  rateLimit:
+    enabled: true
+    authPathRpm: 10            # /api/v1/auth/* per-IP rate ceiling (req/min)
+    # ingress-nginx 公式: burst = limit-rpm × limit-burst-multiplier
+    # multiplier=1 → burst = 10 r/m（与 bare-metal burst=5 差 2×，已是合法范围内最贴近值）
+    # multiplier=0 在 controller 接受但 burst=0 会让所有非匀速请求 429，过严不取
+    # 默认 multiplier=5（=> burst=50 r/m，等价 bare-metal × 10，过松）→ 此处显式覆盖为 1
+    authBurstMultiplier: 1
+  # ingress-nginx 限流默认按 $binary_remote_addr（直连 socket peer）计数。
+  # 云 LB（腾讯云 CLB / 阿里云 SLB / AWS NLB 等）部署时，所有 client 共享 LB 源 NAT IP →
+  # limit-rpm 全租户聚合误伤 + 攻击者控连接源路由获 N× 桶。
+  # 修复需在 ingress-nginx-controller ConfigMap 设 use-forwarded-for + proxy-real-ip-cidr，
+  # 这是 ConfigMap-only 设置，per-Ingress annotation 不存在，本 chart 无法自动注入。
+  # 部署 ops 须根据下方配置先确认 cluster 层已就绪，详见 chart README "部署前提"。
+  realIP:
+    # 云 LB 部署必须 enabled=true + 填 trustedCidr，否则 limit-rpm 按 LB IP 计数
+    enabled: false
+    trustedCidr: ""            # e.g. "100.125.0.0/16" for 腾讯云 CLB
+    header: "X-Forwarded-For"
 
 resources:
   limits:
