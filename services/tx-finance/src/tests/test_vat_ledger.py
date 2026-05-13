@@ -7,7 +7,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from api.vat_ledger_routes import router
+from services.tx_finance.src.api.vat_ledger_routes import router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -58,7 +58,7 @@ async def test_create_output_record():
     mock_db = _make_mock_db()
     mock_db.execute = AsyncMock(return_value=MagicMock())
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/finance/vat/output",
@@ -91,7 +91,7 @@ async def test_create_input_record():
     mock_db = _make_mock_db()
     mock_db.execute = AsyncMock(return_value=MagicMock())
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/finance/vat/input",
@@ -150,7 +150,7 @@ async def test_monthly_summary_calculation():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get(
                 "/api/v1/finance/vat/summary/2026-04",
@@ -197,7 +197,7 @@ async def test_monthly_summary_all_integers():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get(
                 "/api/v1/finance/vat/summary/2026-04",
@@ -226,7 +226,7 @@ async def test_deduct_input_record():
     mock_result.fetchone.return_value = updated_row
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.put(
                 f"/api/v1/finance/vat/input/{record_id}/deduct",
@@ -248,7 +248,7 @@ async def test_pl_account_update():
     mock_db = _make_mock_db()
     mock_db.execute = AsyncMock(return_value=MagicMock())
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.put(
                 "/api/v1/finance/vat/pl-accounts/3010101",
@@ -324,7 +324,7 @@ async def test_output_list_by_period():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.vat_ledger_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get(
                 "/api/v1/finance/vat/output?period_month=2026-04",

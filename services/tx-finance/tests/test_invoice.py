@@ -26,10 +26,10 @@ from sqlalchemy.pool import StaticPool
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from models.cost_snapshot import Base
-from models.invoice import Invoice
+from services.tx_finance.src.models.cost_snapshot import Base
+from services.tx_finance.src.models.invoice import Invoice
 
-from services.invoice_service import (
+from services.tx_finance.src.services.invoice_service import (
     InvoiceAmountMismatchError,
     InvoiceNotFoundError,
     InvoiceService,

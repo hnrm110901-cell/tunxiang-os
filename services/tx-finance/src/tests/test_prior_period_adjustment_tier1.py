@@ -30,8 +30,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
     VoucherCreateInput,
     VoucherLineInput,
@@ -225,7 +225,7 @@ class TestAccountMapping6901:
     """ACCOUNT_MAPPING 新 6901 科目场景."""
 
     def test_prior_period_adjustment_scene_exists(self):
-        from services.voucher_generator import ACCOUNT_MAPPING  # type: ignore
+        from services.tx_finance.src.services.voucher_generator import ACCOUNT_MAPPING  # type: ignore
 
         assert "prior_period_adjustment" in ACCOUNT_MAPPING
         scene = ACCOUNT_MAPPING["prior_period_adjustment"]
@@ -234,7 +234,7 @@ class TestAccountMapping6901:
 
     def test_6901_is_credit_account_in_mapping(self):
         """6901 "以前年度损益调整" 默认配置为贷方科目 (冲减利润)."""
-        from services.voucher_generator import ACCOUNT_MAPPING  # type: ignore
+        from services.tx_finance.src.services.voucher_generator import ACCOUNT_MAPPING  # type: ignore
 
         credit_acc = ACCOUNT_MAPPING["prior_period_adjustment"]["credit"]
         assert credit_acc["code"] == "6901"

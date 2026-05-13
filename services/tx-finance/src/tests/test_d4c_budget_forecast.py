@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 ROOT = Path(__file__).resolve().parents[4]
 
-from services.budget_forecast_service import (  # noqa: E402
+from services.tx_finance.src.services.budget_forecast_service import (  # noqa: E402
     BudgetForecastResult,
     BudgetForecastService,
     BudgetSignalBundle,

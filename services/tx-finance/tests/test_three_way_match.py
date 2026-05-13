@@ -28,11 +28,11 @@ from sqlalchemy.pool import StaticPool
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from models.three_way_match import (
+from services.tx_finance.src.models.three_way_match import (
     Base as MatchBase,
 )
 
-from services.three_way_match_engine import (
+from services.tx_finance.src.services.three_way_match_engine import (
     MatchResult,
     MatchStatus,
     PurchaseOrderNotFoundError,

@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # 注册 analytics_routes（若 main.py 尚未注册，在此补充）
-from api.analytics_routes import router as analytics_router
+from services.tx_finance.src.api.analytics_routes import router as analytics_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -129,20 +129,20 @@ class TestAuditViewAPI:
 
 class TestSafeRatio:
     def test_zero_denominator(self):
-        from services.finance_analytics import _safe_ratio
+        from services.tx_finance.src.services.finance_analytics import _safe_ratio
 
         assert _safe_ratio(100, 0) == 0.0
         assert _safe_ratio(0, 0) == 0.0
 
     def test_normal_ratio(self):
-        from services.finance_analytics import _safe_ratio
+        from services.tx_finance.src.services.finance_analytics import _safe_ratio
 
         assert _safe_ratio(1, 4) == 0.25
         assert _safe_ratio(350, 1000) == 0.35
 
     def test_profit_rate_calculation(self):
         """验证利润率计算：profit / revenue"""
-        from services.finance_analytics import _safe_ratio
+        from services.tx_finance.src.services.finance_analytics import _safe_ratio
 
         revenue = 100000  # 1000元
         food_cost = 35000

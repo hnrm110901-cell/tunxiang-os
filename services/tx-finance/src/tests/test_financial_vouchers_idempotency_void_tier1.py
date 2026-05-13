@@ -35,7 +35,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.voucher import FinancialVoucher  # type: ignore  # noqa: E402
 
 # ─── 真实场景 #1-3: 幂等行为 (ORM + 迁移文件双视角) ──────────────────────
 

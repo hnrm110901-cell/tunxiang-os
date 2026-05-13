@@ -438,7 +438,7 @@ class TestAccountMappingOverride:
     @pytest.mark.asyncio
     async def test_tenant_override_applied(self) -> None:
         """租户自定义科目映射覆盖默认映射"""
-        from services.voucher_generator import VoucherGenerator
+        from services.tx_finance.src.services.voucher_generator import VoucherGenerator
 
         generator = VoucherGenerator()
         tenant_id = str(uuid.uuid4())
@@ -464,7 +464,7 @@ class TestAccountMappingOverride:
     @pytest.mark.asyncio
     async def test_default_mapping_when_no_tenant_config(self) -> None:
         """无租户配置时使用默认科目映射"""
-        from services.voucher_generator import ACCOUNT_MAPPING, VoucherGenerator
+        from services.tx_finance.src.services.voucher_generator import ACCOUNT_MAPPING, VoucherGenerator
 
         generator = VoucherGenerator()
         tenant_id = str(uuid.uuid4())
@@ -480,7 +480,7 @@ class TestAccountMappingOverride:
     @pytest.mark.asyncio
     async def test_db_error_fallbacks_to_default(self) -> None:
         """DB 读取异常时降级使用默认映射（不阻断凭证生成）"""
-        from services.voucher_generator import ACCOUNT_MAPPING, VoucherGenerator
+        from services.tx_finance.src.services.voucher_generator import ACCOUNT_MAPPING, VoucherGenerator
 
         generator = VoucherGenerator()
         tenant_id = str(uuid.uuid4())
@@ -502,7 +502,7 @@ class TestVoucherGeneratorWithMockDB:
 
     @pytest.fixture()
     def generator(self):
-        from services.voucher_generator import VoucherGenerator
+        from services.tx_finance.src.services.voucher_generator import VoucherGenerator
 
         return VoucherGenerator()
 

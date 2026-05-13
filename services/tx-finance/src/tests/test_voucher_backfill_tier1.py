@@ -30,7 +30,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.voucher_backfill_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.voucher_backfill_service import (  # type: ignore  # noqa: E402
     BackfillReport,
     VoucherBackfillService,
 )
