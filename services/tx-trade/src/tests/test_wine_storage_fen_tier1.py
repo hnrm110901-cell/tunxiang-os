@@ -27,7 +27,7 @@ for p in [ROOT, os.path.join(TRADE_SRC, "src"), TRADE_SRC]:
 # ── 1. 模型 schema：BigInteger fen 列 ──────────────────────────────────────────
 class TestWineStorageRecordFenSchema:
     def test_storage_price_fen_is_big_integer(self):
-        from models.wine_storage import WineStorageRecord
+        from services.tx_trade.src.models.wine_storage import WineStorageRecord
 
         col = WineStorageRecord.__table__.columns.get("storage_price_fen")
         assert col is not None, "WineStorageRecord 必须有 storage_price_fen 列"
@@ -37,7 +37,7 @@ class TestWineStorageRecordFenSchema:
         assert col.nullable is True, "storage_price_fen 应 nullable（存酒可以未定价）"
 
     def test_old_storage_price_column_removed(self):
-        from models.wine_storage import WineStorageRecord
+        from services.tx_trade.src.models.wine_storage import WineStorageRecord
 
         assert WineStorageRecord.__table__.columns.get("storage_price") is None, (
             "旧 storage_price (Decimal) 列必须已删除"
@@ -47,7 +47,7 @@ class TestWineStorageRecordFenSchema:
 class TestWineStorageTransactionFenSchema:
     def test_price_at_trans_fen_is_big_integer(self):
         """7 类流水共用同一个金额字段 price_at_trans_fen，覆盖 store_in/take_out/extend/transfer_in/transfer_out/write_off/adjustment 全部"""
-        from models.wine_storage import WineStorageTransaction
+        from services.tx_trade.src.models.wine_storage import WineStorageTransaction
 
         col = WineStorageTransaction.__table__.columns.get("price_at_trans_fen")
         assert col is not None, "WineStorageTransaction 必须有 price_at_trans_fen 列"
@@ -56,7 +56,7 @@ class TestWineStorageTransactionFenSchema:
         )
 
     def test_old_price_at_trans_column_removed(self):
-        from models.wine_storage import WineStorageTransaction
+        from services.tx_trade.src.models.wine_storage import WineStorageTransaction
 
         assert (
             WineStorageTransaction.__table__.columns.get("price_at_trans") is None
@@ -66,7 +66,7 @@ class TestWineStorageTransactionFenSchema:
 # ── 2. 元 ↔ fen helper ───────────────────────────────────────────────────────
 class TestYuanFenHelpers:
     def test_yuan_to_fen_simple(self):
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("123.45")) == 12345
         assert _yuan_to_fen(Decimal("0.01")) == 1
@@ -74,18 +74,18 @@ class TestYuanFenHelpers:
 
     def test_yuan_to_fen_accepts_zero(self):
         """存酒可以 storage_price=0（赠酒/未定价场景）— 与 invoice 不同"""
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("0")) == 0
 
     def test_yuan_to_fen_rejects_negative(self):
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         with pytest.raises(ValueError):
             _yuan_to_fen(Decimal("-1.00"))
 
     def test_fen_to_yuan_str(self):
-        from models.wine_storage import _fen_to_yuan_str
+        from services.tx_trade.src.models.wine_storage import _fen_to_yuan_str
 
         assert _fen_to_yuan_str(12345) == "123.45"
         assert _fen_to_yuan_str(0) == "0.00"
@@ -107,7 +107,7 @@ class TestSevenTransactionTypes:
     def test_seven_types_all_can_use_fen_field(self):
         """7 类流水共用 price_at_trans_fen，每类用法在 routes/services 各异，
         但 schema 层只验证字段存在 + 类型。"""
-        from models.wine_storage import WineStorageTransaction
+        from services.tx_trade.src.models.wine_storage import WineStorageTransaction
 
         col = WineStorageTransaction.__table__.columns.get("price_at_trans_fen")
         assert col is not None
@@ -132,7 +132,7 @@ class TestWineExtendBalanceAccumulation:
     def test_three_extend_calls_produce_correct_fen_sequence(self):
         from decimal import Decimal
 
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         # 模拟门店收银员连续 3 次为同一瓶酒续存（人工流水）
         extend_fees_yuan = [Decimal("500.00"), Decimal("300.00"), Decimal("200.00")]
@@ -157,7 +157,7 @@ class TestWineExtendBalanceAccumulation:
         """1 分续存边界（如收 0.01 元手续费）必须保留精度，不被舍入丢失"""
         from decimal import Decimal
 
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         # 1 分续存 → 必须存为 1 fen（不是 0）
         assert _yuan_to_fen(Decimal("0.01")) == 1
@@ -169,7 +169,7 @@ class TestWineExtendBalanceAccumulation:
         """免费续存场景（VIP 会员）：fee=0 必须接受，存为 0 fen"""
         from decimal import Decimal
 
-        from models.wine_storage import _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("0")) == 0
 
@@ -193,7 +193,7 @@ class TestWineExtendBalanceAccumulation:
         from datetime import date as _date
         from decimal import Decimal
 
-        from models.wine_storage import WineExtendRequest, _yuan_to_fen
+        from services.tx_trade.src.models.wine_storage import WineExtendRequest, _yuan_to_fen
 
         # 3 次连续续存：500/300/200 元
         fees_yuan = [Decimal("500.00"), Decimal("300.00"), Decimal("200.00")]
