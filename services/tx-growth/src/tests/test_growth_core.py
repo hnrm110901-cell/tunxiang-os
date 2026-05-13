@@ -109,7 +109,7 @@ if _src_dir not in sys.path:
 
 # journey_routes 使用 async_session_factory（上下文管理器），不走 get_db
 # 我们需要 patch async_session_factory；在此先导入以备用
-from api import (
+from services.tx_growth.src.api import (
     growth_campaign_routes,  # noqa: E402
     journey_routes,  # noqa: E402
 )

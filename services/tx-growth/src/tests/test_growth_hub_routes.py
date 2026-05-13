@@ -405,7 +405,7 @@ class TestGetGrowthProfile:
     def test_get_profile_not_found(self):
         """当 service 返回 None 时，响应 ok=False。"""
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._profile_svc.get_profile
 
@@ -437,7 +437,7 @@ class TestUpdateGrowthProfile:
     def test_update_profile_value_error(self):
         """service 抛出 ValueError 时，响应 ok=False。"""
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._profile_svc.update_profile
 
@@ -513,7 +513,7 @@ class TestJourneyTemplates:
 
     def test_get_template_not_found(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._journey_svc.get_template
 
@@ -600,7 +600,7 @@ class TestJourneyEnrollments:
 
     def test_get_enrollment_not_found(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._journey_svc.get_enrollment
 
@@ -728,7 +728,7 @@ class TestServiceRepairCases:
 
     def test_get_repair_case_not_found(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._repair_svc.get_case
 
@@ -815,7 +815,7 @@ class TestAgentSuggestions:
 
     def test_get_suggestion_not_found(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._suggestion_svc.get_suggestion
 
@@ -1177,7 +1177,7 @@ class TestBrandConfigs:
     def test_list_brand_configs_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.list_brand_configs
 
@@ -1197,7 +1197,7 @@ class TestBrandConfigs:
     def test_list_brand_configs_empty(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.list_brand_configs
 
@@ -1221,7 +1221,7 @@ class TestBrandConfigs:
     def test_create_brand_config_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.upsert_brand_config
 
@@ -1264,7 +1264,7 @@ class TestBrandConfigs:
     def test_get_brand_config_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.get_brand_config
 
@@ -1290,7 +1290,7 @@ class TestBrandConfigs:
     def test_get_brand_config_not_found(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.get_brand_config
 
@@ -1307,7 +1307,7 @@ class TestBrandConfigs:
     def test_budget_check_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._brand_svc.check_brand_budget
 
@@ -1401,7 +1401,7 @@ class TestCrossBrand:
     def test_opportunities_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._cross_brand_svc.find_cross_brand_opportunities
 
@@ -1430,7 +1430,7 @@ class TestCrossBrand:
     def test_opportunities_empty(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._cross_brand_svc.find_cross_brand_opportunities
 
@@ -1454,7 +1454,7 @@ class TestCrossBrand:
     def test_customer_profile_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._cross_brand_svc.get_customer_cross_brand_profile
 
@@ -1491,7 +1491,7 @@ class TestCrossBrand:
     def test_customer_profile_error(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._cross_brand_svc.get_customer_cross_brand_profile
 
@@ -1520,7 +1520,7 @@ class TestExperiments:
     def test_experiment_summary_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.get_experiment_summary
 
@@ -1549,7 +1549,7 @@ class TestExperiments:
     def test_experiment_summary_error(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.get_experiment_summary
 
@@ -1575,7 +1575,7 @@ class TestExperiments:
     def test_select_variant_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.select_variant
 
@@ -1602,7 +1602,7 @@ class TestExperiments:
     def test_select_variant_error(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.select_variant
 
@@ -1624,7 +1624,7 @@ class TestExperiments:
     def test_auto_iterate_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.auto_iterate
 
@@ -1655,7 +1655,7 @@ class TestExperiments:
     def test_adjustments_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.auto_adjust_journey_params
 
@@ -1684,7 +1684,7 @@ class TestExperiments:
     def test_adjustments_empty(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._experiment_svc.auto_adjust_journey_params
 
@@ -1878,7 +1878,7 @@ class TestP1Recompute:
     def test_p1_recompute_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._profile_svc.batch_compute_p1_fields
 
@@ -1898,7 +1898,7 @@ class TestP1Recompute:
     def test_p1_recompute_error(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._profile_svc.batch_compute_p1_fields
 
@@ -1927,7 +1927,7 @@ class TestP1Recompute:
 class TestWeatherSignal:
     def test_weather_signal_ok(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._weather_svc.get_weather_signal
 
@@ -1955,7 +1955,7 @@ class TestWeatherSignal:
 
     def test_weather_signal_error(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._weather_svc.get_weather_signal
 
@@ -1979,7 +1979,7 @@ class TestWeatherSignal:
 class TestCalendarTriggers:
     def test_calendar_triggers_ok(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._calendar_svc.get_growth_triggers
 
@@ -2006,7 +2006,7 @@ class TestCalendarTriggers:
 
     def test_calendar_triggers_empty(self):
         _reset_db()
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._calendar_svc.get_growth_triggers
 
@@ -2037,7 +2037,7 @@ class TestStoresReadinessRanking:
     def test_readiness_ranking_ok(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._store_cap_svc.get_all_stores_readiness
 
@@ -2064,7 +2064,7 @@ class TestStoresReadinessRanking:
     def test_readiness_ranking_empty(self):
         _reset_db()
         _setup_empty_db_mocks(2)
-        from api import growth_hub_routes as _mod
+        from services.tx_growth.src.api import growth_hub_routes as _mod
 
         original = _mod._store_cap_svc.get_all_stores_readiness
 
