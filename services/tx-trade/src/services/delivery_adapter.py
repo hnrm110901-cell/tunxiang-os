@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 import structlog
 from sqlalchemy import and_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import _SET_TENANT_SQL, async_session_factory
@@ -240,7 +241,40 @@ class DeliveryPlatformAdapter:
             )
 
             session.add(delivery_order)
-            await session.commit()
+            try:
+                await session.commit()
+            except IntegrityError:
+                # INSERT race 兜底：L150 SELECT 未命中 + 并发另一路已 INSERT 同
+                # platform_order_id 后，本路 commit 触发 unique constraint。
+                # 回滚后重新 SELECT existing，按"幂等已存在"分支返回与 L161-173 同结构。
+                await session.rollback()
+                existing_after = await session.execute(
+                    select(DeliveryOrder).where(
+                        DeliveryOrder.platform_order_id == platform_order_id
+                    )
+                )
+                existing_after_order = existing_after.scalar_one_or_none()
+                if existing_after_order is None:
+                    # 不是 platform_order_id unique 触发（如 order_no 撞）→ 上抛
+                    raise
+                logger.info(
+                    "delivery_order_insert_race_recovered",
+                    platform_order_id=platform_order_id,
+                    existing_order_id=str(existing_after_order.id),
+                )
+                return {
+                    "order_id": str(existing_after_order.id),
+                    "order_no": existing_after_order.order_no,
+                    "platform_order_id": platform_order_id,
+                    "platform": existing_after_order.platform,
+                    "status": existing_after_order.status,
+                    "items_mapped": existing_after_order.items_json or [],
+                    "total_fen": existing_after_order.total_fen,
+                    "commission_fen": existing_after_order.commission_fen,
+                    "merchant_receive_fen": existing_after_order.merchant_receive_fen,
+                    "unmapped_items": existing_after_order.unmapped_items or [],
+                    "duplicate": True,
+                }
 
             logger.info(
                 "delivery_order_received",
@@ -281,7 +315,7 @@ class DeliveryPlatformAdapter:
         """
         session = await self._get_session()
         try:
-            order = await self._get_order(session, order_id)
+            order = await self._get_order(session, order_id, lock=True)
 
             if order.status not in ("confirmed", "pending"):
                 raise ValueError(f"订单状态 {order.status}，无法确认")
@@ -326,7 +360,7 @@ class DeliveryPlatformAdapter:
         """
         session = await self._get_session()
         try:
-            order = await self._get_order(session, order_id)
+            order = await self._get_order(session, order_id, lock=True)
 
             if order.status not in ("preparing", "confirmed"):
                 raise ValueError(f"订单状态 {order.status}，无法标记出餐")
@@ -383,7 +417,7 @@ class DeliveryPlatformAdapter:
 
         session = await self._get_session()
         try:
-            order = await self._get_order(session, order_id)
+            order = await self._get_order(session, order_id, lock=True)
 
             if order.status in ("completed", "cancelled", "refunded"):
                 raise ValueError(f"订单状态 {order.status}，无法取消")
@@ -441,7 +475,7 @@ class DeliveryPlatformAdapter:
         """
         session = await self._get_session()
         try:
-            order = await self._get_order(session, order_id)
+            order = await self._get_order(session, order_id, lock=True)
 
             if order.status not in ("ready", "delivering", "preparing", "confirmed"):
                 raise ValueError(f"订单状态 {order.status}，无法完成")
@@ -642,12 +676,28 @@ class DeliveryPlatformAdapter:
 
     # ─── 内部方法 ───
 
-    async def _get_order(self, session: AsyncSession, order_id: str) -> DeliveryOrder:
-        """从数据库获取订单（显式 tenant_id 过滤，配合 RLS 双重保障）"""
+    async def _get_order(
+        self,
+        session: AsyncSession,
+        order_id: str,
+        *,
+        lock: bool = False,
+    ) -> DeliveryOrder:
+        """从数据库获取订单（显式 tenant_id 过滤，配合 RLS 双重保障）.
+
+        Args:
+            lock: 是否对 DeliveryOrder 行加 FOR UPDATE 排他锁（PostgreSQL 行锁）。
+                  Tier 1 state machine 切换路径（confirm / mark_ready / cancel / complete）
+                  必须 lock=True，防多平台 webhook + 内部触发并发 race 丢状态更新。
+                  read-only 入口默认 False 不回归性能。
+        """
         conditions = [DeliveryOrder.id == uuid.UUID(order_id)]
         if self.tenant_id:
             conditions.append(DeliveryOrder.tenant_id == uuid.UUID(self.tenant_id))
-        result = await session.execute(select(DeliveryOrder).where(and_(*conditions)))
+        stmt = select(DeliveryOrder).where(and_(*conditions))
+        if lock:
+            stmt = stmt.with_for_update()
+        result = await session.execute(stmt)
         order = result.scalar_one_or_none()
         if order is None:
             raise ValueError(f"外卖订单不存在: {order_id}")
