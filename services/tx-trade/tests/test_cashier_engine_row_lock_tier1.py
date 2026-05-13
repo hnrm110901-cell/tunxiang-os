@@ -94,16 +94,24 @@ def _make_order(**kw):
 
 
 def _make_engine(db):
-    """构造 CashierEngine 实例，注入 mock db."""
+    """构造 CashierEngine 实例，注入 mock db.
+
+    CashierEngine.__init__ 签名是 `tenant_id: str`，内部 `uuid.UUID(tenant_id)`
+    再 normalize 为 UUID 对象。这里必须传 str，传 UUID 对象会触发
+    `uuid.UUID(uuid_obj)` → `hex.replace('urn:', ...)` AttributeError
+    (Python 3.11 CI 暴露；本机 3.9 module-level skip 跳过没暴露)。
+    """
     from services.tx_trade.src.services.cashier_engine import CashierEngine
 
-    return CashierEngine(db=db, tenant_id=TENANT_ID)
+    return CashierEngine(db=db, tenant_id=str(TENANT_ID))
 
 
 def _build_db_capture(order_to_return, dish_to_return=None):
     """构造 AsyncSession mock，capture 所有 execute 的 stmt.
 
     add_item 路径返回 (Order, Dish) row；其他单 SELECT 路径返回 scalar Order.
+    非 Order/OrderItem 查询（如 Store / Payment 等下游查询）返回 None
+    避免 MagicMock 算术导致 `floor = 1.0 - MagicMock` 等 TypeError.
     """
     db = AsyncMock()
     captured: list = []
@@ -111,7 +119,17 @@ def _build_db_capture(order_to_return, dish_to_return=None):
     async def mock_execute(stmt, *args, **kwargs):
         captured.append(stmt)
         result = MagicMock()
-        result.scalar_one_or_none = MagicMock(return_value=order_to_return)
+        # 仅对 Order/OrderItem 查询返回 order_to_return；其他下游查询
+        # （Store cost_ratio_target / Payment 等）返回 None，让业务代码
+        # 走 default 分支（避免 MagicMock 参与算术运算 TypeError）。
+        stmt_str = str(stmt) if stmt is not None else ""
+        # SQLAlchemy 渲染 "\nFROM orders \n"，用 \b 边界检测更稳
+        is_order_query = (
+            "FROM orders" in stmt_str or "FROM order_items" in stmt_str
+        )
+        result.scalar_one_or_none = MagicMock(
+            return_value=order_to_return if is_order_query else None
+        )
         # add_item 单次查询返回 (Order, Dish) row
         if dish_to_return is not None:
             row = (order_to_return, dish_to_return)
