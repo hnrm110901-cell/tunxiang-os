@@ -93,7 +93,7 @@ class TestInvoiceFenArithmetic:
 # ── 3. 元 ↔ fen 边界换算 helper：避免 0.30、0.1+0.2 类浮点舍入 bug ────────────
 class TestYuanFenBoundaryHelpers:
     def test_yuan_to_fen_simple(self):
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("123.45")) == 12345
         assert _yuan_to_fen(Decimal("100.00")) == 10000
@@ -101,7 +101,7 @@ class TestYuanFenBoundaryHelpers:
 
     def test_yuan_to_fen_handles_decimal_floating_edges(self):
         """边界：0.1 + 0.2 = 0.3 在 float 是 0.30000000000000004，但 Decimal 精确"""
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("0.30")) == 30
         assert _yuan_to_fen(Decimal("0.1") + Decimal("0.2")) == 30
@@ -118,7 +118,7 @@ class TestYuanFenBoundaryHelpers:
         金税四期/诺诺接口约定 HALF_UP；HALF_EVEN 在 .005 边界会与税务系统差 1 分，
         累计后触发对账偏差稽查（PR #264 verifier 反馈）。
         """
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         # HALF_UP: 0.005 → 1 fen（HALF_EVEN 会得 0）
         assert _yuan_to_fen(Decimal("0.005")) == 1, "ROUND_HALF_UP 必须把 0.005 进位到 1 分"
@@ -127,25 +127,25 @@ class TestYuanFenBoundaryHelpers:
 
     def test_yuan_to_fen_rejects_negative(self):
         """金额不能为负；红冲走另外的 negation 路径，不通过此 helper"""
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         with pytest.raises(ValueError):
             _yuan_to_fen(Decimal("-1.00"))
 
     def test_yuan_to_fen_rejects_zero_by_default(self):
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         with pytest.raises(ValueError):
             _yuan_to_fen(Decimal("0"))
 
     def test_yuan_to_fen_accepts_zero_when_explicit(self):
         """免税商品 tax_amount=0 路径，必须 allow_zero=True 显式表达意图"""
-        from services.invoice_service import _yuan_to_fen
+        from services.tx_finance.src.services.invoice_service import _yuan_to_fen
 
         assert _yuan_to_fen(Decimal("0"), allow_zero=True) == 0
 
     def test_fen_to_yuan_str_two_decimals(self):
-        from services.invoice_service import _fen_to_yuan_str
+        from services.tx_finance.src.services.invoice_service import _fen_to_yuan_str
 
         assert _fen_to_yuan_str(12345) == "123.45"
         assert _fen_to_yuan_str(10000) == "100.00"
@@ -157,14 +157,14 @@ class TestYuanFenBoundaryHelpers:
 # ── 4. _validate_amount 必须接收 int fen 进行精确比较，容差 1 fen ──────────────
 class TestValidateAmountFen:
     def test_validate_accepts_exact_match(self):
-        from services.invoice_service import InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceService
 
         svc = InvoiceService()
         # exact match never raises
         svc._validate_amount_fen(12345, 12345)
 
     def test_validate_accepts_one_fen_tolerance(self):
-        from services.invoice_service import InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceService
 
         svc = InvoiceService()
         # 1 fen diff allowed (tolerance == 1 fen)
@@ -172,7 +172,7 @@ class TestValidateAmountFen:
         svc._validate_amount_fen(12344, 12345)
 
     def test_validate_rejects_two_fen_diff(self):
-        from services.invoice_service import InvoiceAmountMismatchError, InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceAmountMismatchError, InvoiceService
 
         svc = InvoiceService()
         with pytest.raises(InvoiceAmountMismatchError):
@@ -182,7 +182,7 @@ class TestValidateAmountFen:
         """方法签名必须用 int 类型注解，避免重新引入 Decimal"""
         import inspect
 
-        from services.invoice_service import InvoiceService
+        from services.tx_finance.src.services.invoice_service import InvoiceService
 
         sig = inspect.signature(InvoiceService._validate_amount_fen)
         for name, param in sig.parameters.items():
@@ -201,7 +201,7 @@ class TestInvoiceToDictSerialization:
         from datetime import datetime, timezone
 
         from models.invoice import Invoice
-        from services.invoice_service import _invoice_to_dict
+        from services.tx_finance.src.services.invoice_service import _invoice_to_dict
 
         now = datetime.now(timezone.utc)
         inv = Invoice(
@@ -228,7 +228,7 @@ class TestInvoiceToDictSerialization:
 
     def test_dict_emits_none_for_missing_tax(self):
         from models.invoice import Invoice
-        from services.invoice_service import _invoice_to_dict
+        from services.tx_finance.src.services.invoice_service import _invoice_to_dict
 
         inv = Invoice(
             id=uuid.uuid4(),
@@ -254,7 +254,7 @@ class TestRedFlushAmountIntegrity:
     """
 
     def test_red_flush_amount_strictly_negates_original(self):
-        from services.invoice_service import _fen_to_yuan_str
+        from services.tx_finance.src.services.invoice_service import _fen_to_yuan_str
 
         original_fen = 12345
         original_str = _fen_to_yuan_str(original_fen)  # "123.45"
@@ -268,22 +268,22 @@ class TestRedFlushAmountIntegrity:
 
     def test_red_flush_zero_tax_path(self):
         """tax_fen=None 红冲不能崩"""
-        from services.invoice_service import _fen_to_yuan_str
+        from services.tx_finance.src.services.invoice_service import _fen_to_yuan_str
 
         # 模拟 invoice.tax_fen 为 None：负数化时用 `-(invoice.tax_fen or 0)` → -0 = 0
         assert _fen_to_yuan_str(-(None or 0)) == "0.00"
 
     def test_red_flush_one_fen_precision(self):
         """1 分边界：原 0.01 元 → 红冲 -0.01 元，绝不能因精度变成 0.00"""
-        from services.invoice_service import _fen_to_yuan_str
+        from services.tx_finance.src.services.invoice_service import _fen_to_yuan_str
 
         assert _fen_to_yuan_str(1) == "0.01"
         assert _fen_to_yuan_str(-1) == "-0.01"
 
 
-# ── 7. 迁移文件存在 + revision 链对接 v402（AST 解析，不依赖 alembic 运行时）───
+# ── 7. 迁移文件存在 + revision 链对接 v413_member_identity_map（AST 解析，不依赖 alembic 运行时）───
 class TestMigrationFile:
-    def test_v403_invoice_amount_fen_migration_present(self):
+    def test_v414_invoice_amount_fen_migration_present(self):
         import ast
 
         repo_root = Path(__file__).resolve().parents[4]
@@ -292,7 +292,7 @@ class TestMigrationFile:
             / "shared"
             / "db-migrations"
             / "versions"
-            / "v403_invoice_amount_fen.py"
+            / "v414_invoice_amount_fen.py"
         )
         assert mig_path.exists(), f"迁移文件 {mig_path} 必须存在"
 
@@ -312,11 +312,11 @@ class TestMigrationFile:
             elif isinstance(node, ast.FunctionDef):
                 functions.add(node.name)
 
-        assert assigned.get("revision") == "v403", (
-            f"revision 必须是 'v403'，got {assigned.get('revision')!r}"
+        assert assigned.get("revision") == "v414_invoice_amount_fen", (
+            f"revision 必须是 'v414_invoice_amount_fen'，got {assigned.get('revision')!r}"
         )
-        assert assigned.get("down_revision") == "v402", (
-            f"down_revision 必须接 'v402'，got {assigned.get('down_revision')!r}"
+        assert assigned.get("down_revision") == "v413_member_identity_map", (
+            f"down_revision 必须接 'v413_member_identity_map'，got {assigned.get('down_revision')!r}"
         )
         assert "upgrade" in functions, "缺 upgrade()"
         assert "downgrade" in functions, "缺 downgrade()"

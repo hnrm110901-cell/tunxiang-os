@@ -1,8 +1,8 @@
 """invoice 金额字段 Decimal 元 → BigInteger 分（CLAUDE.md §15+§17 Tier1 红线）
 
-Revision ID: v403
-Revises: v402
-Create Date: 2026-05-07
+Revision ID: v414_invoice_amount_fen
+Revises: v413_member_identity_map
+Create Date: 2026-05-07 (rebased onto v413 head 2026-05-13)
 
 变更：
   invoices.amount       NUMERIC(10,2) → invoices.amount_fen BIGINT (NOT NULL)
@@ -23,7 +23,7 @@ Create Date: 2026-05-07
   - 把 fen 数据回填到旧列（仅在不可逆 DROP 之前可全量回滚）
 
 关联：docs/gap-verification-2026-05-07.md Part E 第 1 项 + Part C §C.6
-依赖：v402（main 4a373343 head）
+依赖：v413_member_identity_map（rebase 2026-05-13 main b37e50aa head）
 """
 from typing import Sequence, Union
 
@@ -31,8 +31,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "v403"
-down_revision: Union[str, Sequence[str], None] = "v402"
+revision: str = "v414_invoice_amount_fen"
+down_revision: Union[str, Sequence[str], None] = "v413_member_identity_map"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
@@ -56,7 +56,7 @@ def upgrade() -> None:
     ).scalar()
     if null_count and null_count > 0:
         raise RuntimeError(
-            f"v403 abort: invoices 表有 {null_count} 行 amount IS NULL，"
+            f"v414_invoice_amount_fen abort: invoices 表有 {null_count} 行 amount IS NULL，"
             f"违反 NOT NULL 约束预期。请先人工 backfill 或删除这些记录。"
         )
 
