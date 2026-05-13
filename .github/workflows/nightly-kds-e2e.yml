@@ -56,7 +56,7 @@ jobs:
 
       - name: Upload Playwright HTML report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kds-e2e-report-${{ github.run_id }}
           path: apps/web-kds/playwright-report/
@@ -64,7 +64,7 @@ jobs:
 
       - name: Upload trace + screenshots on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: kds-e2e-trace-${{ github.run_id }}
           path: apps/web-kds/test-results/

@@ -37,7 +37,7 @@ jobs:
         run: npx playwright test e2e/tests/offline-cashier.spec.ts --project=offline
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: offline-e2e-results-${{ github.run_number }}
           path: e2e/test-results/
