@@ -1,3 +1,80 @@
+## 2026-05-13 末段 — structlog `event=` 字段冲突 2 PR follow-up ship (#566 + #570)
+
+### 今日完成
+
+5/13 第 5 波 ship batch — PR-F (#563) §19 reviewer P2#1 follow-up + 同模式 follow-up. 不属 `#532` 6-PR roadmap (roadmap 已晚段晚收官), 是 row-lock audit doc §4.1.5 follow-up + PR review 副产品 grep 出的同模式 bug.
+
+**PR #566 — `delivery_adapter._notify_platform` structlog event 冲突 MERGED** `29e42f30` (admin squash, **Tier 1 fund/源 explicit-ask 第 10 例**, 不在 8 类 carve-out):
+- 2 files / +143 / -1: `services/tx-trade/src/services/delivery_adapter.py` L714 (1 行) + `test_delivery_adapter_notify_platform_tier1.py` 3 用例
+- Bug 模式: `logger.info("platform_notified", platform=..., event=event, data=...)` — structlog 把第一个 positional `"platform_notified"` 视为保留 event_name 字段, payload `event=` kwarg 重复触发 `TypeError: meth() got multiple values for argument 'event'`
+- 修法: payload kwarg rename `event=event` → `notify_event=event` (1 行). 函数签名 `_notify_platform(self, platform, event, data)` **保持不变** — 4 callers (confirm/mark_ready/cancel/complete_order) 全 positional 调用, 无 caller side 联动
+- Prod impact (修前): 4 state machine `session.commit()` 成功后调 `_notify_platform` → 抛 TypeError → API caller 见 HTTP 500 (订单实已确认) + log 噪音, 外卖三平台 webhook 触发高频. P2 (不影响数据正确性)
+- 测试 (3 用例): T1 `no_typeerror_with_event_kwarg` (直接 await coroutine 验证不抛) / T2 `log_uses_notify_event_kwarg` (`structlog.testing.capture_logs` 断言 `notify_event` 字段名 + `event=event_name`) / T3 `signature_unchanged` (`inspect.signature` 锁 caller 兼容)
+
+**PR #570 — `table_production_plan.push_table_ready_ws` structlog 同模式 MERGED** `16e4e5f0` (admin squash, **Tier 1 fund/源 explicit-ask 第 11 例**, 不在 8 类 carve-out, Closes #568):
+- 2 files / +216 / -2: `services/tx-trade/src/services/table_production_plan.py` L88-89 (2 行) + `test_table_fire_ws_push_structlog_tier1.py` 4 用例
+- PR #566 ship 期间 grep `tx-trade/src/services/*.py` 找 `logger\..*event=` 发现的同模式 bug, 起 issue #568 + follow-up PR ship
+- Bug 模式 (双层冲突):
+  - L88 `log = logger.bind(store_id=..., tenant_id=..., event=event)` — 不抛但 event 字段会被 L89 positional **静默覆盖** (dead state)
+  - L89 `log.info("table_fire.ws_push", ..., event=event)` — TypeError 触发点
+- 修法 (2 行, L88 + L89): 双层 `event=event` → `notify_event=event`. L94 JSON payload `"event": event` **保留不动** (Redis pub/sub mac-station 消费协议 wire format, rename 会破坏)
+- Prod impact (修前): 200 桌晚高峰 all_ready=True 触发 → L89 抛 TypeError → caller `notify_dept_ready` try/except Exception 兜底 → log.error 误判 "ws_push_failed" → **真 Redis pub/sub 永不执行** → mac-station/ExpoStation 收不到 "table_ready" → 后厨传菜员未被通知 → 出餐延迟. P1 (出餐信号丢失, 不影响订单/资金)
+- 测试 (4 用例): T1 `no_typeerror` (mock Redis publish 验证流程恢复) / T2 `log_uses_notify_event` (capture_logs 断言 bind context + structlog kwarg) / T3 `redis_payload_event_field_preserved` (**wire protocol 守门** — payload `"event": "table_ready"` 字段必须保留) / T4 `signature_unchanged`
+
+### TDD Red→Green 证据 (#566 + #570)
+
+```
+[Reproduce] Python 3.11 + structlog 25.x:
+  >>> structlog.get_logger().info("platform_notified", event="order_confirmed")
+  TypeError: meth() got multiple values for argument 'event'
+
+  >>> log = structlog.get_logger().bind(event='biz_event')
+  >>> log.info('table_fire.ws_push', table_no=5, event='biz_event')
+  TypeError: ... got multiple values for argument 'event'
+
+[Red]     新测试在 origin/main 跑会抛 TypeError fail
+[Refactor] L714 (PR #566) + L88-89 (PR #570) rename → notify_event=
+[Green]   PR #566: 3/3 passed (新) + 8/8 passed (PR-F #563 existing 不退化)
+          PR #570: 4/4 passed (新) + 11/11 passed (test_table_fire.py existing 不退化, 从 tx-trade rootdir)
+```
+
+### §19 reviewer 评审记录 (#566 + #570)
+
+`code-reviewer` agent (opus, B 选项真 BUG only):
+- **#566**: APPROVED **0 P0 / 0 P1** — 与 PR-C/F 同水位 (roadmap 最高质量). 4 评审 PASS (源改动正确性 / 测试红→绿 robust 不被 mock 蒙混 / 无新增 regression / log analytics 侧无依赖 break)
+- **#570**: APPROVED **0 P0 / 0 P1** — 4 评审 PASS (含 **wire protocol 守门** 重点关注 — L94 mac-station 消费 `event` 字段必须保留, T3 测试守门确保 regression 阻断)
+- **CodeRabbit**: #566 `pass` 完整通过 (PR-C 同水位); #570 触发完整审查
+
+### structlog `event=` 冲突全仓扫净 (本 session 闭环)
+
+`grep -rn 'logger\..*event=' services/tx-trade/src/` — tx-trade/src/services/ 已**扫净** (delivery_adapter ✅ + table_production_plan ✅). 仅剩 `logger.bind(event=...)` 单独使用 (无后续 positional `.info` collision) 是安全模式. 其他服务同模式扫描可作后续 follow-up.
+
+### 数据变化
+
+- 迁移版本: 无 (test + 1-2 行源改动, 0 migration)
+- 新增 API: 0
+- 新增测试: 2 file (1 new tier1 / 7 用例 = #566 3 + #570 4)
+- 修改源: 2 file (delivery_adapter.py 1 行 + table_production_plan.py 2 行)
+
+### 累计 tally 更新 (5/13 末段)
+
+- **Tier 1 fund/源 explicit-ask** (不在 8 carve-out): 5/13 末段累计 11 (上轮 #271/#272/#544/#546/#547/#553/#556/#560/#563 = 9 例 + 本 session **#566 + #570** = 11 例)
+- **`#532` audit doc §4.1.5 follow-up 收尾**: PR-F (#563) §19 P2#1 → PR #566 闭环 (P2 升 P1 实际严重度, log 噪音表面但隐藏真异常)
+- **本 session 累计**: 2 PR ship + 2 issue close (#562 + #568) + 1 follow-up issue create (#568)
+- **同期别 session ship** (rebase 时发现): PR #567 (#549 deduct_for_order ABBA 防护, audit §4.3 scope 外 architect P1 follow-up) — 不在本 session scope
+
+### 遗留问题
+
+- §17 桌台并发语义对齐 follow-up PR (合并 #549/#557/#559/cashier 6 P1+P2/order 3 P1 = ~11 路径) — 等创始人 3 选择题 (双开台 race / 转桌争抢 / 结算释放桌台中间态)
+- 其他服务 (tx-finance/tx-supply/tx-ops/tx-member etc.) `logger.\w+\(positional, ..., event=...\)` 同模式 grep — 候选 follow-up issue
+- pre-existing CI 漂移 12 项 (python-lint-test / Ruff / frontend-build / Test Changed Services) 与本 PR 无关
+
+### 明日计划
+
+等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质) 或 §17 桌台对齐 follow-up PR (前提: 创始人 3 选择题答复)
+
+---
+
 ## 2026-05-13 晚段晚 — Tier 1 row-lock 6-PR roadmap 收官 (PR-E #560 + PR-F #563)
 
 ### 今日完成

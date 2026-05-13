@@ -1,3 +1,35 @@
+## 2026-05-13 末段 · structlog `event=` 字段冲突 2 PR follow-up ship (#566 + #570)
+
+### 完成状态
+
+- [x] **PR #566 `#562` delivery_adapter._notify_platform structlog event 冲突 MERGED** `29e42f30` (admin squash, **Tier 1 fund/源 explicit-ask 第 10 例**, 不在 8 类 carve-out): 2 files / +143 / -1, L714 (1 行) + 3 用例 tier1 测试
+- [x] **PR #570 `#568` table_production_plan.push_table_ready_ws 同模式 MERGED** `16e4e5f0` (admin squash, **Tier 1 fund/源 explicit-ask 第 11 例**, Closes #568): 2 files / +216 / -2, L88-89 (2 行) + 4 用例 tier1 测试
+- [x] **TDD Red→Green** — Python 3.11 reproduce `TypeError: meth() got multiple values for argument 'event'` (structlog 25.x). 新测试在 origin/main 跑会 fail (红), rename `event=` → `notify_event=` 后全绿. 不退化 PR-F existing 8/8 + test_table_fire 11/11
+- [x] **§19 reviewer (opus B 选项)** APPROVED 双 0 P0 / 0 P1 — 与 PR-C/F 同水位 (roadmap 最高质量), 4-4 评审 PASS. **#570 含 wire protocol 守门重点关注** (T3 测试守 L94 mac-station `event` 字段)
+- [x] **CodeRabbit 双完整通过** — PR #566 `pass` (PR-C 同水位); PR #570 触发完整审查无异议
+- [x] **structlog `event=` 冲突全仓扫净** (本 session 闭环) — `grep -rn 'logger\..*event=' services/tx-trade/src/` 已无命中. tx-trade/src/services/ 扫净 ✅ (delivery_adapter + table_production_plan)
+
+### 关键决策
+
+- **PR #566 修法选源 — 仅 rename payload kwarg 不动函数签名** — `_notify_platform(self, platform, event, data)` 4 callers 全 positional, 改签名会破坏 caller. 只动 L714 内部 structlog kwarg, blast radius 最小
+- **PR #570 修法保护 wire protocol** — L94 JSON payload `"event": event` 是 Redis pub/sub mac-station 消费协议 (mac-station 端按 `event` 字段路由), rename 会破坏 wire format. 仅 rename L88-89 structlog 内部 kwarg, T3 测试守门确保未来 regression 阻断
+- **PR-F §19 P2#1 升 P1 实际严重度** — issue #562 标 P2 (不影响数据正确性, 仅 log 噪音), 但 PR #570 同模式 #568 实际是 **P1 出餐信号丢失** (`notify_dept_ready` try/except Exception 兜底误判为 Redis push 失败, 真 pub/sub 永不执行 → 后厨未被通知). 表面 log 噪音 P2 + 隐藏真异常 P1 双重影响, 应优先修
+- **issue 创建 + ship 同 session 节奏** — PR #566 ship 期间 grep 发现同模式 → 立即 create #568 → 同 session ship #570. 不等 session 切换避免上下文流失 + memory `feedback_proactive_session_split` 适用边界 (single follow-up <30min 不强拆 session)
+
+### 下一步
+
+- 其他服务 (tx-finance/tx-supply/tx-ops/tx-member etc.) `logger.\w+\(positional, ..., event=...\)` 同模式 grep — 候选 follow-up issue (本 session scope 外)
+- §17 桌台并发语义对齐 follow-up PR — 合并 #549/#557/#559/cashier 6 P1+P2/order 3 P1 = ~11 路径, 前提创始人 3 选择题答复
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- L94 Redis wire payload 字段命名敏感 — mac-station 端如有 hardcoded `payload["event"]` 引用, 此次修复 (源动 L88-89, 不动 L94) 不破坏. 若后续清理时误改 L94, T3 测试守门 (PR #570 `redis_payload_event_field_preserved`) 会拦截
+- pre-existing `Test Changed Services` / `RLS Runtime — 7 P0 表` / `frontend-build` / 8 个 python-lint-test 在 main 全 fail — 预存漂移 (`project_tunxiang_ci_gates` 已落), 与本 2 PR 无关
+- 同 session 别 worktree 干扰 — 主 worktree (`/Users/lichun/tunxiang-os`) 当前在 stale 分支 `docs/devlog-2026-05-13-late-night-ship-batch` (`c6f60833` 已 merge 为 PR #564 squash, remote 已删). 本 session 用独立 worktree `.tunxiang-p0-worktrees/devlog-2026-05-14-structlog-batch/` 写 DEVLOG/progress.md 不动主 worktree (feedback `并发 Claude 会话互踩`)
+
+---
+
 ## 2026-05-13 深夜 · Tier 1 row-lock 首发 P0 三发全收尾 (PR-C #553)
 
 ### 完成状态
