@@ -22,6 +22,7 @@
 | 报告 | 主题 |
 |---|---|
 | [pg7 RLS UPDATE policy 残留](./pg7-rls-update-policy-residual.md) | PostgreSQL 7 RLS UPDATE 策略边缘场景 |
+| [Tier 1 写路径 SELECT-then-UPDATE 行锁审计 2026-05](./tier1-row-lock-audit-2026-05.md) | PR #272 §19 wine_storage 发现 trigger — 16 服务全扫，24 漏锁 / 14 P0 / 2 架构 gap（issue #532 / arch follow-ups #535 #537） |
 
 ## 如何更新本索引
 
