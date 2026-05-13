@@ -63,7 +63,7 @@ def _shell_dirs():
 
 
 def test_all_expected_shells_exist():
-    """17 service + 1 core shells exist."""
+    """16 service + 1 core shells exist."""
     missing = [(name, str(path)) for name, path in _shell_dirs() if not path.is_dir()]
     assert not missing, f"Missing shells: {missing}"
 
