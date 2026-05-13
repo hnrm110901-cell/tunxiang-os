@@ -1,3 +1,96 @@
+## 2026-05-13 深夜 · Tier 1 row-lock 首发 P0 三发全收尾 (PR-C #553)
+
+### 完成状态
+
+- [x] **PR #553 `#532` 6-PR roadmap PR-C MERGED** `3ee7c9b3` (admin squash, **Tier 1 fund/源 explicit-ask 第 5 例**, 不在 8 类 carve-out): 2 files / +305 / -9, `payment_saga_service.py` 2 路径 + 1 new tier1 测试 (6 用例)
+- [x] **`compensate` (P0 双退款)** FOR UPDATE + 3 幂等检查 (COMPENSATED→True / COMPENSATING→False / FAILED→False) + 重排 `_update_step(COMPENSATING)` 至 SELECT 之后
+- [x] **`recover_pending_sagas` (P0 多 worker)** FOR UPDATE SKIP LOCKED, 多 worker 串行化生效
+- [x] **§19 reviewer (opus B 选项) APPROVED 0 P0 / 0 P1** — **首次无 follow-up issue**, 5 条评审全 PASS (raw SQL 透传 / SKIP LOCKED 事务边界 / 3 幂等覆盖 / 200 桌并发 / 断网 4h)
+- [x] **Stub 污染避坑新模式** — `pytest.skip(allow_module_level=True) + sys.version_info < (3, 10)` 替代 `_ensure_stub("shared")` 污染, CI Python 3.11 直接用 real shared (slots=True 原生)
+- [x] **CodeRabbit 首次完整通过** — PR-A/B 都 pending/disabled, PR-C `CodeRabbit pass`. memory `feedback_coderabbit_incremental_policy` 印证差异
+
+### 关键决策
+
+- **`#532` 6-PR roadmap 首发 P0 三发全收尾** — PR-A tx-finance (#544, 金税四期+客户押金) + PR-B tx-supply (#547, 食安+毛利) + PR-C tx-trade payment_saga (#553, 双退款防护) 三发完工. 剩余 PR-D cashier_engine (二发 P0) / PR-E order_service (二发 P0) / PR-F delivery_adapter (三发 P1)
+- **明确不修边界** — `_validate_order` 架构 P0 在 issue #537 (跨步骤占位锁) / `_complete_order` audit §4.1 自评"条件 UPDATE 已 mitigate 大半". 严守 audit doc §8 PR-C 行注 scope, 不顺手扩张
+- **raw SQL FOR UPDATE 透传** — text() compile 至 driver 100% 透传, 测试断言 `str(text_arg)` 直接 grep `"FOR UPDATE"` (比 ORM compile 更直接), 与 PR-A `wine_storage_routes.py` 同模式
+
+### 下一步
+
+- PR-D cashier_engine row-lock fix (~200 行需 §17 桌台对齐 + §19 reviewer + Tier 1 fund explicit-ask)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 / channel-aggregation 资质)
+
+### 已知风险
+
+- 双退款 on tx-rollback 残留 (refund 网关调成功但 client tx 因 HTTPException 回滚 → 下次 worker 见 COMPLETING 重发) 属 issue #537 跨步骤占位锁议题, 非本 PR 引入, architect 评估
+- pre-existing `test_saga_buffer_tier1.py` 2 fail 仍在 main, 独立调查 (本 PR 验证不在 scope)
+
+---
+
+## 2026-05-13 晚段 ship batch · PR-B tx-supply + #536 follow-up + workflow unblock chain (#547 + #548 + #550 + #552)
+
+### 完成状态
+
+- [x] **PR #547 `#532` 6-PR roadmap PR-B MERGED** `6564b915` (admin squash, **Tier 1 fund explicit-ask 第 4 例**): 6 files / +731 / -17, 5 路径 (receive/issue/adjust + BOM 扣料 + 盘点终结) 补 FOR UPDATE
+- [x] **ABBA 防死锁设计** — BOM 行 + 盘点 items `sorted(key=lambda x: str(ingredient_id))` + 内联 `.with_for_update()`, 跨 DB 一致 + stable sort
+- [x] **PR #548 `#536` follow-up shouqianba mock-delegation MERGED** `140f37a9` (admin squash, **carve-out 第 8 类第 3 例, tally 39→40**): 1 file / +74 / -11, mock 注入验委托契约, Closes #540, 2 failed→0 failed
+- [x] **PR #552 `#551` integration-pg-tests workflow bug 修 MERGED** `8cc91fd4` (admin squash, **T2 infra carve-out**): 1 file / +5 / -3, `upgrade head` → `upgrade v413_member_identity_map` 锁定上限, Closes #551
+- [x] **PR #550 v413 platforms_aligned_with_canonical drift 守门 MERGED** `8b981805` (admin squash, **carve-out test-only T3**): 1 file / +39 / -1, 镜像 v411/v412 pattern, 18 → 19 passed
+- [x] **§19 reviewer (#547) APPROVED 0 P0 / 2 P1** — P1#1 → #549 (跨 dish ABBA, audit §4.3 scope 外) / P1#2 微性能 note 边角
+
+### 关键决策
+
+- **Unblock chain 模式建立** (#552 → #550) — `#551` workflow design bug 阻塞 v413 守门入主线: 必须先修 workflow 上限 (#552) 才能解锁 v413 守门 (#550). 时间倒序 ship 19:13 → 19:19. 后续遇 `xxx → yyy: workflow 阻塞 → 修 workflow 解锁 yyy` chain, 复用此模式
+- **方案 A mock-injected delegation** (#548) — 替代 PR #536 删的内部 `_call_*` stub 测试: 源重构 `_call_*` → 依赖注入 `ShouqianbaClient` 后, 委托契约 (`mock_sqb.pay/refund` 被调用) 不变, 测试不脆
+- **`_get_ingredient` helper kwarg pattern** (#547) — `lock: bool=False` 3 mutation caller 显式 `lock=True`, 第 4 read-only `get_stock_balance` default False 不回归. 与 PR-A invoice_service `_get_ingredient` 同 pattern
+- **CI/local 不一致 round-2 修法** (#547) — 删 `_ensure_stub("shared")`, CI Python 3.11 直接用 real shared (slots=True 原生). memory `feedback_pytest_stub_setdefault_pitfall` 5/13 扩展实例 #2 (跨 test 文件 sys.modules 污染)
+
+### 下一步
+
+- PR-C tx-trade payment_saga (`#532` 6-PR roadmap 第 3 发, P0 双退款防护) — 已在深夜 ship `#553`
+- `#549` deduct_for_order 跨 dish ABBA 防护 (T2 arch follow-up, architect 评估 / PR-D/E 统一预聚合)
+
+### 已知风险
+
+- `Test Changed Services` / `RLS Runtime — 7 P0 表` 两 workflow 预存漂移在 main 全 fail (`project_tunxiang_ci_gates` 已落), 与 fix PR 无关
+- 完整 alembic chain (v001-v409) 仍是独立 issue 候选 — 当前 workflow 上限锁 v413 是 channel-aggregation scope 务实策略
+- 同 ingredient 多 BOM 行 ABBA 路径 (本 PR `deduct_for_dish` 内已防, 但 `deduct_for_order` 跨 dish 共享场景仍裸 → #549)
+
+---
+
+## 2026-05-13 后续 session · #541 fix + _method_to_category dedup (#545 + #546)
+
+### 完成状态
+
+- [x] **PR #545 #541 fix MERGED** `68a9d31e` (admin squash, **carve-out 第 8 类第 2 例, tally 38→39**): 1 file / 4 行修, `test_route_methods` 聚合 dict overwrite bug, Closes #541, 3 fail→2 fail
+- [x] **PR #546 _method_to_category dedup MERGED** `7db25a7c` (admin squash, **Tier 1 源 refactor explicit-ask**, 不在 8 类 carve-out): 3 files / +84 / -24, SoT 收敛至 PaymentGateway, 行为变化 0 (mapping 字节级一致)
+- [x] **#542 tier1-gate 正向 TDD 压力机制首次真实验证成功** — PR #546 source-test-pairing gate + 17 service matrix 全跑通过, #542 设计闭环验证
+- [x] **§19 reviewer (opus B 选项)** APPROVED 0 P0 / 0 P1 — 5 条评审全 PASS, hasattr invariant 健壮性 NOTE (非 BUG)
+- [x] **CI/local 不一致 round-2 debug + fix**: 同 dir 17 src-prefix vs 3 FQN 混入 → SQLAlchemy MetaData Table 'payments' 双注册. round-2 切 src-prefix majority 修, memory `feedback_pytest_stub_setdefault_pitfall` 5/13 扩展
+
+### 关键决策
+
+- **P1-D dedup 路径选择 src-prefix over FQN 跟随 dir majority** — 17/3 split 是 #501 Phase 3 重命名的近邻问题. 在全仓统一前, dir 内 majority 是正确局部 SoT. memory 已加注释指向证据
+- **B (CodeRabbit) → A (§19+CI) 路径切换** — CodeRabbit rate-limit + 用量耗尽, 0 review 落地. memory `feedback_coderabbit_incremental_policy` 印证 "reviews=[] + status SUCCESS 仍无产出, 不算 A2 lane 证据"
+- **Tier 1 源 refactor 不在 8 类 carve-out** — 即使行为变化 0, 触碰 Tier 1 源 (cashier_engine + payment_gateway) 仍走 explicit-ask. 与 PR #271/#272 fund-path explicit-ask 同模式, 累计第 3 次
+
+### 下一步
+
+- 下 session P1 候选:
+  1. **#540 shouqianba 2 obsolete tests fix** — 中等, 需评估 ShouqianbaClient 单测覆盖率
+  2. **v413 drift test 补** — ~10 行 surgical, `test_platforms_aligned_with_canonical` v411/v412 已存在 v413 缺
+  3. **test_saga_buffer_tier1 2 fail 独立调查** — pre-existing on main (本 PR 验证不在我 scope), 真因待挖
+  4. **全仓 tier1 import style 统一** — FQN vs src-prefix 17/3 split, 类 #501 Phase 3 同名 file rename 近邻问题
+- Wave 3 创始人级阻塞 (B dev-plan-60d / C DailySummary §18 / channel-aggregation 资质) 等输入
+
+### 已知风险
+
+- pre-existing `test_saga_buffer_tier1.py` 2 fail 仍在 main, 影响 tier1 group 全绿率 (但本 PR 不修, 独立调查)
+- pre-existing `test_cashier_engine.py` 2 fail (#540 obsolete tests) 仍在 main, 独立 follow-up
+- 全仓 tier1 dir import style mixed (17/3) — 任何新增 *tier1*.py 必须严格跟随 majority (src-prefix), 否则触发 MetaData dup. memory 已扩展, 下次新建 *tier1*.py 前 grep 同 dir majority 风格
+
+---
+
 ## 2026-05-13 cold-start fresh session · test_cashier_engine fee_rate 假绿 fix (#536)
 
 ### 完成状态
