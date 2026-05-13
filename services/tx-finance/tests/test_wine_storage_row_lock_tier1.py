@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import os
 import sys
-import types
 import uuid
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -33,52 +32,10 @@ for p in [ROOT, FINANCE_SRC]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-
-# ── sys.modules stub 注入（与 services/tx-finance/src/tests/test_wine_storage.py 对齐）
-# 原因：shared/events/src/event_base.py 用 @dataclass(slots=True) (Python 3.10+ 语法)，
-# 本地 Python 3.9 仅可通过 stub 跑测；CI 3.11 不需要 stub 但兼容这套 stub。
-def _ensure_stub(module_path: str, attrs: dict | None = None) -> types.ModuleType:
-    if module_path not in sys.modules:
-        mod = types.ModuleType(module_path)
-        if attrs:
-            for k, v in attrs.items():
-                setattr(mod, k, v)
-        sys.modules[module_path] = mod
-    return sys.modules[module_path]
-
-
-_ensure_stub("shared")
-_ensure_stub("shared.ontology")
-_ensure_stub("shared.ontology.src")
-_db_mod = _ensure_stub("shared.ontology.src.database")
-if not hasattr(_db_mod, "get_db_with_tenant"):
-
-    async def _placeholder_get_db_with_tenant(tenant_id: str):
-        yield None
-
-    _db_mod.get_db_with_tenant = _placeholder_get_db_with_tenant
-
-_ensure_stub("shared.events")
-_ensure_stub("shared.events.src")
-_ensure_stub("shared.events.src.emitter", {"emit_event": AsyncMock()})
-_ev_types = _ensure_stub("shared.events.src.event_types")
-if not hasattr(_ev_types, "WineStorageEventType"):
-
-    class _FakeWineStorageEventType:
-        STORED = "wine.stored"
-        RETRIEVED = "wine.retrieved"
-        EXTENDED = "wine.extended"
-        EXPIRED = "wine.expired"
-
-    _ev_types.WineStorageEventType = _FakeWineStorageEventType
-
-if "structlog" not in sys.modules:
-    _sl = types.ModuleType("structlog")
-    _sl.get_logger = MagicMock(return_value=MagicMock())
-    sys.modules["structlog"] = _sl
-
-if "asyncpg" not in sys.modules:
-    sys.modules["asyncpg"] = types.ModuleType("asyncpg")
+# 不用 sys.modules stub — 之前 _ensure_stub("shared") 会把 'shared' 注入为空包，
+# 污染同目录其他 test_*_tier1.py 中 `from shared.adapters.*` 真实 import（memory
+# `feedback_pytest_stub_setdefault_pitfall.md` 记录的陷阱）。CI Python 3.11 直接用 real
+# shared.events / shared.ontology.src.database 即可，slots=True 语法支持。
 
 
 TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
