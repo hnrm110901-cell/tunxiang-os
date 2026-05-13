@@ -1,3 +1,107 @@
+## 2026-05-13 晚段晚 — Tier 1 row-lock 6-PR roadmap 收官 (PR-E #560 + PR-F #563)
+
+### 今日完成
+
+5/13 第 4 波 ship batch — `#532` 6-PR row-lock fix roadmap **真正全收尾**. PR-D 已在前一 entry (#564) 涵盖, 本 entry 补齐由并发 session 在 PR-D ship 同期推进的 PR-E + PR-F (feedback_concurrent_pr_race.md 5/13 实例).
+
+**PR #560 — `#532` 6-PR roadmap PR-E order_service MERGED** `ebb758ce` (admin squash, **Tier 1 fund/源 explicit-ask 第 8 例**, 不在 8 类 carve-out):
+- 2 files / +279 / -10: `services/tx-trade/src/services/order_service.py` 2 P0 路径 + `test_order_service_row_lock_tier1.py` 4 用例
+- 路径 1 `apply_discount` (L321, P0 折扣无锁): `_get_order(lock=True)` — **比 cashier_engine 简化版更危险**, 连 margin 校验都没有, 三条硬约束毛利底线
+- 路径 2 `settle_order` (L339, P0 双结算 + Saga S3 链路): `_get_order(lock=True)` — `payment_saga_service._complete_order` L502 调本函数在**同 AsyncSession + 同事务**, PostgreSQL FOR UPDATE 同事务同行重入无害, 给 saga S3 步骤**补齐占位锁** (PR-C `compensate` + `recover_pending_sagas` 加锁 + 本 PR settle_order 加锁 → 双结算路径闭环)
+- `_get_order(order_id, *, lock: bool = False)` helper — 与 PR-D `_get_order` 100% 模式对齐 (cross-service 一致); 2 P0 caller 显式 `lock=True`, 其他 read-only / 不在范围 caller 默认 False 零回归
+- **3 P1 路径不在范围**: `update_item_quantity` L277 / `remove_item` L300 / `cancel_order` L463 — 跟 PR-D 6 P1/P2 桌台 follow-up PR 合并, 等创始人 §17 桌台并发语义对齐
+- **桌台 release 故意不加锁** (与 PR-D 取舍一致): Order FOR UPDATE 串行化让两路 settle 同订单竞争, 输者抛"订单已结算"分支, table release 只执行一次. 桌台完整语义留 §17 创始人对齐
+
+**PR #563 — `#532` 6-PR roadmap PR-F delivery_adapter MERGED** `d98a23e0` (admin squash, **Tier 1 fund/源 explicit-ask 第 9 例**, 不在 8 类 carve-out):
+- 2 files / +453 / -8: `services/tx-trade/src/services/delivery_adapter.py` 1 P1 + 4 P2 路径 + `test_delivery_adapter_row_lock_tier1.py` 8 用例 / 3 classes
+- 路径 1 `receive_order` (L119, P1 INSERT race): **独立修法非 FOR UPDATE** — catch `IntegrityError` + `session.rollback()` + re-SELECT existing + return `duplicate=True` (与 L162-174 existing 分支同结构). 两路并发 receive 同 platform_order_id 都过 existing 检查 → 都 INSERT → 后写者 unique constraint 触发. 非 platform_order_id (如 order_no) 触发 re-raise 防误吞
+- 路径 2-5 4 P2 state machine: `confirm_order` L318 / `mark_ready` L363 (audit §4.1.5 `start_preparing` 现重命名) / `cancel_order` L420 / `complete_order` L478 全部 `_get_order(lock=True)` (PR-D/E 100% 模式对齐). `grep _get_order` 全仓仅 4 caller + test, 无 read-only 漏切风险
+
+### §19 reviewer 评审记录 (PR-E + PR-F)
+
+`code-reviewer` agent (opus, B 选项真 BUG only) 独立两轮:
+
+**PR-E #560**: ✅ APPROVED (0 P0 / 1 P1 / 0 P2)
+- Saga S3 链路: 安全 (同事务重入 + 无 ABBA)
+- 3 P1 / transition_order / payment_saga / RLS / ontology 全部未越界
+- 回归风险: 极低
+- P1 落 **follow-up issue #559** — `apply_discount` 不校验 order.status, 可对 status=completed/cancelled 订单写 discount/final_amount. **main 既存 bug 非 PR-E 引入**; PR-E 加 FOR UPDATE 反而让"对已结订单改折扣"更可靠原子化生效. 建议在 §17 桌台对齐 PR 一并修
+
+**PR-F #563**: ✅ APPROVED (0 P0 / 0 P1 / 1 P2) — **roadmap 收尾质量最高与 PR-C 同水位**
+- IntegrityError catch 链路: 正确 (rollback → re-SELECT 顺序对, asyncpg PendingRollback 处理对, 非 platform_order_id 分支 re-raise)
+- 4 P2 FOR UPDATE 链路: 正确 (单行锁无 ABBA 死锁可能)
+- state_machine / RLS / ontology / cashier_engine / order_service / payment_saga 全部未越界
+- 回归风险: `receive_order` IntegrityError 分支行为变化 (之前向上抛, 现返回 `duplicate=True` 与 L155 existing 分支语义一致 — **这是预期修复非回归**)
+- P2 落 **follow-up issue #562** — `_notify_platform` L706 `logger.info("platform_notified", platform=..., event=event_str, data=...)` `event=` kwarg 与 **structlog 保留字段 `event`**(第 1 positional arg) 冲突 → 抛 TypeError. **Pre-existing bug 非 PR-F 引入** (helper 本体未在 PR-F 改动). 修法: `event=` → `notify_event=` 或 `action=` 2 行修
+
+**6-PR roadmap §19 水位汇总**:
+| PR | P0 | P1 | P2 | Verdict |
+|---|---|---|---|---|
+| PR-A #544 tx-finance | 0 | 1 (#543 拆三段, #555 已闭环) | 0 | ✅ |
+| PR-B #547 tx-supply | 0 | 2 (#549 ABBA + 微 perf) | 0 | ✅ |
+| PR-C #553 payment_saga | 0 | 0 | 0 | ✅ **首次零 follow-up** |
+| PR-D #556 cashier_engine | 0 | 1 (#557 文档化) | 0 | ✅ |
+| PR-E #560 order_service | 0 | 1 (#559 status 校验) | 0 | ✅ |
+| PR-F #563 delivery_adapter | 0 | 0 | 1 (#562 structlog 冲突) | ✅ |
+
+### 6-PR roadmap 终态 — audit doc §8 CLOSED
+
+5/13 晚段 22:00 → 5/14 凌晨 ~5h 6 PR 全 ship. `docs/security/tier1-row-lock-audit-2026-05.md` §8 roadmap 全部勾选完成, **24 漏锁 hits / 14 P0 全部修复完毕**, Issue #532 status 由本 entry 入主线后正式 closed completed.
+
+| PR | Service | 路径数 | 发数 |
+|---|---|---|---|
+| PR-A #544 | tx-finance | invoice 4 + wine_storage_routes 2 = 6 | 首发 P0 |
+| PR-B #547 | tx-supply | inventory_io 3 + auto_deduction 1 + stocktake 1 = 5 | 首发 P0 |
+| PR-C #553 | tx-trade payment_saga | compensate + recover = 2 | 首发 P0 |
+| PR-D #556 | tx-trade cashier_engine | add_item + apply_discount + settle_order = 3 | 二发 P0 |
+| PR-E #560 | tx-trade order_service | apply_discount + settle_order = 2 | 二发 P0 |
+| PR-F #563 | tx-trade delivery_adapter | receive_order + 4 state machine = 5 | 三发 P1 |
+
+**总修复**: 6 服务 / 23 路径 (含 1 P1 IntegrityError + 22 FOR UPDATE)
+
+### 4 新 follow-up issues 落盘
+
+`#532` umbrella 关闭后留 4 个独立 issue:
+- **#549** `auto_deduction.deduct_for_order` 跨 dish 锁顺序无防护 — 订单含多 dish 共享同 ingredient 仍可 ABBA (PR-B §19 P1#1, audit §4.3 scope 外). C-1 决策 PR-D/E/F 均未折叠, 需 architect 评估方案 A (预聚合 SELECT IN FOR UPDATE) vs 方案 B (跨 dish ingredient_ids sorted 升序锁)
+- **#557** `apply_discount _calc_order_cost` OrderItem 隐式锁不变量文档化 + audit test (PR-D §19 P1#1). 建议在 §17 桌台对齐 PR 一并修
+- **#559** `order_service.apply_discount` 未校验 order.status (PR-E §19 P1#1). main 既存 bug, 建议在 §17 桌台对齐 PR 一并修
+- **#562** `delivery_adapter._notify_platform` `event=` kwarg structlog 保留字段冲突 (PR-F §19 P2#1). Pre-existing 非 PR-F 引入, **blast radius 0 + 2 行修**, 建议立即 follow-up PR ship
+
+### §17 桌台并发对齐 PR 候选 (创始人级决策点)
+
+audit doc §7 Verifier #2 + PR-D/E/F 共留 6 P1/P2 桌台并发 follow-up:
+- cashier_engine 6 路径 (PR-D scope 外): `open_table` / `change_table_status` / `update_item` / `remove_item` / `cancel_order` / `transfer_table`
+- order_service 3 路径 (PR-E scope 外): `update_item_quantity` / `remove_item` / `cancel_order`
+- delivery_adapter `_release_table` UPDATE 影响 0 行致桌台占用风险 (PR-D 取舍, PR-F 同模式继承)
+- 合并 #557 + #559 = **共 ~11 路径**
+
+需创始人 §17 桌台并发语义对齐 (200 桌徐记海鲜峰值场景的真实业务边界):
+1. 桌台开台/换台/合台是否允许双结算 race
+2. 订单取消时桌台释放语义 (订单 cancel ≠ 桌台 release 当前事实, 是 bug 还是 feature)
+3. 多服务员同时改桌台状态 (LWW vs last-writer-wins vs explicit version)
+
+### Tally 更新 (5/13 晚段晚)
+
+- **Tier 1 fund/源 explicit-ask** (不在 8 carve-out): 7 → **9** (+ #560 PR-E + #563 PR-F)
+- **admin-merge cumulative**: 43 → **46** (+ #560 + #563 + 本 docs entry PR 自己)
+- **8 类 carve-out tally**: 38 → **39** (本 entry = **docs-only T3 carve-out 第 13 例**)
+- `#532` 6-PR roadmap: **ALL COMPLETE** (audit doc §8 closed, 24 hits / 14 P0 全修)
+- **本 session 累计 (本 entry)**: 0 PR ship + 4 issue 已知 / 现入主线 / 1 docs-only entry
+
+### 遗留问题
+
+- **§17 桌台并发对齐 PR** (~11 路径, 创始人决策点) — 合并 4 follow-up + cashier_engine 6 + order_service 3 + `_release_table`
+- **#549 ABBA architect 评估** — 方案 A vs B 决定单 issue 修 vs §17 合并修
+- **#562** _notify_platform structlog `event=` 冲突 (P2, 2 行 follow-up PR 立即可 ship)
+- **#535** wine_storage 双轨 SoT (T1 arch debt, 创始人决策) / **#537** PaymentSaga S1→S3 跨步骤占位锁 (T1 arch debt, architect 评估)
+- 持续阻塞 P0 (创始人输入): B' dev-plan-60d demo 故事 / C' DailySummary §18 ontology / channel-aggregation 资质
+
+### 明日计划
+
+按 G → H → I 顺序: 本 entry ship → #549 ABBA architect 评估 → 4 follow-up issue 起手决策 (建议优先 #562 2 行修 follow-up PR)
+
+---
+
 ## 2026-05-13 后半段 — Tier 1 row-lock 6-PR roadmap PR-D 完工 + 3 follow-up PR ship (#555/#556/#558/#561)
 
 ### 今日完成
