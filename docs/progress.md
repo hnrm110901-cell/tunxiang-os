@@ -1,3 +1,34 @@
+## 2026-05-13 cold-start fresh session · test_cashier_engine fee_rate 假绿 fix (#536)
+
+### 完成状态
+
+- [x] **PR #536 test_cashier_engine fee_rate 修 MERGED** `64acde02` (admin squash, **carve-out 第 35 次, 第 8 类首例**): 1 file / +44 / -24, test-only 0 source touched
+- [x] **handoff finding ID 落盘验证** (memory `feedback_handoff_finding_ids` 应用): grep PR #527 实际 reviewer 未提 fee_rate → 现场自验证 4 fail / 49 pass 实际分布
+- [x] **本地 pytest 验证**: 4 fail / 49 pass → 3 fail / 50 pass (3 fee_rate 全清, 多 1 pass)
+- [x] **Karpathy 外科原则**: 不顺手修剩余 3 失败 (shouqianba x2 + route_methods x1, 独立 surface)
+
+### 关键决策
+
+- **handoff ID 现场验证模式** — 上 session brief 标"fee_rate 假绿 fix — PR #527 reviewer P1 pre-existing", 实际 PR #527 reviewer 0 提 fee_rate。验法: 直接 grep 测试 + 源 → 发现真问题混合 (1 真红 KeyError + 2 假绿)。teach: handoff 描述部分准确 ≠ 全准, 起手必须 SoT 自验, 不信缩略
+- **Tier 1 邻接 test-only carve-out 第 8 类扩立** — 测试断言 Tier 1 源配置 (`PaymentGateway.PAYMENT_METHODS`) 但文件非 `*tier1*` 后缀 + 0 source change ⇒ tier1-gate 设计不触发 (path filter gap 已知 design gap, 同 PR #524 暴露模式)。物理可 merge + explicit-ask admin 流程
+- **测试源驱动 vs hardcode** — fee 计算改"从源读 permil + 应用源公式"是两层 catch: 配置变 + 公式变都能 trigger fail。比 hardcode 0.006 强壮且不脆 (源改 6→5 永转 5/1000)
+
+### 下一步
+
+- 下 session P1 候选 (4 项):
+  1. **3 follow-up issues** 开 (shouqianba `_call_shouqianba_pay` 重命名 + route_methods `POST /api/v1/orders` schema drift) — 类 #519/520/521 pattern
+  2. **`_method_to_category` dedup** — payment_gateway.py + cashier_engine.py 双重独立维护, PR #527 P2 pre-existing
+  3. **v413 drift test 补** — `test_platforms_aligned_with_canonical` 对 v411/v412 已存在, v413 缺, PR #530 reviewer 观察
+  4. **`payment_gateway.py` tier1-gate path filter gap fix** — 增本文件入 tier1-gate `paths`, 防 Tier 1 邻接代码 silent bypass (类 #517 pattern)
+- Wave 3 创始人级阻塞 (B / C / channel-aggregation 资质) 等输入
+
+### 已知风险
+
+- 剩余 3 test_cashier_engine 失败仍存 (本 PR 不修)。CI 不跑本文件所以 main 仍假绿。需后续 fix + 让本文件入 CI
+- "Tier 1 邻接代码 silent bypass tier1-gate" design gap 仍未修 — 本 PR 是该 gap 的又一例。fix 优先级提升 (memory `project_tunxiang_ci_gates` 第 4 项)
+
+---
+
 ## 2026-05-13 接 #533 后 · W2-A 主线 + Issue #522 国际化战略全收尾 (#527/#528/#530)
 
 ### 完成状态
