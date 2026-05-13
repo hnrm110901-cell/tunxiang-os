@@ -783,10 +783,10 @@ class TestAPIRouteRegistration:
         """验证HTTP方法正确"""
         from services.tx_trade.src.api.cashier_api import router
 
-        route_methods = {}
+        route_methods: dict[str, set[str]] = {}
         for r in router.routes:
             if hasattr(r, "path") and hasattr(r, "methods"):
-                route_methods[r.path] = r.methods
+                route_methods.setdefault(r.path, set()).update(r.methods)
 
         # POST endpoints
         assert "POST" in route_methods.get("/api/v1/orders", set())
