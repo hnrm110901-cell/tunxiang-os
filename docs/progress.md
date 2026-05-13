@@ -1,3 +1,48 @@
+## 2026-05-13 下午晚 · Tier 1 资金路径双 PR ship #271 + #272 (invoice + wine_storage Decimal→fen + FOR UPDATE 行锁)
+
+### 完成状态
+
+- [x] **PR #271 invoice Decimal→fen MERGED** commit `fbbb6e4f` (2026-05-13T06:48:08Z, admin-merge squash, Tier 1 fund path explicit-ask)
+- [x] **PR #272 wine_storage Decimal→fen + FOR UPDATE MERGED** commit `f249ae27` (2026-05-13T07:45:21Z, admin-merge squash, Tier 1 fund path explicit-ask)
+- [x] **两 PR rebase 一把过 0 冲突** (5/7 创建后 hibernate 6 天，main 推进 190+ commits，但 PR 改动文件主要是新增 + main 改动是 codemod 类无语义冲突)
+- [x] **迁移 rename + revision repoint** (v403/v404 file prefix occupied → v414/v415 + repoint down_revision 接 main 真叶 v413_member_identity_map → v414_invoice_amount_fen)
+- [x] **#488 codemod 应用 test 端 bare-NS → FQN** (#271: 16 处 services.invoice_service / #272: 14 处 models.wine_storage 修 banquet_leads MetaData dup)
+- [x] **baseline 同步** (tests/tier1/test_no_decimal_amount_tier1.py 删 4 entries — invoice.amount/tax_amount + wine_storage.storage_price/price_at_trans)
+- [x] **#272 §19 reviewer MUST FIX 一起修** — extend/transfer/write_off 3 路由加 FOR UPDATE 行锁 (与 take_wine L578 模式对齐)，3 行 SQL surgical edit
+- [x] **§19 双 reviewer P0:0** + **CI 真门禁双 PR 都 23/23 全绿** + **explicit user 授权 admin-merge 双 PR**
+- [x] **3 follow-up issues 落盘** — #529 (banquet_lead dead file) / #531 (wine_storage 真并发 e2e) / #532 (Tier 1 row-lock 全扫审计)
+- [x] **memory feedback_pytest_stub_setdefault_pitfall.md 5/13 扩展段** — bare-NS 经 root conftest namespace merge 触发的双路径加载 case study
+- [x] **memory MEMORY.md 5/13 下午晚段** — Tier 1 资金路径 explicit-ask admin-merge 新模式 + #271/#272 ship 数据
+- [x] **DEVLOG + progress.md 本段沉淀**
+
+### 关键决策
+
+- **PR 长 stale rebase 模式可复用** — 6 天 + 190+ commits replay 0 冲突的关键不是运气，是 PR 改动局部化 (只改 invoice/wine_storage 4 文件 + 新建 migration) + main 改动主要 codemod 类 (#358 / #488) 无语义冲突。同模式可用于 #240 / #487 等其他 stale PR rescue
+- **Tier 1 资金路径不属 7 类 carve-out** — admin-merge 必须 explicit user 授权 (yes/no)，每 PR 单独 ask。流程: §19 reviewer P0:0 + CI 真门禁全绿 + 重 fetch + 重 search 同主题 + 最后 explicit confirm "merge 后无法回退"
+- **§19 reviewer MUST FIX 跨 PR scope 决策** — #272 reviewer 找出 main pre-existing FOR UPDATE 缺失 (push 不在原 PR scope)，user 拍板 (a) 一起修。理由: 3 行 SQL surgical / blast radius 0 / 与 take_wine 已有模式对齐 / 押金核销 Tier 1 资金路径并发安全财务稽核不可接受。**memory feedback_tier1_review_loops 警 round-N 套娃但 round-1 真 BUG 不豁免**
+- **CI/local 不一致根因明确** — bare-NS 经 root conftest namespace merge 与 FQN 形成两个 sys.modules 入口指向同一 .py，加载语义上是两次 → SQLAlchemy declarative class 双注册 → MetaData dup error。本地 cwd 隔离 + collection 顺序差异让 sys.modules 状态走单路径，CI 干净 env + Tier 1 gate 单 test 文件 collect 必现。修法 = FQN 切换 (与 #488 codemod 已 mainline 模板对齐)
+- **跳过 #272 §19 round-2** — FOR UPDATE 修是 surgical 3 行 SQL，与 take_wine L578 现有模式对齐，memory `feedback_tier1_review_loops` B 选项停止线证明 round-2 reviewer 不再有真 finding 高概率，user/我都同意跳过避免无限套娃
+
+### 下一步
+
+- A: **新 session 起手 #487 W1 batch** (T2/T3/T4/T5 治理基建 + tx-agent fail-loud)
+- B: **新 session 起手 #425-429 npm Dependabot 5 PR** (vite patch + eslint patch 先批量低风险，storybook/jsdom major 后单独处理)
+- C: **新 session 起手 #240 V4 android sprint** (DRAFT，需创始人方向)
+- D: **#529 / #531 / #532 follow-up issues** 任一起手 (T2 优先级 + 与 #271/#272 ship 自然延续)
+- E: **持续阻塞** (需 user 创始人输入): B (dev-plan-60d) / C (§18 ontology) / D1 (Phase 4 三国 production 数据) / 5/13 deal-breaker channel-aggregation 资质
+
+### 已知风险
+
+- **本 session docs PR 可能与 W2-A Phase 4 / W1 后续 PR base 触碰相同 docs 文件** (DEVLOG / progress.md prepend 模式)，但我用独立 worktree + branch + admin-merge docs-only carve-out 模式与既往 docs PR (#480 / #506 / #523 / #525 / #526) 无差，撞车风险极低
+- **#529 / #531 / #532 follow-up issues 不阻塞 #271 / #272 main 已 ship**，但若长期不处理，banquet_lead dead file dup 可能再 fail 别的 PR (任何新 test 用 bare-NS 加载 wine_storage 链都会触发)
+
+### 反思（memory candidate）
+
+- **PR 长 stale rescue 决策树**: 看 PR 改动文件在 main 5/7+ 期间被改动 commits 数 — 0~2 commits 即 rebase 一把过 0 冲突高概率 (codemod 类 main 改动多无语义冲突); 5+ commits 需 case-by-case 评估
+- **§19 reviewer scope 边界**: 一次 review 可发现"PR 改动 BUG"也可发现"main pre-existing BUG，PR test 触发暴露"。后者跨 PR scope 决策依赖 1) 修法是否 surgical 2) 是否 Tier 1 资金路径 3) 是否符合现有 codebase pattern。建议 user 同时给 reviewer 标注此判定标准
+
+---
+
 ## 2026-05-13 接 #525 后 · W2-A Phase 3 (#524) 完工 + W2-A 主线 3 Phase 全收尾
 
 ### 完成状态
