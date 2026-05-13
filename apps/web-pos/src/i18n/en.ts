@@ -122,9 +122,6 @@ export const en = {
     wsConnected: 'Connected',
     wsDisconnected: 'Disconnected',
     autoAcceptActive: '🤖 Auto-accept active',
-    grabfood: 'GrabFood',
-    foodpanda: 'foodpanda',
-    shopeefood: 'ShopeeFood',
   },
   common: {
     confirm: 'Confirm',

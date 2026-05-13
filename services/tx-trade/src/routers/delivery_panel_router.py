@@ -181,7 +181,6 @@ async def _handle_platform_webhook(
         "meituan": "X-Meituan-Signature",
         "eleme": "X-Eleme-Hmac",
         "douyin": "X-Douyin-Signature",
-        "grabfood": "X-GrabFood-Signature",
     }
     signature: str = request.headers.get(sig_header_map.get(platform, ""), "")
 
@@ -295,30 +294,6 @@ async def webhook_douyin(
         raise HTTPException(status_code=500, detail="服务器内部错误")
 
 
-@router.post("/webhooks/grabfood", summary="GrabFood 新订单推送")
-async def webhook_grabfood(
-    request: Request,
-    db: AsyncSession = Depends(get_db),
-):
-    """
-    接收 GrabFood 马来西亚外卖 Webhook 推送。
-
-    签名：Header X-GrabFood-Signature（HMAC-SHA256）
-    GrabFood 要求返回：{"code": "OK", "message": "Order received"}
-    """
-    try:
-        await _handle_platform_webhook("grabfood", request, db)
-        return {"code": "OK", "message": "Order received"}
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.warning("webhook_grabfood.value_error", error=str(exc))
-        raise safe_http_exception(400, "请求参数无效", exc) from exc
-    except Exception as exc:  # noqa: BLE001 — 最外层 HTTP 兜底
-        logger.error("webhook_grabfood.unexpected", error=str(exc), exc_info=True)
-        raise HTTPException(status_code=500, detail="服务器内部错误")
-
-
 # ─── 订单管理 ──────────────────────────────────────────────────────────────────
 
 
@@ -328,7 +303,7 @@ async def list_delivery_orders(
     store_id: Optional[UUID] = Query(None, description="门店 ID 过滤"),
     platform: Optional[str] = Query(
         None,
-        pattern="^(meituan|eleme|douyin|grabfood)$",
+        pattern="^(meituan|eleme|douyin)$",
         description="平台过滤",
     ),
     status: Optional[str] = Query(
@@ -700,7 +675,7 @@ async def upsert_auto_accept_rule(
         biz_end = _parse_time(body.business_hours_end)
 
         # 校验平台名合法性
-        valid_platforms = {"meituan", "eleme", "douyin", "grabfood"}
+        valid_platforms = {"meituan", "eleme", "douyin"}
         if body.excluded_platforms:
             invalid = set(body.excluded_platforms) - valid_platforms
             if invalid:

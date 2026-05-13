@@ -135,10 +135,6 @@ export const id = {
     wsConnected: 'Terhubung',
     wsDisconnected: 'Terputus',
     autoAcceptActive: '🤖 Agen Operasi aktif',
-    // ID platform names
-    grabfood: 'GoFood',
-    foodpanda: 'foodpanda',
-    shopeefood: 'ShopeeFood',
   },
 
   common: {

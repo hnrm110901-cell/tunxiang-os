@@ -14,7 +14,7 @@ import { txColors } from '@tx/tokens';
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
-type Platform = 'meituan' | 'eleme' | 'douyin' | 'grabfood' | 'foodpanda' | 'shopeefood';
+type Platform = 'meituan' | 'eleme' | 'douyin';
 type OrderStatus = 'pending' | 'preparing' | 'done';
 
 interface OrderItem {
@@ -44,9 +44,6 @@ const PLATFORM_CONFIG: Record<Platform, { label: string; color: string; bg: stri
   meituan: { label: '美团', color: '#FF6600', bg: '#FFF0E6' },
   eleme: { label: '饿了么', color: '#0EA5E9', bg: '#E6F4FF' },
   douyin: { label: '抖音', color: '#1C1C1E', bg: '#F0F0F2' },
-  grabfood: { label: 'GrabFood', color: '#00B14F', bg: '#E8F5E9' },
-  foodpanda: { label: 'foodpanda', color: '#FF6B9D', bg: '#FCE4EC' },
-  shopeefood: { label: 'ShopeeFood', color: '#EE4D2D', bg: '#FFF3EF' },
 };
 
 const REJECT_REASONS: { code: number; label: string }[] = [
@@ -351,9 +348,7 @@ function OrderCard({
           marginBottom: 12,
         }}>
           <span style={{ fontSize: 22, fontWeight: 700, color: '#2C2C2A' }}>
-            {['grabfood', 'foodpanda', 'shopeefood'].includes(order.platform)
-              ? formatPrice(order.total_fen, 'MYR')
-              : formatPrice(order.total_fen)}
+            {formatPrice(order.total_fen)}
           </span>
         </div>
 
@@ -664,7 +659,7 @@ export function OmniChannelOrders() {
 
           {/* 平台筛选标签 */}
           <div style={{ display: 'flex', gap: 6, padding: '8px 0' }}>
-            {(['all', 'meituan', 'eleme', 'douyin', 'grabfood', 'foodpanda', 'shopeefood'] as const).map((p) => (
+            {(['all', 'meituan', 'eleme', 'douyin'] as const).map((p) => (
               <button
                 key={p}
                 onClick={() => setPlatformFilter(p)}

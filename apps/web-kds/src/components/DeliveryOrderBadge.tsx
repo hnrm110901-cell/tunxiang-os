@@ -2,23 +2,20 @@
  * DeliveryOrderBadge — KDS 外卖订单平台标识
  *
  * 在 KDS 工单卡片上显示小徽章，标明外卖平台。
- * 色码：GrabFood=绿, foodpanda=粉, ShopeeFood=橙
  * 堂食工单不显示任何徽章。
  */
 
-type DeliveryPlatform = 'grabfood' | 'foodpanda' | 'shopeefood';
-
 interface DeliveryOrderBadgeProps {
   /** 外卖平台标识（仅外卖订单传入） */
-  platform?: DeliveryPlatform;
+  platform?: string;
   /** 订单类型：dine-in / delivery */
   orderType?: string;
 }
 
-const PLATFORM_STYLES: Record<DeliveryPlatform, { label: string; color: string; bg: string }> = {
-  grabfood: { label: 'GrabFood', color: '#00B14F', bg: 'rgba(0,177,79,0.15)' },
-  foodpanda: { label: 'foodpanda', color: '#FF6B9D', bg: 'rgba(255,107,157,0.15)' },
-  shopeefood: { label: 'ShopeeFood', color: '#EE4D2D', bg: 'rgba(238,77,45,0.15)' },
+const PLATFORM_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+  meituan: { label: '美团', color: '#FF6600', bg: 'rgba(255,102,0,0.15)' },
+  eleme: { label: '饿了么', color: '#0EA5E9', bg: 'rgba(14,165,233,0.15)' },
+  douyin: { label: '抖音', color: '#1C1C1E', bg: 'rgba(28,28,30,0.10)' },
 };
 
 export function DeliveryOrderBadge({ platform, orderType }: DeliveryOrderBadgeProps) {

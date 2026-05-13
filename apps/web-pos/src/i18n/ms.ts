@@ -122,9 +122,6 @@ export const ms = {
     wsConnected: 'Bersambung',
     wsDisconnected: 'Terputus',
     autoAcceptActive: '🤖 Terima auto aktif',
-    grabfood: 'GrabFood',
-    foodpanda: 'foodpanda',
-    shopeefood: 'ShopeeFood',
   },
   common: {
     confirm: 'Sahkan',
