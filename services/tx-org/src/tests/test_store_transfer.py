@@ -3,7 +3,7 @@
 """
 
 import pytest
-from services.store_transfer_service import (
+from services.tx_org.src.services.store_transfer_service import (
     approve_transfer_order,
     compute_cost_split,
     compute_time_split,

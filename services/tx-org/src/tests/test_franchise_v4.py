@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from api.franchise_v4_routes import router as franchise_v4_router
+from services.tx_org.src.api.franchise_v4_routes import router as franchise_v4_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

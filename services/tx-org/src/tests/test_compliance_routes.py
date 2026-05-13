@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from api.compliance_routes import router as compliance_router
+from services.tx_org.src.api.compliance_routes import router as compliance_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

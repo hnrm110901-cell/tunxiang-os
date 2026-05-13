@@ -28,10 +28,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from services.attendance_engine import (
+from services.tx_org.src.services.attendance_engine import (
     AttendanceEngine,
 )
-from services.leave_service import (
+from services.tx_org.src.services.leave_service import (
     compute_balance_after_deduction,
     count_leave_work_days,
     validate_leave_request,
@@ -363,7 +363,7 @@ class TestAttendanceRepositoryHelpers:
 
     def test_calculate_clock_in_on_time(self) -> None:
         """上班打卡：宽限内 → on_time"""
-        from api.attendance_routes import _calculate_clock_in_status
+        from services.tx_org.src.api.attendance_routes import _calculate_clock_in_status
 
         clock_time = datetime(2026, 3, 31, 8, 3, tzinfo=timezone.utc)
         shift_start = time(8, 0)
@@ -373,7 +373,7 @@ class TestAttendanceRepositoryHelpers:
 
     def test_calculate_clock_in_late(self) -> None:
         """上班打卡：超宽限 → late"""
-        from api.attendance_routes import _calculate_clock_in_status
+        from services.tx_org.src.api.attendance_routes import _calculate_clock_in_status
 
         clock_time = datetime(2026, 3, 31, 8, 20, tzinfo=timezone.utc)
         shift_start = time(8, 0)
@@ -383,7 +383,7 @@ class TestAttendanceRepositoryHelpers:
 
     def test_calculate_clock_out_early_leave(self) -> None:
         """下班打卡：提前 → early_leave"""
-        from api.attendance_routes import _calculate_clock_out_status
+        from services.tx_org.src.api.attendance_routes import _calculate_clock_out_status
 
         clock_time = datetime(2026, 3, 31, 14, 30, tzinfo=timezone.utc)
         shift_end = time(15, 0)
@@ -394,7 +394,7 @@ class TestAttendanceRepositoryHelpers:
 
     def test_calculate_clock_out_overtime(self) -> None:
         """下班打卡：加班超30分钟 → overtime"""
-        from api.attendance_routes import _calculate_clock_out_status
+        from services.tx_org.src.api.attendance_routes import _calculate_clock_out_status
 
         clock_time = datetime(2026, 3, 31, 15, 45, tzinfo=timezone.utc)
         shift_end = time(15, 0)
@@ -405,7 +405,7 @@ class TestAttendanceRepositoryHelpers:
 
     def test_calculate_clock_out_no_schedule(self) -> None:
         """无排班下班打卡：unscheduled"""
-        from api.attendance_routes import _calculate_clock_out_status
+        from services.tx_org.src.api.attendance_routes import _calculate_clock_out_status
 
         clock_time = datetime(2026, 3, 31, 15, 0, tzinfo=timezone.utc)
         status, diff, ot = _calculate_clock_out_status(clock_time, None, grace_minutes=5, overtime_min=30)
@@ -423,7 +423,7 @@ class TestLeaveRepositoryCallbacks:
     @pytest.mark.asyncio
     async def test_on_leave_approved_calls_deduct(self) -> None:
         """审批通过：调用余额扣减和 daily_attendance 更新"""
-        from services.leave_repository import on_leave_approved
+        from services.tx_org.src.services.leave_repository import on_leave_approved
 
         # Mock DB
         db = AsyncMock()
@@ -464,7 +464,7 @@ class TestLeaveRepositoryCallbacks:
     @pytest.mark.asyncio
     async def test_on_leave_approved_no_deduct_for_sick(self) -> None:
         """病假审批通过：不扣减余额（病假不在 BALANCE_CHECKED_TYPES）"""
-        from services.leave_repository import BALANCE_CHECKED_TYPES, on_leave_approved
+        from services.tx_org.src.services.leave_repository import BALANCE_CHECKED_TYPES, on_leave_approved
 
         assert "sick" not in BALANCE_CHECKED_TYPES
 
@@ -499,7 +499,7 @@ class TestLeaveRepositoryCallbacks:
     @pytest.mark.asyncio
     async def test_on_leave_approved_raises_for_nonexistent(self) -> None:
         """审批回调：不存在的请假申请抛出 ValueError"""
-        from services.leave_repository import on_leave_approved
+        from services.tx_org.src.services.leave_repository import on_leave_approved
 
         db = AsyncMock()
 

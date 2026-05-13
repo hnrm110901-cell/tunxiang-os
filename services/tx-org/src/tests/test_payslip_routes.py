@@ -48,7 +48,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from api.payslip import router as payslip_router
+from services.tx_org.src.api.payslip import router as payslip_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

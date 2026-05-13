@@ -48,8 +48,8 @@ for _p in (_SRC_DIR, _ROOT):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-from repositories.task_repo import InMemoryTaskRepository  # noqa: E402
-from services.task_dispatch_service import TaskDispatchService  # noqa: E402
+from services.tx_org.src.repositories.task_repo import InMemoryTaskRepository  # noqa: E402
+from services.tx_org.src.services.task_dispatch_service import TaskDispatchService  # noqa: E402
 
 from shared.events.src import TaskEventType  # noqa: E402
 from shared.ontology.src.extensions.tasks import TaskStatus, TaskType  # noqa: E402
@@ -78,7 +78,7 @@ def _make_service(monkeypatch) -> tuple[TaskDispatchService, AsyncMock, InMemory
     repo = InMemoryTaskRepository()
     emit_mock = AsyncMock(return_value=str(uuid4()))
     # monkeypatch 直接替换 service 模块里引入的 emit_event 名称
-    import services.task_dispatch_service as svc_mod
+    import services.tx_org.src.services.task_dispatch_service as svc_mod
 
     monkeypatch.setattr(svc_mod, "emit_event", emit_mock)
     service = TaskDispatchService(repo=repo)

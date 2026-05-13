@@ -186,9 +186,9 @@ _contrib_route_mod = _load_route_module(
 # ──────────────────────────────────────────────────────────────────────────────
 from uuid import uuid4
 
-import api.compliance_alert_routes as _ca_mod
+import services.tx_org.src.api.compliance_alert_routes as _ca_mod
 import pytest
-from api.compliance_alert_routes import router as compliance_router
+from services.tx_org.src.api.compliance_alert_routes import router as compliance_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

@@ -22,8 +22,8 @@ from httpx import ASGITransport, AsyncClient
 
 
 def _make_app() -> FastAPI:
-    from api.brand_management_routes import router as brand_router
-    from api.region_management_routes import router as region_router
+    from services.tx_org.src.api.brand_management_routes import router as brand_router
+    from services.tx_org.src.api.region_management_routes import router as region_router
 
     app = FastAPI()
     app.include_router(brand_router)
@@ -131,7 +131,7 @@ async def test_brand_list_db_path():
         db.commit = AsyncMock()
         return db
 
-    with patch("api.brand_management_routes.get_db") as mock_get_db:
+    with patch("services.tx_org.src.api.brand_management_routes.get_db") as mock_get_db:
         mock_db = _make_call_tracking_db()
 
         async def _override():
@@ -215,7 +215,7 @@ async def test_brand_strategy_config():
         db.commit = AsyncMock()
         return db
 
-    with patch("api.brand_management_routes.get_db") as mock_get_db:
+    with patch("services.tx_org.src.api.brand_management_routes.get_db") as mock_get_db:
         mock_db = _make_strategy_db()
 
         async def _override():
@@ -334,7 +334,7 @@ async def test_region_tree_structure():
         db.commit = AsyncMock()
         return db
 
-    with patch("api.region_management_routes.get_db") as mock_get_db:
+    with patch("services.tx_org.src.api.region_management_routes.get_db") as mock_get_db:
         mock_db = _make_region_db()
 
         async def _override():
@@ -429,7 +429,7 @@ async def test_region_tax_rate_update():
         db.commit = AsyncMock()
         return db
 
-    with patch("api.region_management_routes.get_db") as mock_get_db:
+    with patch("services.tx_org.src.api.region_management_routes.get_db") as mock_get_db:
         mock_db = _make_tax_db()
 
         async def _override():

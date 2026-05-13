@@ -78,7 +78,7 @@ sys.modules["shared.events.src.emitter"] = _emitter_mod
 sys.modules["shared.events.src.event_types"] = _evt_types_mod
 
 
-from services.sales_coach_job_service import (  # noqa: E402
+from services.tx_org.src.services.sales_coach_job_service import (  # noqa: E402
     SalesCoachJobService,
 )
 

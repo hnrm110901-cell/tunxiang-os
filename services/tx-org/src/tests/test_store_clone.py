@@ -35,7 +35,7 @@ _src = os.path.join(_here, "..")
 if _src not in sys.path:
     sys.path.insert(0, _src)
 
-from services.store_clone import (
+from services.tx_org.src.services.store_clone import (
     CLONE_ITEMS,
     _clone_attendance_rules,
     _clone_tables,
@@ -250,7 +250,7 @@ def test_cross_tenant_clone_raises_permission_error():
     模拟跨 tenant 场景：通过 _assert_same_tenant 函数直接测试。
     生产环境中，路由层从 DB 查出两个门店的 tenant_id，再调用此校验。
     """
-    from services.store_clone import _assert_same_tenant
+    from services.tx_org.src.services.store_clone import _assert_same_tenant
 
     with pytest.raises(PermissionError, match="跨租户克隆被拒绝"):
         _assert_same_tenant(
@@ -262,7 +262,7 @@ def test_cross_tenant_clone_raises_permission_error():
 
 
 def test_same_tenant_assert_passes():
-    from services.store_clone import _assert_same_tenant
+    from services.tx_org.src.services.store_clone import _assert_same_tenant
 
     # 不应抛出异常
     _assert_same_tenant(TENANT_A, TENANT_A, SOURCE_STORE, TARGET_STORE)
@@ -408,7 +408,7 @@ def test_clone_tables_status_reset_to_free():
             "current_order_id": "order-xyz",
         }
     ]
-    import services.store_clone as sc
+    import services.tx_org.src.services.store_clone as sc
 
     captured: list[dict] = []
     original_fn = sc._new_id
@@ -530,7 +530,7 @@ def test_legacy_clone_store_empty_address_raises():
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 try:
-    from api.store_clone_routes import router as clone_router
+    from services.tx_org.src.api.store_clone_routes import router as clone_router
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
 

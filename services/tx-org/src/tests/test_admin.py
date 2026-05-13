@@ -7,8 +7,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 from main import app
-from services.legal_entity import reset_storage as reset_legal
-from services.store_batch import reset_storage as reset_batch
+from services.tx_org.src.services.legal_entity import reset_storage as reset_legal
+from services.tx_org.src.services.store_batch import reset_storage as reset_batch
 
 client = TestClient(app)
 TENANT = "test-tenant-001"

@@ -18,9 +18,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..
 
 from uuid import uuid4
 
-import api.transfers as transfers_module
+import services.tx_org.src.api.transfers as transfers_module
 import pytest
-from api.transfers import router as transfer_router
+from services.tx_org.src.api.transfers import router as transfer_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

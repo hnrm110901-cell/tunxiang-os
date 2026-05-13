@@ -22,10 +22,10 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from uuid import uuid4
 
 import pytest
-from models.payroll_record import PayrollRecordStatus
-from services.income_tax import IncomeTaxCalculator
-from services.payroll_engine_v2 import PayrollEngine
-from services.social_insurance import SocialInsuranceCalculator
+from services.tx_org.src.models.payroll_record import PayrollRecordStatus
+from services.tx_org.src.services.income_tax import IncomeTaxCalculator
+from services.tx_org.src.services.payroll_engine_v2 import PayrollEngine
+from services.tx_org.src.services.social_insurance import SocialInsuranceCalculator
 
 # ── 测试数据常量 ────────────────────────────────────────────────────────────
 

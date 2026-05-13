@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
-from api.payroll_routes import router as payroll_router
+from services.tx_org.src.api.payroll_routes import router as payroll_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

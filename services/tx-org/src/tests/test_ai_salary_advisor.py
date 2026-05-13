@@ -17,7 +17,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 
-from services.ai_salary_advisor_service import (
+from services.tx_org.src.services.ai_salary_advisor_service import (
     REGION_FACTORS,
     ROLE_TIERS,
     SENIORITY_CURVE,
