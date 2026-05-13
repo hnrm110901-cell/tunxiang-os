@@ -392,6 +392,10 @@ class PaymentSagaService:
 
         挂起定义：step IN ('paying','completing') 且 updated_at < now()-5min
 
+        Tier 1 资金路径行锁约束（防多 worker/pod 双跑）：
+          SELECT 用 FOR UPDATE SKIP LOCKED — 其他 worker 已锁住的 saga 行
+          本 worker 直接跳过（不阻塞、不重复处理），各 worker 自然分裂工作集。
+
         Returns:
             恢复处理的Saga数量。
         """
@@ -404,7 +408,8 @@ class PaymentSagaService:
                 "FROM payment_sagas "
                 "WHERE tenant_id = :tenant_id "
                 "  AND step IN ('paying', 'completing') "
-                "  AND updated_at < :cutoff"
+                "  AND updated_at < :cutoff "
+                "FOR UPDATE SKIP LOCKED"
             ),
             {"tenant_id": self._tenant_id, "cutoff": cutoff},
         )
