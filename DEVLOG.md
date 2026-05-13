@@ -1,3 +1,48 @@
+## 2026-05-13 round-2 — W1-T1 reviewer P0 + P1 修补（`84151f70`）
+
+### 今日完成
+
+派 code-reviewer agent 独立 verifier 审 PR #489，verdict **REQUEST_CHANGES**：1 P0 + 1 P1。两个都验真后同 PR 修：
+
+**P0 — T4 AST 守护对 tuple 形式 except 失明**
+- `test_lifespan_payment_consumer_tier1.py:171` 原版只查 `ast.Name`
+- 后人写 `except (Exception, asyncio.CancelledError):` 时 `handler.type` 是 `ast.Tuple` → 整段 isinstance 跳过 → silent swallow 重新成立但 T4 全绿（守护形同虚设）
+- 修：抽 `_exception_handler_is_broad(handler.type)` helper 覆盖 bare / Name / Tuple 三路径；T4 重写用 helper + 新增 T5 (5 样本契约 + 反例)
+- 注入式验证：把 main.py 包成 broad tuple except → T4 正确 fail with `(Exception, asyncio.CancelledError):` 字样 → restore 后 5/5 GREEN
+
+**P1 — `audit_outbox_flusher_stop.set()` 在 finally 块外（W1-T1 引入新风险）**
+- `main.py:285-289` 处于 `try/yield/finally` **之外**
+- 旧 silent 代码让 raise 路径几乎不触发；W1-T1 fail-loud 使其成为 hot path → audit 行丢失风险放大
+- 修：移 4 行进 finally 块末尾，任意终止路径均 stop + flush
+
+**P2 nit 不修**：`start_payment_event_consumer` 不用 `session_factory` 参数 — pre-existing 设计（PR #128），不在 W1-T1 surgical scope，留 audit P3 follow-up
+
+**Reviewer 遗漏覆盖 #2 修**：T1 + T2 加 `registered == []` 断言，闭环 graceful shutdown 链契约
+
+### 数据变化
+
+- branch HEAD: `9dbebff6` → `84151f70`
+- main.py: 17 行变更（4 行移入 finally + 注释）
+- test_lifespan_payment_consumer_tier1.py: +128/-40，4 cases → 5 cases（新增 T5 tuple 绕过专项测）
+
+### 验证证据
+
+- **5/5 PASS**（T1-T5 全绿）
+- **81 邻近 tier1 测试 0 回归**（audit_outbox_flusher / audit_outbox / api_idempotency / banquet_lead / codemod_tzinfo / alembic_chain）
+- **T4 注入式验证通过** — tuple bypass 注入 → fail，restore → green
+
+### 反思（memory candidate）
+
+reviewer P1 finding 暴露了一个反模式：**单元测试只 mock 启动失败抛异常路径，但 finally 块的运行时副作用（stop event 在块外）没有 lifespan 级集成测试覆盖**。这种 "module-level 副作用串行结构"的 contract，单纯 helper 单测覆盖不到。
+
+W1-T1 修复链路：fail-loud → raise path → audit shutdown 链路联动 — 三者耦合从未被单测验证。下次 Tier 1 startup 类改动应同时评估 finally/shutdown 链的副作用顺序。
+
+### 遗留问题（接 round-1 段）
+
+PR #489 仍 OPEN，等 reviewer round-2 复审 P0+P1 fix。Memory `feedback_tier1_review_loops` 警示 — round-N 越审越严，需用"真 BUG only"设停止线。已 explicit decline P2 nit。
+
+---
+
 ## 2026-05-13 — W1-T1：tx-trade payment_event_consumer 启动 fail-loud（12 周升级战略 W1 收官）
 
 ### 今日完成

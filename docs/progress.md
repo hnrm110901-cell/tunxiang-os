@@ -1,3 +1,39 @@
+## 2026-05-13 round-2 · W1-T1 reviewer P0 + P1 修补（`84151f70`）
+
+### 完成状态
+
+- [x] **派 code-reviewer 独立 verifier 审 PR #489** — verdict REQUEST_CHANGES (1 P0 + 1 P1)
+- [x] **P0 修：T4 AST 守护补 tuple 路径** — 抽 `_exception_handler_is_broad` helper + 新增 T5 专项测；注入式验证通过
+- [x] **P1 修：audit_outbox_flusher_stop 移入 finally 块** — W1-T1 fail-loud 引入新风险已闭环
+- [x] **T1+T2 加 register=[] 断言** — reviewer "遗漏覆盖 #2"
+- [x] **P2 nit 明确拒绝**（pre-existing 设计，超 surgical scope）
+- [x] **5/5 PASS + 81 邻近 tier1 测试 0 回归 + 注入式 T4 验证**
+- [x] **PR comment 逐条回复 reviewer**
+- [ ] **等 reviewer round-2 复审 P0+P1 fix**
+- [ ] **merge 后 W2 起手**
+
+### 关键决策
+
+- **P0 + P1 同 PR 修而非拆 PR** — P1 是 W1-T1 fail-loud 改动直接引入的新风险，责任归属本 PR；不修等于交付 known regression
+- **P0 修法选 helper 抽取** — `_exception_handler_is_broad` 提供契约级抽象，T5 用 5 样本 fixture 双向覆盖（broad + narrow），不只是改 isinstance 写法
+- **注入式验证 T4 真锁** — 把 broad tuple except 临时注入 main.py，跑 T4 看是否 fail；restore 后再次跑确认 green — 这是 contract test 的"自我证伪"，比单纯静态阅读更可靠
+- **P2 nit 拒绝有 explicit 理由** — pre-existing API（PR #128 引入），跟 W1-T1 fail-loud 无直接关联；强行修改其签名违反 §三 surgical change；memory `feedback_tier1_review_loops` 警示停止线
+- **不重派 reviewer round-2 by default** — round-N 越审越严，应 user 拍板要不要再来一轮（已 ping）
+
+### 下一步
+
+- A：user 拍板要不要 reviewer round-2（推荐——P0+P1 是真 BUG 修补，独立 verify 一次 fix 正确性合理）
+- B：若 reviewer 通过 → user explicit 授权 merge（不 admin-merge，Tier 1 资金路径）
+- C：W2 起手（删 indonesia/malaysia/vietnam + Gateway 瘦身）— 依赖 merge
+
+### 已知风险
+
+- **round-N 深度漂移** — reviewer 二次审可能挖出新 nits；memory 已警示，"真 BUG only" 停止线已 explicit
+- **P1 修补改了 graceful shutdown 链顺序** — `audit_outbox_flusher_stop.set()` 现在在 `payment_event_consumer_task.cancel()` 之后；逻辑等价但顺序换了，**reviewer round-2 应特别检查这个顺序是否引入新 race**
+- **`audit_outbox_flusher_task` 在 fail-loud raise 路径下从未被 await 过** — 现在 finally 会 wait_for(timeout=10s) 一个其实只跑了几毫秒的 task；timeout 10s 是按原 graceful shutdown 路径设计的，raise 路径 timeout 应该是 0 或瞬完成；不影响正确性但可能拖慢 boot 失败的 readiness probe 响应时间（边缘风险）
+
+---
+
 ## 2026-05-13 · W1-T1：tx-trade payment_event_consumer 启动 fail-loud（Tier 1）
 
 ### 完成状态
