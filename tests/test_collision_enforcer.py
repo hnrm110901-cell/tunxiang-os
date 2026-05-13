@@ -71,6 +71,63 @@ class TestEnforcerAllowsNonCollision:
             )
 
 
+class TestAllowlistBypass:
+    """Allowlist bypass via _NOQA_ALLOWED_FILES — M2 coverage from §19 review.
+
+    When a caller frame's file basename is in _NOQA_ALLOWED_FILES, the enforcer
+    must return None (bypass) instead of raising. This preserves pre-existing
+    noqa-marked bare-NS imports (test_approval_engine.py / test_auto_procurement.py).
+
+    Direct unit test of find_spec with mocked frame — verifies the frame walk
+    logic, independent of how/when the enforcer is triggered.
+    """
+
+    def test_noqa_allowed_file_bypasses_enforcer(self) -> None:
+        from unittest import mock
+
+        enforcer = repo_conftest._CollisionEnforcer()
+        fake_frame = mock.MagicMock()
+        fake_frame.f_code.co_filename = "/some/path/to/test_approval_engine.py"
+        fake_frame.f_back = None
+
+        with mock.patch("sys._getframe", return_value=fake_frame):
+            result = enforcer.find_spec("services.approval_engine")
+
+        assert result is None, "Allowlisted file must bypass enforcer (return None)"
+
+    def test_non_allowed_file_still_blocked(self) -> None:
+        from unittest import mock
+
+        enforcer = repo_conftest._CollisionEnforcer()
+        fake_frame = mock.MagicMock()
+        fake_frame.f_code.co_filename = "/some/path/to/test_random_other.py"
+        fake_frame.f_back = None
+
+        with mock.patch("sys._getframe", return_value=fake_frame):
+            with pytest.raises(ImportError, match=r"bare-NS .* blocked"):
+                enforcer.find_spec("services.approval_engine")
+
+    def test_allowlist_bypass_works_at_deeper_frame(self) -> None:
+        # Caller stack may have intermediate frames (e.g., import wrappers);
+        # allowlist match anywhere in the walk should bypass.
+        from unittest import mock
+
+        enforcer = repo_conftest._CollisionEnforcer()
+        intermediate = mock.MagicMock()
+        intermediate.f_code.co_filename = "/some/random/intermediate.py"
+        allowed = mock.MagicMock()
+        allowed.f_code.co_filename = "/svc/tests/test_auto_procurement.py"
+        allowed.f_back = None
+        intermediate.f_back = allowed
+
+        with mock.patch("sys._getframe", return_value=intermediate):
+            result = enforcer.find_spec("services.approval_engine")
+
+        assert result is None, (
+            "Allowlist file at deeper frame should still bypass enforcer"
+        )
+
+
 class TestFQNBypassesEnforcer:
     """FQN (5+ segments) bypasses enforcer — only `services.X` (2-seg) intercepted."""
 
