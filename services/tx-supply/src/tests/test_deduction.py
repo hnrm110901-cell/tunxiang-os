@@ -80,33 +80,33 @@ class TestCalcStatus:
     """库存状态计算纯函数测试"""
 
     def test_normal_stock(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         assert _calc_status(10.0, 5.0) == "normal"
 
     def test_low_stock(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         assert _calc_status(4.0, 5.0) == "low"
 
     def test_critical_stock(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         # min_qty=10, 0.3*10=3, current=2 < 3 → critical
         assert _calc_status(2.0, 10.0) == "critical"
 
     def test_out_of_stock(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         assert _calc_status(0.0, 5.0) == "out_of_stock"
 
     def test_negative_stock(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         assert _calc_status(-1.0, 5.0) == "out_of_stock"
 
     def test_exact_min_boundary(self):
-        from services.auto_deduction import _calc_status
+        from services.tx_supply.src.services.auto_deduction import _calc_status
 
         # current == min_qty → low
         assert _calc_status(5.0, 5.0) == "low"
@@ -122,7 +122,7 @@ class TestGetBomForDish:
 
     @pytest.mark.asyncio
     async def test_returns_bom_lines(self):
-        from services.auto_deduction import _get_bom_for_dish
+        from services.tx_supply.src.services.auto_deduction import _get_bom_for_dish
 
         bom_line = _make_bom_line(ING_ID_1, 0.5)
 
@@ -140,7 +140,7 @@ class TestGetBomForDish:
 
     @pytest.mark.asyncio
     async def test_empty_bom(self):
-        from services.auto_deduction import _get_bom_for_dish
+        from services.tx_supply.src.services.auto_deduction import _get_bom_for_dish
 
         mock_result = MagicMock()
         mock_result.scalars.return_value.all.return_value = []
@@ -162,7 +162,7 @@ class TestStocktakeService:
 
     @pytest.mark.asyncio
     async def test_create_stocktake(self):
-        from services.stocktake_service import _stocktakes, create_stocktake
+        from services.tx_supply.src.services.stocktake_service import _stocktakes, create_stocktake
 
         # 清理内存
         _stocktakes.clear()
@@ -184,7 +184,7 @@ class TestStocktakeService:
 
     @pytest.mark.asyncio
     async def test_record_count(self):
-        from services.stocktake_service import (
+        from services.tx_supply.src.services.stocktake_service import (
             _stocktakes,
             create_stocktake,
             record_count,
@@ -211,7 +211,7 @@ class TestStocktakeService:
 
     @pytest.mark.asyncio
     async def test_record_count_wrong_tenant(self):
-        from services.stocktake_service import (
+        from services.tx_supply.src.services.stocktake_service import (
             _stocktakes,
             create_stocktake,
             record_count,
@@ -237,7 +237,7 @@ class TestStocktakeService:
 
     @pytest.mark.asyncio
     async def test_record_count_not_found(self):
-        from services.stocktake_service import record_count
+        from services.tx_supply.src.services.stocktake_service import record_count
 
         result = await record_count("nonexistent", ING_ID_1, 8.5, TENANT_ID, AsyncMock())
 
@@ -254,7 +254,7 @@ class TestDeductionRoutes:
     """API 路由基础测试"""
 
     def _get_client(self):
-        from api.deduction_routes import router
+        from services.tx_supply.src.api.deduction_routes import router
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
 

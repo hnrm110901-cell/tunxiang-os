@@ -125,9 +125,9 @@ def _mock_db():
 # PART A — seafood_routes.py
 # ═══════════════════════════════════════════════════════════════════════════════
 
-import api.seafood_routes as _seafood_module
-from api.seafood_routes import _get_db as seafood_get_db
-from api.seafood_routes import router as seafood_router
+import services.tx_supply.src.api.seafood_routes as _seafood_module
+from services.tx_supply.src.api.seafood_routes import _get_db as seafood_get_db
+from services.tx_supply.src.api.seafood_routes import router as seafood_router
 
 
 def _seafood_client(db_mock):
@@ -452,9 +452,9 @@ class TestSeafoodAlertsAndMonitoring:
 # PART B — supplier_portal_routes.py
 # ═══════════════════════════════════════════════════════════════════════════════
 
-import api.supplier_portal_routes as _portal_module
-from api.supplier_portal_routes import _get_db as portal_get_db
-from api.supplier_portal_routes import router as portal_router
+import services.tx_supply.src.api.supplier_portal_routes as _portal_module
+from services.tx_supply.src.api.supplier_portal_routes import _get_db as portal_get_db
+from services.tx_supply.src.api.supplier_portal_routes import router as portal_router
 
 SUPPLIER_ID = str(uuid.uuid4())
 RFQ_ID = "rfq_" + str(uuid.uuid4())[:8]

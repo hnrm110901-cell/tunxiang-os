@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.supplier_portal_service import SupplierPortalService
+from services.tx_supply.src.services.supplier_portal_service import SupplierPortalService
 
 STORE_ID = "store_furong"
 

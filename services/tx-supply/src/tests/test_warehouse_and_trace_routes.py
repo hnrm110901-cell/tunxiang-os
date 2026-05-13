@@ -42,8 +42,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 #          (等效于路由层行为验证)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-import services.warehouse_ops as _wh_svc
-from services.warehouse_ops import (
+import services.tx_supply.src.services.warehouse_ops as _wh_svc
+from services.tx_supply.src.services.warehouse_ops import (
     create_bom_split,
     create_split_assembly,
     create_transfer_order,
@@ -230,7 +230,7 @@ sys.modules.setdefault("services.tx_supply.src.services", _svc_tx_src_svc)
 sys.modules["services.tx_supply.src.services.traceability"] = _trace_mod
 _svc_tx_src_svc.traceability = _trace_mod
 
-from api.trace_routes import router as trace_router
+from services.tx_supply.src.api.trace_routes import router as trace_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

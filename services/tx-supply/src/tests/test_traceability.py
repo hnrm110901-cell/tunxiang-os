@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.traceability import (
+from services.tx_supply.src.services.traceability import (
     TraceDirection,
     TraceNodeType,
     _clear_store,

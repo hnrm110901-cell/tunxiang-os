@@ -73,7 +73,7 @@ def _make_db(execute_results=None):
 
 # ─── 导入服务 ───
 
-from services.smart_replenishment import (
+from services.tx_supply.src.services.smart_replenishment import (
     DUAL_EARLY_TRIGGER_RATIO,
     InventoryThreshold,
     ReplenishmentItem,

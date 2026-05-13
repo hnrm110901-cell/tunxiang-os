@@ -176,7 +176,7 @@ async def _fake_get_db_with_tenant(tenant_id: str = TENANT_ID):
 # ─── 测试 App ─────────────────────────────────────────────────────────────────
 
 with patch("shared.ontology.src.database.get_db_with_tenant", _fake_get_db_with_tenant):
-    from api.edi_routes import router as edi_router
+    from services.tx_supply.src.api.edi_routes import router as edi_router
 
 app = FastAPI()
 app.include_router(edi_router)

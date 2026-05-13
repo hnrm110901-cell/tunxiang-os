@@ -91,7 +91,7 @@ _make_supply_stubs()
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-from api.procurement_recommend_routes import (
+from services.tx_supply.src.api.procurement_recommend_routes import (
     _get_db,  # noqa: E402
     router,  # noqa: E402
 )

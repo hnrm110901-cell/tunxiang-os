@@ -30,7 +30,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from models.stocktake_loss import (  # noqa: E402
+from services.tx_supply.src.models.stocktake_loss import (  # noqa: E402
     ApproverRole,
     CaseStatus,
     InvalidStateTransition,
@@ -38,7 +38,7 @@ from models.stocktake_loss import (  # noqa: E402
     ResponsiblePartyType,
 )
 
-from services.stocktake_loss_service import (  # noqa: E402
+from services.tx_supply.src.services.stocktake_loss_service import (  # noqa: E402
     LARGE_AMOUNT_THRESHOLD_FEN,
     SMALL_AMOUNT_THRESHOLD_FEN,
     ApprovalPermissionError,
@@ -545,7 +545,7 @@ async def test_state_machine_rejects_invalid_transition():
     case_row = _make_case_row(case_id=case_id, case_status="DRAFT")
     db.queue.append(("ROW", case_row))
 
-    from services.stocktake_loss_service import CaseValidationError
+    from services.tx_supply.src.services.stocktake_loss_service import CaseValidationError
 
     # approve 函数会先校验 case_status 是 PENDING_APPROVAL 否则抛 CaseValidationError
     with pytest.raises(CaseValidationError):
@@ -558,7 +558,7 @@ async def test_state_machine_rejects_invalid_transition():
         )
 
     # 同时校验状态机本身的转换规则（独立测试）
-    from models.stocktake_loss import assert_can_transition
+    from services.tx_supply.src.models.stocktake_loss import assert_can_transition
 
     with pytest.raises(InvalidStateTransition):
         assert_can_transition(CaseStatus.DRAFT, CaseStatus.APPROVED)
@@ -641,7 +641,7 @@ async def test_cross_tenant_isolation():
     # RLS 过滤后 query 返回空
     db.queue.append(("ROW", None))
 
-    from services.stocktake_loss_service import CaseNotFoundError, get_case_detail
+    from services.tx_supply.src.services.stocktake_loss_service import CaseNotFoundError, get_case_detail
 
     with pytest.raises(CaseNotFoundError):
         await get_case_detail(case_id, TENANT_B, db)

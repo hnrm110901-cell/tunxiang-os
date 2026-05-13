@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.dept_issue import (
+from services.tx_supply.src.services.dept_issue import (
     check_yield_rate,
     create_dept_transfer,
     create_issue_order,
