@@ -1,3 +1,69 @@
+## 2026-05-13 cold-start fresh session — test_cashier_engine fee_rate 假绿 fix (#536)
+
+### 今日完成
+
+新 session 起手, 按上一 session handoff P1 候选清单第 1 项推进 `test_cashier_engine.py fee_rate 假绿` (PR #527 reviewer P1 pre-existing 标记). **handoff finding ID 验证落盘** (memory `feedback_handoff_finding_ids` 应用): grep PR #527 实际 reviewer comments **未提 fee_rate** — handoff ID 抽象, 现场自验。结果证明 handoff 描述部分准确但分类错: 文件实际 **4 fail / 49 pass (含 1 真红 fee_rate KeyError)**, 不是单纯"假绿"。
+
+### 实际问题分布 (3 处 fee_rate 漂移)
+
+| 测试 | 行号 | 性质 | 现象 |
+|----|----|----|----|
+| `test_payment_methods_config` | L121-140 | **真红** (非假绿) | `KeyError: 'fee_rate'` — 源 `PAYMENT_METHODS` 用 `fee_rate_permil` (int ‰), 测试断言 `fee_rate` (float)。CI 未触发本文件 → main 一直绿 |
+| `test_fee_calculation` | L142-147 | 假绿 | `rate=0.006; round(amount*rate)` 本地数学, 不调源, 永远 PASS |
+| `test_fee_calculation_for_split` | L378-387 | 假绿 | splits dict hardcode `fee_rate`, `sum(round(...))` 自己算 |
+
+### 修法
+
+- 全部切 `fee_rate_permil` schema (int ‰, 源真实 key)
+- fee 计算改"读源 PaymentGateway.PAYMENT_METHODS + 应用源 ceiling 公式 `payment_gateway.py:242` `(amount * permil + 999) // 1000`"
+- Catch 两层漂移: (1) permil 配置漂移 (2) 公式漂移
+- `test_payment_methods_config` 顺便覆盖全 6 method (原只 2)
+
+### PR #536 ship (本 session 唯一 PR)
+
+**MERGED** `64acde02` (admin squash, **carve-out 第 35 次**):
+- 1 file / +44 / -24 (test-only, 0 source touched)
+- 本地 pytest: 4 fail / 49 pass → 3 fail / 50 pass (3 fee_rate 全清, 多 1 pass)
+- 剩余 3 个失败 (独立 surface, Karpathy 外科原则 — 不顺手修):
+  - `test_shouqianba_trade_no_format` / `_refund_` — 源 `_call_shouqianba_pay` 已重命名/删
+  - `test_route_methods` — 路由 schema drift (`POST /api/v1/orders` vs 源 `GET`)
+
+### 数据变化
+
+- 迁移版本: 无 (test-only)
+- 新增 API: 0
+- 修改测试: 1 文件 (3 处方法重写 + 1 覆盖扩展)
+
+### CI Gate 判定
+
+- `tier1-gate.yml` paths filter **未触发** — 我的文件非 `*tier1*` 后缀 + 0 source change。设计预期, 同 memory `project_tunxiang_ci_gates` PR #524 暴露的"Tier 1 邻接代码 design gap" 同模式
+- 其他失败 (Ruff / frontend-build / python-lint-test × 10 / Test Changed Services) 全在 memory 噪音清单, 忽略
+- 真 required = `{}` (方案 A1 防灾难不防 dev), 物理可 merge
+
+### Admin-merge carve-out 模式扩立
+
+**第 8 类: "test-only fix against Tier 1 source (non-*tier1*-suffix) blast radius 0"** 正式扩立。
+- 与第 7 类 "T2 test-only fixture/mock fix" 区别: 本类测试**断言 Tier 1 源配置** (PaymentGateway.PAYMENT_METHODS), 标 `[Tier1]`, 但仍 test-only 0 source。
+- 与 carve-out 第 6 类 "Tier 1 test-infra ADD" 区别: 本类是**修已有 broken test**, 不是新增 infra。
+- 流程: pytest 本地 verify (4 → 3 fail) + 同主题 race check + explicit-ask user → admin-merge。
+
+### 遗留问题
+
+- 剩余 3 个 test_cashier_engine 失败 (shouqianba x2 + route_methods x1) → follow-up issues 候选 (类 #519/520/521 pattern)
+- `_method_to_category` dedup (payment_gateway.py + cashier_engine.py 双重独立维护, PR #527 P2 pre-existing) → 下个 P1
+- `v413 test_platforms_aligned_with_canonical drift test` 与 v411/v412 对称补 (PR #530 reviewer 观察) → 下个 P1
+- `payment_gateway.py tier1-gate path filter gap` follow-up issue + PR (类 #517 pattern, PR #524 暴露)
+
+### 明日计划
+
+下 session 起手候选 (P1):
+1. **3 个 follow-up issues 开** (shouqianba 重命名 + route_methods schema drift) — 类 #519-#521 pattern
+2. **_method_to_category dedup** — PR #527 P2 pre-existing
+3. **v413 drift test 补** — PR #530 reviewer 观察
+4. **payment_gateway.py tier1-gate path filter gap fix** — 增 `services/tx-trade/src/services/payment_gateway.py` 入 tier1-gate paths, 防 Tier 1 邻接 silent bypass
+
+---
+
 ## 2026-05-13 接 #533 后 — W2-A 主线 + Issue #522 国际化战略全收尾 (#527/#528/#530)
 
 ### 今日完成
