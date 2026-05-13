@@ -449,7 +449,7 @@ class TestRoutesNotMocked:
     @pytest.mark.asyncio
     async def test_earn_route_calls_service(self, monkeypatch):
         """POST /earn 必须调用 services.points_engine.earn_points。"""
-        from api import points_routes
+        from services.tx_member.src.api import points_routes
 
         called = {}
 
@@ -473,7 +473,7 @@ class TestRoutesNotMocked:
     @pytest.mark.asyncio
     async def test_spend_cash_offset_blocks_when_margin_violated(self, monkeypatch):
         """POST /spend (cash_offset) 抵现使毛利低于阈值 → 拒绝，不调用 spend_points。"""
-        from api import points_routes
+        from services.tx_member.src.api import points_routes
         from services.tx_member.src.api.points_routes import SpendPointsRequest, spend_points
 
         spend_called = {"called": False}
@@ -502,7 +502,7 @@ class TestRoutesNotMocked:
     @pytest.mark.asyncio
     async def test_spend_cash_offset_passes_normal_order(self, monkeypatch):
         """正常订单：抵现少且毛利充足 → 调用 spend_points。"""
-        from api import points_routes
+        from services.tx_member.src.api import points_routes
         from services.tx_member.src.api.points_routes import SpendPointsRequest, spend_points
 
         spend_called = {"called": False}
