@@ -19,8 +19,12 @@ Tier1 铁律（CLAUDE.md §17/§20）:
 
 from __future__ import annotations
 
-from services.tx_trade.src.services.cashier_engine import CashierEngine
-from services.tx_trade.src.services.payment_gateway import PaymentGateway
+# 用 src-prefix 跟随同 dir 17 个 tier1 文件 majority (test_api_idempotency_tier1 等).
+# 混入 FQN `services.tx_trade.src.X` 会与 src-prefix 形成同一 .py 双 sys.modules 路径,
+# 触发 SQLAlchemy `Table 'payments' is already defined` MetaData dup (CI vs local 差异).
+# memory feedback_pytest_stub_setdefault_pitfall.md 5/13 实测扩展。
+from src.services.cashier_engine import CashierEngine
+from src.services.payment_gateway import PaymentGateway
 
 
 class TestMethodToCategorySoT:
