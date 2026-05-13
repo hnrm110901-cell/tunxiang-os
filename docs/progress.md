@@ -1,3 +1,51 @@
+## 2026-05-13 · W1-T1：tx-trade payment_event_consumer 启动 fail-loud（Tier 1）
+
+### 完成状态
+
+- [x] **W1-T1 修复** — `services/tx-trade/src/main.py:251-257` payment_event_consumer
+  silent `except Exception` 静吞 → fail-loud（抽 helper `payment_consumer_lifecycle.py`）
+- [x] **Tier 1 TDD 覆盖** — `test_lifespan_payment_consumer_tier1.py` 4 cases
+  (create raise / start raise / happy path / AST source guard) 全 RED → GREEN
+- [x] **回归验证** — 80 邻近 tier1 测试 0 回归 / 45 payment-domain 测试 0 回归 /
+  pre-existing failures（test_payment_idempotency 3 / test_banquet_payment 19）
+  git stash 验证为基线，与本 PR 无关
+- [x] **DEVLOG.md + progress.md 沉淀**（本段）
+- [ ] **PR 开 + 独立 verifier 审** — 不 admin-merge（§19 Tier 1 资金链路必须）
+- [ ] **PR merge 后 W2 开局** — 删 indonesia/malaysia/vietnam + Gateway 瘦身
+
+### 关键决策
+
+- **抽 helper 模块而非纯改 main.py** — main.py module-level deps
+  (permission_client / omni_channel_service / tenacity 等) 让 src.main
+  不可单测 import；helper 只依赖 payment_event_consumer，单测干净
+  mock。这是 enable Tier 1 TDD 的最小 surgical 改动，符合 §三、§17
+  "TDD 强制"要求
+- **AST 源码守护作为第 4 个测试** — 防 PR #128 反模式回归（后人重新
+  在 lifespan 加 broad `except Exception:` 静吞）；源码级 contract 锁
+- **不 self-approve / 不 admin-merge** — §19 触发条件全占（3 文件 + Tier 1
+  路径），独立 verifier 不可替代（memory feedback_self_review_blind_spots）
+- **按 memory feedback_tunxiang_ci_gates 起手 W1-T1** — PR #487 OPEN 但
+  CI 失败全是 memory 标的预存漂移噪声，且 PR #487 改的是 tx-agent 不动
+  tx-trade，T1 物理 0 依赖于 #487；user 选 A 选项 explicit 授权
+
+### 下一步
+
+- A：push branch + 开 PR `fix(tx-trade): payment_event_consumer 启动 fail-loud [Tier1]`
+  → 等独立 verifier
+- B：W2 开局（PR merge 后启动）— 删 indonesia/malaysia/vietnam + Gateway 瘦身
+- C：PR #487 (W1-T2/T3/T4/T5) 等 reviewer，CI 失败均预存漂移
+
+### 已知风险
+
+- **PR race** — fetch origin 已确认无新提交（b2b1fb7a 仍为 main HEAD）；push 前需再 fetch
+- **pre-existing baseline 失败** — test_payment_idempotency 3 / test_banquet_payment 19
+  仍存在，但不在 W1-T1 scope；候选独立 issue（SQLAlchemy Table 重定义元数据碰撞）
+- **W1-T1 改的是 P0 资金链路** — fail-loud 改变 boot 期行为：从前 redis
+  不可达时服务能起 → 现在直接 raise；若生产 redis SLA < tx-trade SLA，
+  tx-trade 会反复 readiness 失败重启。运维需评估（reviewer checklist 中列出）
+
+---
+
 ## 2026-05-12 13:00Z · Phase 1：F#5 + F#6 follow-up 完整闭环（傍晚 session）
 
 ### 完成状态

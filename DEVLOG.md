@@ -1,3 +1,73 @@
+## 2026-05-13 — W1-T1：tx-trade payment_event_consumer 启动 fail-loud（12 周升级战略 W1 收官）
+
+### 今日完成
+
+**W1-T1 修复 P0 资金链路 silent failure（CLAUDE.md §17 Tier 1）**
+
+- branch: `fix/tx-trade-payment-consumer-fail-loud-w1-t1`，base `b2b1fb7a`
+- bug 锁定：`fd94028e feat(payment+rls)` (PR #128) 在 tx-trade lifespan
+  用 `except Exception: warning(...)` 静吞 payment_event_consumer 启动
+  失败 → tx-trade 仍能起来但不消费 tx-pay 事件 → 订单永远 stuck 在 paying
+- 修复设计：
+  - 抽 7 行启动逻辑到 `services/tx-trade/src/services/payment_consumer_lifecycle.py`
+    的 `start_payment_event_consumer_or_raise(session_factory, register_bg_task)` —
+    fail-loud，任何异常向上传播
+  - `main.py:235-257`（-21/+7）改为单行调用 helper
+  - 抽 helper 的关键原因：`src.main` module-level deps（permission_client /
+    omni_channel_service / tenacity）让单测里直接 `from src.main` 不可行；
+    helper 模块依赖最小化（只 import payment_event_consumer），单测干净 mock
+- Tier 1 TDD（先 RED 后 GREEN）：`test_lifespan_payment_consumer_tier1.py` 4 cases
+  - T1 create 抛 → helper 重抛
+  - T2 start 抛 → helper 重抛
+  - T3 happy path → register_background_task 注册 + 返回 task
+  - T4 AST 源码守护：lifespan payment_event_consumer 区段不得再有
+    broad `except Exception:` 静吞（防回归 PR #128 反模式）
+- 验证证据：
+  - 4 新测试 RED → GREEN 全程截到
+  - 80 邻近 tier1 测试 0 回归
+  - 45 payment-domain 测试 0 回归
+  - test_payment_idempotency 3 fail + test_banquet_payment 19 error 是
+    pre-existing baseline（git stash 验证）— 与本 PR 无关
+
+**PR 流程（§19 + §21）**
+
+- 不 admin-merge — Tier 1 资金链路必须独立 verifier 审
+- PR body explicit 标 "needs independent verifier per §19"
+- §19 触发条件：3 文件（main.py + helper + test）+ Tier 1 路径
+
+### 数据变化
+
+- main: `b2b1fb7a` → `2d61fe24`（本地 commit，未 push）
+- 新增 service module: 1（payment_consumer_lifecycle.py）
+- 新增 Tier 1 test 文件: 1（test_lifespan_payment_consumer_tier1.py）
+- 修改 main.py: -21/+7 行（净 -14）
+- broad `except Exception` 实例: tx-trade lifespan 区段 1 → 0
+
+### 战略对齐
+
+12 周升级战略 W1 任务清单：
+- T2 tx-agent fail-loud（PR #487 OPEN，CI 全是 memory 标的预存噪声）
+- T3 CLAUDE.md V3.0 → V3.1（PR #487 中）
+- T4 service-freeze hook（PR #487 中）
+- T5 服务健康度 baseline + 周扫脚本（PR #487 中）
+- **T1 tx-trade payment consumer fail-loud（本 session 完成，PR 待开）** ✅
+
+### 遗留问题
+
+- **PR #487 (W1-T2/T3/T4/T5)** 仍 OPEN — 等 reviewer 或先 review #487 再
+  并 land；CI 失败均为 memory 标的预存漂移，非真门禁失败
+- **test_payment_idempotency.py 3 fail** + **test_banquet_payment.py 19 error**
+  pre-existing baseline — 独立 issue 候选（SQLAlchemy `Table 'payments'
+  already defined` 元数据碰撞 / test infra 漂移），不在 W1-T1 scope
+- **5/13 deal-breaker（channel-aggregation 资质）** 仍未启动 — 创始人级别
+
+### 明日计划
+
+- W2 开局：删 indonesia/malaysia/vietnam + Gateway 瘦身
+- 等 W1-T1 PR 独立 verifier 审完 merge 后才能往下推
+
+---
+
 ## 2026-05-12 傍晚 — Phase 1 切片 1 续：F#5 + F#6 follow-up 完整闭环（admin-merge 第 16-18 次 + #457 父 issue close）
 
 ### 今日完成
