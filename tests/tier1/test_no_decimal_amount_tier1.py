@@ -51,9 +51,7 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         ("services/tx-finance/src/models/cost_snapshot.py", 58, "overhead_allocated"),
         ("services/tx-finance/src/models/cost_snapshot.py", 59, "total_cost"),
         ("services/tx-finance/src/models/cost_snapshot.py", 62, "selling_price"),
-        # 待 P0-1 修复后删除（PR #271 fix/p0-1-invoice-fen）：
-        ("services/tx-finance/src/models/invoice.py", 66, "amount"),
-        ("services/tx-finance/src/models/invoice.py", 67, "tax_amount"),
+        # PR #271 已修复 invoice.amount/tax_amount → fen int (entries 删除 2026-05-13)
         ("services/tx-finance/src/models/voucher.py", 110, "total_amount"),
         # ── tx-member ───────────────────────────────────────────────────
         # 行号 85/91/99/105 由 PR #369 stored_value_account_transactions class
