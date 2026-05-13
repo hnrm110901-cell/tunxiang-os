@@ -1,3 +1,40 @@
+## 2026-05-13 傍晚 · #408 codemod chain 完工 6/6 + Helm chart fix（7 PR / 3 issue / carve-out 19-25）
+
+### 完成状态
+
+- [x] **PR #485** `fix(helm): web-admin podAnnotations → with-guard [T2]` MERGED — close #445 / helm v3.16.3 binary 实测 / reviewer 0 P0 P1 / carve-out 19
+- [x] **PR #486** `[codemod] tx-growth resume — 23 文件 / 84 import + 25 string-patch [Tier1]` MERGED — chain 1/6 / round-1 P0 fix 25 string-patch / carve-out 20
+- [x] **PR #488** `[codemod] tx-finance resume — 24 文件 / 62 import + 18 string-patch + D 段移除 [Tier1]` MERGED — chain 2/6 / D 段移除 = P0 hidden BUG fix (Py 3.9 cost_snapshot PEP 604 → conftest broken) → 0→296 tests / carve-out 21
+- [x] **PR #491** `[codemod] tx-member resume — 31 文件 / 121 import [Tier1]` MERGED — chain 3/6 / **round-2 教训源** codemod 漏抓 `from <NS> import <X>` 形式 / Tier 1 真测 fail → fix → 全过 / carve-out 22
+- [x] **PR #494** `[codemod] tx-supply resume — 39 文件 / 116 import + 20 string-patch [Tier1]` MERGED — chain 4/6 / Plan B revert test_auto_procurement (follow-up #495) / 0 regression / carve-out 23
+- [x] **PR #497** `[codemod] tx-org resume — 39 文件 / 126 import + 23 string-patch [Tier1]` MERGED — chain 5/6 / Plan B revert test_approval_engine (services namespace collision 真 root cause, follow-up #501) / carve-out 24
+- [x] **PR #502** `[codemod] tx-trade resume — 25 文件 / 75 import + 17 string-patch [Tier1]` MERGED — **chain 6/6 闭环最干净 PR** / 0 noqa 例外 / 0 regression / 5 维度全 0 / carve-out 25
+- [x] **3 follow-up issue 落盘 audit trail**：#493 tx-growth 31 处 latent dual-load / #495 tx-supply collect-order / #501 services namespace collision (真 root cause)
+- [ ] **#408 chain follow-up 未跟进** — fresh session pick
+
+### 关键决策
+
+- **#408 chain resume 推翻 #298 deferred 判断** — 5/9 决策 81 "rebase 成本 vs style-only 收益不成正比" 被推翻：main HEAD 重跑 codemod + 一服务一 PR + admin-merge carve-out → **7 PR 一 session 闭环 vs 历史 7 PR 全 deferred**
+- **起手 5 维度扫成为 chain 标准** — namespace-completeness.md §A-E 补 4 维度 + collision audit
+- **Plan B revert + noqa 边界判定** — 2 文件接受例外：root cause 是项目历史遗留不在 codemod 任务定义内 → follow-up issue + chain 闭环优先（不 in-PR fix shared.events / namespace collision = surgical 边界保留）
+- **D 段移除带 P0 hidden BUG fix 副产物** — codemod chain 闭环后 conftest 过渡 D 段失去用途，移除带 P0 fix（#488 conftest broken）
+
+### 下一步
+
+- A：fresh session 起手 — handoff 留 DEVLOG 顶 + 本 progress.md 顶
+- B：5/13 deal-breaker 资质（创始人级别非技术，已 due）
+- C：#408 chain follow-up pick — ① #493 tx-growth dual-load fix (mechanical) ② #495 collect-order ③ #501 namespace collision audit
+- D：换主题候选 — Dependabot / Helm chore / V4 sprint / Tier1 改造
+
+### 已知风险
+
+- **carve-out 累积 25 次** — 后续非 codemod/docs-only/test-only/security 主题须重新评估资格
+- **namespace collision latent 扩散** — 13 同名 services 文件跨服务，bare-NS import 可能 silent 错调
+- **2 noqa 例外需 follow-up 跟踪** — test_auto_procurement.py + test_approval_engine.py
+- **Tier 1 路径影响 = 0** — 本 session 所有改动严格 test-only / 0 production source touch / 0 业务逻辑变化
+
+---
+
 ## 2026-05-13 · W2-A Phase 1 三独立服务整删（PR #499 `52d4e09e` + `21fde0e6`）
 
 ### 完成状态
