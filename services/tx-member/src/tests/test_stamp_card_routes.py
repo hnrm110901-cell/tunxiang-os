@@ -63,7 +63,7 @@ with patch.dict(
     fake_svc.redeem_card = AsyncMock(return_value=_mock_redeem_result)
     sys.modules["services.tx_member.src.services.stamp_card_service"] = fake_svc
 
-    from api.stamp_card_routes import get_db, router
+    from services.tx_member.src.api.stamp_card_routes import get_db, router
 
 app = FastAPI()
 app.include_router(router)

@@ -12,17 +12,17 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.external_import_routes import (
+from services.tx_member.src.api.external_import_routes import (
     _hash_phone,
     _imports_store,
 )
-from api.external_import_routes import (
+from services.tx_member.src.api.external_import_routes import (
     router as external_router,
 )
-from api.wifi_probe_routes import router as wifi_router
+from services.tx_member.src.api.wifi_probe_routes import router as wifi_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from services.wifi_probe_service import (
+from services.tx_member.src.services.wifi_probe_service import (
     OUI_VENDORS,
     _detect_vendor,
     _hash_mac,

@@ -99,10 +99,10 @@ _EMIT_EVENT_MOCK = _inject_stubs()
 
 # ─── 真实 import（在 stub 注入之后） ────────────────────────────────────
 
-from repositories.customer_lifecycle_repo import (  # noqa: E402, I001
+from services.tx_member.src.repositories.customer_lifecycle_repo import (  # noqa: E402, I001
     CustomerLifecycleRepository,
 )
-from services.customer_lifecycle_fsm import (  # noqa: E402, I001
+from services.tx_member.src.services.customer_lifecycle_fsm import (  # noqa: E402, I001
     CustomerLifecycleFSM,
     LifecycleThresholds,
 )
@@ -767,7 +767,7 @@ async def test_projector_skips_events_older_than_current_state():
     策略：monkey-patch projector._is_event_older_than_current_state 返回 True，
     模拟"DB 检查发现事件过老"，确认 handle 早退。
     """
-    from services.customer_lifecycle_projector import CustomerLifecycleProjector
+    from services.tx_member.src.services.customer_lifecycle_projector import CustomerLifecycleProjector
 
     _EMIT_EVENT_MOCK.reset_mock()
     tid = _uid()

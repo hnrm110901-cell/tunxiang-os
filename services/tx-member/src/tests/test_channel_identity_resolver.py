@@ -21,7 +21,7 @@ from unittest.mock import patch
 
 import pytest
 
-from services.channel_identity_resolver import (
+from services.tx_member.src.services.channel_identity_resolver import (
     ChannelIdentityResolverError,
     InvalidIdentityTypeError,
     MissingPlatformError,
@@ -179,7 +179,7 @@ def test_resolver_validate_openid_requires_platform():
     """
     # 简化：直接测 _validate 逻辑（resolver 依赖 _load_salt，需 mock env）
     from unittest.mock import MagicMock
-    from services.channel_identity_resolver import (
+    from services.tx_member.src.services.channel_identity_resolver import (
         ChannelIdentityResolver,
     )
     fake_session = MagicMock()
@@ -203,7 +203,7 @@ def test_resolver_validate_openid_requires_platform():
 
 def test_resolver_validate_unknown_type():
     from unittest.mock import MagicMock
-    from services.channel_identity_resolver import (
+    from services.tx_member.src.services.channel_identity_resolver import (
         ChannelIdentityResolver,
     )
     resolver = ChannelIdentityResolver(MagicMock(), salt=SALT)
@@ -232,7 +232,7 @@ async def test_link_returns_db_member_id_on_conflict_keeps_existing():
     """
     from unittest.mock import AsyncMock, MagicMock
     from uuid import uuid4
-    from services.channel_identity_resolver import ChannelIdentityResolver
+    from services.tx_member.src.services.channel_identity_resolver import ChannelIdentityResolver
 
     db_existing_id = uuid4()
     local_member_id = uuid4()
@@ -265,7 +265,7 @@ async def test_get_or_create_member_concurrent_race_returns_db_real_id():
     """
     from unittest.mock import AsyncMock, MagicMock
     from uuid import uuid4
-    from services.channel_identity_resolver import ChannelIdentityResolver
+    from services.tx_member.src.services.channel_identity_resolver import ChannelIdentityResolver
 
     db_winner_id = uuid4()
     fake_session = MagicMock()
@@ -293,7 +293,7 @@ async def test_get_or_create_member_first_creator_was_created_true():
     """无 race：DB RETURNING 等于本调用 candidate → was_created=True。"""
     from unittest.mock import AsyncMock, MagicMock
     from uuid import UUID, uuid4
-    from services.channel_identity_resolver import ChannelIdentityResolver
+    from services.tx_member.src.services.channel_identity_resolver import ChannelIdentityResolver
 
     fake_session = MagicMock()
 
@@ -321,7 +321,7 @@ async def test_get_or_create_member_existing_match_returns_was_created_false():
     """resolve() 命中已有 member → 直接返回，was_created=False，不生成新 uuid。"""
     from unittest.mock import AsyncMock, MagicMock
     from uuid import uuid4
-    from services.channel_identity_resolver import ChannelIdentityResolver
+    from services.tx_member.src.services.channel_identity_resolver import ChannelIdentityResolver
 
     existing_member_id = uuid4()
     fake_session = MagicMock()
@@ -356,7 +356,7 @@ async def test_get_or_create_member_existing_branch_uses_link_returning():
     """
     from unittest.mock import AsyncMock, MagicMock
     from uuid import uuid4
-    from services.channel_identity_resolver import ChannelIdentityResolver
+    from services.tx_member.src.services.channel_identity_resolver import ChannelIdentityResolver
 
     resolved_id = uuid4()      # T0 resolve() 看到的 uuid
     db_actual_id = uuid4()      # T1 后 DB 真实值（admin/race 改过）

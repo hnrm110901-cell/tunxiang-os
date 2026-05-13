@@ -28,7 +28,7 @@ _HEADERS = {"X-Tenant-ID": TENANT_ID, "Authorization": "Bearer test"}
 
 # ── 加载路由 ────────────────────────────────────────────────────────────────
 
-from api.members import router
+from services.tx_member.src.api.members import router
 
 app = FastAPI()
 app.include_router(router)

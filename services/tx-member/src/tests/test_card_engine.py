@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.card_routes import router as card_router
+from services.tx_member.src.api.card_routes import router as card_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -159,7 +159,7 @@ class TestBatchOperationsAPI:
 
 # ── 服务层纯函数单元测试 ─────────────────────────────────────
 
-from services.card_engine import (
+from services.tx_member.src.services.card_engine import (
     BATCH_OP_TYPES,
     MEMBER_DAY_TYPES,
     UPGRADE_CRITERIA,

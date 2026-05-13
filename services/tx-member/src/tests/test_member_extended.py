@@ -109,7 +109,7 @@ import importlib
 # gdpr_routes 有相对导入，需要用 importlib 绕开包级别检查
 # 先把 api 包的 __package__ 设置好，再 import
 # group_routes 使用绝对导入，直接导入即可
-from api.group_routes import router as group_router
+from services.tx_member.src.api.group_routes import router as group_router
 
 from shared.ontology.src.database import get_db_session  # group_routes 依赖此函数
 
@@ -188,7 +188,7 @@ def test_group_create_success():
     fake_group.brand_tenant_ids = [str(uuid.uuid4()), str(uuid.uuid4())]
 
     # 让 BrandGroup 构造器返回 fake_group
-    import api.group_routes as gr_mod
+    import services.tx_member.src.api.group_routes as gr_mod
 
     original_bg = gr_mod.BrandGroup
     gr_mod.BrandGroup = MagicMock(return_value=fake_group)
@@ -529,7 +529,7 @@ def test_gdpr_create_request_success():
         }
     )
 
-    import api.gdpr_routes as gdpr_route_mod
+    import services.tx_member.src.api.gdpr_routes as gdpr_route_mod
 
     original_cls = gdpr_route_mod.GDPRService
     gdpr_route_mod.GDPRService = MagicMock(return_value=fake_svc)
@@ -596,7 +596,7 @@ def test_gdpr_list_requests_success():
     fake_svc = MagicMock()
     fake_svc.list_requests = AsyncMock(return_value=fake_items)
 
-    import api.gdpr_routes as gdpr_route_mod
+    import services.tx_member.src.api.gdpr_routes as gdpr_route_mod
 
     original_cls = gdpr_route_mod.GDPRService
     gdpr_route_mod.GDPRService = MagicMock(return_value=fake_svc)
@@ -631,7 +631,7 @@ def test_gdpr_get_request_not_found():
     fake_svc = MagicMock()
     fake_svc.get_request = AsyncMock(return_value=None)
 
-    import api.gdpr_routes as gdpr_route_mod
+    import services.tx_member.src.api.gdpr_routes as gdpr_route_mod
 
     original_cls = gdpr_route_mod.GDPRService
     gdpr_route_mod.GDPRService = MagicMock(return_value=fake_svc)
@@ -662,7 +662,7 @@ def test_gdpr_review_request_value_error():
     fake_svc = MagicMock()
     fake_svc.review_request = AsyncMock(side_effect=ValueError("请求已审核，不可重复操作"))
 
-    import api.gdpr_routes as gdpr_route_mod
+    import services.tx_member.src.api.gdpr_routes as gdpr_route_mod
 
     original_cls = gdpr_route_mod.GDPRService
     gdpr_route_mod.GDPRService = MagicMock(return_value=fake_svc)
