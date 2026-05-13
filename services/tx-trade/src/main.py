@@ -233,28 +233,14 @@ async def lifespan(app: FastAPI):
         )
 
     # ── Task 1.2: 支付事件消费者 — 消费 tx-pay 的 payment.confirmed/payment.refunded ──
-    # 在 tx-trade 中启动 EventConsumer，订阅 Redis Stream 上的支付事件，
-    # 更新 orders 和 payments 表状态（关闭 P0-02 风险）。
-    payment_event_consumer_task: asyncio.Task | None = None
-    try:
-        from .services.payment_event_consumer import (
-            create_payment_event_consumer,
-            start_payment_event_consumer,
-        )
+    # §17 Tier 1 资金链路：启动失败 fail-loud（W1-T1 修复 PR #128 silent swallow）。
+    # helper 抽到独立模块，便于 Tier 1 TDD 覆盖（test_lifespan_payment_consumer_tier1.py）。
+    from .services.payment_consumer_lifecycle import start_payment_event_consumer_or_raise
 
-        _payment_consumer = create_payment_event_consumer(async_session_factory)
-        payment_event_consumer_task = await start_payment_event_consumer(_payment_consumer, async_session_factory)
-        _register_background_task(payment_event_consumer_task)
-        import structlog as _structlog
-
-        _structlog.get_logger(__name__).info("payment_event_consumer_started")
-    except Exception:
-        import structlog as _structlog
-
-        _structlog.get_logger(__name__).warning(
-            "payment_event_consumer_start_failed",
-            exc_info=True,
-        )
+    payment_event_consumer_task = await start_payment_event_consumer_or_raise(
+        async_session_factory,
+        _register_background_task,
+    )
 
     try:
         yield
