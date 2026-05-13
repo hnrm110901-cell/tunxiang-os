@@ -1,3 +1,58 @@
+## 2026-05-13 round-3 — W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
+
+### 今日完成
+
+PR #489 round-2 push 后 CodeRabbit 落 round-2 review（无人类 reviewer / OMC code-reviewer 独立 review）。outside-diff #1 finding 真实命中 round-1 P1 契约姊妹漏洞，accept + 修；其余两条 nit decline。
+
+**Accept #1 — main.py:240 `start_payment_event_consumer_or_raise` 在 try 块外**
+
+`start_*_or_raise` 按 W1-T1 fail-loud 设计该路径必抛 → finally 不跑 → round-1 P1 修补的 `audit_outbox_flusher_stop.set()` 仍被绕过。这是 round-1 P1 "任意终止路径均 stop + flush" 契约的逻辑姊妹漏洞。
+
+修补：
+- `payment_event_consumer_task: asyncio.Task | None = None` 先初始化（避 raise 路径下 finally NameError）
+- await 调用移入 try 块（同 yield 同 try）
+- T6 AST 源码守护：(a) `start_*_or_raise` 必须在 try.body；(b) 同一 try 的 finalbody 含 `audit_outbox_flusher_stop.set(`
+
+业务损害评估：line 165-238 lifespan 启动期间无 emit_event 业务调用，启动期 outbox 实际为空 → 实际数据损害接近 0；本 fix 闭合契约边界，防"任意终止路径"承诺再回归。
+
+**Decline #2 — docs/session-handoff MD040/MD052 nit**
+
+markdownlint 渲染微调，docs 非 CI 门禁。memory `feedback_tier1_review_loops` 真-BUG-only 停止线。
+
+**Decline #3 — test return type annotation nit**
+
+项目级 ruff/mypy 未强制返回类型注解，文件内其他 helper/test 风格一致无 return type。强行补违反 §三 surgical change。Audit P4 follow-up：项目级讨论 ANN201。
+
+### 数据变化
+
+- branch HEAD: `0102e5ac` → `0fce495d`
+- main.py: +5 / -2 行（None init + try 块包 await）
+- test_lifespan_payment_consumer_tier1.py: +60 / -3 行（T6 + 注释扩展）
+
+### 验证证据
+
+- **6/6 PASS**（T1-T6 全绿）
+- **82 邻近 tier1 测试 0 回归**（alembic_chain / api_idempotency / audit_outbox / audit_outbox_flusher / banquet_lead / codemod_tzinfo / lifespan_payment_consumer）
+
+### 反思（memory candidate）
+
+CodeRabbit round-2 这次**真 catch 了一个契约漏洞** — round-1 P1 "audit_outbox_flusher_stop 移入 finally" 的修补，**只闭合了 yield 中抛和 mark_offline raise 路径**，没闭合 `start_payment_event_consumer_or_raise` 自身 raise 路径（fail-loud 主路径）。
+
+教训：**"修一个 fix 把代码移入 finally" 时必须验证 try 块的 body 是否完整包含 fix 想保护的所有调用路径**。round-1 fix 时只看到 `try: yield` 这个 obvious target，没注意到 `await start_*` 这个调用本身也是"终止路径"之一（按 fail-loud 设计是高频终止路径）。
+
+memory `feedback_coderabbit_incremental_policy` 仍成立（CodeRabbit 不重审 already-reviewed commits），但这次它对 round-1 P1 commit `84151f70` 之后的 commits 跑了 round-2 review，**在 outside-diff 视角抓到了 P1 fix 自身的姊妹漏洞**。这条记入更新版 memory：CodeRabbit outside-diff finding 比 inline finding 更可能是真 BUG，因为 inline 通常是 nit-level lint，outside-diff 是结构/契约视角。
+
+### 遗留问题
+
+- PR #489 round-3 fix push 完，**等 user 拍板**：(A) normal merge（不 admin-merge §19 Tier 1）/ (B) 派 OMC code-reviewer round-3 复审契约 fix（推荐）
+- 持续阻塞同 round-2：#487 W1-T2/T3/T4/T5 等 reviewer / B（dev-plan-60d demo 故事）/ C（DailySummary ontology）/ 5/13 channel-aggregation 资质
+
+### 上 session 意外发现（user 已 ping）
+
+Tier 1 资金路径 idempotency 测试覆盖率虚高（#492 根因 1）— `test_payment_idempotency.py` 3 个"并发 IntegrityError → rollback" case 由于 mock fixture 早返回路径，实际从未触发 production 的 flush/rollback 代码分支。production code 是对的，但 contract 锁失效。审计级 finding，独立 issue 已落盘。
+
+---
+
 ## 2026-05-13 round-2 — W1-T1 reviewer P0 + P1 修补（`84151f70`）
 
 ### 今日完成

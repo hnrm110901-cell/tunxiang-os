@@ -1,3 +1,39 @@
+## 2026-05-13 round-3 · W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
+
+### 完成状态
+
+- [x] **CodeRabbit round-2 finding #1 (main.py:240) accept + 修** — `payment_event_consumer_task` None init + await 进 try 块；闭合 round-1 P1 "任意终止路径均 stop + flush" 契约姊妹漏洞
+- [x] **补 T6 AST 源码守护** — (a) start_*_or_raise 必须在 try.body；(b) 同一 try 的 finalbody 含 audit_outbox_flusher_stop.set(
+- [x] **6/6 PASS（T1-T6 全绿）+ 82 邻近 tier1 测试 0 回归**
+- [x] **Decline 两条 nit** — docs markdownlint + test return type annotation；理由：超 surgical scope + 项目级 lint 未强制
+- [x] **PR comment 逐条回复 CodeRabbit 裁决**（issuecomment-4436358221）
+- [x] **DEVLOG + progress.md round-3 沉淀**
+- [ ] **等 user 拍板** — (A) normal merge / (B) 派 OMC code-reviewer round-3 复审
+
+### 关键决策
+
+- **accept #1 / decline #2 #3** — 严格按 memory `feedback_tier1_review_loops` "真 BUG only" 停止线：#1 是 round-1 P1 自身契约漏洞（真 BUG，契约层），#2 #3 是 nit；不修两条 nit 避免 round-N 越审越深。但**仍主动 catch + fix #1**：因为它跟 round-1 P1 是同一闭合契约的两个支路，分两 PR 反而隔断责任归属
+- **T6 用 AST 源码守护风格** — 跟 T4/T5 一致，避免 runtime 集成测试需要 import src.main 触发 module-level 副作用（W1-T1 round-1 已验受阻）；T6 锁的是结构契约（"必须在 try 块内"），AST 完全够用
+- **不做注入式验证** — round-1 P0 fix 时做了，因为 helper `_exception_handler_is_broad` 有逻辑漏洞可能；T6 helper 是 `body_text contains` 简单 string 检查，没逻辑可漏，省一次手工 break + restore
+- **commit message 沿用本仓库风格不加 Co-Authored-By** — 看 `0102e5ac / 4522b6ca / 84151f70` 都无 co-authored line
+
+### 下一步
+
+- A：user 拍板 normal merge — Memory `feedback_self_review_blind_spots` 警示 T2+ infra/安全改动必须 explicit ask review；但本 fix 是 T1 资金路径 contract closure，**强烈建议派 OMC code-reviewer round-3**
+- B：merge 后 W2 起手 — 删 indonesia/malaysia/vietnam（PR #129 引入）+ Gateway 瘦身，预期产出 `docs/w2-deprecate-regional-plan.md`
+
+### 已知风险
+
+- **P1 修补改了 try 块边界** — 整段 lifespan 现在的运行时语义跟 round-1 之前等价（业务行为没改），但 try 块的 scope 扩大了；round-3 reviewer 应额外检查"line 245-249 try 块包含的代码路径上，是否有新代码会被未来加进去而误共享 finally 的 cleanup 副作用"（边缘风险）
+- **业务损害评估接近 0 但非零** — 启动期 line 165-238 之间若**未来**加 emit_event 业务调用（如 init_db 后置 hook 发 'service_started' 事件），且若这些事件落 outbox，本 fix 才有真实保护意义；现在是预防性 closure
+- **CodeRabbit incremental policy 仍可能漏审 round-3 commit** — memory `feedback_coderabbit_incremental_policy`；不依赖 CodeRabbit 重审，依赖 user / OMC reviewer
+
+### 反思（memory candidate）
+
+CodeRabbit **outside-diff finding** 比 **inline finding** 更可能是真 BUG。这次 outside-diff #1 抓到了 round-1 P1 修补自身的契约漏洞（结构/作用域视角），inline 全是 markdownlint nit。下次看 CodeRabbit comments 时**先看 outside-diff 段**，再判断 inline 是否进 scope。
+
+---
+
 ## 2026-05-13 round-2 · W1-T1 reviewer P0 + P1 修补（`84151f70`）
 
 ### 完成状态
