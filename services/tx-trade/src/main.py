@@ -279,14 +279,15 @@ async def lifespan(app: FastAPI):
                         if not t.done():
                             t.cancel()
 
-    # ── Graceful shutdown ─────────────────────────────────────────────
-    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
-    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
-    audit_outbox_flusher_stop.set()
-    try:
-        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
-    except asyncio.TimeoutError:
-        audit_outbox_flusher_task.cancel()
+        # ── PR-4：audit outbox flusher graceful shutdown（W1-T1 round-1 P1 修补）──
+        # 原版本在 try/finally 块外执行，W1-T1 fail-loud 后 lifespan 异常路径
+        # （consumer 启动失败 raise）跳过此段 → audit 行丢失。移入 finally 块保证
+        # 任意终止路径（正常 yield / start raise / yield 中抛）均能 stop + flush。
+        audit_outbox_flusher_stop.set()
+        try:
+            await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+        except asyncio.TimeoutError:
+            audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
