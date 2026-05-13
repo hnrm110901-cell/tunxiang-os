@@ -670,12 +670,14 @@ async def extend_wine_storage(
     tenant_id: str = Depends(_tid),
 ):
     """延长存酒到期日，可选收取续存费用，记录 extend 流水。"""
+    # 加 FOR UPDATE 锁防止并发续存（与 take_wine L578 一致）
     row_r = await db.execute(
         text(
             """
             SELECT id, status, store_id, wine_name, expiry_date
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
+            FOR UPDATE
         """
         ),
         {"rid": record_id, "tid": tenant_id},
@@ -772,12 +774,14 @@ async def transfer_wine(
     tenant_id: str = Depends(_tid),
 ):
     """将存酒记录关联台位从当前台位变更为目标台位，记录 transfer_out + transfer_in 流水。"""
+    # 加 FOR UPDATE 锁防止并发转台（与 take_wine L578 一致）
     row_r = await db.execute(
         text(
             """
             SELECT id, status, store_id, wine_name, table_id, remaining_quantity
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
+            FOR UPDATE
         """
         ),
         {"rid": record_id, "tid": tenant_id},
@@ -894,12 +898,14 @@ async def write_off_wine(
     tenant_id: str = Depends(_tid),
 ):
     """核销存酒记录（过期处理/损耗/特殊情况），需要审批人确认，记录 write_off 流水。"""
+    # 加 FOR UPDATE 锁防止并发双核销（与 take_wine L578 一致）— 押金核销 Tier 1 资金路径
     row_r = await db.execute(
         text(
             """
             SELECT id, status, store_id, wine_name, remaining_quantity
             FROM wine_storage_records
             WHERE id = :rid::UUID AND tenant_id = :tid::UUID AND is_deleted = FALSE
+            FOR UPDATE
         """
         ),
         {"rid": record_id, "tid": tenant_id},
