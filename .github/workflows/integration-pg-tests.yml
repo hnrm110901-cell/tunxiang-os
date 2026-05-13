@@ -76,14 +76,16 @@ jobs:
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
             -f infra/docker/init-pgvector.sql
 
-      - name: Alembic stamp v409 + upgrade head (跳过 pre-v409 历史 chain)
+      - name: Alembic stamp v409 + upgrade v413 (跳过 pre-v409 历史 chain)
         # v411/v412/v413 down_revision = v409，不需要 v408 之前的历史。
-        # stamp v409 让 alembic 视 v409 为已应用，再 upgrade 跑 v411→v412→v413。
+        # stamp v409 让 alembic 视 v409 为已应用，再 upgrade 到 v413_member_identity_map。
+        # 锁定上限到 v413 (channel-aggregation scope)，避免 v414+ 触碰 pre-v409 表 (如
+        # v414 ALTER invoices.amount → invoices 在 pre-v409 chain 不存在 → fail, issue #551).
         # 完整 chain 修复（v301 等历史 bug）属独立 issue。
         working-directory: shared/db-migrations
         run: |
           python -m alembic stamp v409_fund_settlement_revive
-          python -m alembic upgrade head
+          python -m alembic upgrade v413_member_identity_map
           # 验证 3 表已建
           PGPASSWORD=test_password_dev_only psql \
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
