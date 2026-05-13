@@ -29,6 +29,18 @@ for p in [ROOT, SRC]:
 TENANT_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 
 
+# ─── pytest collection guard ──────────────────────────────────────────
+# payment_saga_service 顶层 import `shared.events`，后者用 `dataclass(slots=True)`
+# 仅 Python 3.10+ 支持。本机 3.9 跑会 TypeError；CI Python 3.11 原生通过。
+# 用 sys.version_info gate 而非 sys.modules stub（避免 PR-A round-1 教训：
+# stub 注入 'shared' 包污染同目录 test_invoice_tier1.py 等真实 shared.* import）。
+if sys.version_info < (3, 10):
+    pytest.skip(
+        "需 Python 3.10+ (shared.events 用 dataclass slots=True)；CI Python 3.11 跑通",
+        allow_module_level=True,
+    )
+
+
 def _make_mock_db():
     db = AsyncMock()
     db.execute = AsyncMock()
