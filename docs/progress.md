@@ -1,3 +1,50 @@
+## 2026-05-13 接 #513 后 · #501 Phase 2 (#515) + tier1-gate path filter (#517) / carve-out #30 + #31
+
+### 完成状态
+
+- [x] **PR #515 MERGED** `148beff7` (carve-out #30) — feat(test-infra) #501 Phase 2 MetaPathFinder enforcer + 14 Tier 2 tests + tx-analytics/tx-menu conftest gap fix [T2]
+- [x] **Issue #501 reopen + Phase 2 完工 comment + Phase 3 plan** — 修正 #509 PR body close keyword 误关
+- [x] **Issue #516 OPENED** [T3] tier1-gate.yml path filter 缺 conftest.py（PR #515 暴露的 CI design gap）
+- [x] **PR #517 MERGED** `88d729bc` (carve-out #31) — fix(ci) tier1-gate.yml paths 加 `**/conftest.py` + shared/test_utils/** + shared/test_infra/** [T3]
+- [x] **Issue #516 AUTO-CLOSED** (PR #517 body Close keyword 闭环 25 分钟内)
+- [x] **§19 reviewer 双 PR APPROVE** — #515 round-1 M2 fix → round-2 APPROVE / #517 round-1 APPROVE 含 M1+L1 简化建议（已采纳 commit 2）
+- [x] **新主题白名单 +2**：T2 test-infra enforcement (#515) + T3 CI path filter (#517) = 共 7 大主题
+- [ ] **#501 Phase 3 file rename** — 重型独立 session 起手
+- [ ] **#516 listed 其他 4 workflow** path filter gap — 各自独立 issue + PR
+
+### 关键决策
+
+- **#515 admin-merge carve-out #30**：T2 test-infra import enforcement 新主题，14 tests 覆盖 + §19 reviewer round-2 APPROVE + 17 真 required SUCCESS — 新白名单
+- **#517 admin-merge carve-out #31**：T3 CI path filter fix，self-verifying（改 tier1-gate.yml 自身触发完整 17 Tier 1 checks）+ §19 reviewer M1+L1 已采纳 — 新白名单或 T2-infra-workflow 扩展
+- **#515 → #516 follow-up issue → #517 fix 同 session 闭环**：~25 分钟（issue opened 03:35Z → PR merged 04:25Z），防 follow-up issue 失忆
+- **不接手 #516 body listed 4 workflow path filter gap**（surgical change，§三）— 各自需独立评估实际 gap 范围
+- **B1 fix scope 扩展合理**：tx-analytics/tx-menu conftest 是 #515 自身解锁前提（production code 已用 FQN 但本地缺 namespace 注册），与主题强相关
+
+### 下一步
+
+**A (本 session 候选)** Wave 1 Continue：
+- A1: #347 conftest shared namespace [T2]（独立勘察）
+- A2: #336 test_trade_promotions 转绿 [T2]（独立勘察）
+
+**B (下 session)**:
+- #516 listed 其他 4 workflow path filter gap follow-up issue × 4
+- #501 Phase 3 file rename（~30 rename + 全 import）— 重型独立 session
+
+**C (Wave 2 + 创始人决策)**:
+- #272/#271 Tier 1 wine_storage/invoice Decimal→fen + 迁移 v403/v404 (TDD)
+- #351 14 服务 main.py import 烟测网
+- #240 V4 architecture sprint DRAFT
+- channel-aggregation 资质 (5/13 deal-breaker)
+- dev-plan-60d demo 故事方向 / DailySummary §18 ontology / D1 三国 production tenant 状态
+
+### 已知风险
+
+- **#501 Phase 3 前置**：必须先 fix #516 body listed 4 workflow 同款 conftest path filter gap，否则 Phase 3 大量 conftest 改动会绕过 gate
+- **`_NOQA_ALLOWED_FILES` 仍含 2 文件**：等 #501 Phase 3 file rename 完工后可清空，启用 zero-tolerance enforcement
+- **本 session 累计 6 工件 + 31 carve-out**：context 长，建议下 session fresh start（per memory `feedback_proactive_session_split.md`）
+
+---
+
 ## 2026-05-13 接 #503 后 · #506 + #508 + #511 接力 / v301 PK 修复链 / docs-only carve-out 第 6 例
 
 > **并发互补**：本 entry（我方 session）与下文 "深夜 · #509 / #512" entry（并发 session）平行工作于 5/13 同时段。两 session 独立处理 #510：我方 ship #511（F2 sentinel）于 03:25Z；并发 session 同时段开 #512（D DROP），reviewer APPROVE 后因 #511 已 ship 而 close。详见下文 entry 与 memory 规则 6。

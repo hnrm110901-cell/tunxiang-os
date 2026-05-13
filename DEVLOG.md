@@ -1,3 +1,88 @@
+## 2026-05-13 接 #513 后 — #501 Phase 2 (#515) + tier1-gate path filter (#517) / carve-out #30 + #31
+
+### 今日完成
+
+承上 #513 DEVLOG 沉淀（前段 carve-out #28 + #512 race close）后 fresh continuation：本 session 后段 2 PR ship + 1 follow-up issue 闭环。
+
+**PR #515 MERGED** `148beff7` (admin-squash, carve-out **#30**)
+- `feat(test-infra)`: #501 Phase 2 — MetaPathFinder enforcer + 4 bare-NS → FQN [T2]
+- 升级 Phase 1 advisory warning 为 import-time enforcement — `sys.meta_path[0]` 注册 `_CollisionEnforcer`
+- `COLLISION_BASENAMES` hardcoded frozenset (12 跨服务同名 .py，含 Tier 1 `invoice_service.py`)
+- `_NOQA_ALLOWED_FILES` (test_approval_engine.py / test_auto_procurement.py) 保留 noqa 例外
+- 4 bare-NS imports → FQN (tx-analytics × 3 + tx-menu × 1)
+- **Infrastructure gap fix**: tx-analytics + tx-menu **conftest.py 新增**（production code 已用 FQN 但本地 pytest 缺 namespace 注册 — 仿 tx-trade/tx-org 模式）
+- 14 个 Tier 2 测试覆盖 enforcement / allowlist / FQN bypass / frame walk 三路径
+- 主题白名单 **+1**：T2 test-infra import enforcement（第 6 大主题）
+
+**Issue #501 reopen + Phase 2 完工 comment + Phase 3 plan**
+- 修正 #509 PR body "Close #501" close keyword 误关
+- Phase 1 ✅ via #509 / Phase 2 ✅ via #515 / Phase 3 file rename 仍 TODO
+- 留 OPEN 等 Phase 3 重型独立 session
+
+**Issue #516 OPENED** [T3] tier1-gate.yml path filter 缺 conftest.py — PR #515 暴露的 CI design gap
+- conftest.py 是所有 test 入口，但 tier1-gate.yml paths 是 Tier 1 业务路径白名单 → #515 整个 Tier 1 gate workflow 没触发
+- 隐患：未来 conftest 改动可能 silently pass CI 后 break main
+
+**PR #517 MERGED** `88d729bc` (admin-squash, carve-out **#31**)
+- `fix(ci)`: tier1-gate.yml paths 加 conftest entries — 闭合 #515 暴露 path filter gap (#516) [T3]
+- 加 3 paths: `**/conftest.py` + `shared/test_utils/**` + `shared/test_infra/**`
+- §19 reviewer round-1 APPROVE + M1+L1 简化建议（4 → 1 `**/conftest.py` unambiguous）已采纳
+- **Self-verifying**：本 PR 改 tier1-gate.yml 触发完整 17 Tier 1 gate workflow checks — 最强 verification
+- Issue #516 AUTO-CLOSED（PR body "Closes #516"）
+- 主题白名单 **+1**：T3 CI workflow path filter fix（第 7 大主题 / 或 T2-infra-workflow 扩展）
+
+### 数据变化
+
+- main HEAD：本 session 全段 `af9039d6` → `88d729bc`（+8 commits 含本 session 主推 4 PR：#509 #513 #515 #517）
+- alembic chain: 511 unchanged（无 migration 改动）
+- 新主题白名单 +2：test-infra advisory (#509) + T2 test-infra enforcement (#515) + T3 CI path filter (#517)（**已累计 7 大主题白名单**）
+- admin-merge tally：本 session **+4 (carve-out #28 #29 #30 #31)**，session 累计推进 #28 → #31
+- 新增测试：14 个 (#515 collision enforcer tests)
+- 新增 path triggers：3 (#517 tier1-gate `**/conftest.py` + shared/test_utils/** + shared/test_infra/**)
+- worktree 清理：#515 collision-enforce / #517 tier1-gate / #512 v414-drop（close + cleanup）+ #513 devlog
+
+### 遗留问题
+
+**#501 Phase 3 — 重型独立 session**
+- 12 collision groups × 2-4 services 文件 rename（~30 file rename + 全 import 更新 + Tier 1 验证）
+- 完工后 `_NOQA_ALLOWED_FILES` 可清空 + enforcer 可升级 zero-tolerance
+- 前置：先 fix #516 listed 其他 4 workflow (rls-gate / integration-pg-tests / migration-ci / rls-runtime-p0-pg-tests) 同款 conftest path filter gap，否则 Phase 3 conftest 改动绕过这些 gate
+
+**Wave 1 剩余**
+- #347 conftest shared namespace [T2]（6+ 天 OPEN，需独立勘察）
+- #336 test_trade_promotions 转绿 [T2]（8+ 天 OPEN）
+- 其他 4 workflow path filter gap follow-up
+
+**持续阻塞（沿用 5/13 傍晚 handoff）**
+- B: dev-plan-60d 5/7 demo 故事核心方向
+- C: DailySummary / Header export (#351 xfail) §18 ontology
+- 5/13 channel-aggregation 资质（创始人级别，已 due）
+- D1: W2-A Phase 4 三国 production tenant 数据状态
+
+### 明日计划
+
+**Wave 1 立即**：
+- #516 follow-up — 其他 4 workflow 同款 path filter gap 各自 issue + PR
+- #347 / #336 勘察起手
+
+**Wave 2 重型独立 session**：
+- #501 Phase 3 同名 file rename（~30 rename + 全 import）
+- #272/#271 Tier1 wine_storage/invoice Decimal→fen + 迁移 v403/v404
+- #351 14 服务 main.py import 烟测网（Tier 1 前置）
+- #240 V4 architecture sprint DRAFT
+
+### 反思 (memory candidate — 已落盘 feedback_concurrent_pr_race.md 规则 6)
+
+**Issue → PR → Issue auto-close 闭环 1 session 内完成**：#516 (本 session opened) → #517 fix → #516 AUTO-CLOSED — 共 ~25 分钟。验证 "follow-up issue 防失忆 + PR body Close keyword" pattern 有效。
+
+**Self-verifying CI = path filter PR 最强 verification**：PR #517 改 tier1-gate.yml，self-touching 自动触发完整 17 真 required checks。Tier 1 gate workflow 全绿 = path filter fix 不破坏 + 新增 entries 行为正确。无须独立"Tier 1 测试覆盖 path filter"测试 — workflow 本身就是 verification。
+
+**Reviewer round-1 M+L 简化建议价值高**：§19 reviewer 给 M1 (minimatch 语义歧义) + L1 (tests/ 不递归) 建议，采纳后 entries 49 → 46 + 行为等价 + 注释清晰。"reviewer 建议简化代码（不是修 BUG）" 是高价值反馈类型 — 不算 nit，是设计层面优化。
+
+**Tier 1 path filter design gap "本 PR 暴露 + 同 session 修复" 是良性循环**：#515 推 advisory enforcement 时**自身被 path filter 排除**导致 Tier 1 gate 没跑 — 这是 BUG 但 §19 独立 reviewer + 本地 14 tests catch 住了。立刻起 follow-up issue #516 → 同 session fix PR #517 闭环。Path filter 维护成本 lower 了，未来类似 test-infra 改动有 gate 兜底。
+
+---
+
 ## 2026-05-13 接 #503 后 — #506 + #508 admin-merge + #511 v301 PK 修复链 / docs-only carve-out 第 6 例
 
 > **并发互补**：本 entry（我方 session）与下文 "深夜 — #509/#512" entry（并发 session）平行工作于同一 5/13 时段。两 session 独立处理 issue #510：我方 ship PR #511（F2 sentinel）于 03:25Z；并发 session 同时段开 PR #512（方案 D DROP），reviewer APPROVE 后因 #511 已 ship 而 close。详见下文 entry 的 race 分析与 memory 规则 6。
