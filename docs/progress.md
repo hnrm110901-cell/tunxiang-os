@@ -1,3 +1,43 @@
+## 2026-05-14 凌晨 · PR-03A 起步 — doc_number 单号引擎核心 (PRD-03 / 供应链 Phase 1 W6)
+
+### 完成状态
+- [x] worktree `.tunxiang-p0-worktrees/tx-supply-pr03a-doc-number-2026-05-14/` 起 (branch `feat/tx-supply-pr03a-doc-number-engine`, base `cc518e39`)
+- [x] **v418_doc_number_rules** 迁移 — `doc_number_rules` + `doc_number_sequences` 表 + RLS + 17 类系统默认模板（fallback）
+- [x] **doc_number_service.py** — DSL 解析（yyyy/MM/dd/HH/mm/store_code/seq:Nd）+ PG advisory_xact_lock + UPSERT 序号增量
+- [x] **test_doc_number_tier1.py** — 32 用例 / 7 测试类（DSL/Render/Scope/Lock/Fallback/Generate/Upsert）+ 1 skipped 真 PG 并发占位
+- [x] **doc_number_routes.py** — POST /generate + GET/POST/DELETE /doc-number-rules
+- [x] main.py 注册 `doc_number_router`
+- [x] 本地 pytest 32 passed / 1 skipped (0.19s)
+- [x] alembic chain 516 revisions OK，v418 chained from v417_grabfood_enum_shrink
+- [ ] Tier 1 explicit-ask 第 9 例 — 待 user yes/no merge 授权
+- [ ] §19 reviewer pass — PR 创建后跑
+
+### 关键决策
+- **创始人 Q1-Q6 一次性授权（2026-05-14）**：
+  - Q1 ontology 冻结豁免 PRD-03/01 范围 — 实测本 PR 走 raw SQL + RLS，**未触碰 ontology**，无需豁免
+  - Q2 supplier_certificates 新建独立表（PR-01A 用，本 PR 不涉及）
+  - Q3 Wave1 操作优先：PO/requisition/stocktake/receiving/inventory_io（PR-03B 用）
+  - Q4 系统默认模板表 + tenant 覆盖（**本 PR 实现**：`SYSTEM_TENANT_ID = '00...000'` + ORDER BY tenant_id = :tid DESC LIMIT 1）
+  - Q5 PRD-01 三方推送 30 天前 OR / 过期当天 AND（PR-01B 用）
+  - Q6 tx-supply 独立 Celery beat container（PR-01B 用）
+- **PG advisory_xact_lock 并发安全模式** — 沿用 `services/tx-trade/src/services/api_idempotency.py` SHA256[:8] signed int64，跨 (tenant,doc_type,scope_key) 不碰撞，commit/rollback 自动释放
+- **fallback SQL 优雅实现** — `ORDER BY (tenant_id::text = :tid) DESC LIMIT 1` 单 query 完成 tenant 优先 + 系统默认兜底
+- **UPSERT ON CONFLICT current_seq + 1** — INSERT 失败则 +1，原子操作 + advisory_lock 双保险，跨服务节奏不漏号
+
+### 下一步
+- §19 reviewer (opus B 选项) 独立审查（真餐厅场景视角）
+- 用户 explicit-ask 授权 PR-03A merge（**Tier 1 第 9 例**，不在 8 类 carve-out）
+- merge 后并行：PR-03B (Wave1 回填) + PR-01A (supplier_certificates 新表+收货阻断)
+
+### 已知风险
+- **真 PG 并发用例 deferred Sprint H DEMO** — `test_200_concurrent_settle_no_duplicate_po_number` `@pytest.mark.skip`，advisory_lock 真锁行为未在 CI 验证。mock 仅断言 lock SQL 被调用，不证明锁实际生效
+- **17 类系统默认模板 INSERT** — 迁移 upgrade 跑两次会触发 `ON CONFLICT DO NOTHING` 静默跳过；手工 truncate 后 re-upgrade 不清理 sequences 残留 — 文档化为运维注意
+- **DSL 模板含 `{store_code}` 但 caller 不传** → 422，要求所有 17 类回填 PR (-03B/-03C) 显式 wire `store_code` 参数
+- pre-existing CI 漂移（`Test Changed Services` / `RLS Runtime — 7 P0 表` / `frontend-build` / 8 个 python-lint-test）在 main 全 fail，与本 PR 无关
+- 主 worktree (`/Users/lichun/tunxiang-os`) 当前 stale 分支 `docs/tx-supply-readme-upgrade-plan-2026-05-14` (PR #572 已 merge 入 main `cc518e39`)，本 PR 用独立 worktree 不动主 worktree
+
+---
+
 ## 2026-05-13 末段 · structlog `event=` 字段冲突 2 PR follow-up ship (#566 + #570)
 
 ### 完成状态
