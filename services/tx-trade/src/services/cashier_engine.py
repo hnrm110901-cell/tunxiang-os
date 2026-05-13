@@ -350,18 +350,21 @@ class CashierEngine:
         dish_uuid = uuid.UUID(dish_id) if dish_id else None
 
         # 单次查询同时获取 Order + Dish（合并 2 次 DB 往返为 1 次）
+        # Tier 1 资金路径：对 Order 行加 FOR UPDATE，防 200 桌并发加菜丢更新
+        # （audit doc §4.1 P0）。Dish 只读 BOM 成本不加锁，避免阻塞菜单查询。
         if dish_uuid:
             result = await self.db.execute(
                 select(Order, Dish)
                 .outerjoin(Dish, Dish.id == dish_uuid)
                 .where(Order.id == order_uuid, Order.tenant_id == self.tenant_id)
+                .with_for_update(of=Order)
             )
             row = result.one_or_none()
             if not row:
                 raise ValueError(f"订单不存在: {order_id}")
             order, dish = row[0], row[1]
         else:
-            order = await self._get_order(order_uuid)
+            order = await self._get_order(order_uuid, lock=True)
             dish = None
 
         if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
@@ -578,7 +581,10 @@ class CashierEngine:
             discount_value: percent_off时为折扣率(如0.8=打八折)；amount_off时为减免金额(分)
         """
         order_uuid = uuid.UUID(order_id)
-        order = await self._get_order(order_uuid)
+        # Tier 1 资金路径 + 毛利底线硬约束：折扣需读最新订单 total / discount，
+        # 并写回 discount_amount_fen + final_amount_fen。FOR UPDATE 串行化
+        # 加菜 / 折扣 / 结算三路并发（audit doc §4.1 P0）。
+        order = await self._get_order(order_uuid, lock=True)
 
         if order.status in (OrderStatus.completed.value, OrderStatus.cancelled.value):
             raise ValueError(f"订单状态 {order.status}，无法应用折扣")
@@ -743,7 +749,11 @@ class CashierEngine:
             customer_id: 顾客ID（auto_pay 时必传）
         """
         order_uuid = uuid.UUID(order_id)
-        order = await self._get_order(order_uuid)
+        # Tier 1 资金路径：结算需读 final_amount_fen 验收 + 状态机切到 completed +
+        # 释放桌台。FOR UPDATE 防双 worker 并发 settle 同一订单（POS 重试 / 网关
+        # 回调 / 用户连点）导致双扣款 / 双释放（audit doc §4.1 P0）。
+        # 注：桌台 release 在本 PR 范围外（桌台并发语义待创始人 §17 对齐）。
+        order = await self._get_order(order_uuid, lock=True)
 
         if order.status == OrderStatus.completed.value:
             raise ValueError("订单已结算")
@@ -1123,8 +1133,19 @@ class CashierEngine:
     # Internal helpers
     # ─────────────────────────────────────
 
-    async def _get_order(self, order_id: uuid.UUID) -> Order:
-        result = await self.db.execute(select(Order).where(Order.id == order_id, Order.tenant_id == self.tenant_id))
+    async def _get_order(self, order_id: uuid.UUID, *, lock: bool = False) -> Order:
+        """加载订单。
+
+        Args:
+            lock: 是否对 Order 行加 FOR UPDATE 排他锁（PostgreSQL 行锁）。
+                  Tier 1 资金路径（add_item / apply_discount / settle_order）
+                  必须 lock=True，防 200 桌并发 race 丢更新 / 双结算。
+                  read-only 入口（如查单 / 状态查看）默认 False 不回归性能。
+        """
+        stmt = select(Order).where(Order.id == order_id, Order.tenant_id == self.tenant_id)
+        if lock:
+            stmt = stmt.with_for_update()
+        result = await self.db.execute(stmt)
         order = result.scalar_one_or_none()
         if not order:
             raise ValueError(f"订单不存在: {order_id}")
