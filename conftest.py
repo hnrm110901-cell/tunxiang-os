@@ -38,6 +38,17 @@ _REPO_ROOT = os.path.dirname(os.path.abspath(__file__))
 _SERVICES_DIR = os.path.join(_REPO_ROOT, "services")
 
 
+class ServicesNamespaceCollision(UserWarning):
+    """Bare-NS `services.X` import 可能解析到 alphabetically-first 服务（Issue #501）。
+
+    专用 category 让未来 `filterwarnings = ["error", "ignore::conftest.ServicesNamespaceCollision"]`
+    选择性放行（避免与其他 UserWarning 误伤）。
+    """
+
+
+_COLLISION_WARNED = False
+
+
 def _collect_src_services_dirs() -> list[str]:
     paths = []
     if os.path.isdir(_SERVICES_DIR):
@@ -62,6 +73,12 @@ def _warn_on_collisions(services_dirs: list[str]) -> None:
 
     Advisory only — 不阻塞 import，仅 warn。
     """
+    global _COLLISION_WARNED
+    if _COLLISION_WARNED:
+        # 防 pytest-xdist worker / 多次 import 重复 emit
+        return
+    _COLLISION_WARNED = True
+
     seen: dict[str, str] = {}
     collisions: dict[str, list[str]] = {}
     for svc_services_dir in services_dirs:
@@ -80,6 +97,7 @@ def _warn_on_collisions(services_dirs: list[str]) -> None:
             f"'from services.{f[:-3]} import ...' may silently resolve to wrong "
             f"service. Use FQN: 'from services.<svc>.src.services.{f[:-3]} "
             f"import ...'. See issue #501.",
+            ServicesNamespaceCollision,
             stacklevel=2,
         )
 
