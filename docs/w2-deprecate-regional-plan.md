@@ -77,27 +77,63 @@ v390 → v413 (24 个后续 migration) **不引用 country_code**，反向 drop 
 
 → 三服务都是独立 FastAPI app，与 gateway 通过 HTTP/event-bus 通信。删除前需确认 `infra/compose/base.yml` / `infra/helm/` 中是否有 chart 引用。
 
-### Phase 2 — shared 区域框架（中风险，跨服务）
+### Phase 2 — shared 区域框架（低-中风险，已 deep-recon 5/13）
 
-- `shared/region/` 整目录删（PR #129 引入）
-- `shared/security/data_sovereignty.py` 整文件删
-- `shared/adapters/delivery_publish/publishers.py` + `shared/adapters/delivery_canonical/transformers.py` 中的国际外卖分支
+> **5/13 recon 修正 3 处 stale**（plan 原文 vs 实际仓库）：
+> - 真实路径 `shared/security/src/data_sovereignty.py`（多一层 `src/`）
+> - `MalaysiaFlags` 不存在；实际只有 `VietnamFlags` + `IndonesiaFlags` (`shared/feature_flags/flag_names.py:223 + 248`)
+> - `delivery_publish/publishers.py` + `delivery_canonical/transformers.py` 内**无**国际分支；国际外卖/支付实际在 `shared/adapters/` 下 8 个独立 brand 目录
 
-### Phase 3 — tx-agent / tx-trade / tx-finance 内嵌分支（中风险，surgical）
+**Phase 2 完整删除清单（外部 consumer 0 验证 5/13）**：
 
-**tx-agent**:
-- `services/tx-agent/src/api/regional_forecast_routes.py` 整文件删（PR #129 引入）
-- `services/tx-agent/src/services/regional_forecasting_service.py` 整文件删
-- `services/tx-agent/src/services/malaysia_forecasting_service.py` 整文件删
-- `services/tx-agent/src/config/malaysia_ingredients.py` + `malaysia_holidays.py` 整文件删
+| # | 路径 | 文件数 | 外部 consumer |
+|---|------|------|-----------|
+| 1 | `shared/region/` 整目录 | 3 (`__init__` + 2 src) | 0（只剩 Phase 1 已删的 tx-malaysia） |
+| 2 | `shared/security/src/data_sovereignty.py` | 1 | 0（只剩 Phase 1 已删的 tx-malaysia） |
+| 3 | `shared/vector_store/src/malaysia_embeddings.py` | 1 | 0 |
+| 4 | `shared/feature_flags/flag_names.py` 删 `VietnamFlags` + `IndonesiaFlags` class | edit | 0 |
+| 5 | `shared/adapters/dana/` | 4 | 0（仅自引用 adapter.py→client.py） |
+| 6 | `shared/adapters/foodpanda/` | 4 | 0 |
+| 7 | `shared/adapters/gopay/` | 4 | 0 |
+| 8 | `shared/adapters/momo/` | 4 | 0 |
+| 9 | `shared/adapters/myinvois/` | 3 | 0（唯一 consumer tx-malaysia 已 Phase 1 删） |
+| 10 | `shared/adapters/shopeefood/` | 4 | 0 |
+| 11 | `shared/adapters/zalopay/` | 4 | 0 |
 
-**tx-trade**:
-- `services/tx-trade/src/routers/delivery_panel_router.py` — surgical 删 FoodPanda / ShopeeFood 路由
-- `services/tx-trade/src/services/my_payment_notify_service.py` 整文件删
-- `services/tx-trade/src/services/delivery_adapters/foodpanda_adapter.py` + `shopeefood_adapter.py` 整文件删
+**总计 ~37 files 整删 + 1 file edit / 0 新增**。
 
-**tx-finance**:
-- `invoice_service.py` MY 分支删（LHDN MyInvois 电子发票）
+**CI/infra/scripts 引用扫描 0 命中**：`.github/workflows/` / `infra/compose/` / `infra/helm/` / `scripts/` 均无对 Phase 2 11 项的引用（已 grep）。
+
+**grabfood 撤回（PR #504 round-2 reviewer 发现）**：原 plan 把 `shared/adapters/grabfood/` 列入 #8 应删项，但 reviewer 发现 `GrabFoodDeliveryAdapter` 经 `shared/adapters/delivery_factory.py:15` import 进入 `_PLATFORM_REGISTRY` 与 meituan/eleme/douyin/wechat 并列为 6 大主流外卖平台之一；`delivery_canonical/transformers.GrabFoodTransformer` + `delivery_publish/publishers.GrabFoodPublisher` + `delivery_panel_router.py:298 @router.post("/webhooks/grabfood")` 均 active；v411/v412/v413 migration enum 含 `"grabfood"`。grabfood 是 OmniChannel 6 平台一等公民，**不属东南亚 i18n 跨境删除范围**。Phase 2 撤回 grabfood，另起 follow-up issue 评估"grabfood OmniChannel 是否真有马来业务流量，含 transformer/publisher/webhook router/migration enum 整体 deprecate or 保留"。
+
+**保留**（不删，与 i18n 无关或 generic 通用组件）：
+- `shared/security/data_masking.py`（PII 脱敏通用工具）
+- `shared/security/tests/` 4 个测试（encryption/error_handler/prompt_sanitizer/validators）
+- `shared/security/src/` 下其他通用 security 文件
+- `shared/vector_store/{client,embeddings,indexes}.py`（tx-agent 知识检索在用）
+
+### Phase 3 — tx-agent / tx-trade 内嵌分支（低-中风险，5/13 recon 修正）
+
+> **5/13 recon 修正 plan 原文**：
+> - `services/tx-trade/src/routers/delivery_panel_router.py` 内**无** FoodPanda/ShopeeFood 路由（plan 原文 stale）
+> - `tx-finance/invoice_service.py` 内**无** MY/LHDN/MyInvois 分支（plan 原文 stale，已整目录 grep 0 hit）
+> - gateway / tx-menu / tx-member / tx-ops / tx-supply / tx-brain / tx-analytics / tx-intel / tx-org / tx-civic / tx-growth / mcp-server **0 regional 引用**
+
+**Phase 3 完整清单**：
+
+| # | 路径 | 类型 | 验证 |
+|---|---|---|---|
+| 1 | `services/tx-agent/src/api/regional_forecast_routes.py` | 整删 | tx-agent/main.py 未注册（dead route） |
+| 2 | `services/tx-agent/src/services/regional_forecasting_service.py` | 整删 | 仅被 #1 引用 |
+| 3 | `services/tx-agent/src/services/malaysia_forecasting_service.py` | 整删 | 0 外部引用 |
+| 4 | `services/tx-agent/src/config/malaysia_ingredients.py` | 整删 | 0 外部引用 |
+| 5 | `services/tx-agent/src/config/malaysia_holidays.py` | 整删 | 0 外部引用 |
+| 6 | `services/tx-trade/src/services/my_payment_notify_service.py` | 整删 | 0 外部引用 |
+| 7 | `services/tx-trade/src/services/delivery_adapters/foodpanda_adapter.py` | 整删 | 0 外部引用 |
+| 8 | `services/tx-trade/src/services/delivery_adapters/shopeefood_adapter.py` | 整删 | 0 外部引用（仅自身 class 定义） |
+| 9 | `services/tx-trade/src/services/payment_gateway.py` | **surgical** | 删 line 53-56 (Malaysia comment + tng_ewallet/grabpay/boost in `PAYMENT_METHODS` dict) + line 672-675 (Malaysia comment + 3 项 in 标签 mapping) — **保留**国内 alipay/wechat/unionpay/member_balance/credit_account |
+
+**Phase 3 PR diff 估算**：8 files 整删 + 1 file surgical edit / 0 新增 / 约 500-1000 行删
 
 ### Phase 4 — Alembic 反向 migration（高风险，需 user 决策点）
 
@@ -108,13 +144,11 @@ v390 → v413 (24 个后续 migration) **不引用 country_code**，反向 drop 
 
 按 user prompt（首批客户都在国内）+ commit history（三国服务上线时间 5/3，离当前 10 天，customer adoption 极有限），**默认走"无 production 数据"分支**，等 user 确认后写 v414+ 反向 migration。
 
-### Phase 5 — Gateway 瘦身（W2-B 联动）
+### Phase 5 — Gateway 瘦身（5/13 recon: 范围实际为空）
 
-W2-B "Gateway 瘦身" 范围未细说，但与 W2-A 联动点：
-- `services/gateway/` 删除三国服务的路由代理
-- Gateway 健康检查删除 tx-malaysia / tx-indonesia / tx-vietnam upstream
-
-→ **deep-dive 在 fresh session 单独评估**，W2-A merge 后才能精确 grep gateway 影响。
+> **5/13 recon 结论**：gateway / 其他 11 个服务 0 regional 引用 — Phase 5 W2-A 联动范围实际**为空**（gateway 从未注册三国 service upstream proxy）。
+>
+> W2-B "Gateway 瘦身" 真实范围（非 W2-A 衍生）需 fresh session deep-dive。本 plan Phase 5 标记 **closed (out of W2-A scope)**。
 
 ---
 
@@ -162,16 +196,18 @@ gh pr list --search "is:open w1 OR W2 OR regional" --limit 10
 3. docs/progress.md 顶部 round-3 段
 
 == 任务 ==
-按 plan 文档 Phase 1+2 (服务整删 + shared 框架删) 起首 PR：
-- branch: refactor/w2a-remove-regional-phase1-2
-- diff 规模预估: 50+ 文件删 / 1500+ 行删 / 0 新增（除 reverse migration）
-- 验证: import 链全过（python -m pytest -k "not regional" 全绿）
+按 plan 文档 Phase 2 (shared 区域框架删) 起首 PR — Phase 1 已 merged commit `21fde0e6` (#499)：
+- branch: refactor/w2a-remove-regional-phase2
+- diff 规模预估: ~37 文件删 + 1 file edit / 0 新增（grabfood 撤回后修正）
+- 验证:
+  - import 链全过（`python -c "import shared.feature_flags.flag_names"` 等关键 module）
+  - Tier 1 测试全绿（`pytest tests/tier1/` + `pytest shared/db-migrations/tests/test_per_service_shells_tier1.py`）
+  - alembic chain integrity 不变（`python3 scripts/check_alembic_chain.py --versions-dir shared/db-migrations/versions`）
 
-deep-dive 要点：
-- gateway 路由代理是否引用三国 service URL（grep services/gateway/）
-- infra/compose/ + infra/helm/ 三国 chart / yaml 删除
-- apps/ i18n 资源精确路径
-- shared/feature_flags/ MalaysiaFlags 删除 import side-effects
+deep-recon 结论 (5/13)：
+- Phase 2 11 项 0 外部 consumer（grabfood 撤回后修正；详见上方"grabfood 撤回"段）
+- 7 个国际 adapter 仅自引用，全部整删（dana/foodpanda/gopay/momo/myinvois/shopeefood/zalopay）
+- VietnamFlags + IndonesiaFlags class 0 consumer，删 enum 段
 
 == 强制约束 ==
 - CLAUDE.md §14 / §17 / §18 / §19 / §20 全约束
