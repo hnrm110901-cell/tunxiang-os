@@ -67,9 +67,9 @@ DB_URL="${DATABASE_URL:-postgresql://tunxiang:CHANGE_ME@localhost/tunxiang_os}"
 DB_URL="${DB_URL/postgresql+asyncpg:\/\//postgresql:\/\/}"
 export DATABASE_URL="$DB_URL"
 
-# ── alembic 列表（核心 + 17 services） ──────────────────────────────────────
-# 注：未列入的 6 services（tx-civic / tx-devforge / tx-forge / tx-indonesia /
-#     tx-vietnam / mcp-server）按 Phase 4a-1 audit 无 owner 表，暂无 shell。
+# ── alembic 列表（核心 + 16 services） ──────────────────────────────────────
+# 注：未列入的 4 services（tx-civic / tx-devforge / tx-forge / mcp-server）
+#     按 Phase 4a-1 audit 无 owner 表，暂无 shell。
 CORE_DIR="$PROJECT_ROOT/shared/db-migrations-core"
 SERVICE_NAMES=(
     gateway
@@ -80,7 +80,6 @@ SERVICE_NAMES=(
     tx-finance
     tx-growth
     tx-intel
-    tx-malaysia
     tx-member
     tx-menu
     tx-ops

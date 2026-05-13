@@ -22,16 +22,19 @@ REPO_ROOT = Path(__file__).parent.parent.parent.parent  # tunxiang-os/
 SERVICES_DIR = REPO_ROOT / "services"
 SHARED_CORE_DIR = REPO_ROOT / "shared/db-migrations-core"
 
-# Phase 4a-1 audit 决定的 17 个 service owners — 这些 services 在
+# Phase 4a-1 audit 决定的 16 个 service owners — 这些 services 在
 # docs/migration-architecture-route-a-ownership-audit.md 中被 grep heuristic
 # 标记为某张表的 owner（clear/weak）。
 #
-# 以下 6 个 services 目录存在但未纳入（audit 未发现表 ownership）：
-#   tx-civic / tx-devforge / tx-forge / tx-indonesia / tx-vietnam / mcp-server
+# 以下 4 个 services 目录存在但未纳入（audit 未发现表 ownership）：
+#   tx-civic / tx-devforge / tx-forge / mcp-server
 # 待 4a-2 founder review 时若证实它们有自有表，再添加 shell（同模式扩展）。
 #
 # 4a-3（本 PR）在 4a-2 founder review 完成前 ship 是 intentional：骨架是确定性
 # 工作，与 owner 决策正交；若 4a-2 改 owner 归属，调整本列表 + 重跑生成脚本即可。
+#
+# W2-A Phase 1 (PR 待开)：tx-indonesia / tx-malaysia / tx-vietnam 三服务整删；
+# 原 17→16 services owner list. 见 docs/w2-deprecate-regional-plan.md。
 EXPECTED_SERVICE_SHELLS = [
     "gateway",
     "tx-agent",
@@ -41,7 +44,6 @@ EXPECTED_SERVICE_SHELLS = [
     "tx-finance",
     "tx-growth",
     "tx-intel",
-    "tx-malaysia",
     "tx-member",
     "tx-menu",
     "tx-ops",

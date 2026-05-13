@@ -26,8 +26,6 @@
 # Phase 4a-1 audit 中无 alembic shell 但 base.yml 仍部署的 service
 # （tx-civic / tx-devforge / tx-forge / mcp-server 等）仍 depends_on postgres
 # + migrate 完成（防它们对 cross-service 表的运行时依赖）。
-# tx-indonesia / tx-vietnam 仅在 services/ 有 src + db-migrations，无 Dockerfile，
-# 不部署为 runtime service — 不在本 overlay depends_on 列表。
 # ─────────────────────────────────────────────────────────────────────────────
 
 services:
@@ -151,8 +149,6 @@ services:
       migrate:
         condition: service_completed_successfully
 
-  # tx-malaysia 不在 base.yml 中（只有 src + db-migrations，无 Dockerfile / 不部署
-  # 为 runtime service）— migrate 仍会跑其 alembic shell，但无 service 容器需 depends_on
   tx-predict:
     depends_on:
       migrate:
