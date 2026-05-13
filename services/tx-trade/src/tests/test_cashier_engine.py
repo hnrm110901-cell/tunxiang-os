@@ -119,32 +119,47 @@ class TestPaymentGatewayUnit:
     """支付网关单元测试"""
 
     def test_payment_methods_config(self):
-        """支付方式配置完整性"""
+        """支付方式配置完整性 — 源用 fee_rate_permil (整数 ‰), 不是 fee_rate (浮点)"""
         from services.tx_trade.src.services.payment_gateway import PaymentGateway
 
         methods = PaymentGateway.PAYMENT_METHODS
 
-        assert "cash" in methods
-        assert "wechat" in methods
-        assert "alipay" in methods
-        assert "unionpay" in methods
-        assert "member_balance" in methods
-        assert "credit_account" in methods
+        assert set(methods.keys()) == {
+            "cash",
+            "wechat",
+            "alipay",
+            "unionpay",
+            "member_balance",
+            "credit_account",
+        }
 
-        # 现金不需要交易号，无手续费
-        assert methods["cash"]["need_trade_no"] is False
-        assert methods["cash"]["fee_rate"] == 0
+        # 无手续费 + 不需要交易号
+        for m in ("cash", "member_balance", "credit_account"):
+            assert methods[m]["need_trade_no"] is False
+            assert methods[m]["fee_rate_permil"] == 0
 
-        # 微信需要交易号，手续费0.6%
-        assert methods["wechat"]["need_trade_no"] is True
-        assert methods["wechat"]["fee_rate"] == 0.006
+        # 微信 / 支付宝 0.6% (permil=6) + 需要交易号
+        for m in ("wechat", "alipay"):
+            assert methods[m]["need_trade_no"] is True
+            assert methods[m]["fee_rate_permil"] == 6
+
+        # 银联 0.5% (permil=5) + 需要交易号
+        assert methods["unionpay"]["need_trade_no"] is True
+        assert methods["unionpay"]["fee_rate_permil"] == 5
 
     def test_fee_calculation(self):
-        """手续费计算验证"""
-        rate = 0.006
-        amount = 10000  # ¥100
-        fee = round(amount * rate)
-        assert fee == 60  # ¥0.60
+        """手续费计算: 走源的 ceiling 公式 + 源的 permil 配置, 不再 hardcode rate"""
+        from services.tx_trade.src.services.payment_gateway import PaymentGateway
+
+        wechat_permil = PaymentGateway.PAYMENT_METHODS["wechat"]["fee_rate_permil"]
+        amount_fen = 10000  # ¥100
+        # 源公式 payment_gateway.py:242: fee_fen = (amount * permil + 999) // 1000
+        fee_fen = (amount_fen * wechat_permil + 999) // 1000
+        assert fee_fen == 60  # ¥0.60
+
+        # 同公式 cash 路径 0 手续费
+        cash_permil = PaymentGateway.PAYMENT_METHODS["cash"]["fee_rate_permil"]
+        assert (amount_fen * cash_permil + 999) // 1000 == 0
 
 
 class TestDailySettlementUnit:
@@ -376,14 +391,19 @@ class TestSplitPayment:
         assert total == 35000
 
     def test_fee_calculation_for_split(self):
-        """拆单手续费：微信0.6% + 支付宝0.6% + 现金0"""
+        """拆单手续费: rate 从源 PAYMENT_METHODS 读, 用源 ceiling 公式"""
+        from services.tx_trade.src.services.payment_gateway import PaymentGateway
+
         splits = [
-            {"method": "wechat", "amount_fen": 20000, "fee_rate": 0.006},
-            {"method": "alipay", "amount_fen": 10000, "fee_rate": 0.006},
-            {"method": "cash", "amount_fen": 5000, "fee_rate": 0},
+            {"method": "wechat", "amount_fen": 20000},
+            {"method": "alipay", "amount_fen": 10000},
+            {"method": "cash", "amount_fen": 5000},
         ]
-        total_fee = sum(round(s["amount_fen"] * s["fee_rate"]) for s in splits)
-        # 20000*0.006=120 + 10000*0.006=60 + 0 = 180
+        total_fee = 0
+        for s in splits:
+            permil = PaymentGateway.PAYMENT_METHODS[s["method"]]["fee_rate_permil"]
+            total_fee += (s["amount_fen"] * permil + 999) // 1000
+        # 20000*6/1000=120 + 10000*6/1000=60 + 0 = 180
         assert total_fee == 180
 
     def test_split_must_equal_order_total(self):
