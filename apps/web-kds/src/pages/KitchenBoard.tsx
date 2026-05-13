@@ -635,8 +635,8 @@ const MOCK_TICKETS: KDSTicket[] = [
   { id: 't7', orderNo: '007', tableNo: 'A02', items: [{ name: '酸菜鱼', qty: 1, notes: '微辣' }, { name: '辣椒炒肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'vip', deptId: 'hot' },
   { id: 't8', orderNo: '008', tableNo: 'B03', items: [{ name: '红烧肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'done', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(15), completedAt: MOCK_NOW - min(1) },
   { id: 't9', orderNo: '009', tableNo: 'C02', items: [{ name: '蒸鲈鱼', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(20), status: 'done', priority: 'normal', deptId: 'steam', startedAt: MOCK_NOW - min(18), completedAt: MOCK_NOW - min(2) },
-  // MY 外卖平台工单
-  { id: 't10', orderNo: '010', tableNo: '外卖005', items: [{ name: '炒粿条', qty: 2, notes: '加辣' }, { name: '沙爹串', qty: 5, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'grabfood' },
-  { id: 't11', orderNo: '011', tableNo: '外卖006', items: [{ name: '海南鸡饭', qty: 1, notes: '' }, { name: '叻沙', qty: 1, notes: '不要太辣' }], createdAt: MOCK_NOW - min(8), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(4), orderType: 'delivery', platform: 'foodpanda' },
-  { id: 't12', orderNo: '012', tableNo: '外卖007', items: [{ name: '马来西亚炒面', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'shopeefood' },
+  // 外卖平台工单
+  { id: 't10', orderNo: '010', tableNo: '外卖005', items: [{ name: '黄焖鸡米饭', qty: 2, notes: '加辣' }, { name: '小炒肉', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(2), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'meituan' },
+  { id: 't11', orderNo: '011', tableNo: '外卖006', items: [{ name: '糖醋排骨', qty: 1, notes: '' }, { name: '蒜蓉虾', qty: 1, notes: '不要太辣' }], createdAt: MOCK_NOW - min(8), status: 'cooking', priority: 'normal', deptId: 'hot', startedAt: MOCK_NOW - min(4), orderType: 'delivery', platform: 'eleme' },
+  { id: 't12', orderNo: '012', tableNo: '外卖007', items: [{ name: '剁椒鱼头', qty: 1, notes: '' }], createdAt: MOCK_NOW - min(1), status: 'pending', priority: 'normal', deptId: 'hot', orderType: 'delivery', platform: 'douyin' },
 ];

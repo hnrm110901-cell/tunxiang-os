@@ -83,7 +83,7 @@ interface DemoTicket {
   /** 客位数 */
   guestSeat?: number;
   /** 配送平台（外卖订单专用） */
-  platform?: 'grabfood' | 'foodpanda' | 'shopeefood';
+  platform?: string;
   /** 订单类型（dine-in / delivery） */
   orderType?: 'dine-in' | 'delivery';
 }
@@ -194,13 +194,13 @@ function buildMockTickets(): DemoTicket[] {
     makeTicket({ createdAtOffsetMin: 1, status: 'pending', priority: 'normal', tableNo: '自取003',
       items: [{ name: '番茄炒蛋', qty: 2, notes: '' }, { name: '土豆丝', qty: 1, notes: '' }],
       channel: 'pickup' }),
-    // MY 外卖平台工单
+    // 外卖平台工单
     makeTicket({ createdAtOffsetMin: 2, status: 'pending', priority: 'normal', tableNo: '外卖005',
-      items: [{ name: '炒粿条', qty: 2, notes: '加辣' }, { name: '沙爹串', qty: 5, notes: '' }],
-      channel: 'takeout', orderType: 'delivery', platform: 'grabfood' }),
+      items: [{ name: '黄焖鸡米饭', qty: 2, notes: '加辣' }, { name: '小炒肉', qty: 1, notes: '' }],
+      channel: 'takeout', orderType: 'delivery', platform: 'meituan' }),
     makeTicket({ createdAtOffsetMin: 8, status: 'cooking', priority: 'normal', tableNo: '外卖006',
-      items: [{ name: '海南鸡饭', qty: 1, notes: '' }, { name: '叻沙', qty: 1, notes: '不要太辣' }],
-      channel: 'takeout', orderType: 'delivery', platform: 'foodpanda',
+      items: [{ name: '糖醋排骨', qty: 1, notes: '' }, { name: '蒜蓉虾', qty: 1, notes: '不要太辣' }],
+      channel: 'takeout', orderType: 'delivery', platform: 'eleme',
       startedAt: Date.now() - 4 * 60 * 1000 }),
   ];
 }

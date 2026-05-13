@@ -137,10 +137,6 @@ export const zh = {
     wsConnected: '实时连接',
     wsDisconnected: '连接断开',
     autoAcceptActive: '🤖 运营指挥官代理中',
-    // MY platform names
-    grabfood: 'GrabFood',
-    foodpanda: 'foodpanda',
-    shopeefood: 'ShopeeFood',
   },
 
   // 通用

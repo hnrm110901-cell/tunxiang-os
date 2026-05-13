@@ -122,9 +122,6 @@ export const vi = {
     wsConnected: 'Đã Kết Nối',
     wsDisconnected: 'Mất Kết Nối',
     autoAcceptActive: '🤖 Tự động nhận đang hoạt động',
-    grabfood: 'GrabFood',
-    shopeefood: 'ShopeeFood',
-    foodpanda: 'foodpanda',
   },
   common: {
     confirm: 'Xác Nhận',
