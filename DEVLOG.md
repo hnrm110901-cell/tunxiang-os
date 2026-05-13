@@ -1,3 +1,78 @@
+## 2026-05-13 接 #525 后 — W2-A Phase 3 (#524) 完工 + W2-A 主线 3 Phase 全收尾
+
+### 今日完成
+
+承上 #525 DEVLOG (afternoon ship batch #351 / #336 / #347 close) 后，本 session 在独立 Phase 3 worktree 推进 PR #524 W2-A Phase 3 完工，闭合 W2-A 主线 3 Phase 国际化删除战略。
+
+**PR #524 MERGED** `149b7785` (normal squash, **非** admin-merge — T2 改动 §19)
+- `refactor(regional)`: W2-A Phase 3 — tx-agent/tx-trade 内嵌国际化分支整删 (8 file 整删 + 1 surgical) [T2]
+- 8 整删: tx-agent 5 file (`regional_forecast_routes` / `regional_forecasting_service` / `malaysia_forecasting_service` / `malaysia_ingredients` / `malaysia_holidays` — 5 file 内部闭环, main.py 0 注册 dead route) + tx-trade 3 file (`my_payment_notify_service` TnG/GrabPay/Boost callback / `foodpanda_adapter` / `shopeefood_adapter` — `__init__.py` 不暴露 dead)
+- 1 surgical: `payment_gateway.py` 删 8 行 = PAYMENT_METHODS 3 entries (tng_ewallet/grabpay/boost) + `_method_to_category` 3 entries + 2 Sprint 1.4 comments. 保留国内 6 entries 不动. **Tier 1 cashier 主链路零触动**
+- 总计 **9 file / +0 / -3034 line**
+
+**Round-2 (#504) 教训完整应用**:
+- 双重 import grep: 绝对 (`from services.X.src.Y`) + 相对 (`from .X`) form
+- 跨服务 active 链审计: foodpanda/shopeefood 验证非 OmniChannel 一等公民 (区别于 grabfood #522)
+- 精确 dict-key grep (双引号 + 单引号): tng_ewallet/grabpay/boost 仅 payment_gateway + my_payment_notify, 0 frontend / 0 test / 0 其他 service / 0 migration enum 命中
+
+**Reviewer APPROVE** — OMC code-reviewer agent (§19 独立 verifier, opus) verdict `0 P0 / 1 P1 / 1 P2 / 1 nit` 全部 pre-existing 非 Phase 3 引入:
+- **P1**: `test_cashier_engine.py:136,140` 测试键名 `fee_rate` vs 生产 `fee_rate_permil` 假绿 (KeyError 被某层 try/except 吞掉)
+- **P2**: `_method_to_category` mapping 在 `payment_gateway.py:660` + `cashier_engine.py:1308` 双重独立维护重复
+- **nit**: `test_cashier_engine.py:381-385` splits 结构 inline `fee_rate` 浮点命名混乱
+
+**tier1-gate path filter design gap 暴露**: PR #524 改 `payment_gateway.py` 但 tier1-gate.yml `paths` 白名单**不含**此文件，整个 Tier 1 gate workflow 未触发。该文件实际是 Tier 1 邻接 (cashier_engine 调它做支付 dispatch)。类 #515 → #516 → #517 path filter gap pattern.
+
+### 数据变化
+
+- main HEAD: `7e1ea964` → `b37e50aa` (#525 by 下午 session) → `8c4de8d1` (#336 by 下午) → ... → `149b7785` (#524 本 session)
+- W2-A Phase 3 final scope: **9 file / -3034 line**
+- **W2-A 主线 3 Phase 累计删除规模**: -8342 (#499) + -4914 (#504 round-2) + -3034 (#524) = **~ -16290 line 国际化 dead code**
+- alembic chain: 511 unchanged (Phase 3 不动 migration)
+- worktree 清理: `w2a-phase3-2026-05-13` 删 + `refactor/w2a-phase3-tx-services` branch 删 (auto via --delete-branch)
+- 0 新 issue (P1/P2/nit pre-existing follow-up 候选未开)
+- 0 race 损失 (期间另一 session ship #525 afternoon batch, base 漂移 4 commit 但 Phase 3 worktree 独立隔离)
+
+### 反思 (memory candidate)
+
+**tier1-gate.yml `paths` 白名单与 Tier 1 邻接代码的边界设计 gap** — Phase 3 surgical 改 `payment_gateway.py` 是 Tier 1 邻接 (cashier_engine 调它做支付 dispatch), 但 tier1-gate.yml paths 不含此文件 → Tier 1 gate workflow 未触发。CLAUDE.md §17 Tier 1 清单含 `cashier_engine.py`, 但**对 cashier 调用的下游 service 文件**没明确定义。tier1-gate.yml paths 应明确**Tier 1 邻接代码集** (payment_gateway / payment_provider / 等被 cashier_engine 调用的下游 service files), 否则 Tier 1 邻接改动可能 silent bypass Tier 1 gate workflow。属类 #515 → #516 → #517 pattern 的 design gap, 但**不阻塞 Phase 3 merge** (reviewer 已独立 verify Tier 1 主链路零触动).
+
+### Phase 4 阻塞重要性升级
+
+W2-A Phase 1-3 完工后, **Phase 4 (alembic reverse migration v384-v389)** 成 W2-A 全收尾的最后一公里:
+- 17 表 drop `country_code` (default 'CN')
+- 4 表 drop (`subsidy_programs` / `tenant_subsidies` / `subsidy_bills` / `pdpa_requests` / `pdpa_consent_logs` etc.)
+- dishes 3 个 region category column drop
+
+阻塞 **D1 (创始人确认三国 production 是否有真实 tenant 数据)**。三国服务上线 2026-05-03, 离当前 10 天, customer adoption 极有限. 按 user prompt + commit history 默认走"无 production 数据"分支, 等 user 创始人确认后写 v414+ 反向 migration.
+
+### 持续阻塞
+
+- **D1 (Phase 4 阻塞)**: 三国 production 真实 tenant 数据 — 创始人决策点, Phase 4 必须 D1
+- **D2 (Issue #522)**: grabfood OmniChannel 是否真有马来业务流量 — 创始人决策点, 不阻塞 Phase 4
+- **B**: dev-plan-60d demo 故事核心方向 (本 session 不推)
+- **C**: DailySummary / Header export §18 ontology (本 session 不推)
+- **5/13 channel-aggregation 资质**: 3 平台企业资质未启动 (已 due)
+
+### 明日计划 (fresh session 候选)
+
+**Wave 1 (中风险独立)**:
+- Phase 4 alembic reverse migration v414-v419 (待 D1 输入)
+- #522 grabfood OmniChannel deprecate (待 D2 输入)
+- `payment_gateway.py` tier1-gate path filter gap follow-up issue + PR (类 #517)
+- reviewer P1/P2 follow-up: test_cashier_engine 假绿 fix + `_method_to_category` dedup
+- Dependabot npm #425-#429 (5 个)
+
+**Wave 2 (重型独立 session)**:
+- #272/#271 Tier 1 wine_storage/invoice Decimal→fen + 迁移 v403/v404 (TDD + DEMO 验收)
+- #501 Phase 3 同名 file rename (~30 rename, _NOQA_ALLOWED_FILES 清空, enforcer zero-tolerance)
+- #240 V4 architecture sprint DRAFT
+
+### 反思 2 (memory candidate)
+
+**W2-A 主线收尾后的 session 节奏判断** — 本 session 跨 #504 round-1→2 + #522 + #523 + #524 + 本 docs sediment 共 4 PR (其中 3 为代码 PR + 1 docs + 1 follow-up issue #522), 进入 memory `feedback_proactive_session_split` 拆 session 阈值 (4+ PR). user 选 A→D 主动拆 session, 符合 memory 建议。本段 sediment 完成即 end session。
+
+---
+
 ## 2026-05-13 下午 — afternoon ship batch: #351 + #336 + #347 close + 3 follow-up issue + 2 个 memory carve-out 类别
 
 ### 今日完成

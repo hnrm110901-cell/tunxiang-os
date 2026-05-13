@@ -1,3 +1,49 @@
+## 2026-05-13 接 #525 后 · W2-A Phase 3 (#524) 完工 + W2-A 主线 3 Phase 全收尾
+
+### 完成状态
+
+- [x] **PR #524 W2-A Phase 3 MERGED** commit `149b7785` (2026-05-13T06:03:52Z, normal squash, 非 admin-merge)
+- [x] **9 file / +0 / -3034 line** (8 整删: tx-agent 5 + tx-trade 3, 1 surgical: payment_gateway -8 行)
+- [x] **5 file tx-agent 内部闭环** (regional_forecast_routes / regional_forecasting_service / malaysia_forecasting_service / malaysia_ingredients / malaysia_holidays) — main.py 0 注册 dead route
+- [x] **3 file tx-trade 独立 dead** (my_payment_notify_service / foodpanda_adapter / shopeefood_adapter) — __init__.py 不暴露
+- [x] **payment_gateway.py surgical**: 删 PAYMENT_METHODS 3 entries + _method_to_category 3 entries + 2 Sprint 1.4 comments, Tier 1 cashier 主链路零触动
+- [x] **Round-2 (#504) 教训完整应用**: 双重 import grep (绝对+相对) + 跨服务 active 链审计 + 精确 dict-key grep
+- [x] **20 Tier 1 + 14 collision enforcer = 34 PASS** (本地)
+- [x] **alembic chain 511 unchanged**
+- [x] **Reviewer APPROVE**: 0 P0, 1 P1 + 1 P2 + 1 nit 全部 pre-existing 非 Phase 3 引入
+- [x] **真 required CI 3/3 pass**: Analyze Changes + CodeRabbit + edge-mac-station
+- [x] **rebase worktree cleanup**: w2a-phase3-2026-05-13 + refactor/w2a-phase3-tx-services branch 删
+
+### W2-A 主线 3 Phase 累计
+
+| Phase | PR | Commit | 删除 |
+|-------|----|--------|------|
+| 1 三独立服务 | #499 | `0e70af86` | -8342 line |
+| 2 shared 框架 (11/12 项, grabfood 撤回) | #504 | `2af9a1aa` | -4914 line |
+| 3 tx-agent/tx-trade 内嵌分支 | #524 | `149b7785` | -3034 line |
+| **合计** | | | **~ -16290 line** |
+
+### 关键决策
+
+- **不动 grabfood (本 PR)**: Phase 2 round-2 撤回的 OmniChannel 一等公民判定继续适用. grabfood_adapter.py (services/tx-trade/src/services/delivery_adapters/grabfood_adapter.py) 是 active (delivery_panel_service.py 第 39-44/106 引用), 不在 Phase 3 删除范围. Plan SoT 中 Phase 3 列表也无 grabfood, 一致
+- **payment_gateway.py surgical 边界**: 仅删 Malaysia 6 dict entries + 2 comments, 不动 PaymentGateway class signature / 业务方法 / Repository 模式 / cashier_engine 调用路径
+- **tier1-gate path filter 设计 gap 不阻塞**: payment_gateway.py 是 Tier 1 邻接但不在 tier1-gate.yml paths. reviewer 独立 verify Tier 1 主链零触动 + Phase 3 不引入回归, 因此 path filter design gap 是 follow-up issue 候选, 不阻塞本 PR
+- **reviewer P1/P2/nit 不修**: 全部 pre-existing 非 Phase 3 引入. memory `feedback_tier1_review_loops` 真 BUG only 设停止线. test_cashier_engine.py 假绿 + _method_to_category 重复都是独立 follow-up issue 候选, 不阻塞 W2-A Phase 3 merge
+
+### 下一步
+
+- A' (本 docs PR): T3 docs-only carve-out 第 7 例 ship → user explicit 授权 admin-merge → cleanup
+- D' (主动拆 session): memory 更新 + 起手命令准备 + 主动拆 session
+
+### 已知风险 / 持续阻塞
+
+- **D1 阻塞 (Phase 4 必须)**: 三国 production 是否有真 tenant 数据 — 创始人决策点; Phase 4 alembic reverse v384-v389 必须 D1
+- **D2 阻塞 (#522)**: grabfood OmniChannel 真马来业务流量 — 创始人决策点; 不阻塞 Phase 4
+- **B/C 阻塞**: dev-plan-60d demo 故事 / DailySummary §18 ontology
+- **5/13 channel-aggregation 资质**: 3 平台资质未启动 (已 due)
+
+---
+
 ## 2026-05-13 下午 · afternoon ship batch — #351 + #336 + #347 close + 3 follow-up issue + 2 carve-out 类别
 
 ### 完成状态
