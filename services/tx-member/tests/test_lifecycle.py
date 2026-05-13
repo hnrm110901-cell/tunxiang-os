@@ -26,7 +26,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 # 被测模块
-from services.lifecycle_service import (  # noqa: E402
+from services.tx_member.src.services.lifecycle_service import (  # noqa: E402
     LifecycleService,
     LifecycleStage,
 )

@@ -36,37 +36,37 @@ class TestEarnRules:
 
     def test_consume_100_yuan_earns_1_point(self):
         """点单 100 元（10000 分），按默认规则 earn_unit=10000 / earn_ratio=1，得 1 积分。"""
-        from services.points_engine import calculate_earn_points
+        from services.tx_member.src.services.points_engine import calculate_earn_points
 
         assert calculate_earn_points(amount_fen=10000, earn_ratio=1, earn_unit_fen=10000) == 1
 
     def test_consume_888_yuan_earns_8_points(self):
         """点单 888 元（不是 100 的整数倍），向下取整 → 8 积分。"""
-        from services.points_engine import calculate_earn_points
+        from services.tx_member.src.services.points_engine import calculate_earn_points
 
         assert calculate_earn_points(amount_fen=88800, earn_ratio=1, earn_unit_fen=10000) == 8
 
     def test_member_day_double_points(self):
         """会员日双倍：multiplier=2.0，消费 200 元 → 4 积分。"""
-        from services.points_engine import calculate_earn_points
+        from services.tx_member.src.services.points_engine import calculate_earn_points
 
         assert calculate_earn_points(amount_fen=20000, earn_ratio=1, earn_unit_fen=10000, multiplier=2.0) == 4
 
     def test_recharge_500_with_2x_multiplier_earns_10_points(self):
         """大客户充值 500 元做 2x 倍数活动，按 100 元 1 积分基础 → 10 积分。"""
-        from services.points_engine import calculate_earn_points
+        from services.tx_member.src.services.points_engine import calculate_earn_points
 
         assert calculate_earn_points(amount_fen=50000, earn_ratio=1, earn_unit_fen=10000, multiplier=2.0) == 10
 
     def test_signin_fixed_amount(self):
         """签到固定送积分由 source 路由决定，不走金额折算（amount 直接传入）。"""
-        from services.points_engine import EARN_SOURCES
+        from services.tx_member.src.services.points_engine import EARN_SOURCES
 
         assert "sign_in" in EARN_SOURCES
 
     def test_invalid_rule_returns_zero(self):
         """earn_unit_fen 为 0 时不能除零，返回 0 积分而非崩溃。"""
-        from services.points_engine import calculate_earn_points
+        from services.tx_member.src.services.points_engine import calculate_earn_points
 
         assert calculate_earn_points(10000, 1, 0) == 0
 
@@ -81,19 +81,19 @@ class TestCashOffset:
 
     def test_100_points_offsets_1_yuan(self):
         """100 积分按默认 spend_ratio=100 / spend_value_fen=100 → 抵 100 分（= 1 元）。"""
-        from services.points_engine import calculate_cash_offset_fen
+        from services.tx_member.src.services.points_engine import calculate_cash_offset_fen
 
         assert calculate_cash_offset_fen(points=100, spend_ratio=100, spend_value_fen=100) == 100
 
     def test_offset_floor_division(self):
         """150 积分按 100 单位向下取整 → 只能抵 100 分。"""
-        from services.points_engine import calculate_cash_offset_fen
+        from services.tx_member.src.services.points_engine import calculate_cash_offset_fen
 
         assert calculate_cash_offset_fen(points=150, spend_ratio=100, spend_value_fen=100) == 100
 
     def test_1000_points_offsets_10_yuan(self):
         """1000 积分 → 抵 1000 分 = 10 元。"""
-        from services.points_engine import calculate_cash_offset_fen
+        from services.tx_member.src.services.points_engine import calculate_cash_offset_fen
 
         assert calculate_cash_offset_fen(points=1000, spend_ratio=100, spend_value_fen=100) == 1000
 
@@ -103,7 +103,7 @@ class TestMarginFloorConstraint:
 
     def test_normal_offset_passes(self):
         """正常订单：100 元食材成本 60 元，抵 5 元后毛利仍达标。"""
-        from services.points_engine import check_offset_against_margin_floor
+        from services.tx_member.src.services.points_engine import check_offset_against_margin_floor
 
         result = check_offset_against_margin_floor(
             order_total_fen=10000,
@@ -117,7 +117,7 @@ class TestMarginFloorConstraint:
 
     def test_excessive_offset_blocked(self):
         """高额抵现：100 元订单食材成本 90 元，抵 50 元 → 毛利率会变负，必须拒绝。"""
-        from services.points_engine import check_offset_against_margin_floor
+        from services.tx_member.src.services.points_engine import check_offset_against_margin_floor
 
         result = check_offset_against_margin_floor(
             order_total_fen=10000,
@@ -130,7 +130,7 @@ class TestMarginFloorConstraint:
 
     def test_offset_at_exactly_threshold_passes(self):
         """毛利率刚好等于阈值，应通过（>=）。"""
-        from services.points_engine import check_offset_against_margin_floor
+        from services.tx_member.src.services.points_engine import check_offset_against_margin_floor
 
         # 设计: 毛利率 = (price - offset - cost) / (price - offset) = threshold
         # threshold=0.15, cost=850, price=1000, 求 offset 使毛利率 = 0.15
@@ -148,7 +148,7 @@ class TestMarginFloorConstraint:
 
     def test_offset_zero_is_noop(self):
         """0 抵现总是允许。"""
-        from services.points_engine import check_offset_against_margin_floor
+        from services.tx_member.src.services.points_engine import check_offset_against_margin_floor
 
         result = check_offset_against_margin_floor(
             order_total_fen=10000,
@@ -160,7 +160,7 @@ class TestMarginFloorConstraint:
 
     def test_invalid_total_returns_blocked(self):
         """订单金额非正数视为非法 → 拒绝。"""
-        from services.points_engine import check_offset_against_margin_floor
+        from services.tx_member.src.services.points_engine import check_offset_against_margin_floor
 
         result = check_offset_against_margin_floor(
             order_total_fen=0,
@@ -188,7 +188,7 @@ class TestCrossStoreSettlement:
 
     def test_single_store_no_cross_flow(self):
         """全部在 A 店产生且在 A 店消耗，无跨店流量。"""
-        from services.points_settlement import settle_cross_store
+        from services.tx_member.src.services.points_settlement import settle_cross_store
 
         events = [
             {"direction": "earn", "store_id": "A", "points": 100, "amount_fen": 10000},
@@ -202,7 +202,7 @@ class TestCrossStoreSettlement:
     def test_cross_store_flow_a_earns_b_spends(self):
         """A 店产生 100 积分，B 店消耗 100 积分（抵 100 分）→
         B 店需支付 100 分给 A 店（A 店核销自己产生的负债）。"""
-        from services.points_settlement import settle_cross_store
+        from services.tx_member.src.services.points_settlement import settle_cross_store
 
         events = [
             {"direction": "earn", "store_id": "A", "points": 100, "amount_fen": 10000},
@@ -220,7 +220,7 @@ class TestCrossStoreSettlement:
     def test_three_store_settlement_proportional(self):
         """A 店产生 200 积分，B 店产生 100 积分，C 店消耗 150 积分（抵 150 分）。
         C 店需按 A:B = 2:1 比例分别付给 A 店 100 分 / B 店 50 分。"""
-        from services.points_settlement import settle_cross_store
+        from services.tx_member.src.services.points_settlement import settle_cross_store
 
         events = [
             {"direction": "earn", "store_id": "A", "points": 200, "amount_fen": 20000},
@@ -239,7 +239,7 @@ class TestCrossStoreSettlement:
 
     def test_no_negative_balance_protection(self):
         """没有积分产生但有消耗，跳过结算（数据问题，不应崩溃）。"""
-        from services.points_settlement import settle_cross_store
+        from services.tx_member.src.services.points_settlement import settle_cross_store
 
         events = [
             {"direction": "spend", "store_id": "C", "points": 100, "amount_fen": 100},
@@ -251,7 +251,7 @@ class TestCrossStoreSettlement:
 
     def test_rounding_residual_assigned_to_largest_creditor(self):
         """金额无法整除时，余数分给最大债权人，保证总额准确（金额 = 整数分）。"""
-        from services.points_settlement import settle_cross_store
+        from services.tx_member.src.services.points_settlement import settle_cross_store
 
         events = [
             {"direction": "earn", "store_id": "A", "points": 100, "amount_fen": 10000},
@@ -277,7 +277,7 @@ class TestFifoExpiry:
 
     def test_single_expired_batch_cleared(self):
         """一批积分发行 366 天前，今天清理 → 应被清零。"""
-        from services.points_expiry_fifo import clear_expired_batches_fifo
+        from services.tx_member.src.services.points_expiry_fifo import clear_expired_batches_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -297,7 +297,7 @@ class TestFifoExpiry:
 
     def test_unexpired_batch_untouched(self):
         """未过期的批次不动。"""
-        from services.points_expiry_fifo import clear_expired_batches_fifo
+        from services.tx_member.src.services.points_expiry_fifo import clear_expired_batches_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -316,7 +316,7 @@ class TestFifoExpiry:
 
     def test_fifo_order_oldest_first(self):
         """三批积分，最早的两批已过期、第三批未过期 → 清理顺序为最早 → 次早。"""
-        from services.points_expiry_fifo import clear_expired_batches_fifo
+        from services.tx_member.src.services.points_expiry_fifo import clear_expired_batches_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -352,7 +352,7 @@ class TestFifoExpiry:
 
     def test_consume_fifo_takes_oldest_first(self):
         """消费积分时，应从最早批次开始扣减（FIFO）。"""
-        from services.points_expiry_fifo import consume_points_fifo
+        from services.tx_member.src.services.points_expiry_fifo import consume_points_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -388,7 +388,7 @@ class TestFifoExpiry:
 
     def test_consume_insufficient_balance_raises(self):
         """余额不足时拒绝消费（不允许部分消费产生半状态）。"""
-        from services.points_expiry_fifo import consume_points_fifo
+        from services.tx_member.src.services.points_expiry_fifo import consume_points_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -407,7 +407,7 @@ class TestFifoExpiry:
 
     def test_consume_skips_expired_batches(self):
         """已过期/已清零的批次不被消费。"""
-        from services.points_expiry_fifo import consume_points_fifo
+        from services.tx_member.src.services.points_expiry_fifo import consume_points_fifo
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
         batches = [
@@ -460,7 +460,7 @@ class TestRoutesNotMocked:
 
         monkeypatch.setattr(points_routes, "_svc_earn_points", fake_earn, raising=False)
         # 调用路由处理函数（直接 await，不走 HTTP）
-        from api.points_routes import EarnPointsRequest, earn_points
+        from services.tx_member.src.api.points_routes import EarnPointsRequest, earn_points
 
         body = EarnPointsRequest(card_id="c1", source="consume", amount=100)
 
@@ -474,7 +474,7 @@ class TestRoutesNotMocked:
     async def test_spend_cash_offset_blocks_when_margin_violated(self, monkeypatch):
         """POST /spend (cash_offset) 抵现使毛利低于阈值 → 拒绝，不调用 spend_points。"""
         from api import points_routes
-        from api.points_routes import SpendPointsRequest, spend_points
+        from services.tx_member.src.api.points_routes import SpendPointsRequest, spend_points
 
         spend_called = {"called": False}
 
@@ -503,7 +503,7 @@ class TestRoutesNotMocked:
     async def test_spend_cash_offset_passes_normal_order(self, monkeypatch):
         """正常订单：抵现少且毛利充足 → 调用 spend_points。"""
         from api import points_routes
-        from api.points_routes import SpendPointsRequest, spend_points
+        from services.tx_member.src.api.points_routes import SpendPointsRequest, spend_points
 
         spend_called = {"called": False}
 
@@ -536,7 +536,7 @@ class TestExpiryWorker:
     @pytest.mark.asyncio
     async def test_worker_clears_for_single_tenant(self):
         """Worker 收到批次后调用 FIFO 清理函数。"""
-        from workers.points_expiry_worker import PointsExpiryWorker
+        from services.tx_member.src.workers.points_expiry_worker import PointsExpiryWorker
 
         now = datetime(2026, 5, 1, tzinfo=timezone.utc)
 

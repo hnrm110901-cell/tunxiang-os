@@ -18,7 +18,7 @@ from datetime import date, datetime, timezone
 from unittest.mock import AsyncMock
 
 import pytest
-from services.points_mall import (
+from services.tx_member.src.services.points_mall import (
     ACHIEVEMENT_DEFINITIONS,
     check_birthday_privilege,
     create_mall_item,

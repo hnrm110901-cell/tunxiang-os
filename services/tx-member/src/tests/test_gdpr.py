@@ -58,7 +58,7 @@ def _mock_request(
 @pytest.fixture()
 def gdpr_client():
     """只挂载 gdpr_router 的轻量 FastAPI 应用，mock 掉数据库依赖。"""
-    from api.gdpr_routes import _get_tenant_db, router
+    from services.tx_member.src.api.gdpr_routes import _get_tenant_db, router
     from fastapi import FastAPI
 
     mini_app = FastAPI()

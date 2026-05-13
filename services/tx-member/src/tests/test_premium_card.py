@@ -15,7 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.premium_card_routes import router as premium_router
+from services.tx_member.src.api.premium_card_routes import router as premium_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -178,20 +178,20 @@ class TestGiftCard:
 
 class TestAnnualPlanConstants:
     def test_all_plans_have_benefits(self):
-        from services.premium_card import ANNUAL_PLANS
+        from services.tx_member.src.services.premium_card import ANNUAL_PLANS
 
         for plan_id, plan in ANNUAL_PLANS.items():
             assert "benefits" in plan, f"{plan_id} missing benefits"
             assert len(plan["benefits"]) > 0, f"{plan_id} has empty benefits"
 
     def test_all_plans_have_correct_duration(self):
-        from services.premium_card import ANNUAL_PLANS
+        from services.tx_member.src.services.premium_card import ANNUAL_PLANS
 
         for plan_id, plan in ANNUAL_PLANS.items():
             assert plan["duration_days"] == 365, f"{plan_id} duration != 365"
 
     def test_diamond_has_most_benefits(self):
-        from services.premium_card import ANNUAL_PLANS
+        from services.tx_member.src.services.premium_card import ANNUAL_PLANS
 
         silver_count = len(ANNUAL_PLANS["silver"]["benefits"])
         gold_count = len(ANNUAL_PLANS["gold"]["benefits"])

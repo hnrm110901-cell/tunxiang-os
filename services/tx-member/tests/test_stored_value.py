@@ -92,7 +92,7 @@ class TestRecharge:
     @pytest.mark.asyncio
     async def test_recharge_direct_increases_balance(self):
         """充值后本金余额增加，流水记录写入。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(balance_fen=5000, main_balance_fen=5000, gift_balance_fen=0)
         db = _make_async_session(card=card)
@@ -133,7 +133,7 @@ class TestRecharge:
     @pytest.mark.asyncio
     async def test_recharge_invalid_amount_raises(self):
         """充值金额 <= 0 时抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         svc = StoredValueService()
         db = _make_async_session()
@@ -156,7 +156,7 @@ class TestConsume:
     @pytest.mark.asyncio
     async def test_consume_deducts_balance(self):
         """消费时余额正确扣减（先扣赠送，再扣本金）。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         # 有 2000 赠送 + 8000 本金 = 10000 总余额
         card = _make_card(
@@ -201,7 +201,7 @@ class TestConsume:
     @pytest.mark.asyncio
     async def test_consume_insufficient_balance_raises(self):
         """余额不足时抛出 InsufficientBalanceError。"""
-        from services.stored_value_service import InsufficientBalanceError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import InsufficientBalanceError, StoredValueService
 
         card = _make_card(balance_fen=1000, main_balance_fen=1000, gift_balance_fen=0)
         db = _make_async_session(card=card)
@@ -218,7 +218,7 @@ class TestConsume:
     @pytest.mark.asyncio
     async def test_consume_zero_amount_raises(self):
         """消费金额 <= 0 时抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         svc = StoredValueService()
         db = _make_async_session()
@@ -241,7 +241,7 @@ class TestConcurrencySafety:
     @pytest.mark.asyncio
     async def test_consume_uses_select_for_update(self):
         """consume_by_id 内部执行的查询必须包含 with_for_update。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(balance_fen=10000, main_balance_fen=10000)
         db = AsyncMock()
@@ -293,7 +293,7 @@ class TestConcurrencySafety:
     @pytest.mark.asyncio
     async def test_transfer_uses_select_for_update_on_both_cards(self):
         """transfer 对两张卡都加行锁，且按 UUID 排序防死锁。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         # 确保 id_a < id_b，验证排序锁逻辑
         id_a = uuid.UUID("10000000-0000-0000-0000-000000000000")
@@ -360,7 +360,7 @@ class TestExpiryProcessing:
     @pytest.mark.asyncio
     async def test_process_expiry_freezes_expired_cards(self):
         """process_expiry_batch 应冻结已到期的 active 卡。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         yesterday = date.today() - timedelta(days=1)
         expired_card = _make_card(
@@ -387,7 +387,7 @@ class TestExpiryProcessing:
     @pytest.mark.asyncio
     async def test_process_expiry_ignores_non_expired(self):
         """process_expiry_batch 不处理未到期的卡。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         db = AsyncMock()
         db.add = MagicMock()
@@ -405,7 +405,7 @@ class TestExpiryProcessing:
     @pytest.mark.asyncio
     async def test_expired_card_cannot_consume(self):
         """已过期（expired_at 在过去）的卡不可消费。"""
-        from services.stored_value_service import CardNotActiveError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import CardNotActiveError, StoredValueService
 
         yesterday = date.today() - timedelta(days=1)
         card = _make_card(
@@ -435,7 +435,7 @@ class TestTransfer:
     @pytest.mark.asyncio
     async def test_transfer_moves_balance(self):
         """转赠后 from_card 余额减少，to_card 余额增加。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         id_a = uuid.UUID("10000000-0000-0000-0000-000000000000")
         id_b = uuid.UUID("20000000-0000-0000-0000-000000000000")
@@ -491,7 +491,7 @@ class TestTransfer:
     @pytest.mark.asyncio
     async def test_transfer_self_raises(self):
         """自己向自己转赠时抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         svc = StoredValueService()
         db = _make_async_session()
@@ -508,7 +508,7 @@ class TestTransfer:
     @pytest.mark.asyncio
     async def test_transfer_insufficient_main_balance_raises(self):
         """本金不足时抛出 InsufficientBalanceError（赠送余额不可转）。"""
-        from services.stored_value_service import InsufficientBalanceError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import InsufficientBalanceError, StoredValueService
 
         id_a = uuid.UUID("10000000-0000-0000-0000-000000000000")
         id_b = uuid.UUID("20000000-0000-0000-0000-000000000000")
@@ -549,7 +549,7 @@ class TestRefund:
     @pytest.mark.asyncio
     async def test_refund_restores_main_balance(self):
         """退款后本金余额恢复，写入退款流水。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(balance_fen=7000, main_balance_fen=7000, total_refunded_fen=0)
         db = _make_async_session(card=card)
@@ -588,7 +588,7 @@ class TestRefund:
     @pytest.mark.asyncio
     async def test_refund_does_not_restore_gift_balance(self):
         """退款只退本金，赠送余额不变。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(
             balance_fen=7000,
@@ -638,7 +638,7 @@ class TestRechargeGift:
     @pytest.mark.asyncio
     async def test_recharge_with_gift_adds_to_gift_balance(self):
         """充 10000 分（100元）赠送 2000 分（20元），赠送余额正确增加。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(
             balance_fen=0,
@@ -684,7 +684,7 @@ class TestRechargeGift:
     @pytest.mark.asyncio
     async def test_recharge_gift_negative_raises(self):
         """赠送金额为负数时抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         svc = StoredValueService()
         db = _make_async_session()
@@ -708,7 +708,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_consume_wrong_tenant_raises(self):
         """使用错误 tenant_id 时，因找不到卡而抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         # DB 找不到该卡（因为 tenant_id 不匹配，RLS 会过滤掉）
         db = AsyncMock()
@@ -728,7 +728,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_get_balance_wrong_tenant_raises(self):
         """使用错误 tenant_id 查询余额时抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         db = AsyncMock()
         result_mock = MagicMock()
@@ -746,7 +746,7 @@ class TestTenantIsolation:
     @pytest.mark.asyncio
     async def test_transfer_cross_tenant_raises(self):
         """跨租户转赠（to_card 属于不同租户）时因找不到 to_card 抛出 ValueError。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         id_a = uuid.UUID("10000000-0000-0000-0000-000000000000")
         id_b = uuid.UUID("20000000-0000-0000-0000-000000000000")
@@ -786,7 +786,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_freeze_by_id_sets_status_frozen(self):
         """freeze_by_id 将卡状态改为 frozen，写入流水记录。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(status="active", balance_fen=5000, main_balance_fen=5000)
         db = _make_async_session(card=card)
@@ -806,7 +806,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_freeze_already_frozen_raises(self):
         """冻结已冻结的卡时抛出 CardNotActiveError。"""
-        from services.stored_value_service import CardNotActiveError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import CardNotActiveError, StoredValueService
 
         card = _make_card(status="frozen")
         db = _make_async_session(card=card)
@@ -822,7 +822,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_unfreeze_by_id_restores_active(self):
         """unfreeze_by_id 将卡状态从 frozen 恢复为 active，写入流水。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card = _make_card(status="frozen", balance_fen=5000)
         db = _make_async_session(card=card)
@@ -842,7 +842,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_unfreeze_active_card_raises(self):
         """解冻非冻结卡时抛出 CardNotActiveError。"""
-        from services.stored_value_service import CardNotActiveError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import CardNotActiveError, StoredValueService
 
         card = _make_card(status="active")
         db = _make_async_session(card=card)
@@ -858,7 +858,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_frozen_card_cannot_consume(self):
         """冻结状态的卡无法消费，抛出 CardNotActiveError。"""
-        from services.stored_value_service import CardNotActiveError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import CardNotActiveError, StoredValueService
 
         card = _make_card(status="frozen", balance_fen=10000, main_balance_fen=10000)
         db = _make_async_session(card=card)
@@ -875,7 +875,7 @@ class TestFreezeUnfreezeById:
     @pytest.mark.asyncio
     async def test_frozen_card_cannot_recharge(self):
         """冻结状态的卡无法充值，抛出 CardNotActiveError。"""
-        from services.stored_value_service import CardNotActiveError, StoredValueService
+        from services.tx_member.src.services.stored_value_service import CardNotActiveError, StoredValueService
 
         card = _make_card(status="frozen", balance_fen=5000)
         db = _make_async_session(card=card)
@@ -899,7 +899,7 @@ class TestListCardsByCustomer:
     @pytest.mark.asyncio
     async def test_list_cards_returns_active_cards(self):
         """list_cards_by_customer 默认只返回 active 卡。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card1 = _make_card(card_id=CARD_ID_1, status="active")
         card2 = _make_card(card_id=CARD_ID_2, status="frozen")
@@ -925,7 +925,7 @@ class TestListCardsByCustomer:
     @pytest.mark.asyncio
     async def test_list_cards_include_inactive(self):
         """include_inactive=True 时返回所有卡（含冻结）。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         card1 = _make_card(card_id=CARD_ID_1, status="active")
         card2 = _make_card(card_id=CARD_ID_2, status="frozen")
@@ -950,7 +950,7 @@ class TestListCardsByCustomer:
     @pytest.mark.asyncio
     async def test_list_cards_empty_returns_empty_list(self):
         """会员无卡时返回空列表，不抛异常。"""
-        from services.stored_value_service import StoredValueService
+        from services.tx_member.src.services.stored_value_service import StoredValueService
 
         db = AsyncMock()
         result_mock = MagicMock()

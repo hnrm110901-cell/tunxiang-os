@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.rfm_outreach_service import (
+from services.tx_member.src.services.rfm_outreach_service import (
     F_BUCKETS,
     M_BUCKETS,
     R_BUCKETS,

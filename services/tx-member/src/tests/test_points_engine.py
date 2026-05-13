@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.points_routes import router as points_router
+from services.tx_member.src.api.points_routes import router as points_router
 from fastapi.testclient import TestClient
 from main import app
 
@@ -102,7 +102,7 @@ class TestOffsetCheckAPI:
 
 # ── 服务层纯函数单元测试 ─────────────────────────────────────
 
-from services.points_engine import (
+from services.tx_member.src.services.points_engine import (
     DEFAULT_EARN_RATIO,
     DEFAULT_SPEND_RATIO,
     EARN_SOURCES,

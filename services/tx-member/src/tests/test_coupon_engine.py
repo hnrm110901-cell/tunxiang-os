@@ -7,7 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.coupon_engine import (
+from services.tx_member.src.services.coupon_engine import (
     CouponType,
     _CouponInstanceStore,
     _CouponTemplateStore,

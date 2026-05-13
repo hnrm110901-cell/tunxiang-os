@@ -23,7 +23,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.campaign_roi_forecast_service import (  # noqa: E402
+from services.tx_member.src.services.campaign_roi_forecast_service import (  # noqa: E402
     MAPE_THRESHOLD,
     BacktestResult,
     CampaignROIForecastService,
