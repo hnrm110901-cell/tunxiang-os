@@ -1,3 +1,52 @@
+## 2026-05-13 接 #533 后 · W2-A 主线 + Issue #522 国际化战略全收尾 (#527/#528/#530)
+
+### 完成状态
+
+- [x] **PR #527 Issue #522 D2-A 代码层 MERGED** `46a6324e` (normal squash, T2): 23 files / -1833 line, grabfood OmniChannel 全量 deprecate (shared + tx-trade + 前端 zombie + tests + 4 i18n)
+- [x] **PR #528 W2-A Phase 4 v416 reverse MERGED** `ea6224b3` (normal squash, T2): 1 file / +97 line, 反向 v384-v389 (17 表 drop country_code + 4 表 drop + 3 dishes columns + v400 hotfix)
+- [x] **PR #530 Issue #522 D2-B v417 grabfood enum-shrink MERGED** `0870cdbd` (admin squash, **Tier 1 explicit-ask carve-out 第 34 次**): 1 file / 129 line, 3 表 platform CHECK 收缩
+- [x] **Issue #522 OPENED + CLOSED via #527+#530**: grabfood OmniChannel 6 平台马来流量评估, 路径 A risk-accept
+- [x] **W2-A 主线 4 Phase 全收尾**: -16290 line 应用层 + 2 反向 migration = 国际化战略 10 天周期完全 close
+- [x] **2 memory updates 落盘**: NEW `feedback_deletion_pr_grep_pattern.md` + UPDATE `feedback_pr_rebase_worktree_pattern.md`
+- [x] **4 reviewer agent + 2 analyst agent + 4 executor agent**: 全部独立 verifier 流程完整
+- [x] **6 PR + 1 issue ship 本 session**, 0 race 损失
+- [x] **worktree cleanup**: w2a-phase4 / grabfood-deprecate / grabfood-enum-shrink 全清
+
+### W2-A + #522 完整 PR 链 (累计 7 PR)
+
+| PR | 内容 | Commit | Tier | 删除 |
+|----|------|--------|------|------|
+| #499 | W2-A Phase 1 三独立服务 | 0e70af86 | T2 | -8342 |
+| #504 | W2-A Phase 2 shared 框架 (round-2 grabfood 撤回 + #522) | 2af9a1aa | T2 | -4914 |
+| #524 | W2-A Phase 3 tx-agent/tx-trade 内嵌 | 149b7785 | T2 | -3034 |
+| #527 | Issue #522 D2-A 代码层 (round-2 v411-v413 drift fix) | 46a6324e | T2 | -1833 |
+| #528 | W2-A Phase 4 v416 reverse v384-v389 | ea6224b3 | T2 | +97 schema |
+| #530 | Issue #522 D2-B v417 grabfood enum-shrink | 0870cdbd | **T1 DDL** | +129 DDL |
+| 本 PR | W2-A 全收尾 docs sediment | TBD | T3 | docs |
+
+### 关键决策
+
+- **创始人路径 A 双 risk-accept (D1 + D2)** — 不跑 production SQL, 5 条独立证据 converge 到"国际化战略 dead code". 节省 SRE 跑 SQL 时间, 1 个 session 完成应用层 + 反向 + DDL 全套
+- **Tier 1 资金路径 explicit-ask admin-merge 模式首次完整闭环** (PR #530) — 8 类 carve-out 模式正式扩立, 流程: reviewer P0:0 + CI 全绿 + 重 fetch + 重 search 同主题 + user "merge 后无法回退" explicit confirm
+- **Sequential ship PR #528 → PR #530** — PR-1 解锁 chain head v416, PR-3 down_revision 满足. 用 Y 路径 (一次性双授权) 简化 user 决策, normal+admin 同 push 后 sequential merge
+- **Migration slot 动态 discover** — executor agent 起手时主动 grep `ls versions/v41*` 发现 v414/v415 已被 #271/#272 占用, 自适应用 v416/v417. 避免 plan-stale-slot 假设
+- **Reviewer P1 自找补** — PR #527 round-2 v411/v412 drift 同时修 v413 (reviewer round-1 漏列) → reviewer round-2 verdict 认可"比只修明确列出的更彻底"
+
+### 下一步
+
+- **主动拆 session** (memory `feedback_proactive_session_split`: 6+ PR 远超阈值)
+- 下 session 起手: Wave 1 (Reviewer P1/P2 follow-up / path filter gap / dependabot) 或 Wave 2 (#501 Phase 3 rename / #240 V4 architecture)
+- Wave 3 创始人级阻塞 (B / C / channel-aggregation 资质) 等输入
+
+### 已知风险
+
+- **W2-A + D1 + D2 全 closed**, 阻塞清单清空 (除 B/C/channel-aggregation 创始人级)
+- **memory 8 类 carve-out** 正式确立, 后续 admin-merge 评估按 8 类清单走
+- **alembic chain 515 revisions**, integrity OK (含 v414 invoice + v415 wine_storage + v416 reverse + v417 enum-shrink)
+- **Pre-existing follow-up 候选** (不阻塞但建议下 session 收尾): test_cashier_engine 假绿 / _method_to_category dedup / v413 drift test 对称 / payment_gateway path filter gap
+
+---
+
 ## 2026-05-13 下午晚 · Tier 1 资金路径双 PR ship #271 + #272 (invoice + wine_storage Decimal→fen + FOR UPDATE 行锁)
 
 ### 完成状态

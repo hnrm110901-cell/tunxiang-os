@@ -1,3 +1,106 @@
+## 2026-05-13 接 #533 后 — W2-A 主线 + Issue #522 国际化战略全收尾 (#527/#528/#530)
+
+### 今日完成
+
+承接 #533 (Tier 1 资金路径双 PR #271 + #272 沉淀) 后, 本 session 在并发独立 worktree 推进 **W2-A 主线 Phase 4 + Issue #522 D2-A/D2-B grabfood OmniChannel 全量 deprecate**, 完成国际化战略 **2026-05-03 → 2026-05-13** 10 天周期完全 close.
+
+### W2-A + Issue #522 完整路径
+
+```
+✅ #499  W2-A Phase 1 三独立服务整删           — -8342 line
+✅ #504  W2-A Phase 2 shared 框架 (round-2 grabfood 撤回 + #522 D2 follow-up)  — -4914 line
+✅ #524  W2-A Phase 3 tx-agent/tx-trade 内嵌    — -3034 line
+✅ #527  Issue #522 D2-A grabfood 代码层 (round-2 v411-v413 _ALLOWED_PLATFORMS drift fix)  — -1833 line
+✅ #528  W2-A Phase 4 v416 reverse v384-v389 (国际化 schema 全清, 最后一公里)  — +97 line schema 反向
+✅ #530  Issue #522 D2-B v417 grabfood enum-shrink (Tier 1 DDL, 3 表 platform CHECK 收缩)  — +129 line DDL
+```
+
+**累计**: 应用层 ~ -18000+ line 国际化 dead code 清理 + 2 反向 migration (schema + DDL).
+
+### 本 session 推 PR (5 PR + 1 issue)
+
+**PR #527 (Issue #522 D2-A 代码层)** MERGED `46a6324e` (normal squash, T2):
+- 23 files / +27 / -1833. 整删 shared/adapters/grabfood/ (1077 行) + tx-trade/services/delivery_adapters/grabfood_adapter.py (252 行) + 前端 OmniChannelOrders/DeliveryOrderBadge/KDS 多组件 zombie tab + 4 i18n (zh/en/vi/ms) + tests/integration/test_my_adapters
+- Round-1 reviewer P0: 我用绝对 import grep 漏抓相对 `from .grabfood` 引起 delivery_factory ModuleNotFoundError → round-2 撤回 grabfood (PR #504 教训复用)
+- Round-2 reviewer P1: v411/v412 `_ALLOWED_PLATFORMS` Python tuple 仍含 grabfood 触发 drift test → round-2 修补 (含 v413 自找补)
+- Round-2 reviewer APPROVE 0 P0/P1/P2
+
+**PR #528 (W2-A Phase 4 v416 reverse)** MERGED `ea6224b3` (normal squash, T2):
+- 1 file / +97 line. Single migration v416_w2a_phase4_reverse, 7 步 reverse v384-v389:
+  - Step 1: drop v400 RLS hotfix policy (subsidy 2 表 WITH CHECK belt-and-suspenders)
+  - Step 2: drop pdpa_consent_logs + pdpa_requests CASCADE
+  - Step 3: drop subsidy_bills + tenant_subsidies CASCADE (FK 反向顺序)
+  - Step 4-6: drop dishes.{vat_category(+ ix), ppn_category, sst_category}
+  - Step 7: drop country_code from 17 tables (reverse order of v384 TARGET_TABLES)
+  - downgrade: 显式 NotImplementedError (W2-A 完工不可逆设计意图)
+- 创始人 risk-accept 路径 A (5 条独立证据: PR #499 0 deployment / W2-A plan grep 0 import / tenants/ 仅国内 / 7 seed scripts 0 三国 / Phase 1-3 0 stale ref)
+- Reviewer APPROVE 0 P0/P1/P2 + 1 nit (downgrade docstring 轻微歧义)
+- alembic chain 511 → 514 → 515 revisions (含 #271 v414 + #272 v415 + 本 PR v416)
+
+**PR #530 (Issue #522 D2-B v417 grabfood enum-shrink)** MERGED `0870cdbd` (**Tier 1 explicit-ask admin-merge, carve-out 第 34 次**):
+- 1 file / 129 line. Single migration v417_grabfood_enum_shrink, DROP+ADD CHECK constraint × 3 表:
+  - channel_oauth_tokens (NOT NULL platform) + raw_channel_events (NOT NULL platform) + member_identity_map (nullable, IS NULL OR IN)
+  - 新 enum: meituan/eleme/douyin/xiaohongshu/wechat/other (与 canonical/base.py:ALLOWED_PLATFORMS 完全对齐)
+  - down_revision='v416_w2a_phase4_reverse' (sequential ship)
+- 创始人 risk-accept 路径 A (5 条 D2 brief 证据: 0 production webhook 流量 / 0 staging seed grabfood tenant / 0 metrics counter / 3 首批客户无 6 月内出海规划 / channel-aggregation-plan-2026-05-10.md L36 明示"出海储备 不在 demo 路径")
+- Reviewer APPROVE 附 P1 验证项 (constraint 命名: column-level inline anonymous CHECK PG auto-name `<table>_<col>_check` deterministic, 已 grep verify)
+- DDL atomicity: env.py `transaction_per_migration=True`, DROP+ADD atomic, fail-then-rollback 安全
+- Tier 1 explicit-ask admin-merge 模式首次完整应用 (memory `feedback_carveout_admin_merge_pattern` 5/13 新模式)
+
+**PR #523 docs sediment Phase 2** MERGED `7e1ea964` (docs-only carve-out 第 6 例)
+**PR #526 docs sediment Phase 3** MERGED `91364f9b` (docs-only carve-out 第 7 例)
+**Issue #522 OPENED + CLOSED via #527+#530**: grabfood OmniChannel 6 平台马来流量评估, 创始人路径 A risk-accept
+
+### 数据变化
+
+- main HEAD: `7e1ea964` (#523) → `2af9a1aa` (#504) → ... → `91364f9b` (#526) → `46a6324e` (#527) → `ea6224b3` (#528) → `0870cdbd` (#530) → `b064a56c` (#533 by 另一 session) → 本 PR (W2-A 全收尾 docs)
+- alembic chain: 511 → 515 revisions (#271 v414 + #272 v415 + #528 v416 + #530 v417)
+- 国际化 schema 全清: 17 表 country_code drop + 4 张表 drop (subsidy 2 + PDPA 2) + dishes 3 column drop + 3 表 platform CHECK 收缩 enum
+- W2-A 主线完工总: 应用层 ~ -16290 + 代码层 -1833 + schema 反向 +97 + DDL +129 = **~ -17900 net line change**
+- admin-merge tally: 已累积 **≥34 次**, **+1 类新 carve-out 模式** (Tier 1 资金路径 explicit-ask, memory 已更新)
+- worktree 清理: w2a-phase4-2026-05-13 / grabfood-deprecate-2026-05-13 / grabfood-enum-shrink-2026-05-13 全清
+
+### 反思 (memory candidates 已落盘)
+
+1. **deletion-PR grep 必须绝对+相对 import 双重 form** (NEW `feedback_deletion_pr_grep_pattern.md`) — PR #504 round-1 P0 + PR #527 round-1 教训复用. 双重 grep + 跨服务 active 链审计 + dict-key 精确双引号 grep = deletion-PR pre-check 三联防
+2. **OmniChannel 一等公民 vs i18n 跨境分类边界** — PR #129 commit msg 标 "GrabFood = 马来西亚外卖" vs commit `1c96668a` E1 把 grabfood 纳入 6 平台一等公民设计意图冲突. **正面证据 (active 触点 grep) 优于 commit msg**. Issue #522 follow-up 评估证实 5 条证据 converge 到"出海储备 不在 demo 路径", 路径 A 全量 deprecate
+3. **re-rebase race "1 session 期间 origin/main 前移" 应对** (UPDATE `feedback_pr_rebase_worktree_pattern.md`) — `reset --mixed ORIG_HEAD` + `stash -u` + `rebase origin/main` + `stash pop` 三步链 0 work loss. PR #504 round-1 → round-2 期间另一 session merged #351 实例验证
+4. **reset --soft 重组 commits 模式** (UPDATE `feedback_pr_rebase_worktree_pattern.md`) — `reset --soft origin/main` + stage docs/code 分别 commit. 替代 interactive rebase (memory 不允许 -i). 0 work loss + commit 干净分离
+5. **scope contraction 是 reviewer 验证收益, 非 surgical 违例** — Phase 2 12→11 项 grabfood 撤回是 reviewer 推荐选项 B 精确修补. 反例 = F2 全量删 grabfood (动 migration + active 路由 + 违 §18) 是真 surgical 违例, 正确决策路径 = 撤回 + follow-up issue
+6. **tier1-gate.yml `paths` 白名单与 Tier 1 邻接代码 design gap** — PR #524 暴露 `payment_gateway.py` 不在 paths 但实质 Tier 1 邻接. 类 #515→#516→#517 path filter pattern follow-up 候选, 不阻塞 PR
+7. **Tier 1 资金路径 explicit-ask admin-merge 模式首次完整闭环** — PR #530 是首例完整应用 (memory `feedback_carveout_admin_merge_pattern.md` 5/13 新增类别). 流程: §19 reviewer P0:0 + CI 真门禁全绿 + 重 fetch origin/main + 重 search 同主题 + user explicit "merge 后无法回退" confirm. 不属 7 类 carve-out, 8 类正式确立
+8. **migration slot 连续漂移 + 并发 session race** — 本 session 1 张 plan v414 → 实际 v416, 因 #271/#272 双 PR 在 plan 期间 ship 占 v414/v415, executor agent 起手时主动 grep `ls versions/v41*` 发现并自适应 (PR #528 用 v416, PR #530 用 v417). pattern: **executor agent 必须 dynamic discover migration slot, 不依赖 brief 给的数字**
+
+### Phase 4 阻塞 + #522 D2 全 closed
+
+W2-A Phase 4 + Issue #522 D2 路径 A 创始人级 risk-accept 完整 ship 后, 阻塞清单更新:
+- ❌ D1 已 close (路径 A risk-accept, schema 已删, alembic chain integrity OK)
+- ❌ D2 已 close (路径 A risk-accept, grabfood 代码层 + DDL 全清, OmniChannel 6 平台 → 5 平台)
+- ⏳ B: dev-plan-60d demo 故事核心方向 (创始人级未输入)
+- ⏳ C: DailySummary / Header export §18 ontology (创始人级)
+- ⏳ 5/13 channel-aggregation 资质 (创始人级非技术 task, 已 due)
+
+### 明日计划 (fresh session 候选, 主动拆 session)
+
+**Wave 1 (中风险独立, 不需创始人输入)**:
+- Reviewer P1/P2 follow-up: test_cashier_engine.py `fee_rate` 假绿 fix + `_method_to_category` dedup (payment_gateway + cashier_engine)
+- v413 `test_platforms_aligned_with_canonical` drift test 补 (与 v411/v412 对称)
+- `payment_gateway.py` tier1-gate path filter gap follow-up issue + PR (类 #517)
+- Dependabot npm #425-#429 (5 个非 GHA official)
+
+**Wave 2 (重型独立 session)**:
+- #501 Phase 3 同名 file rename (~30 rename, _NOQA_ALLOWED_FILES 清空, enforcer zero-tolerance)
+- #240 V4 architecture sprint DRAFT
+
+**Wave 3 (创始人级阻塞)**:
+- B / C / channel-aggregation 资质
+
+### 反思 2 (session 节奏)
+
+**本 session 6 PR ship + 2 reviewer 双轮 + 1 follow-up issue + 2 memory updates** (~14 file 跨 6 PR 改动). 已远超 `feedback_proactive_session_split` 4+ PR 拆点阈值. 创始人选 A → D 主动拆 session, 符合 memory 建议. 完成节奏: 早 #504 round-2 → 中 #523 → 下午 #524 → 傍晚 #526 → 晚 #527 → 接 #528+#530 → 终 #533 (另一 session) → 本 PR docs 收尾.
+
+---
+
 ## 2026-05-13 下午晚 — Tier 1 资金路径双 PR ship #271 + #272 (invoice + wine_storage Decimal→fen + FOR UPDATE 行锁)
 
 ### 今日完成
