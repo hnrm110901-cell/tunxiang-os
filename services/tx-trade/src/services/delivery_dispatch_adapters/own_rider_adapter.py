@@ -42,7 +42,7 @@ class OwnRiderAdapter(BaseDeliveryDispatchAdapter):
         """
         logger.info(
             "own_rider.publish_to_app",
-            event=event,
+            dispatch_event=event,
             store_id=self.config.store_id,
             payload_keys=list(payload),
         )
