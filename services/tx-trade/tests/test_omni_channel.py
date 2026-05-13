@@ -456,7 +456,7 @@ class TestAcceptAndDispatchToKDS:
         insert_result.scalar_one_or_none = MagicMock(return_value=None)
         db.execute.return_value = insert_result
 
-        with patch("services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
+        with patch("services.tx_trade.src.services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
             mock_kds.return_value = {"dept_tasks": []}
 
             order = await svc.receive_order(
@@ -482,7 +482,7 @@ class TestAcceptAndDispatchToKDS:
         insert_result = MagicMock()
         db.execute.return_value = insert_result
 
-        with patch("services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
+        with patch("services.tx_trade.src.services.omni_channel_service._dispatch_order_to_kds") as mock_kds:
             mock_kds.side_effect = RuntimeError("KDS连接超时")
 
             # 不应抛出异常

@@ -100,7 +100,7 @@ def _make_booking_app(db: AsyncMock) -> FastAPI:
     booking_api 内部的 _get_db_session 调用 get_db_with_tenant，
     我们直接 override _get_db_session 本身，避免触碰真实数据库。
     """
-    import api.booking_api as booking_mod  # type: ignore[import]
+    import services.tx_trade.src.api.booking_api as booking_mod  # type: ignore[import]
 
     app = FastAPI()
     app.include_router(booking_mod.router)
@@ -122,7 +122,7 @@ def test_booking_create_reservation_ok():
 
     fake_result = {"reservation_id": str(uuid.uuid4()), "status": "pending"}
 
-    with patch("api.booking_api.ReservationService") as MockSvc:
+    with patch("services.tx_trade.src.api.booking_api.ReservationService") as MockSvc:
         instance = MockSvc.return_value
         instance.create_reservation = AsyncMock(return_value=fake_result)
 
@@ -162,7 +162,7 @@ def test_booking_list_reservations_pagination():
         "size": 10,
     }
 
-    with patch("api.booking_api.ReservationService") as MockSvc:
+    with patch("services.tx_trade.src.api.booking_api.ReservationService") as MockSvc:
         instance = MockSvc.return_value
         instance.list_reservations = AsyncMock(return_value=fake_result)
 
@@ -196,7 +196,7 @@ def test_booking_get_time_slots_ok():
 
     fake_slots = {"slots": ["11:00", "11:30", "12:00"], "date": "2026-06-01"}
 
-    with patch("api.booking_api.ReservationService") as MockSvc:
+    with patch("services.tx_trade.src.api.booking_api.ReservationService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_time_slots = AsyncMock(return_value=fake_slots)
 
@@ -233,7 +233,7 @@ def test_booking_take_queue_number_ok():
         "status": "waiting",
     }
 
-    with patch("api.booking_api.QueueService") as MockSvc:
+    with patch("services.tx_trade.src.api.booking_api.QueueService") as MockSvc:
         instance = MockSvc.return_value
         instance.take_number = AsyncMock(return_value=fake_result)
 
@@ -271,7 +271,7 @@ def test_booking_get_queue_board_ok():
         "seated": ["Z010"],
     }
 
-    with patch("api.booking_api.QueueService") as MockSvc:
+    with patch("services.tx_trade.src.api.booking_api.QueueService") as MockSvc:
         instance = MockSvc.return_value
         instance.get_queue_board = AsyncMock(return_value=fake_board)
 
@@ -298,7 +298,7 @@ def test_booking_get_queue_board_ok():
 
 def _make_mobile_app(db: AsyncMock) -> FastAPI:
     """构建挂载 mobile_ops_routes.router 的 FastAPI，并注入 mock DB。"""
-    import api.mobile_ops_routes as mobile_mod  # type: ignore[import]
+    import services.tx_trade.src.api.mobile_ops_routes as mobile_mod  # type: ignore[import]
 
     app = FastAPI()
     app.include_router(mobile_mod.router)
@@ -319,7 +319,7 @@ def test_mobile_update_table_info_ok():
 
     fake_result = {"order_id": ORDER_ID, "guest_count": 4, "waiter_id": "staff_001"}
 
-    with patch("api.mobile_ops_routes.CashierEngine") as MockEngine:  # type: ignore[attr-defined]
+    with patch("services.tx_trade.src.api.mobile_ops_routes.CashierEngine") as MockEngine:  # type: ignore[attr-defined]
         # CashierEngine 在路由内部动态 import，需要 patch 模块路径
         pass  # 通过 patch 下方的方式处理
 
@@ -336,7 +336,7 @@ def test_mobile_update_table_info_ok():
         },
     ):
         # 同时 patch 相对导入路径 (api 包内相对导入 ..services.cashier_engine)
-        with patch("api.mobile_ops_routes.CashierEngine", mock_engine_cls, create=True):
+        with patch("services.tx_trade.src.api.mobile_ops_routes.CashierEngine", mock_engine_cls, create=True):
             # 直接在模块命名空间 patch（因为动态导入发生在函数体内）
 
             app = _make_mobile_app(db)

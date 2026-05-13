@@ -372,9 +372,9 @@ class TestKdsDispatchRouting:
         mock_db.add_all = MagicMock()
 
         with (
-            patch("services.kds_dispatch.dispatch_rule_engine") as mock_engine,
-            patch("services.kds_dispatch.print_kitchen_tickets_for_dispatch", new_callable=AsyncMock),
-            patch("services.kds_dispatch.coordinate_same_table", new_callable=AsyncMock, return_value=[]),
+            patch("services.tx_trade.src.services.kds_dispatch.dispatch_rule_engine") as mock_engine,
+            patch("services.tx_trade.src.services.kds_dispatch.print_kitchen_tickets_for_dispatch", new_callable=AsyncMock),
+            patch("services.tx_trade.src.services.kds_dispatch.coordinate_same_table", new_callable=AsyncMock, return_value=[]),
         ):
             # 不使用规则引擎（store_id 为空）
             result = await dispatch_order_to_kds(
@@ -439,8 +439,8 @@ class TestKdsDispatchRouting:
         mock_db.add_all = MagicMock()
 
         with (
-            patch("services.kds_dispatch.print_kitchen_tickets_for_dispatch", new_callable=AsyncMock),
-            patch("services.kds_dispatch.coordinate_same_table", new_callable=AsyncMock, return_value=[]),
+            patch("services.tx_trade.src.services.kds_dispatch.print_kitchen_tickets_for_dispatch", new_callable=AsyncMock),
+            patch("services.tx_trade.src.services.kds_dispatch.coordinate_same_table", new_callable=AsyncMock, return_value=[]),
         ):
             result = await dispatch_order_to_kds(
                 order_id=order_id,

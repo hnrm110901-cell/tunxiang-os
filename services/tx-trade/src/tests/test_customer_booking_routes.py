@@ -24,7 +24,7 @@ import uuid
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-from api.customer_booking_routes import router
+from services.tx_trade.src.api.customer_booking_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import SQLAlchemyError

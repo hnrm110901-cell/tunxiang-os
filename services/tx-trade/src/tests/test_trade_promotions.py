@@ -63,8 +63,8 @@ if not hasattr(_db_stub, "get_db"):
     _db_stub.get_db = _get_db_stub
 
 # ─── 导入被测路由（保证 shared 存根已注册）──────────────────────────────────────
-from api.discount_engine_routes import router as discount_router  # type: ignore[import]
-from api.stored_value_routes import router as stored_value_router  # type: ignore[import]
+from services.tx_trade.src.api.discount_engine_routes import router as discount_router  # type: ignore[import]
+from services.tx_trade.src.api.stored_value_routes import router as stored_value_router  # type: ignore[import]
 
 from shared.ontology.src.database import get_db  # noqa: E402
 

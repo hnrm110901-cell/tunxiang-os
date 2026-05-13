@@ -76,7 +76,7 @@ def _make_db(*execute_results):
 
 # ─── 加载路由 ──────────────────────────────────────────────
 
-from api.crew_stats_routes import _period_to_date_range, router
+from services.tx_trade.src.api.crew_stats_routes import _period_to_date_range, router
 
 from shared.ontology.src.database import get_db
 
@@ -333,7 +333,7 @@ async def test_leaderboard_db_error_fallback():
 @pytest.mark.asyncio
 async def test_get_trend_seven_days():
     """直接调用路由函数：返回连续 7 天日期序列，缺失日期补零"""
-    from api.crew_stats_routes import get_trend
+    from services.tx_trade.src.api.crew_stats_routes import get_trend
 
     today = date.today()
     rows = [
@@ -381,7 +381,7 @@ async def test_get_trend_seven_days():
 @pytest.mark.asyncio
 async def test_get_trend_db_error_returns_zero_series():
     """DB 异常时直接调用函数返回全零趋势，不抛错"""
-    from api.crew_stats_routes import get_trend
+    from services.tx_trade.src.api.crew_stats_routes import get_trend
 
     db = AsyncMock()
     db.execute = AsyncMock(side_effect=OperationalError("stmt", {}, Exception("conn error")))
