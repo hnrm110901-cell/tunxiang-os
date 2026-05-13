@@ -20,7 +20,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # 被测模块
-from api.piecework_routes import _serialize_row, router
+from services.tx_org.src.api.piecework_routes import _serialize_row, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -87,7 +87,7 @@ class TestZoneCRUD:
         app = _make_app()
         mock_db = _make_db_mock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/org/piecework/zones",
@@ -117,7 +117,7 @@ class TestZoneCRUD:
         app = _make_app()
         mock_db = _make_db_with_rows(db_rows)
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get("/api/v1/org/piecework/zones", headers=HEADERS)
 
@@ -136,7 +136,7 @@ class TestZoneCRUD:
         mock_result.rowcount = 1
         mock_db.execute.return_value = mock_result
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.put(
                 f"/api/v1/org/piecework/zones/{zone_id}",
@@ -156,7 +156,7 @@ class TestZoneCRUD:
         mock_result.rowcount = 1
         mock_db.execute.return_value = mock_result
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.delete(
                 f"/api/v1/org/piecework/zones/{zone_id}",
@@ -175,7 +175,7 @@ class TestZoneCRUD:
         mock_result.rowcount = 0
         mock_db.execute.return_value = mock_result
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.delete(
                 f"/api/v1/org/piecework/zones/{zone_id}",
@@ -206,7 +206,7 @@ class TestSchemeWithItems:
         app = _make_app()
         mock_db = _make_db_mock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/org/piecework/schemes",
@@ -276,7 +276,7 @@ class TestSchemeWithItems:
         mock_db.execute.side_effect = side_effect
         mock_db.commit = AsyncMock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get(
                 f"/api/v1/org/piecework/schemes/{scheme_id}",
@@ -294,7 +294,7 @@ class TestSchemeWithItems:
         app = _make_app()
         mock_db = _make_db_mock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/org/piecework/schemes",
@@ -329,7 +329,7 @@ class TestSchemeWithItems:
         app = _make_app()
         mock_db = _make_db_with_rows(db_rows)
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get("/api/v1/org/piecework/schemes", headers=HEADERS)
 
@@ -375,7 +375,7 @@ class TestRecordTotalFeeCalculation:
         unit_fee_fen = 250
         expected_total = quantity * unit_fee_fen  # 1750
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/org/piecework/records",
@@ -398,7 +398,7 @@ class TestRecordTotalFeeCalculation:
         app = _make_app()
         mock_db = _make_db_mock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.post(
                 "/api/v1/org/piecework/records",
@@ -435,7 +435,7 @@ class TestEmployeeStatsAggregation:
         app = _make_app()
         mock_db = _make_db_with_rows(agg_rows)
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get(
                 f"/api/v1/org/piecework/stats/employee"
@@ -453,7 +453,7 @@ class TestEmployeeStatsAggregation:
         app = _make_app()
         mock_db = _make_db_with_rows([])
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get(
                 f"/api/v1/org/piecework/stats/employee"
@@ -507,7 +507,7 @@ class TestDailyReportTop5:
         mock_db.execute.side_effect = side_effect
         mock_db.commit = AsyncMock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(_make_app())
             resp = client.get(
                 f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
@@ -557,7 +557,7 @@ class TestDailyReportTop5:
         mock_db.execute.side_effect = side_effect
         mock_db.commit = AsyncMock()
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app)
             resp = client.get(
                 f"/api/v1/org/piecework/daily-report?store_id={STORE_ID}&date=2026-04-06",
@@ -599,7 +599,7 @@ class TestDBErrorReturns500:
         mock_db = AsyncMock()
         mock_db.execute.side_effect = SQLAlchemyError("db down")
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get(path, headers=HEADERS)
 
@@ -614,7 +614,7 @@ class TestDBErrorReturns500:
         mock_db = AsyncMock()
         mock_db.execute.side_effect = SQLAlchemyError("db down")
 
-        with patch("api.piecework_routes.get_db", return_value=mock_db):
+        with patch("services.tx_org.src.api.piecework_routes.get_db", return_value=mock_db):
             client = TestClient(app, raise_server_exceptions=False)
             resp = client.get(
                 f"/api/v1/org/piecework/schemes/{scheme_id}",

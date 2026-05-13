@@ -25,7 +25,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from models.approval_flow_engine import eval_condition, eval_trigger_conditions
+from services.tx_org.src.models.approval_flow_engine import eval_condition, eval_trigger_conditions
 
 # ─────────────────────────────────────────────────────────────────────────────
 # 条件评估函数测试（纯函数，无 DB 依赖）
@@ -157,7 +157,7 @@ def _make_mapping(**kwargs):
 
 @pytest.fixture
 def engine():
-    from services.approval_engine import ApprovalEngine
+    from services.tx_org.src.services.approval_engine import ApprovalEngine
 
     return ApprovalEngine()
 
@@ -167,28 +167,28 @@ class TestApprovalEngineConditions:
 
     def test_engine_importable(self):
         """引擎可以正常导入"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         assert engine is not None
 
     def test_parse_jsonb_dict(self):
         """_parse_jsonb 处理 dict 输入"""
-        from services.approval_engine import _parse_jsonb
+        from services.tx_org.src.services.approval_engine import _parse_jsonb
 
         result = _parse_jsonb({"key": "value"})
         assert result == {"key": "value"}
 
     def test_parse_jsonb_str(self):
         """_parse_jsonb 处理 str 输入"""
-        from services.approval_engine import _parse_jsonb
+        from services.tx_org.src.services.approval_engine import _parse_jsonb
 
         result = _parse_jsonb('{"key": "value"}')
         assert result == {"key": "value"}
 
     def test_parse_jsonb_none(self):
         """_parse_jsonb 处理 None 输入"""
-        from services.approval_engine import _parse_jsonb
+        from services.tx_org.src.services.approval_engine import _parse_jsonb
 
         result = _parse_jsonb(None)
         assert result == {}
@@ -200,7 +200,7 @@ class TestAutoApproveOnTriggerNotMet:
     @pytest.mark.asyncio
     async def test_auto_approved_when_trigger_not_met(self):
         """amount=50000 < 100000 → 触发条件不满足 → 直接 approved"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -361,7 +361,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_cancel_non_pending_raises(self):
         """非 pending 状态不能撤回"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -405,7 +405,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_cancel_wrong_initiator_raises(self):
         """非发起人不能撤回"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -449,7 +449,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_approve_already_ended_raises(self):
         """已结束的审批不能再次审批"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -495,7 +495,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_reject_already_ended_raises(self):
         """已结束的审批不能再拒绝"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -541,7 +541,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_approve_wrong_node_raises(self):
         """尝试处理非当前节点时报错"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()
@@ -587,7 +587,7 @@ class TestApprovalStateMachineRules:
     @pytest.mark.asyncio
     async def test_instance_not_found_raises(self):
         """实例不存在时报错"""
-        from services.approval_engine import ApprovalEngine
+        from services.tx_org.src.services.approval_engine import ApprovalEngine
 
         engine = ApprovalEngine()
         db = _make_db_mock()

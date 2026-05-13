@@ -85,8 +85,8 @@ sys.modules["shared.ontology.src.database"] = _db_mod
 # 路由导入
 # ──────────────────────────────────────────────────────────────────────────────
 import pytest
-from api.job_grade_routes import router as job_grade_router
-from api.schedule_routes import router as schedule_router
+from services.tx_org.src.api.job_grade_routes import router as job_grade_router
+from services.tx_org.src.api.schedule_routes import router as schedule_router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 

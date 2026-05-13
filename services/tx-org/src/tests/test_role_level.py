@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from fastapi.testclient import TestClient
 from main import app
-from models.role_level import check_role_permission
+from services.tx_org.src.models.role_level import check_role_permission
 
 client = TestClient(app)
 

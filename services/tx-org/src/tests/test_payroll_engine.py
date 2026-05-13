@@ -3,7 +3,7 @@
 """
 
 import pytest
-from services.payroll_engine import (
+from services.tx_org.src.services.payroll_engine import (
     compute_absence_deduction,
     compute_base_salary,
     compute_commission,

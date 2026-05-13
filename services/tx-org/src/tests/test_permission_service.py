@@ -29,7 +29,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".."))
 
-from services.permission_service import (
+from services.tx_org.src.services.permission_service import (
     PermissionCheckResult,
     PermissionRepository,
     PermissionService,

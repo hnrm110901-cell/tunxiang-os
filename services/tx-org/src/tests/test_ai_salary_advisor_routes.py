@@ -14,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from api.ai_salary_advisor_routes import router
+from services.tx_org.src.api.ai_salary_advisor_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

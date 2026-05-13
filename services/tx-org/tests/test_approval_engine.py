@@ -31,7 +31,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-from models.approval_flow import (
+from models.approval_flow import (  # noqa: I100 — keep bare-NS, codemod full-path 触发 shared.events PEP 兼容性 chain (Py 3.9 `@dataclass(slots=True)` 不兼容) collect 失败；同 #495 dual-load family follow-up
     ApprovalFlowDefinition,
     ApprovalInstance,
     ApprovalRecord,
@@ -41,7 +41,7 @@ from models.approval_flow import (
     StepCondition,
 )
 
-from services.approval_engine import ApprovalEngine
+from services.approval_engine import ApprovalEngine  # noqa: I100 — 同上反约束
 
 # ── 测试夹具 ──────────────────────────────────────────────────────────────────
 

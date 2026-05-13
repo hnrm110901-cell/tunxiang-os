@@ -14,7 +14,7 @@ import sys
 # 确保 src 目录在 import path 中
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.labor_efficiency_service import (
+from services.tx_org.src.services.labor_efficiency_service import (
     compare_stores,
     compute_guests_per_hour,
     compute_labor_cost_ratio,

@@ -30,15 +30,15 @@ import importlib.util as _ilu
 from datetime import date, datetime, timedelta
 
 import pytest
-from services.attendance_engine import (
+from services.tx_org.src.services.attendance_engine import (
     SHIFT_TIMES,
     AttendanceEngine,
 )
-from services.payroll_service import (
+from services.tx_org.src.services.payroll_service import (
     EMPLOYEE_SALARY_CONFIG,
     PayrollService,
 )
-from services.smart_schedule import (
+from services.tx_org.src.services.smart_schedule import (
     EMPLOYEE_DATABASE,
     MAX_OVERTIME_MONTH_HOURS,
     SHIFT_DEFINITIONS,
