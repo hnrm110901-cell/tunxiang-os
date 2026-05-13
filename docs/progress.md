@@ -1,3 +1,48 @@
+## 2026-05-13 深夜 · #509 carve-out #28 + #512 close 因并发撞车（memory 规则演进 6）
+
+### 完成状态
+
+- [x] **PR #509 MERGED** `d3f20c0d` — `feat(test-infra)` conftest collision detection warning [T2] (#501 Phase 1)，admin-merge carve-out **#28**（新主题 "test-infra advisory"，第 5 大白名单）
+- [x] **Issue #501 reopen + Phase 2/3 status comment** — 修正 #509 PR body "Close #501" close keyword 误关；Phase 1 ✅ / Phase 2 MetaPathFinder TODO / Phase 3 rename TODO
+- [x] **Issue #510 深度影响面评估 + 方案 D comment** — 全仓 grep 验证业务零消费者；Tier 重判建议 T2 → T3；提出方案 D (DROP TABLE) 作为最 surgical 选项
+- [x] **PR #512 创建 + CI 全绿 + reviewer APPROVE 后 CLOSED** — 因并发 session #511 (方案 F2 sentinel) **"user 创始人决定"** ship 取代；本 PR DROP 方案如 merge 会 DROP 掉刚 fix 好的表
+- [x] **Cleanup**：#509 + #512 worktree + local branch + #512 remote branch 全删
+- [x] **Memory 演进**：`feedback_concurrent_pr_race.md` 加规则 6（admin-merge 决策前重 fetch + 重 search 同主题 PR）
+- [ ] **未接手 stash@{0}**：另一 session DEVLOG 草稿（#506/#508/#510-via-#511 沉淀，admin-merge tally 数字差异需 user 校准）
+
+### 关键决策
+
+- **#509 admin-merge carve-out #28（新主题）**：test-infra advisory warning，advisory 性质 + 不动 production source + 不动 Tier 1 路径 + reviewer APPROVE + CI 真 required 17/17 全绿 → 进白名单；user 单独授权（不批量）
+- **#510 推方案 D（DROP）而非 sentinel/generated-column**：基于业务零消费者 + §三 surgical change 原则，dead schema 拖 5 个月无消费者建议清理而非保留 schema 复杂度
+- **#512 close 而非 rebase/merge**：被 user 创始人 informed decision 选定的 #511 方案 F2 取代；continue 是 churn，无价值；CI 证据 + reviewer APPROVE 备忘在 close comment 留底
+- **stash@{0} 不接手**：另一 session work-in-progress（含 admin-merge tally 数字差异），boundary 守，避免污染 PR #504 W2-A Phase 2 diff；保留 stash 等另一 session 自己 unstash 或 user 决策
+
+### 下一步
+
+**Wave 1（中风险独立，下 session 候选）**
+- A: #501 Phase 2 — MetaPathFinder 强制 FQN（需重构 hook sys.meta_path，评估 21+ bare-NS imports）
+- B: Dependabot 低风险 3 个：#422/#423/#424（GitHub 官方 actions）
+- C: #347 conftest shared namespace / #336 test_trade_promotions 转绿
+- D: 本 DEVLOG/progress PR ship（docs-only carve-out 第 N+1 例，established pattern）
+
+**Wave 2（重型独立 session）**
+- #272/#271 Tier1 wine_storage/invoice Decimal→fen + 迁移 v403/v404（TDD + DEMO 验收）
+- #351 14 服务 main.py import 烟测网（Tier1 前置）
+- #240 V4 architecture sprint DRAFT
+- #501 Phase 3 同名 file rename（~30 rename）
+
+**Wave 3（base 漂移 7+ 天）**
+- 旧 [SECURITY][Tier1] rebase PR 群体 #222-#232 + #212-#218
+
+### 已知风险
+
+- **stash@{0} 未处理** — 主 worktree 仍有未提交改动，需另一 session 接手或 user 决策；本 session 已留 stash tag 防丢失
+- **admin-merge SoT 过期窗口** — `feedback_concurrent_pr_race.md` 规则 6 落盘，但**已发生案例的损害是"防御性识别得早"** — 下次同样窗口 race 风险减；未规避前 4 分钟内 race 仍不可防（PR create 后 user 授权前的纯并发已无脉冲监控手段）
+- **Tier 1 路径无影响** — 本 session 0 Tier 1 改动；#509 conftest advisory 不动业务路径，#512 close 不入 chain
+- **CLAUDE.md §15 表格未变** — v148 8 个 mv_* 仍列；v151b 3 个 mv_* 仍未列（与 #511 sentinel fix 后状态对齐：保留 schema 但表格不需 mention）
+
+---
+
 ## 2026-05-13 傍晚 · #408 codemod chain 完工 6/6 + Helm chart fix（7 PR / 3 issue / carve-out 19-25）
 
 ### 完成状态
