@@ -57,8 +57,14 @@
 - **PR #487 (W1-T2/T3/T4/T5)** 仍 OPEN — 等 reviewer 或先 review #487 再
   并 land；CI 失败均为 memory 标的预存漂移，非真门禁失败
 - **test_payment_idempotency.py 3 fail** + **test_banquet_payment.py 19 error**
-  pre-existing baseline — 独立 issue 候选（SQLAlchemy `Table 'payments'
-  already defined` 元数据碰撞 / test infra 漂移），不在 W1-T1 scope
+  pre-existing baseline 已**落盘成独立 issue**：
+  - **#490** [test-debt][T3] test_banquet_payment 19 errors —
+    MOCK_BANQUET_ORDERS/MOCK_PAYMENTS 在 mock 消除重构（`5c49e3d7`）后
+    未更新，dead test code，建议方案 A 删除文件
+  - **#492** [test-debt][T2] test_payment_idempotency 3 fail —
+    双层根因（idempotent hit 早返回绕过 rollback 断言 + SQLAlchemy `Table
+    'payments' already defined` 元数据碰撞），方案 A rewrite + 仓库级
+    MetaData fixture
 - **5/13 deal-breaker（channel-aggregation 资质）** 仍未启动 — 创始人级别
 
 ### 明日计划

@@ -38,8 +38,10 @@
 ### 已知风险
 
 - **PR race** — fetch origin 已确认无新提交（b2b1fb7a 仍为 main HEAD）；push 前需再 fetch
-- **pre-existing baseline 失败** — test_payment_idempotency 3 / test_banquet_payment 19
-  仍存在，但不在 W1-T1 scope；候选独立 issue（SQLAlchemy Table 重定义元数据碰撞）
+- **pre-existing baseline 失败已落盘** —
+  - **#490** test_banquet_payment 19 errors — MOCK 消除重构遗漏的 dead test code
+  - **#492** test_payment_idempotency 3 fail — 双层根因（rollback 早返回绕过 + Table 元数据碰撞）
+  - 两 issue 均不在 W1-T1 scope，独立分流（reviewer 看 PR #489 时可参考）
 - **W1-T1 改的是 P0 资金链路** — fail-loud 改变 boot 期行为：从前 redis
   不可达时服务能起 → 现在直接 raise；若生产 redis SLA < tx-trade SLA，
   tx-trade 会反复 readiness 失败重启。运维需评估（reviewer checklist 中列出）
