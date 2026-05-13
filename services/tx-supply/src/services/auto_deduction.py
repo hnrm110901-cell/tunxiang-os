@@ -245,8 +245,52 @@ async def deduct_for_order(
     all_missing_bom: list[dict[str, Any]] = []
     all_insufficient: list[dict[str, Any]] = []
 
+    tenant_uuid = uuid.UUID(tenant_id)
+    store_uuid = uuid.UUID(store_id)
+
     # 使用 savepoint 保证原子性
     async with db.begin_nested():
+        # Tier 1 跨 dish ABBA 防护（Issue #549, audit doc §4.3 P0 下游）:
+        # 订单含多 dish 共享同 ingredient 时, 若每个 dish 内部 sorted 但跨 dish 顺序不同
+        # (订单 A=[dish1, dish2] vs B=[dish2, dish1]) 仍可 ABBA 死锁.
+        # 修法: 在 deduct_for_dish 业务循环前预聚合所有 BOM ingredient_id, 去重 + sorted(key=str)
+        # 升序逐行 SELECT FOR UPDATE 预锁. 后续 deduct_for_dish 内部 sorted SELECT 是 reentrant
+        # 同事务无害, 保留作 defense in depth (单 dish 直接路径仍需该防御).
+        # 范本: services/tx-member/src/services/stored_value_service.py transfer 2 卡 sorted([from, to]).
+        # `key=str` 必须与 deduct_for_dish L131 内部 sorted key 一致, 否则一致性破坏防御失效.
+        await _set_tenant(db, tenant_id)
+        bom_cache: dict[uuid.UUID, list[dict[str, Any]]] = {}
+        all_ing_ids: set[uuid.UUID] = set()
+        for item in order_items:
+            dish_id_str = item.get("dish_id")
+            if not dish_id_str:
+                continue
+            try:
+                dish_uuid = uuid.UUID(dish_id_str)
+            except (ValueError, TypeError):
+                continue
+            if dish_uuid not in bom_cache:
+                bom_cache[dish_uuid] = await _get_bom_for_dish(db, dish_uuid, tenant_uuid)
+            for line in bom_cache[dish_uuid]:
+                ing_id_str = line.get("ingredient_id")
+                if not ing_id_str:
+                    continue
+                try:
+                    all_ing_ids.add(uuid.UUID(ing_id_str))
+                except (ValueError, TypeError):
+                    # 跳 broken row — 与 deduct_for_dish L127 行为一致
+                    continue
+
+        for ing_uuid in sorted(all_ing_ids, key=str):
+            await db.execute(
+                select(Ingredient.id)
+                .where(Ingredient.id == ing_uuid)
+                .where(Ingredient.store_id == store_uuid)
+                .where(Ingredient.tenant_id == tenant_uuid)
+                .where(Ingredient.is_deleted == False)  # noqa: E712
+                .with_for_update()
+            )
+
         for item in order_items:
             dish_id = item.get("dish_id")
             quantity = item.get("quantity", 1)
