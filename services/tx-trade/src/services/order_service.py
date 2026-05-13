@@ -320,10 +320,11 @@ class OrderService:
 
     async def apply_discount(self, order_id: str, discount_fen: int, reason: str = "") -> dict:
         await self._set_tenant()
-        result = await self.db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
-        )
-        order = result.scalar_one_or_none()
+        # Tier 1 资金路径：折扣需读最新 total_amount_fen 后写回 discount/final，
+        # 必须 FOR UPDATE 串行化加菜 / 折扣两路并发（audit doc §4.1 P0）。
+        # **比 cashier_engine.apply_discount 更危险** — 连 margin 校验都没有，
+        # 串行化是唯一防线。
+        order = await self._get_order(uuid.UUID(order_id), lock=True)
         if not order:
             raise ValueError(f"Order not found: {order_id}")
         new_final = order.total_amount_fen - discount_fen
@@ -400,12 +401,13 @@ class OrderService:
         # app.tenant_id → 跨租户 settle 风险；与 cancel_order 的 _set_tenant
         # 调用对齐
         await self._set_tenant()
-        result = await self.db.execute(
-            select(Order)
-            .where(Order.id == uuid.UUID(order_id))
-            .where(Order.tenant_id == self.tenant_id)  # 显式 tenant 过滤双保险
-        )
-        order = result.scalar_one_or_none()
+        # Tier 1 资金路径：结算需读 final_amount_fen + 状态机切到 completed +
+        # 释放桌台。FOR UPDATE 防双 worker 并发 settle 同一订单（POS 重试 /
+        # 网关回调 / 用户连点）导致双扣款 / 双桌台释放（audit doc §4.1 P0）。
+        # **Saga S3 链路依赖此函数** — payment_saga_service._complete_order
+        # 调用本函数；本锁即给 saga 补齐 S3 占位锁（架构层 issue 见 #537）。
+        # 注：桌台 release 不在本 PR 范围（桌台并发语义待创始人 §17 对齐）。
+        order = await self._get_order(uuid.UUID(order_id), lock=True)
         if not order:
             raise ValueError(f"Order not found: {order_id}")
         if order.status == OrderStatus.completed.value:
@@ -528,6 +530,26 @@ class OrderService:
                 for i in items
             ],
         }
+
+    async def _get_order(self, order_id: uuid.UUID, *, lock: bool = False) -> Optional[Order]:
+        """加载订单 ORM 对象（不含 items / 不返 dict）。
+
+        Args:
+            order_id: 订单 UUID。
+            lock:     是否对 Order 行加 FOR UPDATE 排他锁（PostgreSQL 行锁）。
+                      Tier 1 资金路径（apply_discount / settle_order）必须
+                      lock=True，防 200 桌并发 race 丢更新 / 双结算。
+                      read-only 入口默认 False 不回归性能（与 PR-D
+                      cashier_engine._get_order helper 模式对齐）。
+
+        Returns:
+            Order 实例；不存在返回 None（caller 负责 raise ValueError）.
+        """
+        stmt = select(Order).where(Order.id == order_id).where(Order.tenant_id == self.tenant_id)
+        if lock:
+            stmt = stmt.with_for_update()
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def _lock_table(self, store_id: str, table_no: str, order_id: uuid.UUID) -> None:
         await self.db.execute(
