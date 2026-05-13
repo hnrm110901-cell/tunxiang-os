@@ -282,29 +282,56 @@ class PaymentSagaService:
     async def compensate(self, saga_id: uuid.UUID, reason: str) -> bool:
         """对已有Saga执行补偿退款。崩溃恢复时也可调用。
 
+        Tier 1 资金路径行锁约束（防双退款）：
+          先 SELECT ... FOR UPDATE 锁住 saga row 并检查 step 终态/进行态：
+            - 已 compensated → 直接返回 True（幂等）
+            - 正在 compensating / 已 failed → 返回 False（让出）
+          否则才走 COMPENSATING → refund → COMPENSATED 流程，持锁到 commit。
+          锁配 idempotency 检查阻断双 worker 并发触发 refund 两次的资金事故。
+
         Returns:
-            True  — 退款成功，step 更新为 compensated
-            False — 退款失败，step 更新为 failed，需人工介入
+            True  — 退款成功（或已 compensated 幂等），step 更新为 compensated
+            False — 退款失败 / 让出，step 更新为 failed（或保持 compensating）
         """
         log = logger.bind(saga_id=str(saga_id), reason=reason)
         log.info("saga_compensating")
 
-        await self._update_step(saga_id, SagaStep.COMPENSATING, compensation_reason=reason)
-
-        # 查找 payment_id
+        # ── 加锁查询：FOR UPDATE 串行化补偿入口 ──────────────────────────
         result = await self._db.execute(
             text(
-                "SELECT payment_id, payment_amount_fen "
+                "SELECT step, payment_id, payment_amount_fen "
                 "FROM payment_sagas "
-                "WHERE saga_id = :saga_id AND tenant_id = :tenant_id"
+                "WHERE saga_id = :saga_id AND tenant_id = :tenant_id "
+                "FOR UPDATE"
             ),
             {"saga_id": saga_id, "tenant_id": self._tenant_id},
         )
         row = result.mappings().first()
-        if not row or not row["payment_id"]:
+        if not row:
+            log.error("saga_compensate_not_found")
+            return False
+
+        current_step = row["step"]
+        # 幂等：已 compensated 直接返回 True，不重发 refund
+        if current_step == SagaStep.COMPENSATED:
+            log.info("saga_compensate_already_compensated_idempotent")
+            return True
+        # 让出：他人正在 compensating（罕见，A 网关慢未更新 step）
+        if current_step == SagaStep.COMPENSATING:
+            log.info("saga_compensate_in_progress_skip")
+            return False
+        # 让出：已 failed 终态，无 payment 可退
+        if current_step == SagaStep.FAILED:
+            log.info("saga_compensate_already_failed_skip")
+            return False
+
+        if not row["payment_id"]:
             log.error("saga_compensate_no_payment_id")
             await self._update_step(saga_id, SagaStep.FAILED, compensation_reason=reason + " [无payment_id，无法退款]")
             return False
+
+        # 进入 COMPENSATING（持锁至 commit；他人此时阻塞在 FOR UPDATE）
+        await self._update_step(saga_id, SagaStep.COMPENSATING, compensation_reason=reason)
 
         payment_id = str(row["payment_id"])
         amount_fen = row["payment_amount_fen"]
