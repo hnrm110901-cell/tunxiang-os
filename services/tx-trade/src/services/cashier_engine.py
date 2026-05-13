@@ -23,6 +23,7 @@ from shared.ontology.src.enums import OrderStatus
 
 from ..models.enums import TableStatus
 from ..models.tables import Table
+from .payment_gateway import PaymentGateway
 from .state_machine import (
     TABLE_STATES,
     can_table_transition,
@@ -795,7 +796,7 @@ class CashierEngine:
                 status=PaymentStatus.paid.value,
                 trade_no=p.get("trade_no"),
                 paid_at=datetime.now(timezone.utc),
-                payment_category=self._method_to_category(p["method"]),
+                payment_category=PaymentGateway._method_to_category(p["method"]),
             )
             self.db.add(payment)
             payment_records.append(
@@ -1303,19 +1304,6 @@ class CashierEngine:
             "deducted_fen": final_amount_fen,
             "balance_fen": deduct_result["balance_fen"],
         }
-
-    @staticmethod
-    def _method_to_category(method: str) -> str:
-        """支付方式映射到支付类别"""
-        mapping = {
-            "cash": "现金",
-            "wechat": "移动支付",
-            "alipay": "移动支付",
-            "unionpay": "银联卡",
-            "member_balance": "会员消费",
-            "credit_account": "挂账",
-        }
-        return mapping.get(method, "other")
 
     # ─────────────────────────────────────
     # 6. Table Transfer (转台)

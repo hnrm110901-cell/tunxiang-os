@@ -103,16 +103,16 @@ class TestCashierEngineUnit:
         assert len(order_no) == 20  # TX(2) + datetime(14) + random(4)
 
     def test_method_to_category_mapping(self):
-        """支付方式→类别映射"""
-        from services.tx_trade.src.services.cashier_engine import CashierEngine
+        """支付方式→类别映射 — SoT 在 PaymentGateway (test_payment_gateway_tier1.py 锁契约)"""
+        from services.tx_trade.src.services.payment_gateway import PaymentGateway
 
-        assert CashierEngine._method_to_category("cash") == "现金"
-        assert CashierEngine._method_to_category("wechat") == "移动支付"
-        assert CashierEngine._method_to_category("alipay") == "移动支付"
-        assert CashierEngine._method_to_category("unionpay") == "银联卡"
-        assert CashierEngine._method_to_category("member_balance") == "会员消费"
-        assert CashierEngine._method_to_category("credit_account") == "挂账"
-        assert CashierEngine._method_to_category("unknown") == "other"
+        assert PaymentGateway._method_to_category("cash") == "现金"
+        assert PaymentGateway._method_to_category("wechat") == "移动支付"
+        assert PaymentGateway._method_to_category("alipay") == "移动支付"
+        assert PaymentGateway._method_to_category("unionpay") == "银联卡"
+        assert PaymentGateway._method_to_category("member_balance") == "会员消费"
+        assert PaymentGateway._method_to_category("credit_account") == "挂账"
+        assert PaymentGateway._method_to_category("unknown") == "other"
 
 
 class TestPaymentGatewayUnit:
