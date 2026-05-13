@@ -64,7 +64,7 @@ _RLS_EXPR = "NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
 # 与 v411_channel_oauth_tokens._ALLOWED_PLATFORMS 对齐
 _ALLOWED_PLATFORMS = (
-    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "grabfood", "other"
+    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "other"
 )
 
 

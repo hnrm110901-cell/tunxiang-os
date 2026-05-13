@@ -70,7 +70,7 @@ _RLS_EXPR = "NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 # 与 shared/adapters/delivery_canonical/base.py:ALLOWED_PLATFORMS 对齐
 # 新增平台时需同步两处
 _ALLOWED_PLATFORMS = (
-    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "grabfood", "other"
+    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "other"
 )
 
 

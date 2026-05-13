@@ -72,7 +72,7 @@ _RLS_EXPR = "NULLIF(current_setting('app.tenant_id', true), '')::UUID"
 
 _ALLOWED_IDENTITY_TYPES = ("phone", "openid", "card_no", "email")
 _ALLOWED_PLATFORMS = (
-    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "grabfood", "other"
+    "meituan", "eleme", "douyin", "xiaohongshu", "wechat", "other"
 )
 
 
