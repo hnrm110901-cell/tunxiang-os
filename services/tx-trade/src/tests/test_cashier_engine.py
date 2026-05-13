@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
 
 # ─── 模拟数据库对象（脱离真实PG） ───
 
@@ -48,6 +49,9 @@ class FakeResult:
         return self._scalar
 
     def scalar(self):
+        return self._scalar
+
+    def scalar_one(self):
         return self._scalar
 
     def scalars(self):
@@ -689,23 +693,82 @@ class TestRealisticRestaurantData:
 class TestPaymentGatewayFeatures:
     """支付网关功能测试"""
 
-    def test_shouqianba_trade_no_format(self):
-        """收钱吧交易号格式"""
+    async def test_shouqianba_pay_delegates_to_client_with_auth_code(self):
+        """B扫C: PaymentGateway.create_payment(auth_code=...) 通过依赖注入的 sqb_client.pay 委托.
+
+        替代 #536 前已删的 _call_shouqianba_pay 内部 stub 测试 (源重构为 ShouqianbaClient 注入).
+        Issue #540 方案 A: mock 注入验委托契约 — sqb_client.pay 被调用 + trade_no 来自 client response.
+        """
         from services.tx_trade.src.services.payment_gateway import PaymentGateway
+        from services.tx_trade.src.services.shouqianba_client import ShouqianbaClient
+
+        mock_sqb = MagicMock(spec=ShouqianbaClient)
+        mock_sqb.pay = AsyncMock(return_value={"sn": "SQB_TEST_001"})
 
         db = FakeSession()
-        gw = PaymentGateway(db, TENANT_ID)
-        trade_no = gw._call_shouqianba_pay("PAY001", 10000, "auth123", "wechat")
-        assert trade_no.startswith("SQB")
+        order_id = str(uuid.uuid4())
+        db.push_result(FakeResult(scalar=FakeRow()))  # Order lookup truthy
 
-    def test_shouqianba_refund_trade_no_format(self):
-        """收钱吧退款交易号格式"""
+        gw = PaymentGateway(db, TENANT_ID, sqb_client=mock_sqb)
+        result = await gw.create_payment(
+            order_id=order_id,
+            method="wechat",
+            amount_fen=10000,
+            auth_code="auth123",
+        )
+
+        # 委托契约: client.pay 被调用 with 正确 kwargs (源 payment_gateway.py:212-217)
+        mock_sqb.pay.assert_called_once()
+        kwargs = mock_sqb.pay.call_args.kwargs
+        assert kwargs["total_amount"] == 10000
+        assert kwargs["dynamic_id"] == "auth123"
+        assert kwargs["client_sn"].startswith("PAY")
+        assert kwargs["subject"].startswith("订单")
+
+        # trade_no 来自 client response sn (不再是旧 stub 硬编码 SQB 前缀)
+        assert result["trade_no"] == "SQB_TEST_001"
+        assert result["status"] == "paid"
+        assert result["fee_fen"] == 60  # 10000 * 6 permil ceiling
+
+    async def test_shouqianba_refund_delegates_to_client(self):
+        """PaymentGateway.refund → sqb_client.refund 委托 (替代 #536 前已删的 _call_shouqianba_refund stub).
+
+        Issue #540 方案 A: refund_trade_no 来自 client response "sn", 不再是 SQBR 前缀硬编码.
+        """
         from services.tx_trade.src.services.payment_gateway import PaymentGateway
+        from services.tx_trade.src.services.shouqianba_client import ShouqianbaClient
+
+        mock_sqb = MagicMock(spec=ShouqianbaClient)
+        mock_sqb.refund = AsyncMock(return_value={"sn": "SQBR_REFUND_001"})
+
+        payment_id = str(uuid.uuid4())
+        fake_payment = FakeRow(
+            id=uuid.UUID(payment_id),
+            payment_no="PAY20260513001",
+            tenant_id=uuid.UUID(TENANT_ID),
+            order_id=uuid.uuid4(),
+            method="wechat",
+            amount_fen=10000,
+            status="paid",
+            trade_no="SQB_ORIG_001",
+        )
 
         db = FakeSession()
-        gw = PaymentGateway(db, TENANT_ID)
-        refund_no = gw._call_shouqianba_refund("SQB001", "REF001", 5000)
-        assert refund_no.startswith("SQBR")
+        db.push_result(FakeResult(scalar=fake_payment))  # payment lookup
+        db.push_result(FakeResult(scalar=0))             # existing refunds sum
+
+        gw = PaymentGateway(db, TENANT_ID, sqb_client=mock_sqb)
+        result = await gw.refund(payment_id, refund_amount_fen=5000, reason="测试退款")
+
+        # 委托契约: client.refund 被调用 with kwargs (源 payment_gateway.py:411-415)
+        mock_sqb.refund.assert_called_once()
+        kwargs = mock_sqb.refund.call_args.kwargs
+        assert kwargs["sn"] == "SQB_ORIG_001"
+        assert kwargs["refund_amount"] == 5000
+        assert kwargs["refund_request_no"].startswith("REF")
+
+        # refund_trade_no 来自 client response sn
+        assert result["refund_trade_no"] == "SQBR_REFUND_001"
 
     def test_daily_summary_empty(self):
         """无交易日汇总"""
