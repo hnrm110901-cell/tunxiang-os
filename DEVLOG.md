@@ -1,5 +1,7 @@
 ## 2026-05-13 接 #503 后 — #506 + #508 admin-merge + #511 v301 PK 修复链 / docs-only carve-out 第 6 例
 
+> **并发互补**：本 entry（我方 session）与下文 "深夜 — #509/#512" entry（并发 session）平行工作于同一 5/13 时段。两 session 独立处理 issue #510：我方 ship PR #511（F2 sentinel）于 03:25Z；并发 session 同时段开 PR #512（方案 D DROP），reviewer APPROVE 后因 #511 已 ship 而 close。详见下文 entry 的 race 分析与 memory 规则 6。
+
 ### 今日完成
 
 承前 session 3 PR 状态审计（#504 / #506 / #508 + issue #507），按 user 决策树串行推进，session 内完成 3 merge + 1 issue 创建+闭环 + memory 扩展 + 并发 session race 发现：
@@ -58,6 +60,89 @@ a2e156fd HEAD@{2}: commit: docs(devlog): 2026-05-13 傍晚 — #408 codemod chai
 - **Issue #507**（RLS coverage 0.6% gap）— OPEN 0 comments
 - **D1** 三国 production tenant 数据状态（创始人决策）— 本 session 推进 W2-A 时**间接证据**：concurrent session 已做 Phase 2 整删，说明 D1 已隐式决策（无 production 数据 OR 风险可接受）
 - **B/C**: dev-plan-60d demo 故事 / DailySummary §18 ontology
+
+---
+
+## 2026-05-13 深夜 — #509 admin-merge carve-out #28 + #512 close 因并发撞车（memory 规则演进 6）
+
+### 今日完成
+
+承上 session 5/13 傍晚 #408 codemod chain 完工后 fresh session，handoff 推 Wave 0 收尾 (#509 PR ready，等 admin-merge 决策)。本次双轨成果：(1) #509 顺利 ship 成第 28 次 carve-out 新主题"test-infra advisory" 白名单；(2) #512 走完完整 review/CI/reviewer 流程后因并发 session race 撤回，沉淀 memory 演进。
+
+**PR #509 MERGED** `d3f20c0d` (admin-squash, carve-out #28)
+- `feat(test-infra)`: conftest collision detection warning [T2] (#501 Phase 1)
+- root conftest 加 `_detect_services_namespace_collisions()` advisory warning + dedup
+- 17/17 真 required + CodeRabbit pass；噪音失败如预期 (python-lint-test × 8 / frontend-build)
+- 5 项裁决标准评估 "test-infra advisory 新主题"，第 5 大白名单（与 docs-only / test-only / security / T2 infra workflow-only ADD 同列）
+
+**Issue #501 reopen + Phase 2/3 status comment**
+- 根因：#509 PR body 写 "Close #501 Phase 1" 触发 GitHub 自动 close keyword 误关
+- Reopen + comment：Phase 1 ✅ via #509 / Phase 2 MetaPathFinder 强制 FQN (TODO) / Phase 3 同名 file rename (TODO, 13 collision groups × 2-4 services)
+- **PR body 措辞 BUG 教训**：含 issue 编号的 close keyword 必须谨慎；本 PR Phase 1/N 之类应写 "Phase 1 of #501"（无 close 触发词）
+
+**Issue #510 影响面深度评估 + 方案 D comment**
+- 全仓 grep 验证：v301 v151b 3 张物化视图 (mv_table_turnover / mv_session_analytics / mv_waiter_performance) **业务零消费者**
+- 提出方案 D（DROP TABLE）作为业务零损害最 surgical 选项；Tier 重判建议 T2 → T3
+- 生产 schema 校验命令贴给 user/ops 跑（不阻塞 merge）
+
+**PR #512 CLOSED**（方案 D — v414 DROP dead v151b mv_* tables）
+- 86 行 single migration file，新增 v414，不动 v301（遵 CLAUDE.md §18 字面规则）
+- ✅ Fresh PG — 18 alembics 全跑通（PR #508 等价 workflow 首次 v001..head 通过）
+- ✅ 17/17 真 required 全绿 + Tier 1 门禁判定通过 + 12 services Tier 1 测试全绿
+- ✅ OMC code-reviewer (§19 独立 verifier) APPROVE / 0 真 BUG / 0 P0/P1
+- ❌ **并发 session 在 03:25 ship PR #511** (方案 F2 sentinel + NOT NULL，**"user 创始人决定"**)
+- PR #512 在 03:21 创建，user 03:30 授权 admin-merge 时未重 fetch origin/main → 差点 DROP 掉刚 fix 好的 mv_table_turnover
+- Close + cleanup（worktree + local + remote branch 全删）；CI 证据 + reviewer APPROVE 备忘在 close comment 留底以备复用
+
+### 数据变化
+
+- main HEAD：`af9039d6` → `1654c1f6`（多并发 session 推进：#506 docs/audit RLS + #508 RLS Runtime workflow + #509 collision detection + #511 v151b PK sentinel fix；本 session 主推 #509）
+- alembic chain: 511 → 511 revisions（无净变化；本 session 创建并 close 的 v414 不入 chain）
+- 新 admin-merge 主题白名单：**test-infra advisory** (第 5 类，#509 立首例)
+- 新 close PR 模式：**carve-out 完整流程跑完 + 因并发 race 撤回**（PR #512 立首例）
+- worktree 清理：#509 collision-detection-501-2026-05-13 + #512 v414-drop-dead-v151b-tables-2026-05-13
+- Memory 演进：`feedback_concurrent_pr_race.md` 加规则 6（admin-merge 决策前重 fetch + 重 search 同主题 PR）
+
+### 遗留问题
+
+**未接手另一 session 工作**
+- 主 worktree (W2-A Phase 2 分支) 上有 stash@{0}：`another-session-devlog-2026-05-13-evening-incomplete (#506 #508 #510 sinkdown)`
+- 包含 #506/#508 admin-merge 沉淀 + #510 v301 PK BUG 首发现（数字 "admin-merge tally ≥20" 与本 session "carve-out #28" 不一致，需 user 校准 SoT）
+- 该草稿写在 W2-A Phase 2 分支（与 PR #504 主题无关，污染风险已避免）
+- 保留为 stash 等另一 session 自己收尾或 user 决策
+
+**#510 后续（已被 #511 close，但未来重审建议）**
+- user/ops 仍可校验生产 PG `\dt mv_table_turnover` 等三表（本 session #510 comment 已贴命令）
+- 若发现假设 c（部分创建），#511 sentinel 修复对"部分存在"场景仍正确（in-place 重跑 = no-op）
+
+**持续阻塞（沿用 5/13 傍晚 handoff）**
+- B：dev-plan-60d 5/7 旧计划被 30+ commit 推翻，需 user 新 demo 故事核心方向
+- C：DailySummary / Header export (#351 xfail) §18 ontology 对齐
+- 5/13 deal-breaker channel-aggregation 3 平台资质（创始人级非技术，已 due，user carry-over）
+- D1：W2-A Phase 4 三国 production tenant 数据状态（创始人决策点）
+
+### 明日计划（fresh session 候选）
+
+**Wave 1（中风险独立）**
+- **#501 Phase 2**：MetaPathFinder 强制 FQN（reviewer 已提醒不是 in-place，需重构 hook sys.meta_path；评估 21+ existing bare-NS imports 影响）
+- **Dependabot 低风险 3 个**：#422 setup-node 4→6 / #423 upload-artifact 4→7 / #424 cache 4→5（GitHub 官方 actions）
+- **#347** conftest shared namespace [T2]
+- **#336** test_trade_promotions 转绿 [T2]
+
+**Wave 2（重型独立 session）**
+- #272/#271 Tier1 wine_storage/invoice Decimal→fen + 迁移 v403/v404（TDD + DEMO 验收）
+- #351 14 服务 main.py import 烟测网
+- #240 V4 architecture sprint DRAFT
+- #501 Phase 3 同名 file rename（~30 rename）
+
+**Wave 3（base 漂移 7+ 天）**
+- 旧 [SECURITY][Tier1] rebase PR 群体 #222-#232 + #212-#218
+
+### 反思 (memory candidate — 已落盘 feedback_concurrent_pr_race.md 规则 6)
+
+**admin-merge 授权 SoT 过期窗口 ~4 分钟内 race**：本 PR #512 在 03:21 创建后用了 ~10 分钟跑 CI + reviewer + 决策，期间 03:25 #511 已 ship。user 授权 admin-merge 基于"#512 是唯一解决 #510 PR" 假设，但该假设被并发 session 推翻。**PR create 时的防撞车 (feedback_concurrent_pr_race 步骤 1-5) 不够 — admin-merge 决策前必须再次 fetch + 重 search 同主题 PR**。
+
+教训写入 memory 规则 6：任何 PR 从创建到 user 授权 admin-merge 跨过 ≥1 分钟，merge 前都必须重 fetch origin/main + `gh pr list --search "<同主题>"` 重 search。本次差点 DROP TABLE 掉刚 fix 好的表 — 防御机制确立。
 
 ---
 
