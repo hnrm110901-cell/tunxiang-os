@@ -1,3 +1,74 @@
+## 2026-05-13 — W2-A Phase 1 三独立服务整删（PR #499 `52d4e09e` + nit closure `21fde0e6`）
+
+### 今日完成
+
+W1-T1 (PR #489) merge 后 W2 起手 quick recon (#498 plan SoT) → Phase 1 执行：删除 tx-malaysia / tx-indonesia / tx-vietnam 三独立微服务整目录 + infra/script/tier1-test 引用清理。
+
+**Quick recon 惊人发现**：
+- PR #129 (`1f9e592b`) 引入的三服务**从未真正激活**
+- 0 cross-service code imports (services/ shared/ apps/ 干净)
+- 0 deployment (无 Dockerfile / 无 helm chart / 无 compose entry / 无 CI workflow)
+- 仅 `scripts/migrate-all.sh:83` + `infra/compose/special/db-bootstrap.yml` comment 提及
+- 等价**纯 dead code**, 删除安全性 100%
+
+**§18 ontology 冻结约束自动满足**:
+- `TenantBase` 不含 country_code (PR #129 commit msg 描述 vs 实际实现不一致, 实际 v384 migration 逐表 add_column 未改 base.py)
+- `Store.region` 是**国内行政区域** (`String(50)` 华东/华南/华北), 与 PR #129 引入的国家级 `MarketRegion.MY/ID/VN/CN` 语义无关, 不动
+
+→ 无需创始人 ontology 确认。
+
+### Phase 1 PR #499 内容
+
+- 45 files changed, **+9 / -8351** (净 -8342)
+- 三服务整删 42 文件 (tx-malaysia 23py + alembic + tx-indonesia 6py + tx-vietnam 8py)
+- 3 cleanup edit: `migrate-all.sh` (17→16 services) / `db-bootstrap.yml` (comment 清) / `per_service_shells_tier1.py` (EXPECTED_SERVICE_SHELLS + docstring 17→16)
+- branch HEAD: `52d4e09e` → `21fde0e6` (docstring stale closure nit fix)
+
+### OMC code-reviewer Phase 1 verdict: APPROVE
+
+派 code-reviewer agent (§19 独立 verifier) 复审 PR #499，verdict **APPROVE / 0 真 BUG**：
+- 三服务目录完整删除 (含 .gitkeep / tests/__init__.py 等隐藏文件)
+- cross-service imports = 0 (双重 grep 验证)
+- infra/CI/scripts 引用清理完整
+- Tier 1 测试 EXPECTED_SERVICE_SHELLS 同步 (16 entries + 17 tier1 测试本地全绿)
+- alembic chain integrity OK (511 revisions)
+
+**Reviewer 关键观察**: `shared/region/` 留 Phase 2 安全 — 当前只有内部自引用; 外部 consumer 扫仅命中 `apps/miniapp-customer-v2/src/subpages/address/index.tsx` 的 `region` 字段但**是国内行政区组件**, 与 `shared/region/` Python 包**无 import 语义碰撞**。
+
+**Reviewer 一条 nit 已修** (本 commit 连带 stale): `test_per_service_shells_tier1.py:66` docstring "17 service" → "16 service" closure (commit `21fde0e6`)。这跟 W1-T1 round-N 几次 nit decline 性质不同——本 commit 改动的直接连带 stale，修补 cost 1 line。
+
+### 数据变化
+
+- W1-T1 PR #489 MERGED commit `06f4a19f` (2026-05-13T01:47:42Z, squash subject 缺 `(#489)` 后缀因 `--subject` 显式指定，反向印证 #498 normal subject 自动有 `(#498)`)
+- W2 plan doc PR #498 MERGED commit `e67b333b` (docs-only T3 carve-out)
+- W2-A Phase 1 PR #499 OPEN, reviewer APPROVE, **等 user normal merge 授权**
+- 新开 issue #496 [hardening][T2] lifespan startup 序列统一 try/finally (W1-T1 reviewer 抛 audit P2 follow-up)
+
+### Phase 2-4 留 fresh session
+
+- **Phase 2**: `shared/region/` + `shared/security/data_sovereignty.py` + 三国 delivery/payment adapter 删除
+- **Phase 3**: tx-agent (regional_forecast_routes 等) / tx-trade (海外 adapter) / tx-finance (invoice MY 分支) 内嵌区域分支删
+- **Phase 4**: alembic reverse migration (v384-v389) — **需 D1 user 创始人确认 production 数据状态**
+- **W2-B**: Gateway 瘦身 — W2-A merge 后单独评估
+
+### 反思 (memory candidate)
+
+W2-A Phase 1 是 **deletion-type PR**, reviewer 模式跟 W1-T1 contract closure 完全不同：
+- contract closure PR: reviewer 验"修补 vs 契约边界是否闭合"
+- deletion PR: reviewer 验"删除完整性 + 漏网 cross-service references"
+
+deletion PR 的核心验证是 **grep + tree state**, 不是逻辑推理。code-reviewer agent 6 分钟内完成 verdict, 比 contract closure 类 PR 快 50%。这是 W2-A Phase 2-4 / 类似 deletion 改动可复用 review pattern。
+
+### 持续阻塞 (需 user 输入)
+
+- W1-T2/T3/T4/T5 (#487) 仍 OPEN 等 reviewer (不阻塞 W2)
+- B: dev-plan-60d 5/7 demo 故事核心方向
+- C: DailySummary / Header export (#351 xfail) §18 ontology
+- 5/13 channel-aggregation 资质 (创始人级非技术 task)
+- **D1 (W2-A Phase 4 阻塞)**: 三国 production 是否有真实 tenant 数据 — 创始人决策点
+
+---
+
 ## 2026-05-13 round-3 — W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
 
 ### 今日完成

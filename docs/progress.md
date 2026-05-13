@@ -1,3 +1,50 @@
+## 2026-05-13 · W2-A Phase 1 三独立服务整删（PR #499 `52d4e09e` + `21fde0e6`）
+
+### 完成状态
+
+- [x] **W1-T1 PR #489 MERGED** commit `06f4a19f` (2026-05-13T01:47:42Z, squash)
+- [x] **W2 plan SoT PR #498 MERGED** commit `e67b333b` (docs/w2-deprecate-regional-plan.md, T3 carve-out)
+- [x] **W2-A Phase 1 quick recon** — 0 cross-service imports / 0 deployment / 等价纯 dead code
+- [x] **W2-A Phase 1 PR #499** OPEN: 45 files +9/-8351 (三服务整删 + 3 cleanup edit)
+- [x] **OMC code-reviewer verdict APPROVE** / 0 真 BUG (Phase 1 删除完整性独立 verify)
+- [x] **Reviewer 一条 nit 已修** (本 commit 连带 stale, docstring 17→16, commit `21fde0e6`)
+- [x] **DEVLOG + progress.md W2-A Phase 1 沉淀** (本段)
+- [ ] **等 user normal merge 授权 PR #499** (T2 大 diff, 不 admin-merge §19)
+
+### 关键决策
+
+- **W2-A Phase 1 启动时机** — W1-T1 merge 后立即起手, 不等 W1-T2/T3/T4/T5 (#487 OPEN, 不依赖) — 按"长期价值"减负 Tier 1 资金路径 W8 DEMO 心智成本
+- **Phase 1 vs Phase 2 拆分** — plan 建议 1+2 一 PR, 但本 session **保守只做 Phase 1** (三独立服务整删, risk surface 0); Phase 2 (shared/region/ + data_sovereignty + adapter) 留 fresh session 因为涉及跨服务 import 影响面分析, 本 session context 已紧迫
+- **§18 ontology 冻结自动满足** — TenantBase 无 country_code (PR #129 commit msg 与实现不一致), Store.region 是国内行政区与国家级 region 语义无关 → **无需创始人确认 ontology**
+- **Reviewer 模式复用** — deletion PR 核心验证是 grep + tree state, 非逻辑推理; code-reviewer agent 6 分钟内 verdict, 比 contract closure 快 50% — W2-A Phase 2-4 / 类似 deletion 改动可复用此 review pattern
+- **docstring nit 修而非 decline** — 跟 W1-T1 round-N 几次 nit decline 性质不同, 这是**本 commit 连带 stale**, 不是 pre-existing / 项目级 lint; 1-line fix 闭合永久 stale 是合理 surgical change
+
+### 下一步
+
+- A: user normal merge PR #499 (T2 大 diff, 不 admin-merge)
+- B: fresh session 起 W2-A Phase 2 — `shared/region/` + `shared/security/data_sovereignty.py` + 三国 adapter 删除 (跨服务 import 影响面需 deep grep)
+- C: 持续阻塞:
+  - **D1 (W2-A Phase 4 阻塞)**: 三国 production 是否有真实 tenant 数据 — 创始人决策点
+  - W1-T2/T3/T4/T5 (#487) 等 reviewer
+  - B: dev-plan-60d demo 故事核心方向
+
+### 已知风险
+
+- **W1-T2/T3/T4/T5 (#487) 仍 OPEN** — 治理基建 + tx-agent fail-loud 未 land main, W1 整体完工延后, 但不阻塞 W2 推进
+- **Phase 2 grep 影响面** — `shared/region/` 内部自引用 + 外部 consumer 0 (Phase 1 reviewer 已 verify) 但 `apps/` i18n 资源 + `shared/feature_flags/MalaysiaFlags` 还在, 需 Phase 2 同步删
+- **D1 创始人决策点** — 三国 production 数据状态未明; 若有数据, Phase 4 reverse migration 路径需重新设计 (软停用而非硬删 column)
+
+### 反思 (memory candidate)
+
+W2-A Phase 1 deletion PR vs W1-T1 contract closure PR reviewer 模式对比：
+- contract closure: 验"修补是否闭合契约边界" — 需要逻辑推理 + 异常路径分析
+- deletion: 验"删除完整性 + 漏网 references" — 主要是 grep + tree state, mechanical
+- code-reviewer agent 在 deletion 类 PR 上更高效 (6 min vs ~15 min)
+
+未来 W2-A Phase 2-4 / W2-B Gateway 瘦身 / 类似 cleanup 改动可复用 deletion PR review 模板。
+
+---
+
 ## 2026-05-13 round-3 · W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
 
 ### 完成状态
