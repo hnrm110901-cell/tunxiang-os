@@ -1,3 +1,74 @@
+## 2026-05-13 下午晚 — Tier 1 资金路径双 PR ship #271 + #272 (invoice + wine_storage Decimal→fen + FOR UPDATE 行锁)
+
+### 今日完成
+
+承上 W2-A Phase 3 (#524 / #526) 收尾后，本 session 推进 5/7 创建 6 天 stale 的两个 Tier 1 资金路径 PR ship:
+
+- **PR #271 invoice 元→fen + v414_invoice_amount_fen** MERGED commit `fbbb6e4f` (2026-05-13T06:48:08Z, admin-merge squash) — 金税四期 / 全电发票 Tier 1 资金路径
+- **PR #272 wine_storage 元→fen + v415_wine_storage_amount_fen** MERGED commit `f249ae27` (2026-05-13T07:45:21Z, admin-merge squash) — 存酒押金 Tier 1 资金路径，含 §19 reviewer MUST FIX 一起修 (extend/transfer/write_off 3 路由加 FOR UPDATE 行锁)
+
+两 PR 都 5/7 创建后 hibernate 6 天，main 推进 190+ commits。**rebase 一把过 0 冲突** — invoice/invoice_service/wine_storage/wine_storage_routes 4 文件在 main 5/7 后改动总和仅 2 commits，且都是 codemod 类（#358 production import + #488 test stub-key sync），与 PR Decimal→fen 业务改动无语义冲突。
+
+### Rebase 适配模板（两 PR 复用，每 PR ~30min）
+
+1. **迁移 rename + revision repoint**:
+   - PR #271: v403_invoice_amount_fen.py → v414_invoice_amount_fen.py, revision id "v403" → "v414_invoice_amount_fen", down_revision "v402" → "v413_member_identity_map"
+   - PR #272: v404_wine_storage_amount_fen.py → v415_wine_storage_amount_fen.py, revision id "v404" → "v415_wine_storage_amount_fen", down_revision "v403" → "v414_invoice_amount_fen" (接 #271 链头)
+2. **测试 revision assert 同步** (TestMigrationFile)
+3. **#488 codemod 应用** (test 端 bare-NS → FQN):
+   - PR #271: 16 处 `from services.invoice_service` → `from services.tx_finance.src.services.invoice_service`
+   - PR #272: 14 处 `from models.wine_storage` → `from services.tx_trade.src.models.wine_storage` (修 banquet_leads MetaData dup)
+4. **baseline 同步** (tests/tier1/test_no_decimal_amount_tier1.py 删 4 entries — invoice 2 + wine_storage 2)
+5. **(#272 only) FOR UPDATE 行锁 3 处** — extend/transfer/write_off 路由 SELECT 加 `FOR UPDATE`，与 take_wine L578 模式对齐
+
+### §19 reviewer 双 PR 复用 + MUST FIX 一起修
+
+派 code-reviewer agent 独立审 #271 + #272，两次 verdict **P0: 0**:
+- **#271**: 7 维度全审 (downgrade 列顺序 / migration 并发窗口 / PG ROUND vs Python ROUND_HALF_UP / 1-fen tolerance / down_revision 链 / #488 codemod 方向 / 红冲负数 fen→yuan)，0 P0 + 2 SHOULD CONSIDER (设计决策不阻塞)
+- **#272**: 8 维度全审 + **1 MUST FIX** — wine_storage 4 路由 SELECT-then-UPDATE 行锁不一致 (take_wine 已有 FOR UPDATE，extend/transfer/write_off 漏)。memory `feedback_tier1_review_loops` 警 round-N 套娃，但本 finding 是真 BUG (押金核销并发双 write_off 产生重复审计流水)，user 拍板 (a) 一起修。**3 行 SQL surgical edit，14/14 测试不影响**。
+
+### CI/local 不一致 root cause + 修法（追加 memory）
+
+PR #272 round-1 push 后**本地 14 PASS 但 CI 13/14 fail**: `Table 'banquet_leads' is already defined for this MetaData instance`。
+
+**根因**: PR test 用 bare-NS `from models.wine_storage import` → root conftest namespace merge → 双路径加载同一 banquet.py → SQLAlchemy declarative class BanquetLead 在 TenantBase.metadata 双注册 → InvalidRequestError。
+
+**修法**: 14 处 `from models.X` → `from services.<svc>.src.models.X` (FQN，#488 codemod 已 mainline 模板)。
+
+memory `feedback_pytest_stub_setdefault_pitfall.md` 5/13 扩展段沉淀此 case study + identification 信号 + 修复模板。
+
+### 数据变化
+
+- 迁移版本: v413 → **v415** (新增 v414_invoice_amount_fen + v415_wine_storage_amount_fen, 两条都接 main 真叶 v413_member_identity_map)
+- alembic chain check: 511 → **513 unique revisions / 0 warnings** (官方 script 验)
+- admin-merge tally: ≥33 → **≥35** (新增 #271 + #272 — **不属 carve-out 7 类，是新模式 "Tier 1 资金路径 explicit-ask admin-merge"**)
+- 新开 follow-up issues 3 条:
+  - #529 [tech-debt][T2] services/tx-trade/src/models/banquet_lead.py dead file 删除 (0 import + dup BanquetLead)
+  - #531 [test-debt/follow-up][T2] wine_storage 真并发 e2e (pytest-postgresql 验 4 路由 FOR UPDATE 行锁语义)
+  - #532 [Tier1/audit][T2] Tier 1 写路径 SELECT-then-UPDATE 模式 row-lock 全扫审计 (wine_storage 4 路由暴露 inconsistency)
+
+### 决策应用
+
+- ✅ **决策 80** 不动业务逻辑 — Decimal→fen 核心算法 / _yuan_to_fen ROUND / _validate_amount_fen tolerance 全部维持原样, 仅迁移文件名 / revision id / import 路径机械改写
+- ✅ **§17 Tier 1** 灰度路径 — 两 PR 都 §19 reviewer pass + CI 真门禁全绿 + 重 fetch + 重 search 同主题 + explicit user 授权
+- ✅ **§19 独立验证** — code-reviewer agent 独立眼光找出 #272 真 BUG (FOR UPDATE 漏)，证明独立 reviewer 不可替代
+- ✅ **§21 原子化** — 每 PR 多 commit (rebase 适配 + baseline 同步 + FQN 切换 + FOR UPDATE 各独立)，admin-merge squash 时聚合为单 PR commit
+- ✅ **memory feedback_tier1_review_loops B 选项停止线** — #272 §19 round-1 找出 1 真 BUG 修后 user 拍板跳过 round-2，避免无限套娃
+
+### 遗留问题
+
+- **持续阻塞**（与本 session 无关，需 user 创始人输入）: B (dev-plan-60d 故事方向) / C (DailySummary §18 ontology) / D1 (W2-A Phase 4 三国 production 数据决策) / 5/13 deal-breaker channel-aggregation 资质
+- **3 follow-up issues 等独立 PR 处理**（#529 / #531 / #532）
+
+### 明日计划（候选，建议新 session 起手）
+
+- A: **#487 W1 batch** (T2/T3/T4/T5) — 治理基建 + tx-agent fail-loud, 重型 multi-tier
+- B: **#425-429 npm Dependabot 5 PR** — vite/eslint patch 低风险 + storybook/jsdom major 需 breaking change check
+- C: **#240 V4 android architecture sprint** — DRAFT, WIP, 需创始人方向
+- D: **#529 / #531 / #532 follow-up issues** 任一起手 (T2 优先级，与 #271/#272 ship 自然延续)
+
+---
+
 ## 2026-05-13 接 #525 后 — W2-A Phase 3 (#524) 完工 + W2-A 主线 3 Phase 全收尾
 
 ### 今日完成
