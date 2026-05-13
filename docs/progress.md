@@ -1,3 +1,52 @@
+## 2026-05-13 接 #503 后 · #506 + #508 + #511 接力 / v301 PK 修复链 / docs-only carve-out 第 6 例
+
+> **并发互补**：本 entry（我方 session）与下文 "深夜 · #509 / #512" entry（并发 session）平行工作于 5/13 同时段。两 session 独立处理 #510：我方 ship #511（F2 sentinel）于 03:25Z；并发 session 同时段开 #512（D DROP），reviewer APPROVE 后因 #511 已 ship 而 close。详见下文 entry 与 memory 规则 6。
+
+### 完成状态
+
+- [x] **PR #506 MERGED** `da260a6a` — `docs/rls-pg-fixture-audit-2026-05-13.md`（docs-only T3 carve-out 第 5 例）
+- [x] **PR #508 MERGED** `7a07703c` — `.github/workflows/rls-runtime-p0-ci.yml`（**T2 infra workflow-only ADD 首例 carve-out**）
+- [x] **Issue #510 OPENED + CLOSED** via #511，3 修复方案候选 + user 选 F2
+- [x] **PR #511 MERGED** `1654c1f6`（**normal** squash-merge，commit `fac46c3e`，2 行 diff，F2 sentinel + NOT NULL）
+- [x] **§十九 独立 reviewer**：`code-reviewer` agent verdict **APPROVE / 0 真 BUG**
+- [x] **empirical 验证**：`Fresh PG — 18 alembics 全跑通` workflow PASS（issue #510 失败点消除）
+- [x] **3 worktree 清理** rls-pg-fixture-audit / rls-runtime-p0-ci / v301-pk-fix-2026-05-13
+- [x] **memory 扩展** `feedback_carveout_admin_merge_pattern.md` 加 5 类 carve-out 清单 + description 同步
+- [x] **DEVLOG + progress.md 沉淀**（本 PR）
+- [ ] **PR #504 / #487 等 reviewer**（PR #504 并发 session 推新 commit `82a64711`，需重新审计）
+- [ ] **Issue #507** RLS coverage 0.6% gap — OPEN 0 comments
+- [ ] **D1** 三国 production tenant 数据状态（创始人决策；并发 session 推进 W2-A Phase 2 间接证据）
+
+### 关键决策
+
+- **#506 admin-merge carve-out** — docs-only 第 5 例 established pattern；CodeRabbit 已 COMMENTED；CI 失败全是预存漂移噪音
+- **#508 admin-merge carve-out（新类别）** — T2 infra workflow-only ADD 首例：4 项判定条件（无业务代码 / workflow 可独立验证 / 失败仅暴露 pre-existing bug / follow-up issue 已立）。与 docs-only / test-only / security 同列加入 established pattern
+- **#510 F2 修复方案（user 创始人决定）** — sentinel + NOT NULL 选项：零消费者使 NULL 语义保留无业务价值，schema 最简
+- **#511 in-place 编辑 v301 path（非 forward-only migration）** — alembic upgrade head 在 v151b halt 到不了下游，forward-only 不可行；v151b 真 PG 上语法无效从未"应用"使 §十八 字面规则与场景冲突，user 创始人明确授权
+- **#511 normal merge（非 admin-merge）** — 真 SQL schema 改动不属 5 类 carve-out；reviewer APPROVE 后 user 授权 normal squash-merge
+- **admin-merge tally ≥21** — 5/10-5/13 跨 5 类 carve-out 总数（含本 docs PR 计入）
+
+### 下一步
+
+- A: PR #504（W2-A Phase 2）状态重审 — 并发 session 已推新 commit `82a64711` 整删 37 files；reviewer + 阻塞依赖需重新评估
+- B: PR #487（W1）等独立 reviewer（不阻塞）
+- C: 持续阻塞 D1（三国 production tenant 数据状态，创始人决策）+ dev-plan-60d demo 故事核心方向 + DailySummary §18 ontology
+
+### 已知风险
+
+- **PR #504 并发推进** — 主 worktree 处于 PR #504 branch HEAD `82a64711`，并发 session 已做 Phase 2 实际整删（37 files）。需用 git author + 物理路径占位符 `你的名字` 排查（per memory `project_tunxiang_clones.md`）
+- **N1 沉淀丢失教训** — 本 session 早些时候做的 DEVLOG/progress.md prepend 被并发 session 操作覆盖；下次 session-end 沉淀应**即时开 docs PR 而非攒批**，或用 worktree 隔离
+- **migration-ci.yml KNOWN GAP 仍在** — 9/10 历史 success 全是 no-op success；现 RLS Runtime workflow 成唯一真 alembic full-chain real-PG dry-run。建议后续技术债扫一次 511 migrations 找类似隐藏 SQL bug
+- **mv_table_turnover 生产部署状态未明** — 若已 stamp v151b 但通过手工 patch 应用过不同 schema，现 in-place 修改后产生不一致；零消费者特性兜底使业务面无影响
+
+### 反思（memory candidate）
+
+1. migration-ci.yml `versions/ 全为空 → no-op` 揭示与 `feedback_smoke_test_must_verify_functionality.md` 同模式：**"CI 通过 ≠ 功能验证"** — 所有 CI step 必须主动核查实质执行内容
+2. **in-place 编辑 migration 文件的合理边界** — §十八 字面规则 vs 真实场景的张力：当 migration 在真 PG 上语法无效从未"应用"过时，in-place 编辑是唯一可行修复路径
+3. **multi-session race + 未 commit docs sediment 易丢** — session-end 沉淀应即时 PR 不攒批
+
+---
+
 ## 2026-05-13 深夜 · #509 carve-out #28 + #512 close 因并发撞车（memory 规则演进 6）
 
 ### 完成状态

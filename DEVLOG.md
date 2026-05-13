@@ -1,3 +1,68 @@
+## 2026-05-13 接 #503 后 — #506 + #508 admin-merge + #511 v301 PK 修复链 / docs-only carve-out 第 6 例
+
+> **并发互补**：本 entry（我方 session）与下文 "深夜 — #509/#512" entry（并发 session）平行工作于同一 5/13 时段。两 session 独立处理 issue #510：我方 ship PR #511（F2 sentinel）于 03:25Z；并发 session 同时段开 PR #512（方案 D DROP），reviewer APPROVE 后因 #511 已 ship 而 close。详见下文 entry 的 race 分析与 memory 规则 6。
+
+### 今日完成
+
+承前 session 3 PR 状态审计（#504 / #506 / #508 + issue #507），按 user 决策树串行推进，session 内完成 3 merge + 1 issue 创建+闭环 + memory 扩展 + 并发 session race 发现：
+
+**PR #506 MERGED** `da260a6a`（admin-squash carve-out）— `docs/rls-pg-fixture-audit-2026-05-13.md`，docs-only T3，**docs-only established pattern 第 5 例**（#452/#456/#464/#466/#506）。CodeRabbit COMMENTED 已审；CI 失败全是 `project_tunxiang_ci_gates.md` 记录的预存漂移噪音（python-lint-test * + frontend-build）。
+
+**PR #508 MERGED** `7a07703c`（admin-squash carve-out）— `.github/workflows/rls-runtime-p0-ci.yml` workflow ADD：每 PR 触发 18 alembic 全链 + 7 P0 表（events / projector_checkpoints / mv_* 等）真 PG cross-tenant + same-tenant 反测。**新 carve-out 类别**："T2 infra workflow-only ADD" 首例（与 docs-only / test-only / security 同列），4 项判定条件：无业务代码 / workflow 可独立验证 / 失败仅暴露 pre-existing bug / follow-up issue 已立。
+
+**Issue #510 OPENED & CLOSED via #511** [T2] v301 migration PK 表达式语法错误：
+- 根因：`shared/db-migrations/versions/v301_table_analytics_views.py` L73-74（revision `v151b`）`PRIMARY KEY (..., COALESCE(zone_id, ...))` — PostgreSQL 不允许 PK constraint 用函数表达式
+- 历史隐瞒：`migration-ci.yml` L68 自承认 KNOWN GAP `versions/ 全为空 → alembic upgrade head 实质 no-op` — 9/10 历史 success 全是 no-op success
+- **PR #508 是首个真正跑 v001..head 全链真 PG upgrade 的 workflow**，首次暴露此 bug — 这正是 #508 workflow 的设计意义
+
+**PR #511 MERGED** `1654c1f6`（**normal** squash-merge，**非** admin-merge）— commit `fac46c3e` 2 行 diff，方案 F2（sentinel + NOT NULL，user 创始人决定）：
+- `zone_id UUID` → `UUID NOT NULL DEFAULT '00000000-...'::UUID, -- sentinel '0000-...' = 全店汇总`
+- PK 由 `(..., COALESCE(zone_id, sentinel))` → `(..., zone_id)` 简单列
+- 选 F2 而非 F1/F3 理由：零消费者特性使 NULL 语义保留无业务价值；F2 schema 最简
+- 选 in-place 编辑 v301 而非 forward-only migration 理由：alembic upgrade head 在 v151b halt 到不了任何下游 migration，CLAUDE.md §十八 字面规则与本场景冲突但 v151b 在真 PG 上语法无效从未被实际"应用"
+- 独立验证（§十九 触发条件"涉及数据库迁移"）：派 `code-reviewer` agent 复审 verdict **APPROVE / 0 真 BUG**（4 维全过：真 BUG / 可回滚性 / RLS / Tier 1 污染）
+- empirical 验证：本 PR 触发 `Fresh PG — 18 alembics 全跑通` workflow PASS（issue #510 的失败点消除）
+
+### 数据变化
+
+- main HEAD：`af9039d6` → `1654c1f6`（#506 → #508 → #509 conftest collision → #511 顺序合入；#509 是并发 session 推的 test-infra）
+- 新 workflow：`.github/workflows/rls-runtime-p0-ci.yml`（118 行）
+- 新 audit doc：`docs/rls-pg-fixture-audit-2026-05-13.md`（292 行，RLS 0.6% coverage gap 记录）
+- 新 issue：#510（v301 PK，已 closed via #511）
+- 修 migration：`shared/db-migrations/versions/v301_table_analytics_views.py`（v151b，2 行 in-place 编辑）
+- 3 worktree 清理：`rls-pg-fixture-audit-2026-05-13` / `rls-runtime-p0-ci-2026-05-13` / `v301-pk-fix-2026-05-13`
+- admin-merge tally：≥**21**（#506 docs-only 第 5 例 + #508 T2 infra workflow-only ADD 首例 + 本 docs PR）
+- memory 扩展：`feedback_carveout_admin_merge_pattern.md` 加 5 类 carve-out 清单（codemod / docs-only / test-only / security / **T2 infra workflow ADD（新）**），description 同步更新
+
+### 并发 session race 发现（memory candidate）
+
+整理本 session 沉淀准备开 docs PR 时，发现主 worktree `/Users/lichun/tunxiang-os/` 已被另一 claude session 占用：reflog 显示
+```
+82a64711 HEAD@{0}: commit: refactor(regional): W2-A Phase 2 shared 框架整删 (12 项 / 37 file) [T2]
+1ca041e6 HEAD@{1}: reset: moving to HEAD^
+a2e156fd HEAD@{2}: commit: docs(devlog): 2026-05-13 傍晚 — #408 codemod chain ...
+```
+主 worktree 当前 HEAD 在 `refactor/w2a-remove-regional-phase2`（同 PR #504 branch），正在做 W2-A Phase 2 实际整删。**我本 session 早些时候做的 N1 DEVLOG/progress.md prepend edits 被并发 session 切 branch / checkout 操作覆盖丢失**，仅本对话历史保留。
+
+这是 memory `feedback_parallel_claude_sessions.md` 描述的经典 race。**应对**：本 docs PR 不依赖主 worktree 文件，改用新 worktree 从 `origin/main` 重写一份完整 session-end 条目（即本段）。
+
+### 反思（memory candidate）
+
+1. **migration-ci.yml KNOWN GAP 揭示**：仓库 9/10 历史 migration-ci success 全部是 no-op success（versions/ 全为空），#508 RLS Runtime workflow 才是首个真 alembic full-chain real-PG dry-run。同模式 `feedback_smoke_test_must_verify_functionality.md`（PR #463 USER UID 通过但 import 测漏路径解析 bug）— **"CI 通过 ≠ 功能验证"**，需主动核查 CI step 实质执行内容
+2. **T2 infra workflow-only ADD carve-out 新类别确立**：与 docs-only / test-only / security 主题并列；4 项判定条件已落 memory
+3. **in-place 编辑 migration 文件的合理边界**：CLAUDE.md §十八 "禁止修改已应用的迁移" 字面规则，但当 migration 文件在真 PG 上语法无效从未真正"应用"过时，in-place 编辑是唯一可行修复（forward-only 因 alembic chain halt 无法 reach）。这是规则的合理 carve-out，须由 user 创始人明确决策
+4. **N1 工作丢失教训**：multi-session 共享主 worktree 时，**未 commit 的 docs sediment 易丢**。下次 session-end 沉淀应**即时开 docs PR 而非攒批**，或用 worktree 隔离
+
+### 持续阻塞（不变 + 1 新增观察）
+
+- **PR #504**（W2-A Phase 2, T2）— 并发 session **已推新 commit `82a64711`**（37 files 整删 Phase 2），状态需重新审计；等独立 reviewer
+- **PR #487**（W1）— 等 reviewer
+- **Issue #507**（RLS coverage 0.6% gap）— OPEN 0 comments
+- **D1** 三国 production tenant 数据状态（创始人决策）— 本 session 推进 W2-A 时**间接证据**：concurrent session 已做 Phase 2 整删，说明 D1 已隐式决策（无 production 数据 OR 风险可接受）
+- **B/C**: dev-plan-60d demo 故事 / DailySummary §18 ontology
+
+---
+
 ## 2026-05-13 深夜 — #509 admin-merge carve-out #28 + #512 close 因并发撞车（memory 规则演进 6）
 
 ### 今日完成
