@@ -73,13 +73,23 @@ class InvoiceService:
 
     # ── 内部工具 ──────────────────────────────────────────────────────────────
 
-    async def _get_invoice(self, invoice_id: uuid.UUID, tenant_id: uuid.UUID, db: AsyncSession) -> Invoice:
-        result = await db.execute(
-            select(Invoice).where(
-                Invoice.id == invoice_id,
-                Invoice.tenant_id == tenant_id,
-            )
+    async def _get_invoice(
+        self,
+        invoice_id: uuid.UUID,
+        tenant_id: uuid.UUID,
+        db: AsyncSession,
+        *,
+        lock: bool = False,
+    ) -> Invoice:
+        # lock=True 时 SELECT ... FOR UPDATE 防止 mutation 路径并发竞态
+        # (audit doc §4.2 P0: retry_failed/get_invoice_status/cancel_invoice 诺诺端重复开票/红冲)
+        stmt = select(Invoice).where(
+            Invoice.id == invoice_id,
+            Invoice.tenant_id == tenant_id,
         )
+        if lock:
+            stmt = stmt.with_for_update()
+        result = await db.execute(stmt)
         invoice = result.scalar_one_or_none()
         if invoice is None:
             raise InvoiceNotFoundError(f"发票 {invoice_id} 不存在或不属于租户 {tenant_id}")
@@ -219,7 +229,7 @@ class InvoiceService:
 
         仅允许 status='failed' 的发票重试。
         """
-        invoice = await self._get_invoice(invoice_id, tenant_id, db)
+        invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=True)
         if invoice.status != "failed":
             raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 failed 状态可重试")
 
@@ -280,7 +290,7 @@ class InvoiceService:
 
         若本地状态为 pending 且存在 platform_request_id，则实时查询诺诺更新状态。
         """
-        invoice = await self._get_invoice(invoice_id, tenant_id, db)
+        invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=True)
 
         if invoice.status == "pending" and invoice.platform_request_id:
             resp = await self._client.query_invoice(invoice.platform_request_id)
@@ -315,7 +325,7 @@ class InvoiceService:
 
         仅 issued 状态的发票可重打。
         """
-        invoice = await self._get_invoice(invoice_id, tenant_id, db)
+        invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=True)
         if invoice.status != "issued":
             raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可重打")
 
@@ -347,7 +357,7 @@ class InvoiceService:
 
         issued 状态方可作废：调用诺诺红冲接口，状态更新为 cancelled。
         """
-        invoice = await self._get_invoice(invoice_id, tenant_id, db)
+        invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=True)
         if invoice.status != "issued":
             raise InvoiceStatusError(f"发票 {invoice_id} 状态为 {invoice.status}，只有 issued 状态可作废")
         if not invoice.invoice_no or not invoice.invoice_code:
