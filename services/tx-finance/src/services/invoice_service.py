@@ -286,33 +286,49 @@ class InvoiceService:
         tenant_id: uuid.UUID,
         db: AsyncSession,
     ) -> dict[str, Any]:
-        """查询发票状态。
+        """查询发票状态（三段事务模式，issue #543）。
 
         若本地状态为 pending 且存在 platform_request_id，则实时查询诺诺更新状态。
+
+        三段拆分避免持锁调诺诺 HTTP 期间阻塞 cancel_invoice / retry_failed:
+          Step 1: 无锁读判断 — 非 pending 或无 platform_request_id 直接 return
+          Step 2: 诺诺 HTTP（锁外，无 DB 持有，5-30 秒不阻塞其他 mutation）
+          Step 3: 短事务加锁写回 — 再次 _get_invoice(lock=True) 并校验 status 仍为 pending
+                  （防中间被并发路径写入终态后本路径覆盖）
         """
+        # Step 1: 无锁读判断
+        invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=False)
+        if invoice.status != "pending" or not invoice.platform_request_id:
+            return _invoice_to_dict(invoice)
+
+        # Step 2: 诺诺 HTTP（锁外）
+        resp = await self._client.query_invoice(invoice.platform_request_id)
+        if not resp.success:
+            return _invoice_to_dict(invoice)
+        items = resp.data.get("invoiceQueryResultList", [])
+        if not items:
+            return _invoice_to_dict(invoice)
+        item = items[0]
+        nuonuo_status = item.get("status")  # 0=开票中 1=成功 2=失败
+        if nuonuo_status not in ("1", "2"):
+            return _invoice_to_dict(invoice)
+
+        # Step 3: 短事务加锁写回（再校验 status 防覆盖）
         invoice = await self._get_invoice(invoice_id, tenant_id, db, lock=True)
-
-        if invoice.status == "pending" and invoice.platform_request_id:
-            resp = await self._client.query_invoice(invoice.platform_request_id)
-            if resp.success:
-                items = resp.data.get("invoiceQueryResultList", [])
-                if items:
-                    item = items[0]
-                    nuonuo_status = item.get("status")  # 0=开票中 1=成功 2=失败
-                    if nuonuo_status == "1":
-                        invoice.status = "issued"
-                        invoice.invoice_no = item.get("invoiceNo", "")
-                        invoice.invoice_code = item.get("invoiceCode", "")
-                        invoice.pdf_url = item.get("pdfUrl", "")
-                        invoice.issued_at = datetime.now(timezone.utc)
-                        await db.commit()
-                        await db.refresh(invoice)
-                    elif nuonuo_status == "2":
-                        invoice.status = "failed"
-                        invoice.failed_reason = item.get("failCause", "诺诺开票失败")
-                        await db.commit()
-                        await db.refresh(invoice)
-
+        if invoice.status != "pending":
+            # 并发：另一路径已先写入终态，本路径不覆盖
+            return _invoice_to_dict(invoice)
+        if nuonuo_status == "1":
+            invoice.status = "issued"
+            invoice.invoice_no = item.get("invoiceNo", "")
+            invoice.invoice_code = item.get("invoiceCode", "")
+            invoice.pdf_url = item.get("pdfUrl", "")
+            invoice.issued_at = datetime.now(timezone.utc)
+        else:  # nuonuo_status == "2"
+            invoice.status = "failed"
+            invoice.failed_reason = item.get("failCause", "诺诺开票失败")
+        await db.commit()
+        await db.refresh(invoice)
         return _invoice_to_dict(invoice)
 
     async def reprint(
