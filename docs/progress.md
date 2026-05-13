@@ -1,3 +1,43 @@
+## 2026-05-13 接 #518 后 · W2-A Phase 2 (#504) round-1→2 完工 + grabfood 撤回 + #522 follow-up
+
+### 完成状态
+
+- [x] **PR #504 W2-A Phase 2 MERGED** commit `2af9a1aa` (2026-05-13T05:40:28Z, normal squash)
+- [x] **Round-1**: rebase onto `937cd99a` (0 冲突) + 20 Tier 1 + 14 #515 enforcer = 34 PASS + 真 required CI 17 Tier 1 gates 全绿
+- [x] **Round-1 reviewer P0 catch**: `delivery_factory.py:15` `from .grabfood.src.adapter` 因 grabfood 整删 → `ModuleNotFoundError`
+- [x] **Round-2 深度调查**: grabfood 非 i18n 跨境 / 是 OmniChannel 6 平台一等公民 (5 active 触点 + v411-v413 enum)
+- [x] **Round-2 修补**: 撤回 grabfood (`shared/adapters/grabfood/` 4 file 恢复) + plan SoT 12 项→11 项 + grabfood 撤回段
+- [x] **Race 处理**: 期间另一 session merged #351; re-rebased onto `0af81d3b` (`reset --mixed ORIG_HEAD` + `stash -u` + `rebase` + `stash pop`) 0 work loss
+- [x] **2 commits 重组**: docs (`040b9bad`) + code (`64abc7c8`) 干净分离, force-pushed-with-lease
+- [x] **Round-2 reviewer APPROVE**: 0 P0/P1/P2 + 1 无害 nit, 撤回边界精确性 + 7 dead-code adapter OmniChannel 零命中复核
+- [x] **Issue #522 OPENED**: grabfood OmniChannel 是否真有马来业务流量 (Tier 2 / 评估型 / 不阻塞)
+- [x] **Round-2 CI 17 Tier 1 gates 全绿**
+- [x] **W2-A Phase 2 final scope**: 11 项 / 33 file 删 + 1 edit / -4914 line
+- [x] **rebase worktree cleanup**: `w2a-phase2-rebase-2026-05-13` 删 + `pr-504-rebase` branch 删
+
+### 关键决策
+
+- **F1 (scope contraction) vs F2 (scope expansion)**: 选 F1 撤回 grabfood + follow-up issue。理由：F2 涉及 active 业务路由 + migration (违反 §18 须创始人确认) + ~8 file 影响面，超出 Phase 2 surgical scope. F1 是 reviewer 推荐选项 B 的精确修补，符合 §三 surgical change
+- **正面证据 vs commit msg 设计意图冲突**: PR #129 commit msg 标"GrabFood = 马来西亚外卖"，但 commit `1c96668a` E1 外卖 canonical schema 把 grabfood 纳入 6 平台一等公民。两 commit 设计意图冲突，正面证据 (active 触点 grep) 应优于 commit msg
+- **2 commits 重组而非 amend HEAD**: `reset --soft origin/main` 后 stage docs/ + code 分离 commit, 保持 docs/code 干净分离 (PR review 友好)。amend HEAD 会让 plan doc 改动跨 commit, 不干净
+- **scope contraction 不算 surgical 违例**: 是 reviewer 验证收益, 不顺手扩 scope. 反例 = F2 全量删 grabfood (动 migration + active 路由)
+- **race 处理: re-rebase 优于强推**: round-1 push 后 round-2 期间 origin/main 前移 1 commit (#351), 强推会导致 base 漂移。重 rebase 0 work loss + 0 冲突. 记 memory 规则补充
+
+### 下一步
+
+- A (本 docs PR): T3 docs-only carve-out 第 6 例 ship → user explicit 授权 admin-merge
+- B (W2-A Phase 3 起手): tx-agent 5 file + tx-trade 3 file 整删 + payment_gateway surgical / 预期 ~500-1000 行删 / Tier 1/2 触及 / 不动 migration
+- Phase 3 起手前置: round-2 教训应用 — 绝对+相对 import 双重 grep + 跨服务 active 链审计
+
+### 已知风险
+
+- **D1 阻塞 (W2-A Phase 4)**: 三国 production 是否有真 tenant 数据 — 创始人决策点；Phase 2 完工后重要性升级 (Phase 4 alembic reverse v384-v389 必须 D1)
+- **D2 阻塞 (Issue #522)**: grabfood OmniChannel 是否真有马来业务流量 — 创始人决策点；不阻塞 W2-A Phase 3-4
+- **Phase 3 风险**: tx-trade 触及 Tier 1 (cashier 邻近 services), 但 9 个 file 整删/surgical 不动 cashier_engine.py 主链路, 风险可控
+- **memory 规则补充**: deletion-PR grep 双重 form (绝对+相对) + force-push 前 fetch + re-rebase pattern
+
+---
+
 ## 2026-05-13 接 #513 后 · #501 Phase 2 (#515) + tier1-gate path filter (#517) / carve-out #30 + #31
 
 ### 完成状态

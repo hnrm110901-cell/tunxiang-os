@@ -1,3 +1,92 @@
+## 2026-05-13 接 #518 后 — W2-A Phase 2 (#504) round-1→2 完工 + grabfood 撤回 + #522 follow-up
+
+### 今日完成
+
+承接前 session origin/main HEAD `937cd99a` (#518)，本 session 在独立 rebase worktree 推进 #504 W2-A Phase 2 完工，闭合 12 周升级战略 W2-A 主线。
+
+**Round-1: rebase + push** — PR #504 base 落后 origin/main 14 commits，独立 worktree `/Users/lichun/.tunxiang-p0-worktrees/w2a-phase2-rebase-2026-05-13` 走 `refs/pull/504/head` + `git rebase origin/main` 0 冲突。本地验证：
+- 顶层 import (`shared.feature_flags` / `vector_store` / `security` / `adapters`) 全过
+- 20 Tier 1 测试 PASS (`shared/db-migrations/tests/test_{per_service_shells,chain_integrity,orm_migration_drift,schema_lint}_tier1.py`)
+- 14 Tier 2 测试 PASS (`tests/test_collision_enforcer.py` — #515 enforcer 未被破坏)
+- 真 required CI 全绿: 17 Tier 1 gates + CodeRabbit + Analyze Changes + edge-mac-station
+- 4 删除符号 (`VietnamFlags` / `IndonesiaFlags` / `shared.region` / `data_sovereignty`) ImportError ✓
+
+**Round-1 reviewer P0** — OMC code-reviewer agent (§19 独立 verifier, opus) REQUEST_CHANGES：`shared/adapters/delivery_factory.py:15` `from .grabfood.src.adapter import GrabFoodDeliveryAdapter` 因 grabfood 整删 → `ModuleNotFoundError` → tx-trade `omni_sync_routes.py` (5 call sites) 整体不可用。我的 round-1 grep 用 `shared\.adapters\.(...)` 绝对 form 漏抓相对 `from .grabfood` import — **memory candidate: deletion-PR 必须绝对+相对 import 双重 grep**。
+
+**Round-2 深度调查 grabfood**：reviewer 选项 B (推迟 grabfood) 验证过程中发现 grabfood **非东南亚 i18n 跨境删除范围**，而是 **OmniChannel 6 平台一等公民**：
+
+| 触点 | 文件:行 | 状态 |
+|------|---------|------|
+| `_PLATFORM_REGISTRY["grabfood"]` | `delivery_factory.py:26` | active |
+| `GrabFoodTransformer` (CanonicalTransformer) | `delivery_canonical/transformers.py:686-854` | active |
+| `GrabFoodPublisher` (DeliveryPublisher) | `delivery_publish/publishers.py:542-664` | active |
+| Production webhook `POST /webhooks/grabfood` | `services/tx-trade/src/routers/delivery_panel_router.py:298-318` | active |
+| `_handle_platform_webhook("grabfood", ...)` 调度 | `services/tx-trade/src/services/delivery_panel_service.py` | active |
+| Migration enum 含 `"grabfood"` | `versions/v411 + v412 + v413` | active (post #129) |
+
+其他 7 adapter (dana/foodpanda/gopay/momo/myinvois/shopeefood/zalopay) 在 OmniChannel 零命中 — 真 dead code 可删。
+
+**Round-2 修补 + re-rebase 处理 race** — 期间另一 session merged PR #351 (`0af81d3b` main_import_smoke), origin/main 前移 1 commit。`git reset --mixed ORIG_HEAD` + `stash -u` + `rebase origin/main` 重 rebase 干净 0 冲突，pop stash 恢复 grabfood + plan doc 编辑。`reset --soft origin/main` + 重组 2 干净 commits（docs + code 分开）+ force-push-with-lease commit `64abc7c8`。
+
+**Round-2 reviewer APPROVE** — OMC code-reviewer agent 二次复审 verdict **APPROVE / 0 P0/P1/P2 / 1 nit (无害 "~37 vs 34 file 估算差异")**。关键验证：
+- `git diff origin/main -- shared/adapters/grabfood/` 空 (4 文件与 main 完全一致, 撤回边界精确)
+- 7 dead-code adapter OmniChannel 零命中复核通过
+- tx-trade 服务内嵌 `foodpanda_adapter.py`/`shopeefood_adapter.py` 不依赖 shared 层 → Phase 2 不预埋 Phase 3 trap
+- Plan SoT 全量同步 (无 stale "12 项" 残留)
+
+**Issue #522 OPENED** [Tier 2 / 评估型] grabfood OmniChannel 6 平台是否真有马来业务流量评估 — 3 决策路径 (A 零流量全量 deprecate / B 有流量保留 / C 未来计划保留)，等 user 创始人 D2 输入。
+
+**PR #504 MERGED** `2af9a1aa` (2026-05-13T05:40:28Z, normal squash, **非** admin-merge — T2 改动)。
+
+### 数据变化
+
+- main HEAD: `937cd99a` → `0af81d3b` (#351 by 另一 session) → `2af9a1aa` (#504 本 session)
+- W2-A Phase 2 final scope: **11 项 / 33 file 删 + 1 edit / -4914 line**（vs round-1 39 file / -6030 line, 撤回 grabfood 4 file + 1116 line）
+- alembic chain: 511 unchanged
+- 新 issue: **#522** grabfood OmniChannel 评估 (Tier 2 follow-up)
+- 4 删除符号闭环不可访问: `VietnamFlags` / `IndonesiaFlags` / `shared.region` / `data_sovereignty`
+- 关闭符号: 7 adapter 目录 (dana/foodpanda/gopay/momo/myinvois/shopeefood/zalopay) 整删
+- 保留撤回: `shared/adapters/grabfood/` (4 file) + Phase 3 范围 grabfood_adapter.py (PR body 已声明)
+- worktree 清理: `w2a-phase2-rebase-2026-05-13` (rebase worktree) + `pr-504-rebase` (local branch)
+
+### 反思 (memory candidates)
+
+1. **deletion-PR grep 必须绝对+相对 import 双重 form** — round-1 P0 根因：我用 `shared\.adapters\.(...)` 绝对 dotted form grep，漏抓 `delivery_factory.py:15` 的相对 `from .grabfood.src.adapter` 形式。下次 deletion-PR pre-check 必跑双重 grep：`grep -rn "shared\.adapters\.X" && grep -rn "from \.X"`。
+2. **OmniChannel 一等公民 vs i18n 跨境的归类边界** — PR #129 commit msg 标"GrabFood = 马来西亚外卖"，但 commit `1c96668a` E1 外卖 canonical schema 把 grabfood 纳入 6 平台一等公民设计意图。两 commit 设计意图冲突，PR #504 plan 沿用 #129 归类导致误判。**deletion plan 必须 grep 跨服务 active consumer 链，不能只看 commit msg**。
+3. **re-rebase race "1 session 期间 origin/main 前移" 应对** — round-1 push 完成到 round-2 push 期间 #351 ship，触发 `reset --soft` 暴露 main_import_smoke "deleted" 假象（origin/main 有 + 我 worktree 无）。`reset --mixed ORIG_HEAD` + `stash -u` + `rebase origin/main` + `stash pop` 三步链 0 work loss。memory `feedback_concurrent_pr_race` 规则 6 (admin-merge 前重 fetch) 扩展：**force-push 前 fetch origin main, 若 base 漂移 ≥1 commit 重 rebase 再 push**。
+4. **scope contraction 是 reviewer 验证收益, 非 surgical 违例** — Phase 2 12→11 项是 reviewer 推荐选项 B 的精确修补，符合 §三 surgical change。反例：scope expansion (F2 全量删 grabfood + transformer/publisher/webhook/migration) 涉及 active 业务路由 + 违反 §18 (动 migration) 是真 surgical 违例，正确决策路径 = 撤回 + follow-up issue。
+
+### 持续阻塞 (沿用 5/13 上午 handoff)
+
+- **D1 (W2-A Phase 4 阻塞)**: 三国 production 是否有真实 tenant 数据 — 创始人决策点；W2-A Phase 2 完工后 D1 重要性升级（Phase 3 不需 D1，Phase 4 alembic reverse v384-v389 必须）
+- **D2 (Issue #522 新增)**: grabfood OmniChannel 是否真有马来业务流量 — 创始人决策点；不阻塞 W2-A Phase 3-4，独立 follow-up
+- **B**: dev-plan-60d 5/7 旧计划被 30+ commit 推翻，需 user 新 demo 故事核心方向
+- **C**: DailySummary / Header export (#351 xfail) §18 ontology 对齐
+- **5/13 channel-aggregation 资质**: 3 平台企业资质未启动（创始人级非技术，已 due）
+
+### 明日计划
+
+**A wave (T3 docs sediment, 本段)** — 本 PR 即 docs-only carve-out 第 6 例 (与 #452/#456/#464/#466/#506 同款)，记 round-1→2 完工 + 4 反思 + 数据变化
+
+**B wave (W2-A Phase 3 起手)**:
+- tx-agent 5 file 整删: `regional_forecast_routes.py` / `regional_forecasting_service.py` / `malaysia_forecasting_service.py` / `malaysia_ingredients.py` / `malaysia_holidays.py`
+- tx-trade 3 file 整删: `my_payment_notify_service.py` / `delivery_adapters/foodpanda_adapter.py` / `delivery_adapters/shopeefood_adapter.py`
+- tx-trade 1 file surgical: `payment_gateway.py` 删 Malaysia 电子钱包 (tng_ewallet/grabpay/boost) dict 项
+- 预期 9 file / ~500-1000 行删 / Tier 1/2 触及 / 不动 migration（Phase 4 才动）
+- **Phase 3 起手前置**: 跑 round-2 教训 grep 双重 form (绝对+相对) 验所有 8 file consumers; 跑跨服务 active 链审计 (不能只看 plan doc)
+
+**Wave 1 备选** (B wave 推进受阻或 Phase 3 完工后):
+- #347 conftest shared namespace [T2] (6+ 天 OPEN)
+- #336 test_trade_promotions 转绿 [T2] (8+ 天 OPEN)
+- #516 path filter follow-up 其他 4 workflow (rls-gate / integration-pg-tests / migration-ci / rls-runtime-p0-pg-tests)
+- Dependabot npm #425-#429 (5 个, 非 GitHub 官方 actions, 需更深审视)
+
+### 上 session 意外发现 / 校准
+
+无新发现。前 session (#503/#506/#508/#509/#511/#512/#513/#514/#515/#516/#517/#518) handoff 5/13 上午终态完整, 本 session 在主 worktree 之外用独立 rebase worktree 推进，0 race 损失。
+
+---
+
 ## 2026-05-13 接 #513 后 — #501 Phase 2 (#515) + tier1-gate path filter (#517) / carve-out #30 + #31
 
 ### 今日完成
