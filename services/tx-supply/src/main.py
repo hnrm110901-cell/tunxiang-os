@@ -29,6 +29,7 @@ from .api.ck_recipe_routes import router as ck_recipe_router
 from .api.craft_routes import router as craft_router
 from .api.deduction_routes import router as deduction_router
 from .api.delivery_proof_routes import router as delivery_proof_router
+from .api.doc_number_routes import router as doc_number_router
 from .api.delivery_route_routes import router as delivery_route_router
 from .api.dept_issue_routes import router as dept_issue_router
 from .api.distribution_routes import router as distribution_router
@@ -128,6 +129,7 @@ app.include_router(supplier_portal_router)
 app.include_router(supplier_portal_v2_router)  # Y-E10 去除静默内存降级
 app.include_router(edi_router)  # 供应商EDI对接（v217表）
 app.include_router(smart_procurement_router)  # 预测驱动智能采购（v219表，对标Fourth iQ）
+app.include_router(doc_number_router)  # 业务单号定制规则引擎（PRD-03 / v418 / Tier 1）
 app.include_router(mobile_supply_router)  # 移动端供应链：扫码采购/收货/盘点（模块3.3）
 app.include_router(transfer_ext_router)  # 调拨扩展：execute 端点
 app.include_router(edi_ext_router)  # EDI 扩展：供应商查看订单 + 确认发货
