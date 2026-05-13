@@ -205,7 +205,45 @@ def test_downgrade_drops_table():
 
 
 # ─────────────────────────────────────────────────────────────────
-# 4. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，fixture 见 conftest.py）
+# 4. ALLOWED_PLATFORMS 与 canonical 对齐（防漂移）
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_platforms_aligned_with_canonical():
+    """v413 _ALLOWED_PLATFORMS 必须等于 delivery_canonical/base.py:ALLOWED_PLATFORMS。
+
+    若不等，新增平台后 canonical transformer 与 member_identity_map 表枚举会漂移。
+    与 v411/v412 同模式 (PR #530 reviewer 观察 — v413 缺此 drift 测试).
+    """
+    v413_src = _read_v413_source()
+    v413_match = re.search(
+        r"_ALLOWED_PLATFORMS\s*=\s*\([^)]*?((?:\"[^\"]+\"\s*,?\s*)+)\)",
+        v413_src, re.DOTALL,
+    )
+    assert v413_match, "无法在 v413 源码找到 _ALLOWED_PLATFORMS"
+    v413_platforms = set(re.findall(r'"([^"]+)"', v413_match.group(1)))
+
+    canonical_path = (
+        Path(__file__).parent.parent.parent
+        / "adapters" / "delivery_canonical" / "base.py"
+    )
+    canonical_src = canonical_path.read_text(encoding="utf-8")
+    canonical_match = re.search(
+        r"ALLOWED_PLATFORMS\s*=\s*frozenset\s*\(\s*\{([^}]+)\}",
+        canonical_src,
+    )
+    assert canonical_match, "无法在 delivery_canonical/base.py 找到 ALLOWED_PLATFORMS"
+    canonical_platforms = set(re.findall(r'"([^"]+)"', canonical_match.group(1)))
+
+    assert v413_platforms == canonical_platforms, (
+        f"v413 _ALLOWED_PLATFORMS={v413_platforms} 与 canonical "
+        f"ALLOWED_PLATFORMS={canonical_platforms} 不一致 — "
+        f"新增平台时两处必须同步！"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────
+# 5. 真 PG 反测（opt-in via INTEGRATION_PG_DSN，fixture 见 conftest.py）
 # ─────────────────────────────────────────────────────────────────
 
 
