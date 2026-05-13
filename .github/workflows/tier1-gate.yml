@@ -69,11 +69,8 @@ on:
       - 'edge/sync-engine/**'
       - 'shared/db-migrations/versions/v091*.py'
       # 测试基础设施（PR #515 暴露的 path filter gap — issue #516）
-      # conftest.py 改坏会 break 所有 Tier 1 test collect，必须触发 gate
-      - 'conftest.py'                  # repo-root conftest（含 #501 Phase 2 enforcer + Phase 1 advisory）
-      - 'services/*/conftest.py'       # per-service conftest（dash-to-underscore namespace 注册）
-      - 'services/*/src/conftest.py'   # per-service src 内 conftest
-      - 'tests/conftest.py'            # tests/ 根 conftest
+      # 任意深度 conftest.py 改坏会 break Tier 1 test collect，必须触发 gate
+      - '**/conftest.py'               # 全仓 conftest.py（root / per-service / tests/ 等任意深度，含 #501 Phase 2 enforcer）
       - 'shared/test_utils/**'         # 共享测试工具
       - 'shared/test_infra/**'         # 测试基础设施
   push:
