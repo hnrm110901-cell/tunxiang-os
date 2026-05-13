@@ -1,3 +1,53 @@
+## 2026-05-13 下午 — afternoon ship batch: #351 + #336 + #347 close + 3 follow-up issue + 2 个 memory carve-out 类别
+
+### 今日完成
+
+下午 session（接 W2-A Phase 2 #504 之后）独立工作流，3 PR 决策 + 3 follow-up issue + 2 memory 沉淀。
+
+**PR 决策**：
+- ✅ **#351 MERGED** commit `0af81d3b` — `feat(test-infra): 14 服务 main.py 容器布局 import 烟测网（决策 77 前置）[Tier1]` — 立网 + xfail 跟踪 + tx-brain explicit skip（§19 reviewer P1 修），shared/test_infra/main_import_smoke.py helper（139 行）+ 13 个新烟测 + 6 已知 xfail 跟踪 production main.py 真实 import bug。
+- ✅ **#336 MERGED** commit `8c4de8d1` — `fix(test): test_trade_promotions 7 测试转绿（#335 暴露 pre-existing 修）[Tier2]` — cherry-pick `9fe04834`（仅 +15/-2）on top of clean main (reset+cherry-pick+force-push 重置 stacked-on-deferred-base PR pattern)，原 7 个 RBAC + mock data fail 转 PASS。
+- ✅ **#347 CLOSED** as 0-value verified — `fix(conftest): repo-root 注册 shared / shared.adapters namespace [Tier2]` — 5/9 PR body claim -16 collection error 在 2026-05-13 main 状态下完全失效（pre/post 5 服务全等 12 errors），main 上其他 PR 已从根上覆盖 `shared is not a package` 误 cache 问题。close 防止死代码污染 conftest。
+
+**Follow-up issues 落盘**（#351 reviewer 报告衍生）：
+- **#519** tx-brain Dockerfile 非标准容器布局统一化（选项 A: 改 Dockerfile / B: 扩 helper module_path 参数）
+- **#520** tx-trade Dockerfile L13 extra COPY（permission_service.py）helper 未模拟（选项 A: 修 main.py FQN / B: helper 加 extra_copies 参数）
+- **#521** xfail 翻 marker 清单（6 服务：tx-ops DailySummary → tx-finance → tx-trade → tx-intel → tx-analytics → tx-org）
+
+**Memory 沉淀**（新 2 类 carve-out + cleanup pattern）：
+- `feedback_carveout_admin_merge_pattern.md` 加第 6 类 **Tier 1 test-infra ADD**（#351 首例，5 项判定 + §19 reviewer P1 必修后才 merge）
+- `feedback_carveout_admin_merge_pattern.md` 加第 7 类 **T2 test-only fixture/mock fix blast radius 0**（#336 首例，5 项判定 + 与 #460 test-only Tier 1 类别区别说明）
+- `MEMORY.md` admin-merge tally ≥22 → **≥23 / 7 类 carve-out**，沉淀 **stacked PR cleanup pattern**（reset --hard + cherry-pick + force-push 重置 stacked-on-deferred-base PR 为干净单 commit on top of main HEAD — destructive 需 user explicit 授权）
+
+### 数据变化
+
+- main HEAD: `937cd99a` → `8c4de8d1`（+4 commit 来自本 session：#351 / #336 + 后续 docs PR，+ #504 / #518 / #523 来自并发 session）
+- 14 服务（13+gateway）main.py 容器布局 import 烟测网立网（13 服务 PASS + tx-brain skip）
+- tx-trade test_trade_promotions.py 10/10 collection + 10/10 PASS（原 7 fail 修）
+- conftest.py 已无死代码污染（#347 close 防 _patch_shared_namespace 进入）
+- shared/test_infra/main_import_smoke.py 已上线（139 行 helper）
+- 新增 6 个 xfail tracker（services/*/src/tests/test_main_import_smoke_tier1.py 中 strict=False）
+
+### §19 独立 reviewer 复用
+
+- **#351 round-1** reviewer 报告 APPROVE_WITH_NITS — 抓 P1（tx-brain 虚假通过，commit 5769cea2 修）+ P2（shared/ 9.7MB × 13 copy / `_detect_missing_third_party` corner case）+ xfail 翻 marker 优先级独立 verify
+
+### 持续阻塞（沿用 morning W2-A Phase 1 session）
+
+- **B**：dev-plan-60d 5/7 旧计划被 30+ commit 推翻，需 user 新 demo 故事核心方向
+- **C**：DailySummary / Header export（#351 xfail）需 user 创始人 §18 ontology 对齐
+- **D1**：W2-A Phase 4 阻塞 — 三国 production 是否有真实 tenant 数据，创始人决策点
+- **5/13 deal-breaker channel-aggregation 资质**：3 平台企业资质未启动（创始人级别非技术 task，已 due）
+
+### 明日计划（next session 候选）
+
+- W2-A Phase 2 跟进（#504 已 merge，Phase 3-4 待 user 起手）
+- Wave 2 重型：#272/#271 (wine_storage/invoice Decimal→fen + v403/v404 migration) / #487 W1 batch / #240 V4 architecture
+- npm Dependabot 5 个评估（#425-429 vite/jsdom/storybook/eslint major bump）
+- 长期：#521 xfail 翻 marker 推进（依赖 §18 ontology 对齐 + codemod chain 继续）
+
+---
+
 ## 2026-05-13 接 #518 后 — W2-A Phase 2 (#504) round-1→2 完工 + grabfood 撤回 + #522 follow-up
 
 ### 今日完成

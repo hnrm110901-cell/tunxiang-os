@@ -1,3 +1,38 @@
+## 2026-05-13 下午 · afternoon ship batch — #351 + #336 + #347 close + 3 follow-up issue + 2 carve-out 类别
+
+### 完成状态
+
+- [x] **#351 MERGED** commit `0af81d3b` — 14 服务 main.py 容器布局 import 烟测网（Tier 1 test-infra ADD 类别首例）
+- [x] **#336 MERGED** commit `8c4de8d1` — test_trade_promotions 7 测试转绿（T2 test-only fixture/mock fix 类别首例）
+- [x] **#347 CLOSED** — 0 价值 verified（pre/post 5 服务全等 12 errors，#347 想修的 `shared is not a package` 在 main 上已被其他 PR 覆盖）
+- [x] **3 follow-up issues 创建**：#519 tx-brain Dockerfile / #520 tx-trade extra COPY / #521 xfail 翻 marker 清单
+- [x] **Memory 双 file 更新**：feedback_carveout_admin_merge_pattern.md 加 2 新类别 / MEMORY.md tally ≥23 + 7 类 + stacked PR cleanup pattern 沉淀
+- [x] **§19 reviewer #351 round-1** APPROVE_WITH_NITS — P1 tx-brain 虚假通过已修（commit 5769cea2）
+- [x] **DEVLOG + progress.md 沉淀**（本段）
+- [ ] 主 worktree stash@{0} 是并发 session 的 evening devlog WIP — **不动**（沿用 handoff）
+
+### 关键决策
+
+- **#347 close 而非 merge** — 5/9 PR body claim "-16 collection error" 在 2026-05-13 main 状态完全失效（pre/post 跑出 821 tests / 12 errors 完全相同）；按 user CLAUDE.md §三 Surgical Changes + 全局极简原则，死代码不进 main。close 防止 `_patch_shared_namespace` 函数永久污染 conftest 入口
+- **#351 reviewer P1 必修后才 merge** — Tier 1 test-infra ADD 类别**与 docs-only / T2 workflow ADD 区别**：reviewer 发现的是测试基础设施本身虚假通过 bug（tx-brain 烟测在 helper 误判下 skip = CI 绿但烟测无效），必须 merge 前修而不是 post-merge follow-up。沉淀到 feedback_carveout_admin_merge_pattern.md §How to apply
+- **#336 stacked PR cleanup 用 reset --hard + cherry-pick + force-push** — 原 #336 head 9fe04834 stacked 在 #335 codemod chain (5 commits) 之上，#335 closed deferred per decision 81。新 cleanup pattern：reset 到 origin/main + cherry-pick 真正 fix commit + force-push 重置 PR head 为干净单 commit on top of main。**destructive 需 user explicit 授权**（系统 permission 层独立于对话授权）
+- **#336 carve-out 新类别 "T2 test-only fixture/mock fix blast radius 0"** — 与 #460 test-only Tier 1 类别区别：本类适用文件名**无 *tier1* 后缀**（设计上 tier1-gate.yml 不触发），无 Tier 1 真门禁 verify 可用，靠 PR body 本地实跑数据 + 改动局部性兜底。任何业务代码触及或同 PR 改 production 不适用
+- **3 follow-up issues 落盘 vs 仅 memory 沉淀** — #351 reviewer 发现的 P1/P2 沉淀到 issue 而非仅在 memory：issue 让 future-me 或 user 可 grep/triage，memory 是私人 context。两者并行（issue 给团队，memory 给 Claude）
+
+### 下一步
+
+- A: fresh session — Wave 2 重型 PR（#272/#271 wine_storage/invoice Decimal→fen + v403/v404 / #487 W1 batch / #240 V4 architecture）
+- B: npm Dependabot 5 个评估（#425-429 vite/jsdom/storybook/eslint major bump 影响代码运行需逐个评估）
+- C: W2-A Phase 2 跟进（morning session #504 已 merge，Phase 3-4 待创始人 D1 决策）
+
+### 已知风险
+
+- **#336 无 Tier 1 真门禁 CI verify** — tier1-gate.yml path filter 只触发 `*tier1*` 后缀文件，本 PR 不在 white-list。改动 blast radius 0（100% 测试 mock + env var）但**没有 CI 上的回归保护**。后续 tx-trade Tier 1 改动 PR 才会 catch 到本 PR 的可能 mock bug
+- **#351 xfail strict=False 长期腐烂风险** — 6 个 xfail 在 codemod / ontology 对齐完成后可能 XPASS（pytest 不报错 + CI 绿灯 + marker 永久驻留）。#521 issue 已立监控清单（grep -rln "@pytest.mark.xfail" services/*/src/tests/test_main_import_smoke_tier1.py + 看 CI XPASS）
+- **tx-brain Dockerfile 非标准 layout** — 13/14 服务用 `services.<py_svc>.src.main:app` 标准 layout，tx-brain 独占 `src.main:app`。production 部署 / 排障 / 文档 / future codemod 都受非标准影响。#519 issue 已立优先 A 选项（统一标准）
+
+---
+
 ## 2026-05-13 接 #518 后 · W2-A Phase 2 (#504) round-1→2 完工 + grabfood 撤回 + #522 follow-up
 
 ### 完成状态
