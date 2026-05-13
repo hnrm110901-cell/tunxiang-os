@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.period_close import (
+from services.tx_supply.src.services.period_close import (
     check_pending_documents,
     close_period,
     create_cost_adjustment,

@@ -46,7 +46,7 @@ def _make_mapping(data: dict):
 @pytest.mark.asyncio
 async def test_create_craft_card():
     """create_craft_card 应插入卡片和步骤，返回正确结构"""
-    from services.bom_craft import create_craft_card
+    from services.tx_supply.src.services.bom_craft import create_craft_card
 
     session = _mock_session()
     session.execute.return_value = MagicMock()
@@ -74,7 +74,7 @@ async def test_create_craft_card():
 @pytest.mark.asyncio
 async def test_create_craft_card_single_step():
     """create_craft_card 单步骤也能正常工作"""
-    from services.bom_craft import create_craft_card
+    from services.tx_supply.src.services.bom_craft import create_craft_card
 
     session = _mock_session()
     session.execute.return_value = MagicMock()
@@ -96,7 +96,7 @@ async def test_create_craft_card_single_step():
 @pytest.mark.asyncio
 async def test_set_dept_routing():
     """set_dept_routing 应软删旧路由并插入新路由"""
-    from services.bom_craft import set_dept_routing
+    from services.tx_supply.src.services.bom_craft import set_dept_routing
 
     session = _mock_session()
     session.execute.return_value = MagicMock()
@@ -125,7 +125,7 @@ async def test_set_dept_routing():
 @pytest.mark.asyncio
 async def test_set_substitute_rules():
     """set_substitute_rules 应建立替代关系"""
-    from services.bom_craft import set_substitute_rules
+    from services.tx_supply.src.services.bom_craft import set_substitute_rules
 
     session = _mock_session()
     session.execute.return_value = MagicMock()
@@ -152,7 +152,7 @@ async def test_set_substitute_rules():
 @pytest.mark.asyncio
 async def test_manage_bom_version_draft_to_review():
     """manage_bom_version: draft -> review 合法"""
-    from services.bom_craft import manage_bom_version
+    from services.tx_supply.src.services.bom_craft import manage_bom_version
 
     session = _mock_session()
 
@@ -191,7 +191,7 @@ async def test_manage_bom_version_draft_to_review():
 @pytest.mark.asyncio
 async def test_manage_bom_version_invalid_transition():
     """manage_bom_version: draft -> archived 非法"""
-    from services.bom_craft import manage_bom_version
+    from services.tx_supply.src.services.bom_craft import manage_bom_version
 
     session = _mock_session()
 
@@ -227,7 +227,7 @@ async def test_manage_bom_version_invalid_transition():
 @pytest.mark.asyncio
 async def test_manage_bom_version_not_found():
     """manage_bom_version: 模板不存在返回错误"""
-    from services.bom_craft import manage_bom_version
+    from services.tx_supply.src.services.bom_craft import manage_bom_version
 
     session = _mock_session()
 
@@ -256,7 +256,7 @@ async def test_manage_bom_version_not_found():
 @pytest.mark.asyncio
 async def test_craft_tenant_isolation():
     """不同 tenant_id 的工艺卡操作应使用各自 tenant 上下文"""
-    from services.bom_craft import create_craft_card
+    from services.tx_supply.src.services.bom_craft import create_craft_card
 
     session_a = _mock_session()
     session_b = _mock_session()

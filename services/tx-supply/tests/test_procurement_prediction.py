@@ -22,7 +22,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 # ─── 从服务直接导入，避免 DB 依赖 ───
-from services.procurement_forecast_service import (
+from services.tx_supply.src.services.procurement_forecast_service import (
     IngredientDemandForecast,
     ProcurementForecastService,
     PurchaseOrderDraft,
@@ -171,7 +171,7 @@ class TestForecastIngredientDemand:
             return mock_forecasts.get(ingredient_id, 0.0)
 
         # 模拟阈值列表返回
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -209,7 +209,7 @@ class TestForecastIngredientDemand:
                     }
                 ),
             ),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             mock_dfs_instance.forecast_next_period = AsyncMock(
@@ -238,7 +238,7 @@ class TestForecastIngredientDemand:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -266,7 +266,7 @@ class TestForecastIngredientDemand:
                     }
                 ),
             ),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             mock_dfs_instance.forecast_next_period = AsyncMock(return_value=5.0)
@@ -287,7 +287,7 @@ class TestForecastIngredientDemand:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -320,7 +320,7 @@ class TestForecastIngredientDemand:
                     }
                 ),
             ),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             # 7天预测消耗 70kg（日均10kg）
@@ -453,7 +453,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             # 库存 2kg，明日需求 10kg，严重不足
@@ -492,7 +492,7 @@ class TestGetReplenishmentUrgency:
                     }
                 ),
             ),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
 
@@ -518,7 +518,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -537,7 +537,7 @@ class TestGetReplenishmentUrgency:
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-G": 1.0})),
             patch.object(svc, "_call_ai_summary", AsyncMock()) as mock_ai,
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             mock_dfs_instance.forecast_next_period = AsyncMock(return_value=8.0)
@@ -556,7 +556,7 @@ class TestGetReplenishmentUrgency:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -574,7 +574,7 @@ class TestGetReplenishmentUrgency:
         with (
             patch.object(svc, "_fetch_thresholds", AsyncMock(return_value=mock_thresholds)),
             patch.object(svc, "_fetch_current_stocks", AsyncMock(return_value={"ing-H": 0.0})),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             mock_dfs_instance.forecast_next_period = AsyncMock(return_value=5.0)
@@ -650,7 +650,7 @@ class TestEdgeCases:
         svc = ProcurementForecastService()
         mock_db = MagicMock()
 
-        from services.smart_replenishment import InventoryThreshold
+        from services.tx_supply.src.services.smart_replenishment import InventoryThreshold
 
         mock_thresholds = [
             InventoryThreshold(
@@ -677,7 +677,7 @@ class TestEdgeCases:
                     }
                 ),
             ),
-            patch("services.procurement_forecast_service.DemandForecastService") as MockDFS,
+            patch("services.tx_supply.src.services.procurement_forecast_service.DemandForecastService") as MockDFS,
         ):
             mock_dfs_instance = MockDFS.return_value
             mock_dfs_instance.forecast_next_period = AsyncMock(return_value=20.0)

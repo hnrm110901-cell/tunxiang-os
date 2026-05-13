@@ -21,7 +21,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.kingdee_bridge import (
+from services.tx_supply.src.services.kingdee_bridge import (
     ACCOUNT_ADMIN_EXPENSE,
     ACCOUNT_AP,
     ACCOUNT_INVENTORY_GOODS,

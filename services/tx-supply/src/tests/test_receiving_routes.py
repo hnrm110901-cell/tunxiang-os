@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.receiving_routes import router as receiving_router
+from services.tx_supply.src.api.receiving_routes import router as receiving_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

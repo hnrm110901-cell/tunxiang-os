@@ -162,12 +162,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from unittest.mock import AsyncMock, MagicMock, patch
 
 # Patch the service attributes the router code resolves at call time
-import api.inventory
-from api.inventory import _get_db as inventory_get_db
+import services.tx_supply.src.api.inventory
+from services.tx_supply.src.api.inventory import _get_db as inventory_get_db
 
 # Import inventory module; because relative imports resolve via src.services stubs
 # we import directly using the api package path
-from api.inventory import router
+from services.tx_supply.src.api.inventory import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -280,7 +280,7 @@ class TestReceiveStock:
         result = {"batch_id": "batch_001", "quantity": 50.0}
         with (
             patch.object(api.inventory.inventory_io, "receive_stock", new=AsyncMock(return_value=result)),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/receive",
@@ -302,7 +302,7 @@ class TestReceiveStock:
             patch.object(
                 api.inventory.inventory_io, "receive_stock", new=AsyncMock(side_effect=ValueError("duplicate batch"))
             ),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/receive",
@@ -342,7 +342,7 @@ class TestIssueStock:
         result = {"issued": True, "quantity": 10.0}
         with (
             patch.object(api.inventory.inventory_io, "issue_stock", new=AsyncMock(return_value=result)),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/issue",
@@ -363,7 +363,7 @@ class TestIssueStock:
             patch.object(
                 api.inventory.inventory_io, "issue_stock", new=AsyncMock(side_effect=ValueError("insufficient stock"))
             ),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/issue",
@@ -387,7 +387,7 @@ class TestAdjustInventory:
         result = {"adjusted": True}
         with (
             patch.object(api.inventory.inventory_io, "adjust_stock", new=AsyncMock(return_value=result)),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/ing_bass/adjust",
@@ -408,7 +408,7 @@ class TestAdjustInventory:
             patch.object(
                 api.inventory.inventory_io, "adjust_stock", new=AsyncMock(side_effect=ValueError("item not found"))
             ),
-            patch("api.inventory.asyncio.create_task", return_value=None),
+            patch("services.tx_supply.src.api.inventory.asyncio.create_task", return_value=None),
         ):
             resp = _client(db).post(
                 "/api/v1/supply/inventory/fake_item/adjust",

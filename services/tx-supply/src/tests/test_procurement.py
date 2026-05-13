@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.procurement_service import (
+from services.tx_supply.src.services.procurement_service import (
     approve_requisition,
     can_procurement_transition,
     create_purchase_order,

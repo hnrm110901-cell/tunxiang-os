@@ -19,7 +19,7 @@ import pytest
 # 让 tests/ 目录能导入 src/
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
-from services.supplier_scoring_engine import (
+from services.tx_supply.src.services.supplier_scoring_engine import (
     SCORE_WEIGHTS,
     TIER_THRESHOLDS,
     DimensionScores,

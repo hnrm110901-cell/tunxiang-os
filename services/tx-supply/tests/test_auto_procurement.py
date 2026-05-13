@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../src"))
 
 import pytest
 
-from services.auto_procurement import AutoProcurementService, ProcurementRecommendation
-from services.demand_forecast import DemandForecastService
+from services.auto_procurement import AutoProcurementService, ProcurementRecommendation  # noqa: I100 — keep bare-NS, codemod full-path 触发 dual-load 与 test_procurement_prediction.py collect-order namespace conflict（follow-up issue tracks）
+from services.demand_forecast import DemandForecastService  # noqa: I100 — 同款 dual-load 反约束
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  1. 日均消耗量计算

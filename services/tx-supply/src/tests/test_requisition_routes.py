@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from unittest.mock import AsyncMock, patch
 
-from api.requisition_routes import router as req_router
+from services.tx_supply.src.api.requisition_routes import router as req_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

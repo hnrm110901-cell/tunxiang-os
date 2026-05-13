@@ -15,7 +15,7 @@ from decimal import Decimal
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-from api.smart_procurement_routes import _generate_waste_insight, router
+from services.tx_supply.src.api.smart_procurement_routes import _generate_waste_insight, router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

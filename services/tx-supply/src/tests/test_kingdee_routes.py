@@ -18,7 +18,7 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.kingdee_routes import (
+from services.tx_supply.src.api.kingdee_routes import (
     DailyExportRequest,
     MonthExportRequest,
     RetryRequest,

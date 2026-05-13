@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.distribution import (
+from services.tx_supply.src.services.distribution import (
     DeliveryItemStatus,
     DistributionStatus,
     _clear_store,

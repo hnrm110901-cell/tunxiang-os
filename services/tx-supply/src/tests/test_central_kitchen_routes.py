@@ -69,7 +69,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from api.central_kitchen_routes import router as ck_router
+from services.tx_supply.src.api.central_kitchen_routes import router as ck_router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

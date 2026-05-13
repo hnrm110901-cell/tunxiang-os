@@ -99,16 +99,16 @@ _make_shared_stubs()
 
 # ─── 导入路由模块 ──────────────────────────────────────────────────────────────
 
-from api.purchase_order_routes import _get_db as po_get_db  # noqa: E402
-from api.purchase_order_routes import router as po_router  # noqa: E402
+from services.tx_supply.src.api.purchase_order_routes import _get_db as po_get_db  # noqa: E402
+from services.tx_supply.src.api.purchase_order_routes import router as po_router  # noqa: E402
 
 # ck_production_routes 使用顶层 `from shared.ontology.src.database import get_db`
 # 以及内部服务注入（services.supplier_scoring_engine 等），注入存根
 _ck_services_pkg = types.ModuleType("services")
 sys.modules.setdefault("services", _ck_services_pkg)
 
-from api.ck_production_routes import get_db as ck_get_db  # noqa: E402
-from api.ck_production_routes import router as ck_router  # noqa: E402
+from services.tx_supply.src.api.ck_production_routes import get_db as ck_get_db  # noqa: E402
+from services.tx_supply.src.api.ck_production_routes import router as ck_router  # noqa: E402
 
 # ─── 公共常量 ──────────────────────────────────────────────────────────────────
 

@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.waste_guard_service import (
+from services.tx_supply.src.services.waste_guard_service import (
     action_for_causes,
     build_top5_item,
     build_waste_rate_summary,
