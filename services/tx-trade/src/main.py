@@ -237,12 +237,15 @@ async def lifespan(app: FastAPI):
     # helper 抽到独立模块，便于 Tier 1 TDD 覆盖（test_lifespan_payment_consumer_tier1.py）。
     from .services.payment_consumer_lifecycle import start_payment_event_consumer_or_raise
 
-    payment_event_consumer_task = await start_payment_event_consumer_or_raise(
-        async_session_factory,
-        _register_background_task,
-    )
+    # round-3：先 None 初始化 + await 进 try 块，保证 start_payment_event_consumer_or_raise
+    # 异常路径下 finally 仍跑（闭合 round-1 P1 "任意终止路径均 stop + flush" 契约的姊妹漏洞）。
+    payment_event_consumer_task: asyncio.Task | None = None
 
     try:
+        payment_event_consumer_task = await start_payment_event_consumer_or_raise(
+            async_session_factory,
+            _register_background_task,
+        )
         yield
     finally:
         # graceful shutdown：cancel + await，避免事件循环退出时 task 仍在 sleep
