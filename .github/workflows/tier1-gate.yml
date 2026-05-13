@@ -23,6 +23,7 @@ on:
       # LWW 冲突解析（终态豁免）+ 三条硬约束 + RLS
       - 'services/tx-trade/src/services/order_service.py'
       - 'services/tx-trade/src/services/cashier_engine.py'          # 订单状态机
+      - 'services/tx-trade/src/services/payment_gateway.py'         # 支付网关 (费率计算+收钱吧/拉卡拉客户端) — PR #524/#536 暴露邻接 gap
       - 'services/tx-trade/src/services/payment_saga_service.py'
       - 'services/tx-trade/src/services/wine_storage_service.py'    # 存酒押金
       - 'services/tx-trade/src/services/stored_value_service.py'    # 储值 / 挂账
@@ -239,6 +240,7 @@ jobs:
           TIER1_SOURCE_PATTERNS=(
             'services/tx-trade/src/services/order_service.py'
             'services/tx-trade/src/services/cashier_engine.py'
+            'services/tx-trade/src/services/payment_gateway.py'
             'services/tx-trade/src/services/payment_saga_service.py'
             'services/tx-trade/src/services/wine_storage_service.py'
             'services/tx-trade/src/services/stored_value_service.py'
