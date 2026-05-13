@@ -63,7 +63,7 @@ from fastapi.testclient import TestClient
 app = FastAPI()
 
 # 延迟 import（依赖已 mock）
-from api.agreement_unit_routes import router  # noqa: E402
+from services.tx_finance.src.api.agreement_unit_routes import router  # noqa: E402
 
 app.include_router(router)
 
@@ -137,7 +137,7 @@ def test_create_unit_with_credit_limit():
     async def _fake_db_gen(_tid: str):
         yield db
 
-    with patch("api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
+    with patch("services.tx_finance.src.api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
         resp = client.post(
             "/api/v1/agreement-units",
             json={
@@ -198,7 +198,7 @@ def test_charge_within_credit_limit():
     async def _fake_db_gen(_tid: str):
         yield db
 
-    with patch("api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
+    with patch("services.tx_finance.src.api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
         resp = client.post(
             f"/api/v1/agreement-units/{UNIT_ID}/charge",
             json={
@@ -244,7 +244,7 @@ def test_charge_exceeds_credit_limit():
     async def _fake_db_gen(_tid: str):
         yield db
 
-    with patch("api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
+    with patch("services.tx_finance.src.api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
         resp = client.post(
             f"/api/v1/agreement-units/{UNIT_ID}/charge",
             json={
@@ -297,7 +297,7 @@ def test_repay_updates_balance():
     async def _fake_db_gen(_tid: str):
         yield db
 
-    with patch("api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
+    with patch("services.tx_finance.src.api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
         resp = client.post(
             f"/api/v1/agreement-units/{UNIT_ID}/repay",
             json={
@@ -354,7 +354,7 @@ def test_aging_report_categorization():
     async def _fake_db_gen(_tid: str):
         yield db
 
-    with patch("api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
+    with patch("services.tx_finance.src.api.agreement_unit_routes.get_db_with_tenant", _fake_db_gen):
         resp = client.get(
             "/api/v1/agreement-units/report/aging",
             headers=BASE_HEADERS,

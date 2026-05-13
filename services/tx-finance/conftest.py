@@ -41,31 +41,7 @@ def _ensure_ns(name: str, path: str) -> None:
 _ensure_ns("services.tx_finance", SVC_DIR)
 _ensure_ns("services.tx_finance.src", SRC_DIR)
 
-for _sub in ("api", "models", "services", "repositories", "tests", "routers", "workers"):
+for _sub in ("api", "models", "services", "repositories", "tests", "routers", "workers", "tasks"):
     _sub_path = os.path.join(SRC_DIR, _sub)
     if os.path.isdir(_sub_path):
         _ensure_ns(f"services.tx_finance.src.{_sub}", _sub_path)
-
-
-# 3. models/ 模块身份别名 — 防 isinstance 假阴性
-# 决策 77 production codemod 把 financial_voucher_service.py 等改为
-# `from services.tx_finance.src.models.X import ...`，但 Tier 1 测试仍用
-# `from models.X import ...`（test-side codemod 还在 #349 review 中）。
-# 同一文件被加载为两个 sys.modules 条目 → isinstance 失败。
-# 解决：对 models/ 子目录每个 .py，预加载裸路径并把全路径 sys.modules 别名指过去。
-# 范围只限 models/（SQLAlchemy declarative，导入纯注册元数据，无业务副作用）。
-import importlib
-
-_MODELS_DIR = os.path.join(SRC_DIR, "models")
-if os.path.isdir(_MODELS_DIR):
-    for _f in os.listdir(_MODELS_DIR):
-        if not _f.endswith(".py") or _f.startswith("_"):
-            continue
-        _mod_name = _f[:-3]
-        _bare = f"models.{_mod_name}"
-        _full = f"services.tx_finance.src.models.{_mod_name}"
-        try:
-            _bare_mod = importlib.import_module(_bare)
-            sys.modules[_full] = _bare_mod
-        except ImportError:
-            pass

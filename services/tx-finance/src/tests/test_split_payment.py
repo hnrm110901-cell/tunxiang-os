@@ -8,7 +8,7 @@ import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from api.split_payment_routes import router
+from services.tx_finance.src.api.split_payment_routes import router
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
@@ -49,7 +49,7 @@ async def test_create_split_order():
     """POST /orders 发起分账应返回 201 和 split_order_id。"""
     mock_db = _make_mock_db()
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/finance/split/orders",
@@ -82,7 +82,7 @@ async def test_split_idempotency():
     # 第一次 execute（INSERT 主表）抛 IntegrityError 模拟重复键
     mock_db.execute = AsyncMock(side_effect=IntegrityError("", {}, Exception("duplicate key")))
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/finance/split/orders",
@@ -123,7 +123,7 @@ async def test_async_notify_wechat():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 f"/api/v1/finance/split/orders/{split_order_id}/notify",
@@ -165,7 +165,7 @@ async def test_async_notify_alipay():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 f"/api/v1/finance/split/orders/{split_order_id}/notify",
@@ -209,7 +209,7 @@ async def test_adjustment_create():
 
     mock_db.execute = _execute_side_effect
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.post(
                 "/api/v1/finance/split/adjustments",
@@ -326,7 +326,7 @@ async def test_split_records_list():
     mock_result.__iter__ = MagicMock(return_value=iter(mock_rows))
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    with patch("api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
+    with patch("services.tx_finance.src.api.split_payment_routes.get_db_with_tenant", return_value=_async_gen(mock_db)):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             resp = await client.get(
                 f"/api/v1/finance/split/orders/{split_order_id}/records",

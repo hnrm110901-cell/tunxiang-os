@@ -33,8 +33,8 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
-from services.financial_voucher_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.voucher import FinancialVoucher, FinancialVoucherLine  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.financial_voucher_service import (  # type: ignore  # noqa: E402
     FinancialVoucherService,
 )
 

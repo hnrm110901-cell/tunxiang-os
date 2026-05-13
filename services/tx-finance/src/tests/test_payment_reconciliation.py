@@ -65,7 +65,7 @@ sys.modules["shared.ontology.src.database"] = _db_stub
 
 # ─── 加载被测模块 ─────────────────────────────────────────────────────────────
 
-from api.payment_reconciliation_routes import (  # noqa: E402
+from services.tx_finance.src.api.payment_reconciliation_routes import (  # noqa: E402
     _mock_cashier_receipts,
     _mock_channel_summaries,
     _mock_crm_reconciliation,
@@ -170,7 +170,7 @@ def test_payment_reconciliation_by_channel():
 
     client = _make_client()
     # 通过 dependency_overrides 注入 mock DB
-    from api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
+    from services.tx_finance.src.api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
 
     async def _fake_db():
         yield db
@@ -230,7 +230,7 @@ def test_payment_details_date_filter():
     assert resp.status_code == 422
 
     # start_date > end_date → 400
-    from api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
+    from services.tx_finance.src.api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
 
     async def _fake_db():
         yield _db_no_rows()
@@ -301,7 +301,7 @@ def test_cashier_receipts_aggregation():
     db = _db_cashier_rows(cashiers_data)
 
     client = _make_client()
-    from api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
+    from services.tx_finance.src.api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
 
     async def _fake_db():
         yield db
@@ -340,7 +340,7 @@ def test_cashier_receipts_aggregation():
 def test_crm_reconciliation_returns_structure():
     """CRM对账接口返回字段结构完整：match_count/mismatch_count/total_diff_fen/mismatch_items。"""
     client = _make_client()
-    from api.payment_reconciliation_routes import _validate_tenant_id
+    from services.tx_finance.src.api.payment_reconciliation_routes import _validate_tenant_id
 
     app = client.app  # type: ignore[attr-defined]
     app.dependency_overrides[_validate_tenant_id] = lambda: TENANT_ID
@@ -415,7 +415,7 @@ def test_tenant_isolation():
     db_b = _db_no_rows()
     call_log: list[str] = []
 
-    from api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
+    from services.tx_finance.src.api.payment_reconciliation_routes import _get_tenant_db, _validate_tenant_id
 
     app = client.app  # type: ignore[attr-defined]
 

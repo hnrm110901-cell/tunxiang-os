@@ -34,14 +34,14 @@ import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from models.accounting_period import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.models.accounting_period import (  # type: ignore  # noqa: E402
     STATUS_CLOSED,
     STATUS_LOCKED,
     STATUS_OPEN,
     AccountingPeriod,
     month_range,
 )
-from services.accounting_period_service import (  # type: ignore  # noqa: E402
+from services.tx_finance.src.services.accounting_period_service import (  # type: ignore  # noqa: E402
     AccountingPeriodService,
 )
 
