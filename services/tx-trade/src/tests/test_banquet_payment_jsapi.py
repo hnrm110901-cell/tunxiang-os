@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.banquet_payment_service import _build_wechat_jsapi_order_result
+from services.tx_trade.src.services.banquet_payment_service import _build_wechat_jsapi_order_result
 
 
 def test_build_jsapi_new_prepay():

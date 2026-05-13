@@ -112,7 +112,7 @@ BASE_HEADERS = {"X-Tenant-ID": TENANT_ID}
 def _make_webhook_app():
     """构建包含 webhook_routes 的测试 FastAPI 应用"""
     # 延迟导入避免循环
-    from api.webhook_routes import router
+    from services.tx_trade.src.api.webhook_routes import router
 
     app = FastAPI()
     app.include_router(router)
@@ -121,7 +121,7 @@ def _make_webhook_app():
 
 def _make_wechat_app():
     """构建包含 wechat_pay_routes 的测试 FastAPI 应用"""
-    from api.wechat_pay_routes import router
+    from services.tx_trade.src.api.wechat_pay_routes import router
 
     from shared.ontology.src.database import get_db as real_get_db
 
@@ -186,7 +186,7 @@ def test_meituan_webhook_invalid_sign():
         # 重新导入模块使环境变量生效
         import importlib
 
-        import api.webhook_routes as wh_mod
+        import services.tx_trade.src.api.webhook_routes as wh_mod
 
         importlib.reload(wh_mod)
 
@@ -244,7 +244,7 @@ def test_meituan_webhook_valid_push():
     with patch.dict(os.environ, {"MEITUAN_APP_SECRET": secret}):
         import importlib
 
-        import api.webhook_routes as wh_mod
+        import services.tx_trade.src.api.webhook_routes as wh_mod
 
         importlib.reload(wh_mod)
 
@@ -281,7 +281,7 @@ def test_eleme_webhook_invalid_signature():
     with patch.dict(os.environ, {"ELEME_APP_SECRET": "eleme_test_secret"}):
         import importlib
 
-        import api.webhook_routes as wh_mod
+        import services.tx_trade.src.api.webhook_routes as wh_mod
 
         importlib.reload(wh_mod)
 
@@ -344,7 +344,7 @@ def test_douyin_webhook_valid_push():
     with patch.dict(os.environ, {"DOUYIN_APP_SECRET": secret}):
         import importlib
 
-        import api.webhook_routes as wh_mod
+        import services.tx_trade.src.api.webhook_routes as wh_mod
 
         importlib.reload(wh_mod)
 
@@ -415,7 +415,7 @@ def test_wechat_prepay_success():
         }
     )
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -451,7 +451,7 @@ def test_wechat_callback_verify_fail():
     mock_svc = MagicMock()
     mock_svc.verify_callback = AsyncMock(side_effect=ValueError("微信回调签名无效"))
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 
@@ -484,7 +484,7 @@ def test_wechat_query_order_success():
         }
     )
 
-    with patch("api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
+    with patch("services.tx_trade.src.api.wechat_pay_routes.get_wechat_pay_service", return_value=mock_svc):
         app = _make_wechat_app()
         client = TestClient(app, raise_server_exceptions=False)
 

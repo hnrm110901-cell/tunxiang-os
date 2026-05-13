@@ -29,7 +29,7 @@ SRC = ROOT / "services" / "tx-trade" / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from services.dispute_response_templates import (  # noqa: E402
+from services.tx_trade.src.services.dispute_response_templates import (  # noqa: E402
     BUILTIN_TEMPLATES,
     ResponseTemplate,
     get_template,
@@ -37,7 +37,7 @@ from services.dispute_response_templates import (  # noqa: E402
     recommend_template,
     render_template,
 )
-from services.dispute_service import (  # noqa: E402
+from services.tx_trade.src.services.dispute_service import (  # noqa: E402
     ALLOWED_TRANSITIONS,
     DEFAULT_MERCHANT_SLA,
     TERMINAL_STATUSES,

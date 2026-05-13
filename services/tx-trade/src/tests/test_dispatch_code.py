@@ -218,7 +218,7 @@ async def test_platform_notify_failure_does_not_block():
             raise ConnectionError("平台网络不可达")
 
     original_client = None
-    from services import dispatch_code_service as _svc
+    from services.tx_trade.src.services import dispatch_code_service as _svc
 
     original_client = _svc._platform_client
     set_platform_client(_FailingClient())

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from api.xhs_routes import router
+from services.tx_trade.src.api.xhs_routes import router
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 

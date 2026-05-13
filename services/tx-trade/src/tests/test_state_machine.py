@@ -5,7 +5,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from services.state_machine import (
+from services.tx_trade.src.services.state_machine import (
     TABLE_STATES,
     can_order_transition,
     can_table_transition,
@@ -83,7 +83,7 @@ class TestOrderStateMachine:
         assert not can_order_transition("placed", "paid")
 
     def test_9_states_defined(self):
-        from services.state_machine import ORDER_STATES
+        from services.tx_trade.src.services.state_machine import ORDER_STATES
 
         assert len(ORDER_STATES) == 9
 
