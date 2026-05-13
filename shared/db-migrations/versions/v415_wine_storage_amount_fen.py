@@ -1,8 +1,8 @@
 """wine_storage 金额字段 Decimal 元 → BigInteger 分（CLAUDE.md §15+§17 Tier1 红线）
 
-Revision ID: v404
-Revises: v403
-Create Date: 2026-05-07
+Revision ID: v415_wine_storage_amount_fen
+Revises: v414_invoice_amount_fen
+Create Date: 2026-05-07 (rebased onto v414 head 2026-05-13)
 
 变更两张表：
   wine_storage_records.storage_price       NUMERIC(12,2) → storage_price_fen      BIGINT (NULLABLE)
@@ -14,7 +14,7 @@ Create Date: 2026-05-07
 回滚反向。
 
 关联：docs/gap-verification-2026-05-07.md Part E 第 2 项 + Part C §C.5
-依赖：v403 (P0-1 invoice fen) — 串联同一 fen 整数规范
+依赖：v414_invoice_amount_fen (rebase 2026-05-13 — #271 已 merge 进 main fbbb6e4f，串联同一 fen 整数规范)
 """
 from typing import Sequence, Union
 
@@ -22,8 +22,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "v404"
-down_revision: Union[str, Sequence[str], None] = "v403"
+revision: str = "v415_wine_storage_amount_fen"
+down_revision: Union[str, Sequence[str], None] = "v414_invoice_amount_fen"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

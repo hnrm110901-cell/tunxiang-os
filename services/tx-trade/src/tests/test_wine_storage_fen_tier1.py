@@ -230,14 +230,14 @@ class TestWineExtendBalanceAccumulation:
 
 # ── 4. 迁移文件存在 + revision 链（AST 解析，不依赖 alembic 运行时）─────────────
 class TestMigrationFile:
-    def test_v404_wine_storage_amount_fen_migration_present(self):
+    def test_v415_wine_storage_amount_fen_migration_present(self):
         repo_root = Path(__file__).resolve().parents[4]
         mig_path = (
             repo_root
             / "shared"
             / "db-migrations"
             / "versions"
-            / "v404_wine_storage_amount_fen.py"
+            / "v415_wine_storage_amount_fen.py"
         )
         assert mig_path.exists(), f"迁移文件 {mig_path} 必须存在"
 
@@ -255,11 +255,11 @@ class TestMigrationFile:
             elif isinstance(node, ast.FunctionDef):
                 functions.add(node.name)
 
-        assert assigned.get("revision") == "v404", (
-            f"revision 必须 'v404'，got {assigned.get('revision')!r}"
+        assert assigned.get("revision") == "v415_wine_storage_amount_fen", (
+            f"revision 必须 'v415_wine_storage_amount_fen'，got {assigned.get('revision')!r}"
         )
-        assert assigned.get("down_revision") == "v403", (
-            f"down_revision 必须接 'v403'（与 P0-1 invoice fen 串联），got "
+        assert assigned.get("down_revision") == "v414_invoice_amount_fen", (
+            f"down_revision 必须接 'v414_invoice_amount_fen'（与 P0-1 invoice fen 串联，rebase 2026-05-13），got "
             f"{assigned.get('down_revision')!r}"
         )
         assert "upgrade" in functions and "downgrade" in functions
