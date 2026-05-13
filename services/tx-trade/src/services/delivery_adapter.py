@@ -711,7 +711,7 @@ class DeliveryPlatformAdapter:
         logger.info(
             "platform_notified",
             platform=platform,
-            event=event,
+            notify_event=event,
             data=data,
         )
 
