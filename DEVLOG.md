@@ -1,3 +1,98 @@
+## 2026-05-13 后半段 — Tier 1 row-lock 6-PR roadmap PR-D 完工 + 3 follow-up PR ship (#555/#556/#558/#561)
+
+### 今日完成
+
+5/13 第 3 波 ship batch — 6-PR roadmap PR-D 完工 (#532 audit §8 row-lock 三发 + 二发 = 4 路径 P0 全收尾), 3 个 follow-up 收尾 (invoice 三段事务 + wine_storage 真并发 + banquet_lead dead file 删).
+
+**PR #555 — `#543` invoice get_invoice_status 三段事务拆分 MERGED** `dd053d51` (admin squash, **Tier 1 fund/源 explicit-ask 第 6 例**):
+- 修 PR #544 round-2 §19 reviewer P1 落 issue #543 — `get_invoice_status` 持锁调诺诺 HTTP, FOR UPDATE 锁等待时间被网络延迟放大.
+- 拆三段事务: T1 SELECT FOR UPDATE 查发票状态短事务 → T2 HTTP 调诺诺 OPENAPI (无锁) → T3 短事务 UPDATE 落地诺诺结果.
+- 测试用 mock-only 模式（沿用 PR #553 模式, 避 round-1 stub 污染陷阱 — `pytest.skip(allow_module_level=True) + sys.version_info < (3, 10)`）.
+
+**PR #556 — `#532` 6-PR roadmap PR-D cashier_engine row-lock MERGED** `fca685e8` (admin squash, **Tier 1 fund/源 explicit-ask 第 7 例**, 由 user 另一并发 session ship — feedback_concurrent_pr_race.md 实例):
+- 3 P0 路径补 ORM `.with_for_update()` 行锁: `add_item` @ L353 (并发加菜金额丢失) / `apply_discount` @ L584 (毛利底线绕过 — 三条硬约束) / `settle_order` @ L752 (双结算 race).
+- `_get_order(order_uuid, *, lock: bool = False)` helper — 与 PR-A `_get_invoice` / PR-B `_get_ingredient` 模式对齐; 3 P0 caller 显式 `lock=True`, 5 read-only/低危 mutation caller 默认 `lock=False` 零回归.
+- `add_item` 用 `with_for_update(of=Order)` outerjoin Dish 只锁 Order 行 (Dish 是 join 查参考).
+- §19 reviewer (opus): 0 P0 / 1 P1 → follow-up issue (`apply_discount _calc_order_cost` OrderItem 隐式不变量文档化 + audit test).
+- **明确不修**: `_release_table` 不加锁 (settle_order Order FOR UPDATE 串行化已让双结算竞争输者抛"已结算", `_release_table` 只执行一次. pre-existing UPDATE 影响 0 行致桌台占用风险**本 PR 未引入**, 留待 §17 桌台并发对齐统一处理).
+- **6 P1/P2 路径不在范围**: `open_table` / `change_table_status` / `update_item` / `remove_item` / `cancel_order` / `transfer_table` 桌台并发语义需创始人 §17 对齐 (audit §7 Verifier #2), 单独 follow-up.
+- **关键 C-1 决策未折叠**: #549 `deduct_for_order` 跨 dish ABBA 防护 (PR-B §19 P1#1) 未在 PR #556 scope 内, 留 architect follow-up 或 PR-E 统一处理.
+
+**PR #558 — wine_storage 真并发 e2e 反测 MERGED** `2ab05100` (admin squash, **Tier 1 test-infra ADD against Tier 1 source 邻接** carve-out 第 2 例 — 类目 6 延续, 不是 fund explicit-ask):
+- 1 file / +491 / -0: `services/tx-trade/src/tests/test_wine_storage_concurrent_tier1.py` 收尾 PR #272 §19 reviewer MUST FIX (3 路由 FOR UPDATE 加好但 0 测试验真并发).
+- 4 用例: `test_concurrent_take_no_oversell` (库存不超取) / `test_concurrent_extend_serializes` (2 流水 + LWW expiry) / `test_concurrent_transfer_one_succeeds` (序列化 + LWW table) / `test_concurrent_write_off_one_succeeds` (押金不双扣).
+- Opt-in 模式: `requires_integration_pg` 整文件 skip 未设 INTEGRATION_PG_DSN 时 (与 D2b' shared helper / test_nlq_pg_integration_tier1 / test_pinned_dashboard_integration_tier1 完全同模式), CI 自然 skip 不影响其他 PR, 本地/staging 手跑.
+
+### TDD Red→Green 证据 (PR #558)
+
+本地 docker pg16 + 手建 wine_storage 两表 (跳过完整 alembic chain 受 v301 PRIMARY KEY COALESCE bug 阻塞):
+
+```
+[Red] 去掉 take_no_oversell 用例 SELECT 末尾 FOR UPDATE:
+  FAILED test_concurrent_take_no_oversell
+  AssertionError: 应仅 1 个 take 成功, 实得 [('succeeded', 4), ('succeeded', 4)]
+  assert 2 == 1
+  (无锁双 take 都成功, 库存双扣 → take_count=2 而非 1)
+
+[Green] FOR UPDATE 恢复:
+  4 passed in 1.64s
+  - test_concurrent_take_no_oversell PASSED
+  - test_concurrent_extend_serializes PASSED
+  - test_concurrent_transfer_one_succeeds PASSED
+  - test_concurrent_write_off_one_succeeds PASSED
+```
+
+证明测试**真的能 catch FOR UPDATE 失效**, 不是 trivially pass.
+
+### 三个设计陷阱 in-file 化避坑 (PR #558)
+
+1. **autobegin 锁瞬释陷阱**: `set_tenant_guc` + `FOR UPDATE` + UPDATE + INSERT + `asyncio.sleep` 必须全部包在同一 `async with s.begin():` 块. AsyncSession autobegin 行为下每条 `.execute()` 隐式起独立事务并立即提交, 锁瞬时释放, 第二者 SELECT FOR UPDATE 不会撞 → 锁失效时测试仍 pass (伪绿). 显式 `begin()` 让事务跨越所有语句, 锁真持有.
+2. **NullPool 强制每事务新连接**: asyncpg "another operation in progress" (连接池跨 test 复用时 `session.close()` 与 fixture `_cleanup` 间微弱时序窗口暴露). Solution: `create_async_engine(..., poolclass=NullPool)`.
+3. **sqlalchemy text() 冒号歧义**: `:tid::UUID` 中第二冒号被 bind 解析吃掉, 应直接传 `uuid.UUID` 对象让 asyncpg 自动绑 UUID type, 不用文本 cast.
+
+**PR #561 — banquet_lead.py dead file 删除 MERGED** `f748ec57` (admin squash, **deletion-only T2 tech-debt** carve-out 第 N 例延续, #498/#522 同模式):
+- 1 file / +0 / -219: `services/tx-trade/src/models/banquet_lead.py` (PR #272 round-1 CI fail 13/14 暴露 `Table 'banquet_leads' is already defined` 根因, PR #272 已切 FQN 解决 import 但 dead file 残留).
+- 3 类 dup: BanquetLead (banquet_leads) + BanquetLeadFollowUp + BanquetLeadTransfer — 第 1 类与 `banquet.py:14` SQLAlchemy 模型撞 banquet_leads 表; 后 2 类全仓 0 外部 import.
+- 真业务用法全走 `shared.ontology.src.extensions.banquet_leads` (Pydantic) 或 `services/tx-trade/src/models/banquet.py` (SQLAlchemy).
+- alembic chain 不动 (515 unique revisions, 0 dangling, chain OK), `banquet_leads` 表保留 (由 v004 建, v013/v006/v056 后续 ALTER).
+
+### Deletion-PR 双 form grep audit 模式应用 (PR #561)
+
+应用 `feedback_deletion_pr_grep_pattern.md` 模式:
+- 绝对 form: `from services.*tx[._-]trade.*models.banquet_lead` → 0 hits ✅
+- 相对 form: `from .banquet_lead` / `from .models.banquet_lead` → 0 hits (shared/ontology 的 `.banquet_leads` 复数, Pydantic 不同体系) ✅
+- bare-NS form: `from models.banquet_lead` → 0 hits ✅
+- dict-key 双引号: `"banquet_lead"` / `'banquet_lead'` → 仅 stream-type mapping (event_types.py:378) + migration 表名, 与模块无关 ✅
+- 类符号独有: `BanquetLeadFollowUp` / `BanquetLeadTransfer` → 0 外部 import ✅
+
+### 累计 tally 更新 (5/13 后半段)
+
+- **admin-merge** (跨 8 类 carve-out + Tier 1 fund/源 explicit-ask): 5/12-5/13 累计 41 → **43** (+ #558 D + #561 E).
+- **8 类 carve-out tally**: 36 → **38** (+ #558 类目 6 第 N 例 Tier 1 test-infra ADD + #561 deletion-only).
+- **Tier 1 fund/源 explicit-ask** (不在 8 carve-out): 5 → **7** (+ #555 invoice 三段事务 + #556 cashier_engine PR-D fund-path 第 7 例).
+- **#532 6-PR roadmap**: 首发 P0 三发 (PR-A #544 / PR-B #547 / PR-C #553) + 二发 P0 (PR-D #556) 完工; **roadmap 剩余 2 PR**: PR-E `order_service` (二发 P0) + PR-F `delivery_adapter` (三发 P1).
+- **5/13 整日 ship batch**: 早段 (B' #555 不算, 是 cold-start) + #538 audit doc / #547 PR-B / #553 PR-C / 后半段 (本) #556 PR-D / #558 D / #561 E = **6 个 row-lock 直接相关 PR + 多个 docs/test 辅助 PR**.
+- **本 session 累计**: 2 PR ship (#558 + #561), 2 issue 闭环 (#531 + #529 via Closes), 1 task 因并发 session 撞车跳过 (F PR-D 被 #556 提前 ship).
+
+### CI/local 不一致复现 + 修法 (PR #558 设计要点收口)
+
+`shared/db-migrations/versions/v260_wine_storage_food_court_quick_cashier.py` + v415 schema (storage_price_fen BIGINT) 手建表通过 — 完整 alembic chain 受 v301 PRIMARY KEY COALESCE bug 阻塞 (rls-runtime-p0-pg-tests.yml 全 fail 印证), staging 跑前 DSN 需指向 alembic upgrade head 库. 本地 docker pg16 + 手建 SQL 模式适合 dev 验, 不替代 staging.
+
+### 遗留问题
+
+- **#532 roadmap 剩余 PR-E (order_service 二发 P0) + PR-F (delivery_adapter 三发 P1)** — 重 session 单 PR 节奏, 每 PR Tier 1 fund-path explicit-ask.
+- **#549 deduct_for_order 跨 dish ABBA 防护** — PR-B §19 P1#1 留 architect 评估 (方案 A 预聚合 SELECT IN FOR UPDATE / 方案 B 预先 collect + 升序锁), PR #556 scope 外 — 可在 PR-E `order_service` scope 内一并 (因 order_service 与 cashier_engine 同时调 deduct_for_order).
+- **#537 PaymentSaga S1→S3 跨步骤占位锁** — arch P0, 等 architect 评估 (条件 UPDATE / 分布式锁 / saga 重构).
+- **#535 wine_storage 双轨架构债 (tx-trade vs tx-finance)** — 等创始人 SoT 决策.
+- **#556 §19 reviewer P1** — `apply_discount _calc_order_cost` OrderItem 隐式不变量文档化 + audit test, follow-up issue.
+- **CodeRabbit incremental policy** — PR #558 `CodeRabbit pass` (PR #561 也 pass), 与早段 PR-A/B/C 部分 disabled 现象不一致, memory `feedback_coderabbit_incremental_policy` 印证: A2 lane 证据不依赖 CodeRabbit reviews 数量.
+
+### 明日计划
+
+等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 / channel-aggregation 资质) 或继续 PR-E (order_service 二发 P0, scope 内可一并修 #549 ABBA) / PR-F (delivery_adapter 三发 P1).
+
+---
+
 ## 2026-05-13 深夜 — Tier 1 row-lock 首发 P0 三发全收尾 (PR-C #553)
 
 ### 今日完成
