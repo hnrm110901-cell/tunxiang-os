@@ -85,8 +85,8 @@ async def push_table_ready_ws(
     实际项目中通过 Redis Pub/Sub 或 FastAPI WebSocket 广播实现。
     此处提供接口定义，供测试 mock 和生产实现替换。
     """
-    log = logger.bind(store_id=store_id, tenant_id=tenant_id, event=event)
-    log.info("table_fire.ws_push", table_no=data.get("table_no"), event=event)
+    log = logger.bind(store_id=store_id, tenant_id=tenant_id, notify_event=event)
+    log.info("table_fire.ws_push", table_no=data.get("table_no"), notify_event=event)
     # 通过 Redis Pub/Sub 向 mac-station 广播，mac-station 转发 WebSocket 至 ExpoStation
     try:
         r = await UniversalPublisher.get_redis()
