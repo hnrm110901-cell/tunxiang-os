@@ -12,7 +12,7 @@ from services.cost_variance import (
     compute_dish_variance,
     generate_actions,
 )
-from services.dish_margin import (
+from services.tx_analytics.src.services.dish_margin import (
     compute_margin,
     compute_margin_ranking,
     filter_low_margin,

@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from services.repository import DishRepository
+from services.tx_menu.src.services.repository import DishRepository
 
 TENANT_ID = str(uuid.uuid4())
 STORE_ID = str(uuid.uuid4())
