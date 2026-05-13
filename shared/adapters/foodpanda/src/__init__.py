@@ -1,1 +1,0 @@
-"""Foodpanda adapter source modules."""
