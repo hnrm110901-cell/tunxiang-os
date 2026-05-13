@@ -8,19 +8,44 @@
   stored → partial_taken → fully_taken
          → expired（过期）
          → written_off（核销）
+
+金额规范（CLAUDE.md §15+§17 Tier1）：
+  存储一律用 fen int（storage_price_fen / price_at_trans_fen），
+  Pydantic API 边界保留 Decimal 元字段（向后兼容）+ 新增 _fen 字段供新客户端。
 """
 
 import uuid
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Date, ForeignKey, Integer, Numeric, String, Text
+from sqlalchemy import BigInteger, Date, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from shared.ontology.src.base import TenantBase
+
+# ── 元 ↔ 分边界换算 helper（CLAUDE.md §15）─────────────────────────────────────
+
+
+def _yuan_to_fen(yuan: Optional[Decimal]) -> Optional[int]:
+    """元 Decimal → 分 int。None 透传；0 允许（赠酒/未定价）；负数拒。"""
+    if yuan is None:
+        return None
+    if not isinstance(yuan, Decimal):
+        yuan = Decimal(str(yuan))
+    if yuan < 0:
+        raise ValueError(f"金额不能为负，got {yuan}")
+    fen = (yuan * 100).quantize(Decimal("1"), rounding=ROUND_HALF_EVEN)
+    return int(fen)
+
+
+def _fen_to_yuan_str(fen: Optional[int]) -> Optional[str]:
+    """分 int → 元字符串两位小数（API 响应/SQL 序列化边界）。None 透传。"""
+    if fen is None:
+        return None
+    return f"{Decimal(fen) / Decimal(100):.2f}"
 
 # ─── SQLAlchemy ORM ───────────────────────────────────────────────────────────
 
@@ -58,7 +83,8 @@ class WineStorageRecord(TenantBase):
         index=True,
         comment="stored/partial_taken/fully_taken/expired/written_off",
     )
-    storage_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True, comment="存入时金额（元）")
+    # 金额一律 fen 整数（CLAUDE.md §15）；存酒可未定价（赠酒/会员存）所以 nullable
+    storage_price_fen: Mapped[int | None] = mapped_column(BigInteger, nullable=True, comment="存入时金额（分）")
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # 操作人
@@ -89,8 +115,9 @@ class WineStorageTransaction(TenantBase):
 
     # 操作数量与金额
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, comment="本次操作数量（正数）")
-    price_at_trans: Mapped[Decimal | None] = mapped_column(
-        Numeric(12, 2), nullable=True, comment="操作时单价或费用（元）"
+    # 金额一律 fen 整数（CLAUDE.md §15）；7 类流水 store_in/take_out/extend/transfer_in/transfer_out/write_off/adjustment 共用此字段
+    price_at_trans_fen: Mapped[int | None] = mapped_column(
+        BigInteger, nullable=True, comment="操作时单价或费用（分）"
     )
 
     # 关联上下文
@@ -164,13 +191,20 @@ class WineWriteOffRequest(BaseModel):
 
 
 class WineStorageTransactionResponse(BaseModel):
-    """存酒流水响应"""
+    """存酒流水响应
+
+    金额字段对齐 ORM 列名 price_at_trans_fen（fen int），同时输出
+    price_at_trans_yuan 元字符串供前端展示（PR #272 verifier 修复：
+    原 price_at_trans: Decimal 与 ORM 列名不匹配，from_attributes=True
+    会静默返回 None 丢失金额）。
+    """
 
     id: str
     record_id: str
     trans_type: str
     quantity: int
-    price_at_trans: Optional[Decimal]
+    price_at_trans_fen: Optional[int] = None
+    price_at_trans_yuan: Optional[str] = None
     table_id: Optional[str]
     order_id: Optional[str]
     operated_by: Optional[str]
@@ -184,7 +218,12 @@ class WineStorageTransactionResponse(BaseModel):
 
 
 class WineStorageResponse(BaseModel):
-    """存酒主记录响应（含计算字段）"""
+    """存酒主记录响应（含计算字段）
+
+    金额字段对齐 ORM 列名 storage_price_fen（fen int）+ 输出 storage_price_yuan
+    元字符串供前端（PR #272 verifier 修复：原 storage_price: Decimal 与
+    ORM 列名不匹配，from_attributes=True 会静默丢失金额）。
+    """
 
     id: str
     tenant_id: str
@@ -201,7 +240,8 @@ class WineStorageResponse(BaseModel):
     storage_date: date
     expiry_date: Optional[date]
     status: str
-    storage_price: Optional[Decimal]
+    storage_price_fen: Optional[int] = None
+    storage_price_yuan: Optional[str] = None
     notes: Optional[str]
     created_by: Optional[str]
     created_at: datetime
