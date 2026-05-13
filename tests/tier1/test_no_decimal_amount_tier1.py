@@ -68,9 +68,7 @@ KNOWN_BASELINE: frozenset[tuple[str, int, str]] = frozenset(
         ("services/tx-trade/src/models/discount_audit_log.py", 43, "original_amount"),
         ("services/tx-trade/src/models/discount_audit_log.py", 44, "final_amount"),
         ("services/tx-trade/src/models/discount_audit_log.py", 45, "discount_amount"),
-        # 待 P0-2 修复后删除（PR #272 fix/p0-2-wine-storage-fen）：
-        ("services/tx-trade/src/models/wine_storage.py", 61, "storage_price"),
-        ("services/tx-trade/src/models/wine_storage.py", 92, "price_at_trans"),
+        # PR #272 已修复 wine_storage.storage_price/price_at_trans → fen int (entries 删除 2026-05-13)
         # ── 已豁免（PR #B-3 启发式收紧 2026-05-08）─────────────────────
         # 以下条目原在 baseline，本次启发式收紧后扫描器不再误报，已从 baseline 移除：
         #   - services/tx-expense/src/models/travel.py:117 total_mileage_km
