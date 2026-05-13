@@ -1,4 +1,105 @@
-## 2026-05-13 — W2-A Phase 1 三独立服务整删（PR #499 `52d4e09e` + nit closure `21fde0e6`）
+## 2026-05-13 傍晚 — #408 codemod chain 完工 6/6（7 PR merged + 3 follow-up issue opened，carve-out 第 19-25 次）
+
+### 今日完成
+
+承接 5/12 傍晚 #483 F#6 helm 完善包后 fresh session 起手。User 指令"按优先重要任务继续"。从 Wave 1 起手（先 helm chart chore #445）后顺势接手 #408 codemod chain resume — **5/9 #298 chain 7 PR 全 deferred 后第二次完整闭环尝试**，6/6 服务一次性完工。
+
+**Wave 0 — Helm chart chore（同 5/12 傍晚 #483 主题延伸）**：
+- **PR #485 (`b2b1fb7a` @ chain 起点)** `fix(helm): web-admin chart podAnnotations 浮空 {} → with-guard [T2]` — close #445
+  - 单文件 1 行核心改 (`{{- with .Values.podAnnotations }}...{{- end }}` 守卫，替代 unguarded `{{- toYaml .Values.podAnnotations | nindent 8 }}`)
+  - **本地 helm lint 实测验证**: brew install 失败后 fallback 直接下载 v3.16.3 binary → baseline 21 chart 中 web-admin 唯一 lint failure → fix 后 21 chart 全 pass ✓
+  - 4 验证维度: baseline reproduce / fix verify / helm template 默认 {} 渲染无浮空 / 自定义 podAnnotations 正确注入
+  - code-reviewer (opus) APPROVE 0 P0/P1 / 3 P2 设计选择 (with-guard 语义 / whitespace 处理 / 不顺手扩 20 chart 边界)
+  - admin-merge **carve-out 第 19 次**
+
+**Wave 1 — #408 codemod chain 6/6 全闭环**（应用 #491 round-2 教训：起手扫 5 维度 from-NS.X / from-NS-import-X / 缩进 lazy / string-key patch / collision audit）：
+
+| 服务 | PR | 文件 | imports | string-patch | conftest | 例外 | E.3 改善 |
+|---|---|---|---|---|---|---|---|
+| tx-growth | #486 (`bd0314e0+68ef9a1d`) | 23 | 84 | 25 (round-1 P0 fix) | namespace 补 campaigns/tasks | — | 131→382 (+251 tests) |
+| tx-finance | #488 (`3445656a`) | 24 | 62 | 18 | D 段移除（dead code 清理）| — | 0→296 (P0 hidden BUG fix: conftest broken) |
+| tx-member | #491 (`db29e05b+848d1ca5`) | 31 | 121 | 0 (起手干净) | 0 改动 | — | 348→372 (+24/-3) |
+| tx-supply | #494 (`dc286082`) | 39 | 116 | 20 | 0 改动 | 1 noqa (test_auto_procurement) | 434/35 0 regression |
+| tx-org | #497 (`dfb0306b`) | 39 | 126 | 23 | 0 改动 | 1 noqa (test_approval_engine) | 565→573 (+8/-1) |
+| tx-trade | #502 (`c272a88a`) | 25 | 75 | 17 | 0 改动 | **0** ✓ | 1371/63 完全 parity |
+
+**chain 总改动**：6 PRs / **181 文件 / 584 imports / 103 string-patches / 2 noqa 例外**
+
+### 数据变化
+
+- main: `51534af1` (5/12 傍晚 #484) → `1f17f65b` (本 session 末，#502)
+- 7 PR merged (1 helm + 6 codemod chain)
+- 3 follow-up issue opened (#493 / #495 / #501)
+- 5 个 #408 backlog issue auto-closed via PR link
+- code-reviewer (opus) 7 次实战：6 APPROVE 直接 / 1 REQUEST_CHANGES (#486 round-1 P0 string-patch 漏抓 25 处) → fix → APPROVE round-2 implicit
+- CodeRabbit 触发 5+ PR: 全 pass（#486 / #488 / #491 / #494 / #497 / #502）
+- Tier 1 真门禁触发 2 PR (#488 / #491 / #497) — 11/11 service tests 全 pass
+- carve-out 累积：5/12 傍晚第 18 → **5/13 傍晚第 25**（+7 次本 session：#485 helm / #486-#502 chain 6 PR）
+- 6 worktree 起 / 6 全清 / 6 branch 删
+- tests collected 全 service 总改善：+283 tests / -10 errors (含 #488 conftest broken P0 fix 0→296 / #486 #491 净增 / #494 #497 #502 0 regression)
+
+### 战绩
+
+- **#298 chain 5/9 deferred 后真正闭环** — 决策 81 ("rebase 成本 vs style-only 收益不成正比") 被 #408 resume 策略推翻：从 main HEAD 重跑 codemod 工具 + 一服务一 PR + diff ≤ 200 行 + admin-merge carve-out → 6 PR 一 session 闭环 vs 历史 7 PR 全 close as deferred
+- **#491 round-2 教训沉淀** — code-reviewer (opus) round-1 抓出 `string-key patch` 维度漏抓（25 处 in tx-growth）→ tx-finance 起手即扫 → 18 处一次性 sweep / tx-member 0 处不需 sweep / tx-supply 20 处 / tx-org 23 处 / tx-trade 17 处。**起手 5 维度扫"工具改进 + 流程沉淀"循环成功**
+- **#491 + #497 暴露真 BUG 类型**：
+  - **#491**: codemod 工具 BARE_NAMESPACES 启发式漏抓 `from <NS> import <X>` 形式（test_points_tier1.py:452-505 3 处）→ dual-load → monkeypatch 不命中 → Tier 1 真测 fail。Round-1 真 BUG fix + 重跑 Tier 1 全过
+  - **#497**: code-reviewer (opus) 揭示**真 root cause** — `services` namespace collision (tx-ops / tx-org 都有 approval_engine.py，bare-NS 解析到 alphabetically-first → wrong service)。baseline 11 tests in test_approval_engine.py 一直 fail 错调 tx-ops module
+- **#488 D 段移除带 P0 hidden bug fix 副产物** — baseline tx-finance conftest D 段 `importlib.import_module("models.cost_snapshot")` 在 Py 3.9.6 触发 `Mapped[float | None]` PEP 604 syntax TypeError → **整个 conftest 加载失败 → 0 tests collected**。移除 D 段切断放大路径 → 296 tests collected。**Codemod chain 闭环的自然受益**
+- **#494 / #497 Plan B 实战** — collision / collect-order conflict 文件 revert 2 行 + noqa 注释 → 0 regression / surgical 边界保留 / follow-up issue 跟踪 root cause。**Plan B (b)/(c) 否决路径**: in-PR fix shared.events PEP 兼容 / 拆 follow-up PR — scope creep 风险高 / chain 闭环优先
+- **#502 tx-trade chain 最干净的 PR** — 0 noqa 例外 / 5 维度全 0 / pytest collect 完全 parity (1371/63) / 0 production source touch / 75/75 ins-del 对称 / reviewer 建议固化为 "理想 codemod PR" 5 条标准
+- **Tier 1 真测加成 3 次** — #488 / #491 / #497 触发完整 Run Tier 1 (11 service tests + 门禁判定 + 配对测试) 全 pass，加强 carve-out 资格证据链
+- **3 follow-up issue 落盘 audit trail** — #493 tx-growth 31 处 latent dual-load / #495 tx-supply collect-order / #501 services namespace collision (真 root cause)。**避免抽象 finding ID 漂移**（per `feedback_handoff_finding_ids.md`）
+
+### 关键决策
+
+- **chain 完工资格 5 项裁决标准持续应用** — 6 PR 全满足 (a) 同主题（codemod 白名单核心）+ (b) 同 reviewer pattern (opus + CodeRabbit) + (c) CI drift 判定 (失败全在 memory `project_tunxiang_ci_gates.md` 噪音清单) + (d) 不触发 Tier 1 gate 或触发后全过 + (e) `[codemod]` prefix D4 escape hatch
+- **5 维度起手扫成为 chain 后续 PR 起手必跑** — namespace-completeness.md §A-E 补 `from <NS> import <X>` (#491) + `string-key patch` (#486 round-1) + collision audit (#497 reviewer)
+- **revert + noqa Plan B 边界** — 2 文件接受例外：root cause 是工具 + 项目历史遗留（#287 dual-load band-aid / services namespace collision / Py 3.9 vs 3.10 syntax），不在本 codemod 任务定义内合理 fix 范围 → follow-up issue + chain 闭环优先
+- **Codemod chain 闭环 vs scope creep 平衡** — reviewer 建议 in-PR fix shared.events PEP 兼容性 (#497 P2) 被否决 (production source 改动越界 / Tier 1 邻近 / 局部 Py 3.9.6 vs project floor 3.11 不影响 CI)。**Codemod 不解决既存项目级问题** 是 Karpathy §3 surgical 落地
+- **Helm chart fix #485 单 chart 起手** — Wave 1 user 推荐 ROI/blast radius 最小起手，验证 fresh session 流程是否 OK (5 维度验证 + reviewer pattern + admin-merge carve-out 资质链)，后顺势接手 #408 chain
+
+### 遗留问题
+
+- **3 follow-up issue OPEN**：#493 tx-growth 31 处 latent dual-load (`from api import X as _mod`) / #495 tx-supply test_auto_procurement collect-order / #501 services namespace collision (真 root cause)
+- **#408 chain 闭环但 follow-up 未跟进** — 是否 in 下个 session pick #493 (tx-growth dual-load fix, mechanical 31 行 sweep) 或 #501 (audit collision file 全清单 + 评估方案 A/B/C)
+- **CSO 5/12 傍晚后续**：F#6 cluster ConfigMap (跨 namespace ops，需李淳/腾讯云 CLB 源段) / #472 真 LLM staging 验证
+- **5/13 deal-breaker（已 due）**：channel-aggregation 3 平台企业资质（创始人级别，连续 7+ session 提醒未起手）
+- **持续技术债 backlog**：#272 / #271 Tier1 Decimal→fen + 迁移 / #240 V4 sprint DRAFT / #347 conftest shared namespace / #336 test_trade_promotions / #351 14 服务 main.py import 烟测 / #413 / #414 / 8 Dependabot / 旧 [SECURITY][Tier1] rebase 群体 8 PR (#212-#232) / 11 个 CH-10~22 / #468-#470 凭据 / #473 product 决策
+
+### 明日计划
+
+- A：fresh session — handoff 留 DEVLOG 顶（本段）+ docs/progress.md 顶；起手命令含 `gh pr view 485 486 488 491 494 497 502 --json state,mergedAt,mergeCommit`
+- B：5/13 deal-breaker 资质（创始人级别非技术，已 due 实际触发，技术任务不阻塞但 user 创始人级别非技术任务长期 carry-over）
+- C：#408 chain follow-up issue pick — 推荐顺序：① #493 tx-growth dual-load mechanical fix（31 行同款 sweep，最低风险）② #495 collect-order investigation（需 root cause spike + 评估 D 段去留）③ #501 services namespace collision audit（仓库级 cross-service 同名审计）
+- D：换主题候选 — 8 Dependabot 低风险 (#422-#424 actions) / Helm chart chore (#453 NOTES.txt / #454 _helpers.tpl DRY) / #347 conftest / #336 test_trade_promotions / #240 V4 sprint
+- E：长期持续技术债 — #272 / #271 Tier1 Decimal→fen + 迁移（需 TDD + DEMO 验收，重型）/ 旧 [SECURITY] rebase PR 群体（6+ 天 base 漂移 + 完整 Tier 1 真 PG 回归）
+
+### 已知风险
+
+- **carve-out admin-merge 累积 25 次** — 后续非 codemod/docs-only/test-only/security 主题须重新评估资格。Codemod chain 完工后 carve-out 主题白名单收窄
+- **namespace collision (#501) latent 风险扩散** — 仓库级 cross-service 13 同名 services 文件 (approval_engine / approval_service / budget_forecast_service / budget_service / cost_root_cause_service / coupon_service / dish_margin / gdpr_service / invoice_service / notification_service / report_engine / repository / vat_service) — 任何 bare-NS test import 都可能 silently 错调
+- **本 session 拆 session 自然终点** — 7 PR + 3 issue + 长 context burn (chain 6/6 闭环 + helm 1 PR)，按 `feedback_proactive_session_split.md` 收尾 + handoff 沉淀
+- **handoff vs SoT 漂移持续风险** — 并发 session 推进可能在 fresh session 起手时已落新 PR (本 session 起手发现并发 session #499 在 main 推进 W2-A Phase 1)
+- **2 noqa 例外文件需 follow-up 跟踪** — test_auto_procurement.py + test_approval_engine.py 暂时绕过 codemod 任务定义；root cause fix (services namespace collision) 解决后可移除 noqa
+
+### 起手命令（fresh session 必跑）
+
+```bash
+cd /Users/lichun/tunxiang-os
+git fetch git@github.com:hnrm110901-cell/tunxiang-os.git main:refs/remotes/origin/main
+git rev-parse origin/main          # 应 1f17f65b 或更新（含本段 DEVLOG 沉淀 PR）
+gh pr view 485 486 488 491 494 497 502 --json state,mergedAt,mergeCommit
+gh issue view 493 495 501 --json state               # 3 follow-up 全 OPEN
+gh issue view 408 --json state                       # 应 CLOSED (chain 闭环 auto-close)
+gh issue list --state open --search "445 408"        # backlog 状态
+git worktree list                                     # 应已清本 session 6 codemod 起手 worktree
+head -400 DEVLOG.md   # 本段（5/13 傍晚）+ 5/13 W2-A + 5/12 傍晚 + 5/12 下午 + 5/12 中午
+```
+
+---
+
+
 
 ### 今日完成
 
