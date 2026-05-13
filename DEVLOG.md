@@ -1,3 +1,195 @@
+## 2026-05-13 round-3 — W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
+
+### 今日完成
+
+PR #489 round-2 push 后 CodeRabbit 落 round-2 review（无人类 reviewer / OMC code-reviewer 独立 review）。outside-diff #1 finding 真实命中 round-1 P1 契约姊妹漏洞，accept + 修；其余两条 nit decline。
+
+**Accept #1 — main.py:240 `start_payment_event_consumer_or_raise` 在 try 块外**
+
+`start_*_or_raise` 按 W1-T1 fail-loud 设计该路径必抛 → finally 不跑 → round-1 P1 修补的 `audit_outbox_flusher_stop.set()` 仍被绕过。这是 round-1 P1 "任意终止路径均 stop + flush" 契约的逻辑姊妹漏洞。
+
+修补：
+- `payment_event_consumer_task: asyncio.Task | None = None` 先初始化（避 raise 路径下 finally NameError）
+- await 调用移入 try 块（同 yield 同 try）
+- T6 AST 源码守护：(a) `start_*_or_raise` 必须在 try.body；(b) 同一 try 的 finalbody 含 `audit_outbox_flusher_stop.set(`
+
+业务损害评估：line 165-238 lifespan 启动期间无 emit_event 业务调用，启动期 outbox 实际为空 → 实际数据损害接近 0；本 fix 闭合契约边界，防"任意终止路径"承诺再回归。
+
+**Decline #2 — docs/session-handoff MD040/MD052 nit**
+
+markdownlint 渲染微调，docs 非 CI 门禁。memory `feedback_tier1_review_loops` 真-BUG-only 停止线。
+
+**Decline #3 — test return type annotation nit**
+
+项目级 ruff/mypy 未强制返回类型注解，文件内其他 helper/test 风格一致无 return type。强行补违反 §三 surgical change。Audit P4 follow-up：项目级讨论 ANN201。
+
+### 数据变化
+
+- branch HEAD: `0102e5ac` → `0fce495d`
+- main.py: +5 / -2 行（None init + try 块包 await）
+- test_lifespan_payment_consumer_tier1.py: +60 / -3 行（T6 + 注释扩展）
+
+### 验证证据
+
+- **6/6 PASS**（T1-T6 全绿）
+- **82 邻近 tier1 测试 0 回归**（alembic_chain / api_idempotency / audit_outbox / audit_outbox_flusher / banquet_lead / codemod_tzinfo / lifespan_payment_consumer）
+
+### 反思（memory candidate）
+
+CodeRabbit round-2 这次**真 catch 了一个契约漏洞** — round-1 P1 "audit_outbox_flusher_stop 移入 finally" 的修补，**只闭合了 yield 中抛和 mark_offline raise 路径**，没闭合 `start_payment_event_consumer_or_raise` 自身 raise 路径（fail-loud 主路径）。
+
+教训：**"修一个 fix 把代码移入 finally" 时必须验证 try 块的 body 是否完整包含 fix 想保护的所有调用路径**。round-1 fix 时只看到 `try: yield` 这个 obvious target，没注意到 `await start_*` 这个调用本身也是"终止路径"之一（按 fail-loud 设计是高频终止路径）。
+
+memory `feedback_coderabbit_incremental_policy` 仍成立（CodeRabbit 不重审 already-reviewed commits），但这次它对 round-1 P1 commit `84151f70` 之后的 commits 跑了 round-2 review，**在 outside-diff 视角抓到了 P1 fix 自身的姊妹漏洞**。这条记入更新版 memory：CodeRabbit outside-diff finding 比 inline finding 更可能是真 BUG，因为 inline 通常是 nit-level lint，outside-diff 是结构/契约视角。
+
+### Round-3 OMC code-reviewer verdict（user 选 B）
+
+派 OMC code-reviewer agent (§19 独立 verifier) 复审 commit `0fce495d`：
+
+**Verdict: APPROVE** — 0 真 BUG。
+
+关键观察：
+- main.py:240 修补 3 条异常路径全分析通过（task=None / yield 抛 / finally 内异常）
+- T6 AST 测试 (a)(b)(c) 无 bypass，足以防回归
+- decline 两条 nit 合理（CI 无 markdownlint，pyproject.toml ruff 无 ANN 规则）
+
+**Audit follow-up (P2, 不阻塞)** — 已开 issue **#496 [hardening][T2] tx-trade lifespan startup 序列统一 try/finally 闭合**：`audit_outbox_flusher_task` 在 line 171 try 块外初始化是同构边界，**当前**无可 raise 路径触发（line 171 同步赋值 + line 172-238 已被 try/except ImportError 包裹 / None init 保护），但若未来在该段加可 raise 启动调用会泄漏 flusher。属未来演进风险，独立 hardening issue 跟踪。
+
+PR comment 已落 verdict (issuecomment-4436391776)。
+
+### 遗留问题
+
+- PR #489 round-3 reviewer APPROVE，**等 user explicit normal merge 授权**（不 admin-merge §19 Tier 1）
+- 持续阻塞同 round-2：#487 W1-T2/T3/T4/T5 等 reviewer / B（dev-plan-60d demo 故事）/ C（DailySummary ontology）/ 5/13 channel-aggregation 资质
+- 新增 #496 hardening 候选（T2，不阻塞 W1）
+
+### 上 session 意外发现（user 已 ping）
+
+Tier 1 资金路径 idempotency 测试覆盖率虚高（#492 根因 1）— `test_payment_idempotency.py` 3 个"并发 IntegrityError → rollback" case 由于 mock fixture 早返回路径，实际从未触发 production 的 flush/rollback 代码分支。production code 是对的，但 contract 锁失效。审计级 finding，独立 issue 已落盘。
+
+---
+
+## 2026-05-13 round-2 — W1-T1 reviewer P0 + P1 修补（`84151f70`）
+
+### 今日完成
+
+派 code-reviewer agent 独立 verifier 审 PR #489，verdict **REQUEST_CHANGES**：1 P0 + 1 P1。两个都验真后同 PR 修：
+
+**P0 — T4 AST 守护对 tuple 形式 except 失明**
+- `test_lifespan_payment_consumer_tier1.py:171` 原版只查 `ast.Name`
+- 后人写 `except (Exception, asyncio.CancelledError):` 时 `handler.type` 是 `ast.Tuple` → 整段 isinstance 跳过 → silent swallow 重新成立但 T4 全绿（守护形同虚设）
+- 修：抽 `_exception_handler_is_broad(handler.type)` helper 覆盖 bare / Name / Tuple 三路径；T4 重写用 helper + 新增 T5 (5 样本契约 + 反例)
+- 注入式验证：把 main.py 包成 broad tuple except → T4 正确 fail with `(Exception, asyncio.CancelledError):` 字样 → restore 后 5/5 GREEN
+
+**P1 — `audit_outbox_flusher_stop.set()` 在 finally 块外（W1-T1 引入新风险）**
+- `main.py:285-289` 处于 `try/yield/finally` **之外**
+- 旧 silent 代码让 raise 路径几乎不触发；W1-T1 fail-loud 使其成为 hot path → audit 行丢失风险放大
+- 修：移 4 行进 finally 块末尾，任意终止路径均 stop + flush
+
+**P2 nit 不修**：`start_payment_event_consumer` 不用 `session_factory` 参数 — pre-existing 设计（PR #128），不在 W1-T1 surgical scope，留 audit P3 follow-up
+
+**Reviewer 遗漏覆盖 #2 修**：T1 + T2 加 `registered == []` 断言，闭环 graceful shutdown 链契约
+
+### 数据变化
+
+- branch HEAD: `9dbebff6` → `84151f70`
+- main.py: 17 行变更（4 行移入 finally + 注释）
+- test_lifespan_payment_consumer_tier1.py: +128/-40，4 cases → 5 cases（新增 T5 tuple 绕过专项测）
+
+### 验证证据
+
+- **5/5 PASS**（T1-T5 全绿）
+- **81 邻近 tier1 测试 0 回归**（audit_outbox_flusher / audit_outbox / api_idempotency / banquet_lead / codemod_tzinfo / alembic_chain）
+- **T4 注入式验证通过** — tuple bypass 注入 → fail，restore → green
+
+### 反思（memory candidate）
+
+reviewer P1 finding 暴露了一个反模式：**单元测试只 mock 启动失败抛异常路径，但 finally 块的运行时副作用（stop event 在块外）没有 lifespan 级集成测试覆盖**。这种 "module-level 副作用串行结构"的 contract，单纯 helper 单测覆盖不到。
+
+W1-T1 修复链路：fail-loud → raise path → audit shutdown 链路联动 — 三者耦合从未被单测验证。下次 Tier 1 startup 类改动应同时评估 finally/shutdown 链的副作用顺序。
+
+### 遗留问题（接 round-1 段）
+
+PR #489 仍 OPEN，等 reviewer round-2 复审 P0+P1 fix。Memory `feedback_tier1_review_loops` 警示 — round-N 越审越严，需用"真 BUG only"设停止线。已 explicit decline P2 nit。
+
+---
+
+## 2026-05-13 — W1-T1：tx-trade payment_event_consumer 启动 fail-loud（12 周升级战略 W1 收官）
+
+### 今日完成
+
+**W1-T1 修复 P0 资金链路 silent failure（CLAUDE.md §17 Tier 1）**
+
+- branch: `fix/tx-trade-payment-consumer-fail-loud-w1-t1`，base `b2b1fb7a`
+- bug 锁定：`fd94028e feat(payment+rls)` (PR #128) 在 tx-trade lifespan
+  用 `except Exception: warning(...)` 静吞 payment_event_consumer 启动
+  失败 → tx-trade 仍能起来但不消费 tx-pay 事件 → 订单永远 stuck 在 paying
+- 修复设计：
+  - 抽 7 行启动逻辑到 `services/tx-trade/src/services/payment_consumer_lifecycle.py`
+    的 `start_payment_event_consumer_or_raise(session_factory, register_bg_task)` —
+    fail-loud，任何异常向上传播
+  - `main.py:235-257`（-21/+7）改为单行调用 helper
+  - 抽 helper 的关键原因：`src.main` module-level deps（permission_client /
+    omni_channel_service / tenacity）让单测里直接 `from src.main` 不可行；
+    helper 模块依赖最小化（只 import payment_event_consumer），单测干净 mock
+- Tier 1 TDD（先 RED 后 GREEN）：`test_lifespan_payment_consumer_tier1.py` 4 cases
+  - T1 create 抛 → helper 重抛
+  - T2 start 抛 → helper 重抛
+  - T3 happy path → register_background_task 注册 + 返回 task
+  - T4 AST 源码守护：lifespan payment_event_consumer 区段不得再有
+    broad `except Exception:` 静吞（防回归 PR #128 反模式）
+- 验证证据：
+  - 4 新测试 RED → GREEN 全程截到
+  - 80 邻近 tier1 测试 0 回归
+  - 45 payment-domain 测试 0 回归
+  - test_payment_idempotency 3 fail + test_banquet_payment 19 error 是
+    pre-existing baseline（git stash 验证）— 与本 PR 无关
+
+**PR 流程（§19 + §21）**
+
+- 不 admin-merge — Tier 1 资金链路必须独立 verifier 审
+- PR body explicit 标 "needs independent verifier per §19"
+- §19 触发条件：3 文件（main.py + helper + test）+ Tier 1 路径
+
+### 数据变化
+
+- main: `b2b1fb7a` → `2d61fe24`（本地 commit，未 push）
+- 新增 service module: 1（payment_consumer_lifecycle.py）
+- 新增 Tier 1 test 文件: 1（test_lifespan_payment_consumer_tier1.py）
+- 修改 main.py: -21/+7 行（净 -14）
+- broad `except Exception` 实例: tx-trade lifespan 区段 1 → 0
+
+### 战略对齐
+
+12 周升级战略 W1 任务清单：
+- T2 tx-agent fail-loud（PR #487 OPEN，CI 全是 memory 标的预存噪声）
+- T3 CLAUDE.md V3.0 → V3.1（PR #487 中）
+- T4 service-freeze hook（PR #487 中）
+- T5 服务健康度 baseline + 周扫脚本（PR #487 中）
+- **T1 tx-trade payment consumer fail-loud（本 session 完成，PR 待开）** ✅
+
+### 遗留问题
+
+- **PR #487 (W1-T2/T3/T4/T5)** 仍 OPEN — 等 reviewer 或先 review #487 再
+  并 land；CI 失败均为 memory 标的预存漂移，非真门禁失败
+- **test_payment_idempotency.py 3 fail** + **test_banquet_payment.py 19 error**
+  pre-existing baseline 已**落盘成独立 issue**：
+  - **#490** [test-debt][T3] test_banquet_payment 19 errors —
+    MOCK_BANQUET_ORDERS/MOCK_PAYMENTS 在 mock 消除重构（`5c49e3d7`）后
+    未更新，dead test code，建议方案 A 删除文件
+  - **#492** [test-debt][T2] test_payment_idempotency 3 fail —
+    双层根因（idempotent hit 早返回绕过 rollback 断言 + SQLAlchemy `Table
+    'payments' already defined` 元数据碰撞），方案 A rewrite + 仓库级
+    MetaData fixture
+- **5/13 deal-breaker（channel-aggregation 资质）** 仍未启动 — 创始人级别
+
+### 明日计划
+
+- W2 开局：删 indonesia/malaysia/vietnam + Gateway 瘦身
+- 等 W1-T1 PR 独立 verifier 审完 merge 后才能往下推
+
+---
+
 ## 2026-05-12 傍晚 — Phase 1 切片 1 续：F#5 + F#6 follow-up 完整闭环（admin-merge 第 16-18 次 + #457 父 issue close）
 
 ### 今日完成

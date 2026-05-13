@@ -1,3 +1,135 @@
+## 2026-05-13 round-3 · W1-T1 CodeRabbit round-2 outside-diff 裁决（`0fce495d`）
+
+### 完成状态
+
+- [x] **CodeRabbit round-2 finding #1 (main.py:240) accept + 修** — `payment_event_consumer_task` None init + await 进 try 块；闭合 round-1 P1 "任意终止路径均 stop + flush" 契约姊妹漏洞
+- [x] **补 T6 AST 源码守护** — (a) start_*_or_raise 必须在 try.body；(b) 同一 try 的 finalbody 含 audit_outbox_flusher_stop.set(
+- [x] **6/6 PASS（T1-T6 全绿）+ 82 邻近 tier1 测试 0 回归**
+- [x] **Decline 两条 nit** — docs markdownlint + test return type annotation；理由：超 surgical scope + 项目级 lint 未强制
+- [x] **PR comment 逐条回复 CodeRabbit 裁决**（issuecomment-4436358221）
+- [x] **DEVLOG + progress.md round-3 沉淀**
+- [ ] **等 user 拍板** — (A) normal merge / (B) 派 OMC code-reviewer round-3 复审
+
+### 关键决策
+
+- **accept #1 / decline #2 #3** — 严格按 memory `feedback_tier1_review_loops` "真 BUG only" 停止线：#1 是 round-1 P1 自身契约漏洞（真 BUG，契约层），#2 #3 是 nit；不修两条 nit 避免 round-N 越审越深。但**仍主动 catch + fix #1**：因为它跟 round-1 P1 是同一闭合契约的两个支路，分两 PR 反而隔断责任归属
+- **T6 用 AST 源码守护风格** — 跟 T4/T5 一致，避免 runtime 集成测试需要 import src.main 触发 module-level 副作用（W1-T1 round-1 已验受阻）；T6 锁的是结构契约（"必须在 try 块内"），AST 完全够用
+- **不做注入式验证** — round-1 P0 fix 时做了，因为 helper `_exception_handler_is_broad` 有逻辑漏洞可能；T6 helper 是 `body_text contains` 简单 string 检查，没逻辑可漏，省一次手工 break + restore
+- **commit message 沿用本仓库风格不加 Co-Authored-By** — 看 `0102e5ac / 4522b6ca / 84151f70` 都无 co-authored line
+
+### Round-3 OMC code-reviewer verdict（user 选 B）
+
+**Verdict: APPROVE** — 0 真 BUG。
+
+- main.py:240 修补 3 条异常路径全分析通过（task=None / yield 抛 / finally 内异常）
+- T6 AST 测试 (a)(b)(c) 无 bypass，足以防回归
+- decline 两条 nit 合理（CI 无 markdownlint，pyproject.toml ruff 无 ANN 规则）
+
+**Audit follow-up P2 (不阻塞)** — 已开 issue #496 [hardening][T2] tx-trade lifespan startup 序列统一 try/finally 闭合。`audit_outbox_flusher_task` 在 line 171 try 块外初始化是同构边界，当前无可 raise 触发，未来演进风险。
+
+### 下一步
+
+- A：user explicit normal merge — round-3 reviewer APPROVE + 6/6 + 82 邻近 0 回归，可 merge（不 admin-merge §19）
+- B：merge 后 W2 起手 — 删 indonesia/malaysia/vietnam（PR #129 引入）+ Gateway 瘦身，预期产出 `docs/w2-deprecate-regional-plan.md`
+
+### 已知风险
+
+- **P1 修补改了 try 块边界** — 整段 lifespan 现在的运行时语义跟 round-1 之前等价（业务行为没改），但 try 块的 scope 扩大了；round-3 reviewer 应额外检查"line 245-249 try 块包含的代码路径上，是否有新代码会被未来加进去而误共享 finally 的 cleanup 副作用"（边缘风险）
+- **业务损害评估接近 0 但非零** — 启动期 line 165-238 之间若**未来**加 emit_event 业务调用（如 init_db 后置 hook 发 'service_started' 事件），且若这些事件落 outbox，本 fix 才有真实保护意义；现在是预防性 closure
+- **CodeRabbit incremental policy 仍可能漏审 round-3 commit** — memory `feedback_coderabbit_incremental_policy`；不依赖 CodeRabbit 重审，依赖 user / OMC reviewer
+
+### 反思（memory candidate）
+
+CodeRabbit **outside-diff finding** 比 **inline finding** 更可能是真 BUG。这次 outside-diff #1 抓到了 round-1 P1 修补自身的契约漏洞（结构/作用域视角），inline 全是 markdownlint nit。下次看 CodeRabbit comments 时**先看 outside-diff 段**，再判断 inline 是否进 scope。
+
+---
+
+## 2026-05-13 round-2 · W1-T1 reviewer P0 + P1 修补（`84151f70`）
+
+### 完成状态
+
+- [x] **派 code-reviewer 独立 verifier 审 PR #489** — verdict REQUEST_CHANGES (1 P0 + 1 P1)
+- [x] **P0 修：T4 AST 守护补 tuple 路径** — 抽 `_exception_handler_is_broad` helper + 新增 T5 专项测；注入式验证通过
+- [x] **P1 修：audit_outbox_flusher_stop 移入 finally 块** — W1-T1 fail-loud 引入新风险已闭环
+- [x] **T1+T2 加 register=[] 断言** — reviewer "遗漏覆盖 #2"
+- [x] **P2 nit 明确拒绝**（pre-existing 设计，超 surgical scope）
+- [x] **5/5 PASS + 81 邻近 tier1 测试 0 回归 + 注入式 T4 验证**
+- [x] **PR comment 逐条回复 reviewer**
+- [ ] **等 reviewer round-2 复审 P0+P1 fix**
+- [ ] **merge 后 W2 起手**
+
+### 关键决策
+
+- **P0 + P1 同 PR 修而非拆 PR** — P1 是 W1-T1 fail-loud 改动直接引入的新风险，责任归属本 PR；不修等于交付 known regression
+- **P0 修法选 helper 抽取** — `_exception_handler_is_broad` 提供契约级抽象，T5 用 5 样本 fixture 双向覆盖（broad + narrow），不只是改 isinstance 写法
+- **注入式验证 T4 真锁** — 把 broad tuple except 临时注入 main.py，跑 T4 看是否 fail；restore 后再次跑确认 green — 这是 contract test 的"自我证伪"，比单纯静态阅读更可靠
+- **P2 nit 拒绝有 explicit 理由** — pre-existing API（PR #128 引入），跟 W1-T1 fail-loud 无直接关联；强行修改其签名违反 §三 surgical change；memory `feedback_tier1_review_loops` 警示停止线
+- **不重派 reviewer round-2 by default** — round-N 越审越严，应 user 拍板要不要再来一轮（已 ping）
+
+### 下一步
+
+- A：user 拍板要不要 reviewer round-2（推荐——P0+P1 是真 BUG 修补，独立 verify 一次 fix 正确性合理）
+- B：若 reviewer 通过 → user explicit 授权 merge（不 admin-merge，Tier 1 资金路径）
+- C：W2 起手（删 indonesia/malaysia/vietnam + Gateway 瘦身）— 依赖 merge
+
+### 已知风险
+
+- **round-N 深度漂移** — reviewer 二次审可能挖出新 nits；memory 已警示，"真 BUG only" 停止线已 explicit
+- **P1 修补改了 graceful shutdown 链顺序** — `audit_outbox_flusher_stop.set()` 现在在 `payment_event_consumer_task.cancel()` 之后；逻辑等价但顺序换了，**reviewer round-2 应特别检查这个顺序是否引入新 race**
+- **`audit_outbox_flusher_task` 在 fail-loud raise 路径下从未被 await 过** — 现在 finally 会 wait_for(timeout=10s) 一个其实只跑了几毫秒的 task；timeout 10s 是按原 graceful shutdown 路径设计的，raise 路径 timeout 应该是 0 或瞬完成；不影响正确性但可能拖慢 boot 失败的 readiness probe 响应时间（边缘风险）
+
+---
+
+## 2026-05-13 · W1-T1：tx-trade payment_event_consumer 启动 fail-loud（Tier 1）
+
+### 完成状态
+
+- [x] **W1-T1 修复** — `services/tx-trade/src/main.py:251-257` payment_event_consumer
+  silent `except Exception` 静吞 → fail-loud（抽 helper `payment_consumer_lifecycle.py`）
+- [x] **Tier 1 TDD 覆盖** — `test_lifespan_payment_consumer_tier1.py` 4 cases
+  (create raise / start raise / happy path / AST source guard) 全 RED → GREEN
+- [x] **回归验证** — 80 邻近 tier1 测试 0 回归 / 45 payment-domain 测试 0 回归 /
+  pre-existing failures（test_payment_idempotency 3 / test_banquet_payment 19）
+  git stash 验证为基线，与本 PR 无关
+- [x] **DEVLOG.md + progress.md 沉淀**（本段）
+- [ ] **PR 开 + 独立 verifier 审** — 不 admin-merge（§19 Tier 1 资金链路必须）
+- [ ] **PR merge 后 W2 开局** — 删 indonesia/malaysia/vietnam + Gateway 瘦身
+
+### 关键决策
+
+- **抽 helper 模块而非纯改 main.py** — main.py module-level deps
+  (permission_client / omni_channel_service / tenacity 等) 让 src.main
+  不可单测 import；helper 只依赖 payment_event_consumer，单测干净
+  mock。这是 enable Tier 1 TDD 的最小 surgical 改动，符合 §三、§17
+  "TDD 强制"要求
+- **AST 源码守护作为第 4 个测试** — 防 PR #128 反模式回归（后人重新
+  在 lifespan 加 broad `except Exception:` 静吞）；源码级 contract 锁
+- **不 self-approve / 不 admin-merge** — §19 触发条件全占（3 文件 + Tier 1
+  路径），独立 verifier 不可替代（memory feedback_self_review_blind_spots）
+- **按 memory feedback_tunxiang_ci_gates 起手 W1-T1** — PR #487 OPEN 但
+  CI 失败全是 memory 标的预存漂移噪声，且 PR #487 改的是 tx-agent 不动
+  tx-trade，T1 物理 0 依赖于 #487；user 选 A 选项 explicit 授权
+
+### 下一步
+
+- A：push branch + 开 PR `fix(tx-trade): payment_event_consumer 启动 fail-loud [Tier1]`
+  → 等独立 verifier
+- B：W2 开局（PR merge 后启动）— 删 indonesia/malaysia/vietnam + Gateway 瘦身
+- C：PR #487 (W1-T2/T3/T4/T5) 等 reviewer，CI 失败均预存漂移
+
+### 已知风险
+
+- **PR race** — fetch origin 已确认无新提交（b2b1fb7a 仍为 main HEAD）；push 前需再 fetch
+- **pre-existing baseline 失败已落盘** —
+  - **#490** test_banquet_payment 19 errors — MOCK 消除重构遗漏的 dead test code
+  - **#492** test_payment_idempotency 3 fail — 双层根因（rollback 早返回绕过 + Table 元数据碰撞）
+  - 两 issue 均不在 W1-T1 scope，独立分流（reviewer 看 PR #489 时可参考）
+- **W1-T1 改的是 P0 资金链路** — fail-loud 改变 boot 期行为：从前 redis
+  不可达时服务能起 → 现在直接 raise；若生产 redis SLA < tx-trade SLA，
+  tx-trade 会反复 readiness 失败重启。运维需评估（reviewer checklist 中列出）
+
+---
+
 ## 2026-05-12 13:00Z · Phase 1：F#5 + F#6 follow-up 完整闭环（傍晚 session）
 
 ### 完成状态

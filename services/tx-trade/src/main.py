@@ -233,30 +233,19 @@ async def lifespan(app: FastAPI):
         )
 
     # ── Task 1.2: 支付事件消费者 — 消费 tx-pay 的 payment.confirmed/payment.refunded ──
-    # 在 tx-trade 中启动 EventConsumer，订阅 Redis Stream 上的支付事件，
-    # 更新 orders 和 payments 表状态（关闭 P0-02 风险）。
+    # §17 Tier 1 资金链路：启动失败 fail-loud（W1-T1 修复 PR #128 silent swallow）。
+    # helper 抽到独立模块，便于 Tier 1 TDD 覆盖（test_lifespan_payment_consumer_tier1.py）。
+    from .services.payment_consumer_lifecycle import start_payment_event_consumer_or_raise
+
+    # round-3：先 None 初始化 + await 进 try 块，保证 start_payment_event_consumer_or_raise
+    # 异常路径下 finally 仍跑（闭合 round-1 P1 "任意终止路径均 stop + flush" 契约的姊妹漏洞）。
     payment_event_consumer_task: asyncio.Task | None = None
-    try:
-        from .services.payment_event_consumer import (
-            create_payment_event_consumer,
-            start_payment_event_consumer,
-        )
-
-        _payment_consumer = create_payment_event_consumer(async_session_factory)
-        payment_event_consumer_task = await start_payment_event_consumer(_payment_consumer, async_session_factory)
-        _register_background_task(payment_event_consumer_task)
-        import structlog as _structlog
-
-        _structlog.get_logger(__name__).info("payment_event_consumer_started")
-    except Exception:
-        import structlog as _structlog
-
-        _structlog.get_logger(__name__).warning(
-            "payment_event_consumer_start_failed",
-            exc_info=True,
-        )
 
     try:
+        payment_event_consumer_task = await start_payment_event_consumer_or_raise(
+            async_session_factory,
+            _register_background_task,
+        )
         yield
     finally:
         # graceful shutdown：cancel + await，避免事件循环退出时 task 仍在 sleep
@@ -293,14 +282,15 @@ async def lifespan(app: FastAPI):
                         if not t.done():
                             t.cancel()
 
-    # ── Graceful shutdown ─────────────────────────────────────────────
-    # PR-4：通知 audit outbox flusher 停止 + 等待最后一次 flush 完成（最多 10s），
-    # 防止 SIGTERM 时 outbox 文件残留几秒未消费的 audit 行。
-    audit_outbox_flusher_stop.set()
-    try:
-        await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
-    except asyncio.TimeoutError:
-        audit_outbox_flusher_task.cancel()
+        # ── PR-4：audit outbox flusher graceful shutdown（W1-T1 round-1 P1 修补）──
+        # 原版本在 try/finally 块外执行，W1-T1 fail-loud 后 lifespan 异常路径
+        # （consumer 启动失败 raise）跳过此段 → audit 行丢失。移入 finally 块保证
+        # 任意终止路径（正常 yield / start raise / yield 中抛）均能 stop + flush。
+        audit_outbox_flusher_stop.set()
+        try:
+            await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
+        except asyncio.TimeoutError:
+            audit_outbox_flusher_task.cancel()
 
 
 app = FastAPI(
