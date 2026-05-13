@@ -97,7 +97,7 @@ with patch("services.tx_growth.src.engine.journey_engine.JourneyEngine", return_
     engine_jm.JourneyEngine = MagicMock(return_value=_fake_engine)
     sys.modules["services.tx_growth.src.engine.journey_engine"] = engine_jm
 
-    from api.journey_routes import router
+    from services.tx_growth.src.api.journey_routes import router
 
 app = FastAPI()
 app.include_router(router)
@@ -134,7 +134,7 @@ def test_list_journey_definitions_ok():
     set_local = AsyncMock()
     count_result, rows_result = _make_list_result([_journey_row()])
 
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -168,7 +168,7 @@ def test_list_definitions_bad_tenant():
 
 def test_create_journey_definition_ok():
     """正常创建旅程，返回 id 和 is_active=False"""
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -215,7 +215,7 @@ def test_create_definition_missing_name():
 
 def test_create_definition_empty_steps():
     """steps 为空时，业务层校验应返回 422"""
-    with patch("api.journey_routes.async_session_factory"):
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory"):
         resp = client.post(
             "/api/v1/journey/definitions",
             json={"name": "空步骤旅程", "trigger_event": "first_visit", "steps": []},
@@ -231,7 +231,7 @@ def test_create_definition_empty_steps():
 
 def test_get_journey_definition_ok():
     """旅程存在时返回完整字段"""
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -262,7 +262,7 @@ def test_get_journey_definition_ok():
 
 def test_get_journey_definition_not_found():
     """旅程不存在时返回 404"""
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -287,7 +287,7 @@ def test_get_journey_definition_not_found():
 
 def test_delete_journey_definition_ok():
     """软删除成功，返回 deleted=True"""
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -322,7 +322,7 @@ def test_list_enrollments_ok():
     rows_result = AsyncMock()
     rows_result.fetchall = MagicMock(return_value=[])
 
-    with patch("api.journey_routes.async_session_factory") as mock_factory:
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory") as mock_factory:
         mock_db = AsyncMock()
         mock_db.__aenter__ = AsyncMock(return_value=mock_db)
         mock_db.__aexit__ = AsyncMock(return_value=False)
@@ -346,7 +346,7 @@ def test_list_enrollments_ok():
 
 def test_import_template_not_found():
     """导入不存在的模板名称，应返回 404"""
-    with patch("api.journey_routes.async_session_factory"):
+    with patch("services.tx_growth.src.api.journey_routes.async_session_factory"):
         resp = client.post(
             "/api/v1/journey/definitions/import_template",
             json={"template_name": "nonexistent_template_xyz"},

@@ -18,7 +18,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from campaigns.consumption_cashback import CONFIG_SCHEMA, execute
+from services.tx_growth.src.campaigns.consumption_cashback import CONFIG_SCHEMA, execute
 
 
 class TestConsumptionCashback(unittest.TestCase):

@@ -135,8 +135,8 @@ class FakeDB:
 # Import services (after stubs are in place)
 # ---------------------------------------------------------------------------
 
-from services.dual_reward_service import DualRewardError, DualRewardService
-from services.group_deal_service import GroupDealError, GroupDealService
+from services.tx_growth.src.services.dual_reward_service import DualRewardError, DualRewardService
+from services.tx_growth.src.services.group_deal_service import GroupDealError, GroupDealService
 
 TENANT = uuid.uuid4()
 STORE = uuid.uuid4()
@@ -649,7 +649,7 @@ from fastapi.testclient import TestClient
 if "api.group_deal_routes" in sys.modules:
     del sys.modules["api.group_deal_routes"]
 
-from api.group_deal_routes import router
+from services.tx_growth.src.api.group_deal_routes import router
 
 _app = FastAPI()
 _fake_db = AsyncMock()

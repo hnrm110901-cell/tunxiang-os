@@ -18,23 +18,23 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from services.audience_segmentation import (
+from services.tx_growth.src.services.audience_segmentation import (
     AudienceSegmentationService,
     add_users_to_segment,
     clear_all_segments,
 )
-from services.brand_strategy import BrandStrategyService, _brand_strategies
-from services.channel_engine import (
+from services.tx_growth.src.services.brand_strategy import BrandStrategyService, _brand_strategies
+from services.tx_growth.src.services.channel_engine import (
     ChannelEngine,
 )
-from services.content_engine import (
+from services.tx_growth.src.services.content_engine import (
     ContentEngine,
 )
-from services.journey_orchestrator import (
+from services.tx_growth.src.services.journey_orchestrator import (
     JourneyOrchestratorService,
     clear_all_journeys,
 )
-from services.offer_engine import (
+from services.tx_growth.src.services.offer_engine import (
     OfferEngine,
 )
 
@@ -104,7 +104,7 @@ import uuid as _uuid
 from datetime import datetime as _dt
 from datetime import timezone as _tz
 
-from services.roi_attribution import (
+from services.tx_growth.src.services.roi_attribution import (
     ROIAttributionService,
     clear_all_attribution_data,
     set_campaign_cost,

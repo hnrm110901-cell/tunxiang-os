@@ -18,7 +18,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from campaigns.nth_item_discount import CONFIG_SCHEMA, execute
+from services.tx_growth.src.campaigns.nth_item_discount import CONFIG_SCHEMA, execute
 
 
 class TestNthItemDiscount(unittest.TestCase):

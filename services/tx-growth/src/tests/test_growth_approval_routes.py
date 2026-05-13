@@ -147,7 +147,7 @@ sys.modules.setdefault("sqlalchemy", _sa)
 
 # ── 导入被测路由 ────────────────────────────────────────────────────────────
 
-from api.approval_routes import router  # noqa: E402
+from services.tx_growth.src.api.approval_routes import router  # noqa: E402
 
 # ── 构建测试 App，使用 middleware 注入 mock_db ──────────────────────────────
 
@@ -395,7 +395,7 @@ def test_seed_default_workflows_ok():
     _mock_db_holder["db"] = mock_db
 
     # patch 路由模块中的 _svc 实例方法
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.seed_default_workflows = AsyncMock(return_value={"inserted": 2})
 
         resp = client.post("/api/v1/growth/approvals/workflows/seed", headers=HEADERS)
@@ -495,7 +495,7 @@ def test_approve_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.approve = AsyncMock(
             return_value={"ok": True, "status": "approved", "approved_at": "2026-04-06T10:00:00+00:00"}
         )
@@ -524,7 +524,7 @@ def test_approve_request_not_found():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.approve = AsyncMock(side_effect=ValueError("审批单不存在"))
 
         resp = client.post(
@@ -547,7 +547,7 @@ def test_reject_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.reject = AsyncMock(return_value={"ok": True, "status": "rejected", "reason": "折扣过高"})
 
         resp = client.post(
@@ -589,7 +589,7 @@ def test_cancel_request_ok():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.cancel = AsyncMock(return_value={"ok": True, "status": "cancelled"})
 
         resp = client.post(
@@ -616,7 +616,7 @@ def test_cancel_request_not_allowed():
     mock_db.commit = AsyncMock()
     _mock_db_holder["db"] = mock_db
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.cancel = AsyncMock(return_value={"ok": False, "reason": "只有申请人可撤销审批单"})
 
         resp = client.post(
@@ -641,7 +641,7 @@ def test_batch_approve_ok():
 
     ids = [str(uuid.uuid4()) for _ in range(3)]
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.batch_approve = AsyncMock(
             return_value={
                 "total": 3,
@@ -722,7 +722,7 @@ def test_batch_approve_partial_failure():
     id1 = str(uuid.uuid4())
     id2 = str(uuid.uuid4())
 
-    with patch("api.approval_routes._svc") as mock_svc:
+    with patch("services.tx_growth.src.api.approval_routes._svc") as mock_svc:
         mock_svc.batch_approve = AsyncMock(
             return_value={
                 "total": 2,
@@ -758,7 +758,7 @@ def test_batch_approve_partial_failure():
 
 def test_evaluate_conditions_gt():
     """gt 操作符：大于阈值时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -767,7 +767,7 @@ def test_evaluate_conditions_gt():
 
 def test_evaluate_conditions_not_met():
     """条件不满足时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 3000}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -776,7 +776,7 @@ def test_evaluate_conditions_not_met():
 
 def test_evaluate_conditions_in_operator():
     """in 操作符：值在列表中时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"campaign_type": "lottery"}
     conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
@@ -785,7 +785,7 @@ def test_evaluate_conditions_in_operator():
 
 def test_evaluate_conditions_in_operator_not_found():
     """in 操作符：值不在列表中时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"campaign_type": "birthday"}
     conditions = [{"field": "campaign_type", "op": "in", "value": ["lottery", "red_packet"]}]
@@ -794,7 +794,7 @@ def test_evaluate_conditions_in_operator_not_found():
 
 def test_evaluate_conditions_multiple_and():
     """多条件 AND：所有条件均满足时返回 True"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000, "target_count": 600}
     conditions = [
@@ -806,7 +806,7 @@ def test_evaluate_conditions_multiple_and():
 
 def test_evaluate_conditions_multiple_and_partial_fail():
     """多条件 AND：部分条件不满足时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"max_discount_fen": 6000, "target_count": 100}
     conditions = [
@@ -818,14 +818,14 @@ def test_evaluate_conditions_multiple_and_partial_fail():
 
 def test_evaluate_conditions_empty():
     """空条件列表返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     assert _evaluate_conditions([], {"any": "data"}) is False
 
 
 def test_evaluate_conditions_missing_field():
     """数据中缺少条件字段时返回 False"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"other_field": 100}
     conditions = [{"field": "max_discount_fen", "op": "gt", "value": 5000}]
@@ -834,7 +834,7 @@ def test_evaluate_conditions_missing_field():
 
 def test_evaluate_conditions_eq():
     """eq 操作符"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"status": "active"}
     conditions = [{"field": "status", "op": "eq", "value": "active"}]
@@ -843,7 +843,7 @@ def test_evaluate_conditions_eq():
 
 def test_evaluate_conditions_lt_lte():
     """lt 和 lte 操作符"""
-    from services.approval_service import _evaluate_conditions
+    from services.tx_growth.src.services.approval_service import _evaluate_conditions
 
     data = {"amount": 100}
     assert _evaluate_conditions([{"field": "amount", "op": "lt", "value": 200}], data) is True

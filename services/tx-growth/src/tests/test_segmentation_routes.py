@@ -57,7 +57,7 @@ _svc_parent = types.ModuleType("services")
 sys.modules.setdefault("services", _svc_parent)
 sys.modules["services.tx_growth.src.services.audience_segmentation"] = _seg_svc_mod
 
-from api.segmentation_routes import router  # noqa: E402
+from services.tx_growth.src.api.segmentation_routes import router  # noqa: E402
 
 app = FastAPI()
 app.include_router(router)

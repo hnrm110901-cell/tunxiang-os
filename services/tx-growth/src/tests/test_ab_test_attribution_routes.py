@@ -87,9 +87,9 @@ sys.modules.setdefault("structlog", _fake_structlog)
 
 _ab_svc_mock = MagicMock()
 
-with patch("services.ab_test_service.ABTestService", return_value=_ab_svc_mock):
-    from api.ab_test_routes import get_db as ab_get_db
-    from api.ab_test_routes import router as ab_router
+with patch("services.tx_growth.src.services.ab_test_service.ABTestService", return_value=_ab_svc_mock):
+    from services.tx_growth.src.api.ab_test_routes import get_db as ab_get_db
+    from services.tx_growth.src.api.ab_test_routes import router as ab_router
 
 ab_app = FastAPI()
 ab_app.include_router(ab_router)
@@ -308,8 +308,8 @@ def test_get_ab_results():
 
 _roi_svc_mock = MagicMock()
 
-with patch("services.roi_attribution.ROIAttributionService", return_value=_roi_svc_mock):
-    from api.attribution_routes import router as attr_router
+with patch("services.tx_growth.src.services.roi_attribution.ROIAttributionService", return_value=_roi_svc_mock):
+    from services.tx_growth.src.api.attribution_routes import router as attr_router
 
 attr_app = FastAPI()
 attr_app.include_router(attr_router)
