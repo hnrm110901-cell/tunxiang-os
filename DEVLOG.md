@@ -42,10 +42,26 @@ CodeRabbit round-2 这次**真 catch 了一个契约漏洞** — round-1 P1 "aud
 
 memory `feedback_coderabbit_incremental_policy` 仍成立（CodeRabbit 不重审 already-reviewed commits），但这次它对 round-1 P1 commit `84151f70` 之后的 commits 跑了 round-2 review，**在 outside-diff 视角抓到了 P1 fix 自身的姊妹漏洞**。这条记入更新版 memory：CodeRabbit outside-diff finding 比 inline finding 更可能是真 BUG，因为 inline 通常是 nit-level lint，outside-diff 是结构/契约视角。
 
+### Round-3 OMC code-reviewer verdict（user 选 B）
+
+派 OMC code-reviewer agent (§19 独立 verifier) 复审 commit `0fce495d`：
+
+**Verdict: APPROVE** — 0 真 BUG。
+
+关键观察：
+- main.py:240 修补 3 条异常路径全分析通过（task=None / yield 抛 / finally 内异常）
+- T6 AST 测试 (a)(b)(c) 无 bypass，足以防回归
+- decline 两条 nit 合理（CI 无 markdownlint，pyproject.toml ruff 无 ANN 规则）
+
+**Audit follow-up (P2, 不阻塞)** — 已开 issue **#496 [hardening][T2] tx-trade lifespan startup 序列统一 try/finally 闭合**：`audit_outbox_flusher_task` 在 line 171 try 块外初始化是同构边界，**当前**无可 raise 路径触发（line 171 同步赋值 + line 172-238 已被 try/except ImportError 包裹 / None init 保护），但若未来在该段加可 raise 启动调用会泄漏 flusher。属未来演进风险，独立 hardening issue 跟踪。
+
+PR comment 已落 verdict (issuecomment-4436391776)。
+
 ### 遗留问题
 
-- PR #489 round-3 fix push 完，**等 user 拍板**：(A) normal merge（不 admin-merge §19 Tier 1）/ (B) 派 OMC code-reviewer round-3 复审契约 fix（推荐）
+- PR #489 round-3 reviewer APPROVE，**等 user explicit normal merge 授权**（不 admin-merge §19 Tier 1）
 - 持续阻塞同 round-2：#487 W1-T2/T3/T4/T5 等 reviewer / B（dev-plan-60d demo 故事）/ C（DailySummary ontology）/ 5/13 channel-aggregation 资质
+- 新增 #496 hardening 候选（T2，不阻塞 W1）
 
 ### 上 session 意外发现（user 已 ping）
 

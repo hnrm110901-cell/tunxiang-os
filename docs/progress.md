@@ -17,9 +17,19 @@
 - **不做注入式验证** — round-1 P0 fix 时做了，因为 helper `_exception_handler_is_broad` 有逻辑漏洞可能；T6 helper 是 `body_text contains` 简单 string 检查，没逻辑可漏，省一次手工 break + restore
 - **commit message 沿用本仓库风格不加 Co-Authored-By** — 看 `0102e5ac / 4522b6ca / 84151f70` 都无 co-authored line
 
+### Round-3 OMC code-reviewer verdict（user 选 B）
+
+**Verdict: APPROVE** — 0 真 BUG。
+
+- main.py:240 修补 3 条异常路径全分析通过（task=None / yield 抛 / finally 内异常）
+- T6 AST 测试 (a)(b)(c) 无 bypass，足以防回归
+- decline 两条 nit 合理（CI 无 markdownlint，pyproject.toml ruff 无 ANN 规则）
+
+**Audit follow-up P2 (不阻塞)** — 已开 issue #496 [hardening][T2] tx-trade lifespan startup 序列统一 try/finally 闭合。`audit_outbox_flusher_task` 在 line 171 try 块外初始化是同构边界，当前无可 raise 触发，未来演进风险。
+
 ### 下一步
 
-- A：user 拍板 normal merge — Memory `feedback_self_review_blind_spots` 警示 T2+ infra/安全改动必须 explicit ask review；但本 fix 是 T1 资金路径 contract closure，**强烈建议派 OMC code-reviewer round-3**
+- A：user explicit normal merge — round-3 reviewer APPROVE + 6/6 + 82 邻近 0 回归，可 merge（不 admin-merge §19）
 - B：merge 后 W2 起手 — 删 indonesia/malaysia/vietnam（PR #129 引入）+ Gateway 瘦身，预期产出 `docs/w2-deprecate-regional-plan.md`
 
 ### 已知风险
