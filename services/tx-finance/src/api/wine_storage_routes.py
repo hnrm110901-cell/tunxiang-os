@@ -245,12 +245,15 @@ async def retrieve_wine(
         raise HTTPException(status_code=400, detail="取酒数量必须大于0")
 
     try:
+        # FOR UPDATE 防止并发取酒读相同 quantity 各自扣减 → 库存负值
+        # (audit doc §4.2 P0 客户押金/物权风险)
         fetch = await db.execute(
             text(
                 """
                 SELECT id, quantity, status, customer_id, wine_name, store_id
                 FROM biz_wine_storage
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
+                FOR UPDATE
             """
             ),
             {"id": str(sid), "tenant_id": str(tid)},
@@ -379,12 +382,15 @@ async def extend_storage(
         raise HTTPException(status_code=400, detail="延长天数必须大于0")
 
     try:
+        # FOR UPDATE 防止并发续存读相同 old_expires → 重复 fee + 日期叠加错
+        # (audit doc §4.2 P1 押金 race)
         fetch = await db.execute(
             text(
                 """
                 SELECT id, expires_at, status
                 FROM biz_wine_storage
                 WHERE id = :id::UUID AND tenant_id = :tenant_id::UUID
+                FOR UPDATE
             """
             ),
             {"id": str(sid), "tenant_id": str(tid)},
