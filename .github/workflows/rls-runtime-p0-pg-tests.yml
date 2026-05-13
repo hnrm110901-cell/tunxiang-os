@@ -1,0 +1,118 @@
+name: RLS Runtime P0 — 7 P0 表真 PG 反测
+
+# Issue #507 — 把 tests/tier1/test_rls_runtime_p0_tier1.py 从「写了不跑」变成 per-PR 触发。
+#
+# 与 integration-pg-tests.yml 并行（互不干扰）：
+#   · integration-pg-tests.yml 跑 channel-aggregation 3 表 (v411/v412/v413) — stamp v409 + 增量 chain
+#   · 本 workflow 跑 7 P0 业务表 (orders/payments/customers/ingredients/store_daily_settlements/dishes/employees)
+#     — 需 v001 base 起完整 chain upgrade head（覆盖 v001 core entities）
+#
+# 阻塞依赖：alembic chain 完整性
+#   · 5/9 (B') 修复后 `check_alembic_chain.py` 排空 KNOWN_BROKEN（详 MEMORY.md）
+#   · 本 workflow 首次让 legacy chain 在 CI 上 upgrade head from base — 可能暴露 runtime
+#     SQL 错误。失败时不应 hot-fix migration；走独立 issue 修复链路。
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Test 本身改动
+      - 'tests/tier1/test_rls_runtime_p0_tier1.py'
+      - 'shared/test_utils/integration_pg.py'
+      # 7 P0 表对应核心服务源码
+      - 'services/tx-trade/src/services/cashier_engine.py'
+      - 'services/tx-trade/src/services/order_service.py'
+      - 'services/tx-trade/src/services/payment_saga_service.py'
+      - 'services/tx-member/src/**'
+      - 'services/tx-supply/src/services/inventory*.py'
+      - 'services/tx-org/src/services/employee*.py'
+      - 'services/tx-menu/src/services/dish_service.py'
+      - 'services/tx-ops/src/services/daily_settlement_routes.py'
+      # RLS 基建改动
+      - 'infra/docker/init-rls.sql'
+      - 'shared/db-migrations/versions/v001_rls_foundation_and_core_entities.py'
+      # workflow 自身 + 基建
+      - '.github/workflows/rls-runtime-p0-pg-tests.yml'
+      - 'infra/compose/test-pg.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  rls-runtime-p0-tests:
+    name: RLS Runtime — 7 P0 表 cross-tenant + same-tenant 反测
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: tunxiang_test
+          POSTGRES_PASSWORD: test_password_dev_only
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tunxiang_test -d tunxiang_os_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+      INTEGRATION_PG_DSN: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        run: |
+          pip install \
+            "alembic>=1.13" "sqlalchemy[asyncio]>=2.0" \
+            "asyncpg>=0.29" "psycopg2-binary>=2.9" \
+            pytest "pytest-asyncio>=0.23" \
+            structlog cryptography pyyaml
+
+      - name: Apply init-rls.sql + init-pgvector.sql
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-rls.sql
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-pgvector.sql
+
+      - name: Alembic upgrade head (legacy chain from v001 base)
+        # v001 创建 7 P0 表中的 6 张（customers/orders/payments/dishes/employees/stores
+        # 等 core entities）。chain 完整性由 scripts/check_alembic_chain.py 在 5/9 修复
+        # 后保证（详 MEMORY.md 决策 B'）。完整 chain 511 migration 跑通 ~3-5 min 预期。
+        working-directory: shared/db-migrations
+        run: python -m alembic upgrade head
+
+      - name: Verify 7 P0 tables exist + RLS enabled
+        # reviewer round-1 guard: pre-test assertion 让"前置不满足"显式化（与
+        # test_rls_runtime_p0_tier1.py engine fixture 内 assert 同款 pattern）
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -c "SELECT relname, relrowsecurity FROM pg_class
+                WHERE relname IN ('orders','payments','customers','ingredients','store_daily_settlements','dishes','employees','stores')
+                AND relkind='r' ORDER BY relname;"
+
+      - name: Run RLS Runtime P0 tests (14 = 7 表 × 2 scenarios)
+        run: |
+          python -m pytest \
+            tests/tier1/test_rls_runtime_p0_tier1.py \
+            -v --tb=short
+
+      - name: Verify RLS policy state (debug aid, always run)
+        if: always()
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -c "SELECT tablename, policyname, cmd, qual IS NOT NULL AS has_using, with_check IS NOT NULL AS has_check
+                FROM pg_policies
+                WHERE tablename IN ('orders','payments','customers','ingredients','store_daily_settlements','dishes','employees')
+                ORDER BY tablename, cmd;"
