@@ -41,16 +41,23 @@ async def _get_ingredient(
     ingredient_id: str,
     store_id: str,
     tenant_id: str,
+    lock: bool = False,
 ) -> Ingredient:
-    """获取原料记录，不存在则抛出 ValueError"""
-    result = await db.execute(
-        select(Ingredient).where(
-            Ingredient.id == _uuid(ingredient_id),
-            Ingredient.store_id == _uuid(store_id),
-            Ingredient.tenant_id == _uuid(tenant_id),
-            Ingredient.is_deleted == False,  # noqa: E712
-        )
+    """获取原料记录，不存在则抛出 ValueError
+
+    Args:
+        lock: True 时附加 FOR UPDATE 行锁 — mutation 路径必须显式传 lock=True 防并发丢更新
+              （audit doc §4.3 Tier 1 修复，参考范本：tx-member stored_value_service.py）
+    """
+    stmt = select(Ingredient).where(
+        Ingredient.id == _uuid(ingredient_id),
+        Ingredient.store_id == _uuid(store_id),
+        Ingredient.tenant_id == _uuid(tenant_id),
+        Ingredient.is_deleted == False,  # noqa: E712
     )
+    if lock:
+        stmt = stmt.with_for_update()
+    result = await db.execute(stmt)
     ing = result.scalar_one_or_none()
     if ing is None:
         raise ValueError(f"原料 {ingredient_id} 在门店 {store_id} 不存在")
@@ -116,7 +123,8 @@ async def receive_stock(
         raise ValueError("单位成本不能为负数")
 
     await _set_tenant(db, tenant_id)
-    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id)
+    # Tier 1 行锁（audit doc §4.3 P0）：防加权平均单价并发错算（毛利底线硬约束）
+    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
     qty_before = ingredient.current_quantity
     qty_after = qty_before + quantity
@@ -273,7 +281,8 @@ async def issue_stock(
         raise ValueError(f"出库原因必须是 {valid_reasons} 之一")
 
     await _set_tenant(db, tenant_id)
-    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id)
+    # Tier 1 行锁（audit doc §4.3 P0）：防 FIFO 出库并发丢更新（食安/成本）
+    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
     if ingredient.current_quantity < quantity:
         raise ValueError(f"库存不足: 当前 {ingredient.current_quantity}, 需求 {quantity}")
@@ -379,7 +388,8 @@ async def adjust_stock(
         raise ValueError("调整数量不能为0")
 
     await _set_tenant(db, tenant_id)
-    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id)
+    # Tier 1 行锁（audit doc §4.3 P1）：盘点调整与日常 IO 并发丢更新，与其他 mutation 路径统一
+    ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
     qty_before = ingredient.current_quantity
     qty_after = qty_before + quantity

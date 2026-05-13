@@ -114,18 +114,26 @@ async def deduct_for_dish(
     deducted: list[dict[str, Any]] = []
     insufficient_stock: list[dict[str, Any]] = []
 
+    # Tier 1 行锁防 ABBA 死锁（audit doc §4.3 P0）：
+    # 一道菜的 BOM 可含多个 ingredient（如红烧鱼 = 鱼 + 葱姜蒜 + 酱油），
+    # 两单同时完成不同菜品但 BOM 共享 ingredient → 锁顺序不同会 ABBA 死锁.
+    # 范本：tx-member/stored_value_service.py transfer 函数 2 卡同锁 sorted([from, to]).
+    # 跳过无效 ingredient_id 的 BOM 行（保留原 broken-row 日志行为）.
+    sorted_bom_lines: list[dict[str, Any]] = []
     for line in bom_lines:
         ing_id = line["ingredient_id"]
-        consume_qty = line["quantity"] * quantity  # BOM用量 x 份数
-
-        # 查找门店库存记录（ingredient_id 在 dish_ingredients 中是 String(50)）
-        # 需要通过 ingredient_name 或直接 UUID 关联
-        # dish_ingredients.ingredient_id 是 String(50)，可能存的是 UUID 字符串
         try:
-            ing_uuid = uuid.UUID(ing_id)
+            uuid.UUID(ing_id)
         except ValueError:
             log.warning("invalid_ingredient_id", ingredient_id=ing_id, dish_id=dish_id)
             continue
+        sorted_bom_lines.append(line)
+    sorted_bom_lines.sort(key=lambda x: str(x["ingredient_id"]))
+
+    for line in sorted_bom_lines:
+        ing_id = line["ingredient_id"]
+        consume_qty = line["quantity"] * quantity  # BOM用量 x 份数
+        ing_uuid = uuid.UUID(ing_id)
 
         result = await db.execute(
             select(Ingredient)
@@ -133,6 +141,7 @@ async def deduct_for_dish(
             .where(Ingredient.store_id == store_uuid)
             .where(Ingredient.tenant_id == tenant_uuid)
             .where(Ingredient.is_deleted == False)  # noqa: E712
+            .with_for_update()
         )
         ingredient = result.scalar_one_or_none()
         if ingredient is None:

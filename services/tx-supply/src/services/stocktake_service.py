@@ -426,6 +426,12 @@ async def finalize_stocktake(
     deficit_cost_fen = surplus_cost_fen = 0
     details: list[dict[str, Any]] = []
 
+    # Tier 1 行锁防 ABBA 死锁（audit doc §4.3 P0 verifier 转 P0）：
+    # 一次盘点涉及多个 ingredient，并发 finalize / finalize 与 issue_stock/receive_stock
+    # 撞会导致 ingredient 数量错乱 → 按 ingredient_id 升序锁防死锁.
+    # 范本：tx-member/stored_value_service.py transfer 2 卡同锁排序.
+    items_rows = sorted(items_rows, key=lambda r: str(r["ingredient_id"]))
+
     async with db.begin_nested():
         for item in items_rows:
             actual_qty = item["actual_qty"]
@@ -456,11 +462,13 @@ async def finalize_stocktake(
             # 库存调整（仅差异 != 0 时）
             if abs(variance) >= 0.001:
                 ing_uuid = uuid.UUID(str(item["ingredient_id"]))
+                # Tier 1 行锁（audit doc §4.3 P0）：盘点终结 race + 与日常 IO 撞防丢更新
                 ing_result = await db.execute(
                     select(Ingredient)
                     .where(Ingredient.id == ing_uuid)
                     .where(Ingredient.tenant_id == tenant_uuid)
                     .where(Ingredient.is_deleted == False)  # noqa: E712
+                    .with_for_update()
                 )
                 ingredient = ing_result.scalar_one_or_none()
                 if ingredient:
