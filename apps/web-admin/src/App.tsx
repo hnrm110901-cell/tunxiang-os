@@ -70,6 +70,8 @@ import { SupplierCertificatesPage } from './pages/supply/SupplierCertificatesPag
 import { IngredientWeightStandardsPage } from './pages/supply/IngredientWeightStandardsPage';
 import { IngredientYieldStandardsPage } from './pages/supply/IngredientYieldStandardsPage';
 import { SupplierDeliveryWindowsPage } from './pages/supply/SupplierDeliveryWindowsPage';
+import { RFQManagementPage } from './pages/supply/RFQManagementPage';  // PRD-04 sub-C / Phase 2 W9-W10 / T2 normal
+import { RFQSupplierQuotePage } from './pages/supply/RFQSupplierQuotePage';  // 供应商报价提交页（含 X-Supplier-ID）
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
@@ -301,6 +303,8 @@ function AppContent() {
           <Route path="/supply/ingredient-weight-standards" element={<IngredientWeightStandardsPage />} />  {/* PRD-02 商品扣秤标准库 / Tier 1 */}
           <Route path="/supply/ingredient-yield-standards" element={<IngredientYieldStandardsPage />} />  {/* PRD-06 商品出料率标准库 / Tier 1 */}
           <Route path="/supply/supplier-delivery-windows" element={<SupplierDeliveryWindowsPage />} />  {/* PRD-05 供应商配送时间窗 / Tier 1 */}
+          <Route path="/supply/rfqs" element={<RFQManagementPage />} />  {/* PRD-04 sub-C 询价单管理 / T2 normal */}
+          <Route path="/supplier-portal/rfqs/:rfqId/quote" element={<RFQSupplierQuotePage />} />  {/* PRD-04 sub-C 供应商报价 */}
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />

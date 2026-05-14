@@ -34,6 +34,7 @@ from .api.deduction_routes import router as deduction_router
 from .api.delivery_proof_routes import router as delivery_proof_router
 from .api.delivery_window_routes import router as delivery_window_router
 from .api.rfq_routes import router as rfq_router
+from .api.rfq_routes import supplier_portal_router as rfq_supplier_portal_router
 from .api.doc_number_routes import router as doc_number_router
 from .api.delivery_route_routes import router as delivery_route_router
 from .api.dept_issue_routes import router as dept_issue_router
@@ -140,6 +141,7 @@ app.include_router(weight_standard_router)  # 商品扣秤标准库（PRD-02 毛
 app.include_router(yield_standard_router)  # 商品出料率标准库（PRD-06 毛利底线 / v429 / Tier 1）
 app.include_router(delivery_window_router)  # 供应商配送时间窗（PRD-05 食安 / v430 / Tier 1）
 app.include_router(rfq_router)  # RFQ 询价单 award 路径（PRD-04 sub-B / v431 / Tier 1 资金路径前置）
+app.include_router(rfq_supplier_portal_router)  # RFQ 供应商门户报价 (PRD-04 sub-C / supplier-portal scope)
 app.include_router(mobile_supply_router)  # 移动端供应链：扫码采购/收货/盘点（模块3.3）
 app.include_router(transfer_ext_router)  # 调拨扩展：execute 端点
 app.include_router(edi_ext_router)  # EDI 扩展：供应商查看订单 + 确认发货

@@ -512,7 +512,8 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **v429 PRD-06 ingredient_yield_standards（W7-2 PR #637 ✅ ship）**
 - **v430 PRD-05 supplier_delivery_windows + supplier_delivery_violations（W8 PR #641 ✅ ship）**
 - **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 PR #645 ✅ ship）**
-- **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 本 PR，复用 v431 schema 无新 migration）**
+- **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 PR #647 ✅ ship，复用 v431 schema 无新 migration）**
+- **PRD-04 sub-C state transitions + supplier-portal scope + 前端 RFQManagementPage/QuotePage + AI 推荐 UI（W9-W10 本 PR，复用 v431 schema 无新 migration）**
 - v432 PRD-13 sub-A MarketSurvey schema（W11-W12）
 - v433+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
 
@@ -537,6 +538,36 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **预计 5 commits**（service + routes + tier1 tests + #579 concurrent + README/baseline）
 
 Closes #579
+
+#### W9-W10 sub-C PR 立项参数（PRD-04 RFQ state transitions + supplier-portal + 全栈 UI）— ✅ ship
+
+**Tier 级别**：T2 normal（不在 Tier 1 source patterns）／**T2 carve-out type 7 auto admin-merge**（不 explicit-ask）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
+
+- **范围**：
+  - `rfq_service.py` +6 函数：`publish_rfq` / `close_rfq` / `cancel_rfq` / `submit_quote` / `get_rfq_comparison` / `list_rfqs`
+  - `rfq_routes.py` +6 admin endpoints (POST publish/close/cancel + GET list/comparison + 复用 award) + 新 `supplier_portal_router` (POST /api/v1/supply/supplier-portal/rfqs/{id}/quote)
+  - `rfq_models.py` +2 Pydantic schemas: `RFQCancelRequest` / `RFQSupplierQuoteSubmit`
+  - `apps/web-admin/src/pages/supply/RFQManagementPage.tsx`：列表 + 创建 modal + 详情 drawer（state transition buttons + 比价表 + AI 推荐 + Award 二级审批）
+  - `apps/web-admin/src/pages/supply/RFQSupplierQuotePage.tsx`：供应商门户报价提交页（X-Supplier-ID header）
+  - `App.tsx` +2 routes：`/supply/rfqs` (admin) + `/supplier-portal/rfqs/:rfqId/quote` (supplier)
+  - `main.py` +1 router 注册 (rfq_supplier_portal_router)
+- **状态机硬约束**：
+  - `publish`：仅 `draft → published`（其余状态拒绝）
+  - `close`：仅 `quoting → comparing`（其余状态拒绝）
+  - `cancel`：任何非终态 → `cancelled`（reason 必填合规审计 + audit log 拼接到 notes；awarded/cancelled 拒绝）
+  - `submit_quote`：rfq.status in (published, quoting) + 邀请校验（rfq_invitees）+ SKU 校验（rfq_items）+ ON CONFLICT UPSERT（允许 deadline 前修改报价）+ 首报跃迁 published→quoting（FOR UPDATE 锁住 rfq 行）+ invitees.responded_at 更新
+  - `get_rfq_comparison`：按 SKU 聚合所有 quotes，AI 推荐 = 最低价 quote_id（v1 heuristic；sub-D follow-up 引入 supplier_score 综合排序）
+  - 所有 mutation 路径走 FOR UPDATE 行锁（PR-A/B/C/D/E pattern）— 即非 Tier 1 资金路径也防 200 桌并发状态机竞态
+- **测试**：
+  - `test_rfq_state_transitions_tier1.py` 40 用例（publish 7 / close 7 / cancel 6 / submit_quote 10 / comparison 3 / list 4 + parametrize 展开）
+  - 兼容 sub-B `test_rfq_service_tier1.py`（16 用例）+ `test_rfq_schema.py`（10 用例）— 零回归
+- **baseline 不变**：services/tx-supply/src text(f) **82**（所有新增 SQL 用 :param + 预构造常量 `_RFQ_*_SQL` / `_LIST_RFQS_*_SQL`，零 f-string 注入面，L011 严格符合）
+- **supplier-portal auth (sub-C scope)**：X-Supplier-ID header 透传（来自 query param 或 supplier_portal_v2 JWT）；生产 JWT 解析放 sub-D follow-up
+- **不在 sub-C 范围**：
+  - 供应商门户 JWT 鉴权（sub-D follow-up — supplier_portal_v2 `/auth/login` 接 RFQ scope）
+  - AI 推荐综合评分（引入 PRD-05 配送时间窗扣分 + supplier_score 综合排序 — sub-D 或独立 PR）
+  - 邮件/IM 推送邀请通知（依赖 #485 supplier_portal_messages 通用入箱 — 独立 PR）
+- **预计 4 commits**（service 扩展 + routes/models 扩展 + 前端 + tests/README）
 
 #### W9 sub-A PR #645 立项参数（PRD-04 RFQ schema + #613 supplier_portal_messages UNIQUE）— ✅ ship
 
