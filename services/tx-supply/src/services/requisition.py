@@ -89,7 +89,7 @@ async def create_requisition(
         raise ValueError("申购单必须包含至少一项商品")
 
     req_id = _gen_id("req")
-    now = _now_iso()
+    now_iso = _now_iso()
     total_fen = sum(i.get("estimated_price_fen", 0) * i.get("quantity", 1) for i in items)
     approval_level = _determine_approval_level(total_fen)
 
@@ -104,8 +104,8 @@ async def create_requisition(
         "total_estimated_fen": int(total_fen),
         "approval_level": approval_level,
         "approval_log": [],
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
 
     log.info(

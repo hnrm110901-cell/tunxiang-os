@@ -8,7 +8,7 @@ reference_id 存批次号，notes 存 JSON 扩展信息（含 expiry_date）。
 import asyncio
 import json
 import uuid
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 
 import structlog
@@ -18,6 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import InventoryStatus, TransactionType
+
+from .doc_number_service import DocNumberError
+from .doc_number_service import generate as gen_doc_number
 
 logger = structlog.get_logger()
 
@@ -111,11 +114,16 @@ async def receive_stock(
     tenant_id: str,
     db: AsyncSession,
     performed_by: Optional[str] = None,
+    now: Optional[datetime] = None,
 ) -> dict:
     """入库（采购入库）
 
     创建 purchase 类型事务，更新库存数量。
-    Returns: {"transaction_id": str, "new_quantity": float, "status": str}
+
+    Args:
+        now: 入库时间（默认当前 UTC，测试注入用）
+
+    Returns: {"transaction_id": str, "new_quantity": float, "status": str, "doc_number": str|None}
     """
     if quantity <= 0:
         raise ValueError("入库数量必须大于0")
@@ -123,6 +131,18 @@ async def receive_stock(
         raise ValueError("单位成本不能为负数")
 
     await _set_tenant(db, tenant_id)
+
+    # 生成可读单号（PRD-03 Wave1）— 失败 graceful degradation（doc_number 是辅助
+    # 标识，infra 失败不阻塞 Tier 1 出入库业务，参考 issue #580 sequence gap 处理）
+    doc_number: Optional[str] = None
+    try:
+        doc_number = await gen_doc_number(
+            db, tenant_id=tenant_id, doc_type="inventory_io", now=now
+        )
+    except DocNumberError as e:
+        logger.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — 兜底，doc_number infra 异常不阻塞 Tier 1 业务
+        logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
     # Tier 1 行锁（audit doc §4.3 P0）：防加权平均单价并发错算（毛利底线硬约束）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
@@ -157,10 +177,20 @@ async def receive_stock(
     db.add(tx)
     await db.flush()
 
+    # 写入 doc_number（ORM 实体冻结，用 raw SQL UPDATE）
+    if doc_number is not None:
+        await db.execute(
+            text(
+                "UPDATE ingredient_transactions SET doc_number = :doc_number WHERE id = :id"
+            ),
+            {"doc_number": doc_number, "id": str(tx.id)},
+        )
+
     logger.info(
         "stock_received",
         ingredient_id=ingredient_id,
         batch_no=batch_no,
+        doc_number=doc_number,
         quantity=quantity,
         unit_cost_fen=unit_cost_fen,
         new_quantity=qty_after,
@@ -170,6 +200,7 @@ async def receive_stock(
 
     return {
         "transaction_id": str(tx.id),
+        "doc_number": doc_number,
         "new_quantity": qty_after,
         "status": status,
     }

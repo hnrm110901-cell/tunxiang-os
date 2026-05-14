@@ -27,6 +27,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import InventoryStatus
 
+from .doc_number_service import DocNumberError
+from .doc_number_service import generate as gen_doc_number
+
 log = structlog.get_logger(__name__)
 
 
@@ -80,16 +83,35 @@ async def create_stocktake(
     store_id: str,
     tenant_id: str,
     db: AsyncSession,
+    *,
+    now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """创建盘点单，快照当前系统库存
 
+    Args:
+        store_id: 门店 UUID
+        tenant_id: 租户 UUID
+        db: 数据库会话
+        now: 盘点时间（默认当前 UTC，测试注入用）
+
     Returns:
-        {stocktake_id, store_id, status, item_count, items: [...]}
+        {stocktake_id, store_id, status, item_count, items: [...], doc_number}
     """
     tenant_uuid = uuid.UUID(tenant_id)
     store_uuid = uuid.UUID(store_id)
 
     await _set_tenant(db, tenant_id)
+
+    # 生成可读单号（PRD-03 Wave1）— graceful degradation 见 inventory_io 同模式
+    doc_number: Optional[str] = None
+    try:
+        doc_number = await gen_doc_number(
+            db, tenant_id=tenant_id, doc_type="stocktake", now=now
+        )
+    except DocNumberError as e:
+        log.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — doc_number 辅助标识 infra fallback
+        log.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
 
     # 查询门店所有未删除的库存原料
     result = await db.execute(
@@ -102,8 +124,8 @@ async def create_stocktake(
     ingredients = result.scalars().all()
 
     stocktake_id = str(uuid.uuid4())
-    now = datetime.now(timezone.utc)
-    now_iso = now.isoformat()
+    now_ts = now if now is not None else datetime.now(timezone.utc)
+    now_iso = now_ts.isoformat()
 
     items: dict[str, dict[str, Any]] = {}
     for ing in ingredients:
@@ -127,17 +149,18 @@ async def create_stocktake(
             text(
                 """
                 INSERT INTO stocktakes
-                    (id, tenant_id, store_id, status, started_at, created_at, updated_at)
+                    (id, tenant_id, store_id, status, doc_number, started_at, created_at, updated_at)
                 VALUES
                     (:id::uuid, :tenant_id::uuid, :store_id::uuid,
-                     'in_progress', :now, :now, :now)
+                     'in_progress', :doc_number, :now, :now, :now)
             """
             ),
             {
                 "id": stocktake_id,
                 "tenant_id": tenant_id,
                 "store_id": store_id,
-                "now": now,
+                "doc_number": doc_number,
+                "now": now_ts,
             },
         )
 
@@ -169,7 +192,7 @@ async def create_stocktake(
                     "system_qty": item["system_qty"],
                     # v064 用 cost_price (单价，原始数值)；unit_price_fen 存分为单位
                     "cost_price": (item["unit_price_fen"] / 100.0) if item.get("unit_price_fen") else None,
-                    "now": now,
+                    "now": now_ts,
                 },
             )
 
@@ -185,11 +208,18 @@ async def create_stocktake(
             "items": items,
         }
 
-    log.info("stocktake.created", stocktake_id=stocktake_id, item_count=len(items), mode="db" if use_db else "memory")
+    log.info(
+        "stocktake.created",
+        stocktake_id=stocktake_id,
+        doc_number=doc_number,
+        item_count=len(items),
+        mode="db" if use_db else "memory",
+    )
 
     return {
         "ok": True,
         "stocktake_id": stocktake_id,
+        "doc_number": doc_number,
         "store_id": store_id,
         "status": "open",
         "item_count": len(items),
