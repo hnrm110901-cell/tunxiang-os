@@ -1,0 +1,81 @@
+"""v419 — doc_number wave1 回填：5 类高频单据 doc_number 字段
+
+PRD-03 Wave1：为 5 类高频单据新增 doc_number 列，允许 NULL（兼容历史行）。
+历史行回填为 'LEGACY-' + id 前 8 位，便于财务对账定位。
+
+5 类单据：
+  1. purchase_orders     — 采购单（po_number 保留，双轨兼容期）
+  2. requisitions        — 申购单（若表存在）
+  3. stocktakes          — 盘点单（v064 创建）
+  4. receiving_orders    — 收货单（ORM entity）
+  5. ingredient_transactions — 出入库流水
+
+设计约束：
+  - 不加 UNIQUE 约束（历史 LEGACY- 行 NULL 初态 → 回填后可能重复文件名）
+  - 回填用 'LEGACY-' + substring(id::text, 1, 8) 格式
+  - inspector-and-skip 防重运行（参考 v296 / v418 模式）
+  - downgrade 反向 DROP COLUMN
+
+Revision ID: v419_doc_number_wave1_backfill
+Revises: v418_doc_number_rules
+Create Date: 2026-05-14
+"""
+from typing import Sequence, Union
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "v419_doc_number_wave1_backfill"
+down_revision: Union[str, Sequence[str], None] = "v418_doc_number_rules"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+_TABLES = [
+    "purchase_orders",
+    "requisitions",
+    "stocktakes",
+    "receiving_orders",
+    "ingredient_transactions",
+]
+
+
+def _has_column(inspector: sa.Inspector, table: str, column: str) -> bool:
+    return any(c["name"] == column for c in inspector.get_columns(table))
+
+
+def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = set(inspector.get_table_names())
+
+    for table in _TABLES:
+        if table not in existing_tables:
+            continue
+        if _has_column(inspector, table, "doc_number"):
+            continue
+
+        op.execute(
+            f"ALTER TABLE {table} ADD COLUMN doc_number VARCHAR(64) NULL"
+        )
+        # 历史行回填：'LEGACY-' + id 前 8 位（id 必须为 UUID 类型）
+        op.execute(
+            f"""
+            UPDATE {table}
+            SET doc_number = 'LEGACY-' || substring(id::text, 1, 8)
+            WHERE doc_number IS NULL
+            """
+        )
+
+
+def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = set(inspector.get_table_names())
+
+    for table in _TABLES:
+        if table not in existing_tables:
+            continue
+        if not _has_column(inspector, table, "doc_number"):
+            continue
+        op.execute(f"ALTER TABLE {table} DROP COLUMN doc_number")
