@@ -1,3 +1,86 @@
+## 2026-05-14 夜段 — 5/14 ship 收尾 sediment：audit §17 决策表 + ADR 0002 ABBA 文档化 + #559 XFAIL 守护 + 真 PG 并发测试框架 proposal 4 PR batch ship (5/14 累计 30 PR — 含并发 session PR #625)
+
+### 今日完成
+
+5/14 夜段（CST 15:17-15:47）ship 4 PR — 5/14 ship 收尾 sediment：把当日 6-PR row-lock fix roadmap + §17 桌台并发对齐 + concurrent 测试 gap 三条线索的"未落仓库 SoT 部分"批量落盘。**全部 docs/test only，0 source / 0 migration / 0 schema**。同期并发 session ship **PR #625** (PR-01C 证件管理 UI / Phase 1 W6 9/9 收尾)，**5/14 单日累计 ship 30 PR**（25 prior + 本 batch 4 + 并发 #625 = 30）。
+
+**PR #628 — audit doc §11 §17 桌台并发语义对齐决策跟踪表 MERGED** `291081a9` (admin squash, **docs-only carve-out 类 2**, 5/14 17:17 CST, +162 行 / 1 file):
+- `docs/security/tier1-row-lock-audit-2026-05.md` §11 NEW — 11 路径决策跟踪表 (6 P1/P2 桌台 cashier + 3 P1 order_service + #549 ABBA / #557 隐式不变量 / #559 XFAIL gap)，3 选择题 (D1 双开台 race / D2 转桌争抢 / D3 结算释放桌台中间态) + 9 候选方案 + architect default 建议 (1A/2A/3B)
+- §17 桌台并发对齐 PR 阻塞改"待创始人 3 选择题答复"，audit doc 落 single source of truth；下次 §17 PR 起手直接 ref §11
+- audit doc 自加 §11 总行数从 ~700 涨到 ~860，跨 session 跟踪锚点稳固
+
+**PR #629 — ADR 0002 auto_deduction.deduct_for_order 跨 dish ABBA 死锁防护追溯文档化 MERGED** `a8199749` (admin squash, **docs-only carve-out 类 2**, 5/14 17:27 CST, +324 行 / 1 NEW file):
+- `docs/adr/0002-cross-dish-row-lock-abba.md` NEW — 追溯 PR #567 (Phase 1 W3 实施) 实现的 deduct_for_order 跨 dish 锁排序 (`sorted(items, key=lambda x: str(x["ingredient_id"]))`)，提供 ABBA 死锁防护背景、决策记录、实现细节、跨 dish 死锁 case study、§6.2 follow-up "真 PG 并发 e2e 测" 引用 PR #631 proposal §7 第 4 步
+- ADR 模式首次落地：实施在前 (PR #567)，文档化在后 (PR #629)，#549 issue body 更新引用 ADR 0002 + audit doc §4.3
+- "implementation-first → ADR-after" 模式可复用，适合"实施时 ADR 草率，事后整理范本"场景
+
+**PR #630 — #559 XFAIL strict verify order_service.apply_discount 终态订单不校验 status MERGED** `3a78dafd` (admin squash, **test-only Tier 1 *tier1* 后缀 carve-out 类 4**, 5/14 17:37 CST, +113 行 / 1 file):
+- `services/tx-trade/tests/test_order_service_row_lock_tier1.py` 加 3 用例：T1 PASS apply_discount 加 FOR UPDATE 行锁（baseline 防回归）/ T2 XFAIL strict apply_discount 终态订单 (CLOSED/CANCELED/COMPLETED) **不**校验 status 直接通过 — issue #559 silent regression 守护 / T3 PASS baseline 状态机 OPEN→PAID 正常分支
+- **XFAIL strict 模式实证** — `pytest.mark.xfail(strict=True, reason="...")` 让 fix ship 时强制提醒维护者移除标记；T2 当前 XFAIL 反映"已知 bug + 等 §17 PR 修"，fix 后 T2 转 PASS 必须显式去 `strict=True` 标记，防止 silent regression
+- §19: 0 P0 / 0 P1 / approve (test-only blast radius 0)，跳完整 reviewer agent run + 0 fix follow-up
+
+**PR #631 — 真 PG 并发 Tier 1 测试框架设计提案 (DRAFT) MERGED** `5ae0a3e1` (admin squash, **docs-only carve-out 类 2**, 5/14 17:47 CST, +359 行 / 1 NEW file):
+- `docs/testing/concurrent-row-lock-test-framework-proposal.md` NEW — 13 节 / 6-PR roadmap 系统化设计提案
+- §1-2 背景 + 现状：6-PR row-lock fix roadmap 100% mock-driven (`_select_has_for_update` SQL 字符串 grep)，无任何真 PG race 验证；CLAUDE.md §22 Week 8 "P99 < 200ms 200 桌并发"门槛 missing 前置验证
+- §3 Library 选型对比：**复用现有 `infra/compose/test-pg.yml` + service container 模式**（0 新依赖，与 `rls-runtime-p0-pg-tests.yml` 同模式，已 ship 验证）vs pytest-postgresql / testcontainers-python / pgmock（全 disqualified）
+- §4-5 Fixture 架构 + `concurrent_runner.py` API：~80 行 `async run_concurrent(sessionmaker, tenant_id, n, operation)` + `assert_final_consistency()` — 各 worker 独立 session/transaction + SET LOCAL ROLE tunxiang_rls_app 切非 superuser + set_tenant_guc + asyncio.gather(return_exceptions=True)
+- §6 CI 集成：新 workflow `tier1-row-lock-concurrent.yml`（**不扩 tier1-gate** — `feedback_tier1_ci_minimal_deps_trap.md` 教训，骨架抄 `rls-runtime-p0-pg-tests.yml` ~5min PG service container + alembic upgrade chain），第 2 期 pg_dump schema snapshot cache 加速 ~5min → ~30s
+- §7-10 Adoption 路径 + PR 拆分预案 6 PR 分别 1d/0.5d/0.5d/0.5d/1d/0.5d：PR-1 infra (concurrent_runner + conftest_pg + workflow) → PR-2 cashier (框架金标准) → PR-3 payment_saga SKIP LOCKED → PR-4 inventory_io + auto_deduction (验证 ADR 0002 死锁排序) → PR-5 order + delivery → PR-6 (可选) pg_dump cache
+- §12 Consensus Addendum：steelman + 反驳 + tradeoff tension + synthesis (fast/slow 双 tier 不替换 mock)
+- §13 状态 DRAFT — 不阻塞 §17 桌台并发对齐 PR (§17 仍走 mock 路线 ship，real-PG 验证可在 §17 ship 后追溯加固，与 ADR 0002 PR #567 → PR #629 同模式)
+- **关键架构师调研发现**：仓库**已有真 PG 反测基建**（`shared/test_utils/integration_pg.py:39-78` + `tests/tier1/test_rls_runtime_p0_tier1.py:1-100` 413 行 service-level multi-session 范本 + `infra/compose/test-pg.yml` + `infra/docker/init-rls.sql` + 2 workflow），本提案是**横向扩展到行锁**而非另起炉灶
+
+**并发 session PR #625 — PR-01C 供应商证件管理 UI CRUD 闭环 [Tier1]** MERGED `153bc666` (Phase 1 W6 9/9 收尾) — 不在本 session scope，acknowledged for 30 PR tally only
+
+### 关键决策（跨 session 价值）
+
+- **5/14 ship blitz sediment 模式确立** — 单日 ship 25+ PR 后的 sediment session 不动业务源码，纯落 docs/test/proposal/ADR 收尾。本 batch 4 PR 全 docs-only / test-only / proposal carve-out 类 2 + 类 4，0 source / 0 migration / 0 schema，blast radius 0，跳 §19 reviewer + 走 group explicit-ask。下次同主题 sediment batch 可直接套此模式
+- **"implementation-first → ADR-after" 模式实证** — PR #567 (Phase 1 W3 实施 deduct_for_order 跨 dish 锁排序) 在前，PR #629 (ADR 0002 文档化) 在后 ~3 周。适合"实施时 ADR 草率/缺、事后整理范本"场景；#549 issue body 更新引用 ADR 0002 + audit doc §4.3 形成 tracking-doc 三方互链。下次"修在前文档在后"场景直接套 ADR 0002 模板
+- **XFAIL strict 守护模式标准化** — `pytest.mark.xfail(strict=True, reason="待 §17 PR 修")` 让 fix ship 时强制提醒维护者移除标记；T2 当前 XFAIL 反映"已知 bug + 等修"，fix 后 T2 转 PASS 必须显式去 `strict=True` 标记，防止 silent regression。比 `# TODO: 等 #559 修` 评论可执行度高，**比 skip 强 — XFAIL 跑了，只是允许 fail；fix 后 strict 会把"意外 pass"也变 fail**
+- **architect agent 深度调研价值** — PR #631 proposal 的"关键发现"（仓库已有真 PG 反测基建）是 architect agent read-only 分析得出，主代理初读 audit doc §8.3 "用 pytest-postgresql + asyncio.gather" 误以为是"另起炉灶"。Lesson: 写 proposal 前先 architect 调研既有基建，避免"重复造轮子"误判 / `feedback_smoke_test_must_verify_functionality.md` 模式扩展（agent 不仅 fix-time 用，proposal-time 也值得花 ~10min architect run）
+- **DRAFT proposal vs ACCEPTED 决策**：PR #631 proposal 状态 DRAFT (§13 "待 architect / 创始人评审签字 → 翻 ACCEPTED → PR-1 启动")，但用户 cold-start "0 + A" 路径明确授权 PR-1 实施。**Lesson**：DRAFT 标签是文档自身状态，user explicit-ask "实施 PR-1" 是独立授权信号，二者不冲突；proposal ship 后立即转 PR-1 实施完全合规（user 已读 proposal 内容 + 给 explicit 信号）
+- **5/14 累计 30 PR / 单日新历史** — 远超 `feedback_proactive_session_split.md` 4+ 阈值 (7.5 倍)。本 session 仅 ship 4 PR + 1 architect 调研 + 准备 DEVLOG，上下文消费可控；但若 PR-1 infra 继续在本 session 实施，session 上下文累积可能临界，需 PR-1 §19 round-1 后判断是否分 session
+
+### 数据变化
+
+- 迁移版本：无（4 PR 都 0 migration）
+- 新增文档：3 个（audit §11 决策表 +162 行 / ADR 0002 +324 行 / concurrent 框架 proposal +359 行）
+- 新增测试：1 file +113 行（#559 XFAIL strict 守护 — order_service.apply_discount 终态订单不校验 status）
+- 修改源：0 file
+- 修改 lockfile：0
+
+### 累计 tally 更新 (5/14 夜段)
+
+- **本 batch ship**: 4 PR (#628 + #629 + #630 + #631) + 0 lesson memory 落盘（dose 已饱和，无新 surprising pattern）
+- **5/14 单日累计 ship 30 PR**: 25 prior session + 本 batch 4 (#628/#629/#630/#631) + 并发 session 1 (#625) = 30 PR
+- **Tier 1 fund/源/邻接 explicit-ask 累计**: 16 例（上 session 13 + 5/14 早 §17 follow-up batch 1A/2A/3B + 5/14 夜段 sediment batch 0 例 — sediment batch 全 carve-out 不计 explicit-ask）；本 batch PR #630 test-only blast radius 0 跳 explicit-ask；audit doc §11 + ADR 0002 + concurrent proposal 全 docs-only carve-out 类 2 自动跳
+- **carve-out 矩阵 11 类候选不变** — 本 batch 全部落 既有 carve-out 类 2 (docs-only) + 类 4 (*tier1* 后缀)，无新候选类。第 10 类 frontend lockfile resync (PR #621) + 第 11 类双 carve-out 同 PR test-only (PR #623) 候选仍待 sediment session 正式收录到 `feedback_carveout_admin_merge_pattern.md`
+
+### 遗留问题
+
+- **PR #631 proposal 状态 DRAFT** → ACCEPTED 翻转条件：architect / 创始人评审签字。**本 session 走 cold-start "0 + A" 路径直接进 PR-1 实施**，user explicit-ask 等价于运行时 ACCEPTED 信号，proposal §13 "待评审"是文档自身状态不阻塞实施路径
+- **§17 桌台并发语义对齐 PR**: §17-A (cashier 桌台 3 路径) / §17-B (settle 终态保护) 需创始人 3 选择题答复；§17-C (OrderItem lock 加固 #557 隐式不变量) / §17-D (#549/#557/#559 follow-up issue 合并) 可独立 ship。决策表 + architect default (1A/2A/3B) 已落 audit doc §11
+- **PR #240 D2-D5 真机 smoke**: head `2f270c5d` CONFLICTING 220+ commits behind，硬件已就位待 Mac mini M4 真机部署 + Tailscale 接入 + Core ML 模型部署
+- **供应链 Phase 1 W6 全完工** — PR-01C #625 收口后 Phase 1 W6 9/9 全绿；Phase 2 W7-W12 第一发 PRD-02 扣秤标准库 (v428) 待启动（5/14 创始人 deep-interview 锁定 D1=A 默认计划）
+- pre-existing CI 漂移 11+ 项与本批无关（python-lint-test / Ruff / Test Changed Services / TypeScript Check / RLS Runtime — 7 P0 表 / nightly-offline-e2e.yml stale npm-ci 等），`project_tunxiang_ci_gates.md` 已登记
+
+### 明日计划
+
+- 优先 PR-1 infra (concurrent_runner + conftest_pg + workflow) — 本 session "0 + A" 路径 user 已 explicit-ask
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复 — audit doc §11 已落表)
+- 或 PR-2 cashier 框架金标准 (PR-1 ship 后)
+- 或 Mac mini M4 真机部署 (~3-4h, 物理工程, 需 SSH/现场)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 关键 takeaway (跨 session 价值)
+
+- **sediment session 模式落地** — 单日 25+ PR ship blitz 后必备的 docs/test 收口 session，本 batch 4 PR 是首例完整范本（audit + ADR + XFAIL guard + proposal 四件套）。下次大批 ship 后必跑一次 sediment + DEVLOG 收口
+- **DRAFT proposal + user explicit-ask 等价 ACCEPTED 实施信号** — proposal 文档状态 (DRAFT/ACCEPTED) 是文档自身字段，与 user runtime 授权信号是独立维度。explicit-ask "0 + A" 路径授权 PR-1 实施时，proposal §13 "待评审"不阻塞，因 user 已经读 proposal 内容并给出明确 explicit-ask 信号
+- **architect agent 在 proposal-time 的价值** — 不仅 fix-time 用，proposal-time ~10min architect run 能避免"重复造轮子"误判 (PR #631 proposal "关键发现"即如此)。Lesson: 新框架/新基建提案前先 architect read-only 调研既有 ship 内容
+- **30 PR/单日 sediment threshold** — `feedback_proactive_session_split.md` 4+ 阈值 (7.5 倍) 仍可控，因 sediment session 上下文消费集中在 PR fetch + DEVLOG 写入两块（无 multi-round §19 reviewer / 无源码 implementation），属低成本收尾。但 PR-1 infra 实施进入 source/test 改动 + §19 reviewer 后，session 上下文累积可能临界
+
+---
+
 ## 2026-05-14 下午段晚 — P0 nightly 修复 + tx-supply 可观测性收口 + §19 P2 测试补遗 3 PR batch ship (5/14 累计 25 PR)
 
 ### 今日完成

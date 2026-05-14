@@ -1,3 +1,42 @@
+## 2026-05-14 夜段 22:00 · 5/14 ship 收尾 sediment：audit §17 决策表 + ADR 0002 ABBA 文档化 + #559 XFAIL 守护 + 真 PG 并发测试框架 proposal 4 PR batch ship (5/14 累计 30 PR — 含并发 session #625)
+
+### 完成状态
+
+- [x] **PR #628** docs(security) audit doc §11 §17 桌台并发语义对齐决策跟踪表 MERGED `291081a9` (**docs-only carve-out 类 2**, 5/14 17:17 CST, 11 路径决策表 + 3 选择题 D1/D2/D3 + 9 候选方案 + architect default 1A/2A/3B, +162 行 / 1 file)
+- [x] **PR #629** docs(adr) 0002 — auto_deduction.deduct_for_order 跨 dish 行锁 ABBA 死锁防护追溯文档化 MERGED `a8199749` (**docs-only carve-out 类 2**, 5/14 17:27 CST, 追溯 PR #567 实施 + #549 issue body 更新引用 ADR 0002 + audit §4.3, +324 行 / 1 NEW file)
+- [x] **PR #630** test(tx-trade) #559 XFAIL strict verify order_service.apply_discount 终态订单不校验 status MERGED `3a78dafd` (**test-only Tier 1 *tier1* 后缀 carve-out 类 4**, 5/14 17:37 CST, T1 PASS baseline + T2 XFAIL strict #559 守护 + T3 PASS 状态机 baseline, +113 行)
+- [x] **PR #631** docs(testing) 真 PG 并发 Tier 1 测试框架设计提案 (DRAFT) MERGED `5ae0a3e1` (**docs-only carve-out 类 2**, 5/14 17:47 CST, 13 节 / 6-PR roadmap / 0 新依赖复用 service container, +359 行 / 1 NEW file)
+- [x] **architect agent 调研** — PR #631 proposal "关键发现"（仓库已有真 PG 反测基建 `shared/test_utils/integration_pg.py:39-78` + `tests/tier1/test_rls_runtime_p0_tier1.py` 413 行范本 + `infra/compose/test-pg.yml` + 2 workflow），本提案是横向扩展非另起炉灶
+- [x] **跳 §19 reviewer 完整 run** — 本 batch 4 PR 全 docs-only / test-only blast radius 0，无源/migration/schema 改动；走 group explicit-ask "0 + A 实施 PR-1" 等价 ACCEPTED 信号
+- [x] **CI 真门禁** — 4 PR 全 docs-only / test-only 不触发 tier1-gate；PR #630 *tier1* 后缀触发 tier1-gate paths 命中 17 service matrix 全绿；其余 PR Tier 1 门禁判定不触发是设计预期 + frontend-build + edge-mac-station + Analyze Changes & Label SUCCESS
+- [x] **5/14 累计 30 PR ship** = 25 prior session + 本 batch 4 (#628/#629/#630/#631) + 并发 session 1 (#625 PR-01C 证件管理 UI Phase 1 W6 9/9 收尾)
+
+### 关键决策
+
+- **5/14 ship blitz sediment 模式确立** — 单日 ship 25+ PR 后的 sediment session 不动业务源码，纯落 docs/test/proposal/ADR 收尾。本 batch 4 PR 全 docs-only / test-only / proposal carve-out 类 2 + 类 4，0 source / 0 migration / 0 schema，blast radius 0，跳 §19 reviewer + 走 group explicit-ask 单点 confirm
+- **"implementation-first → ADR-after" 模式实证** — PR #567 (Phase 1 W3 实施 deduct_for_order 跨 dish 锁排序) 在前 ~3 周，PR #629 (ADR 0002 文档化) 在后。#549 issue body 更新引用 ADR 0002 + audit doc §4.3 形成 tracking-doc 三方互链。下次"修在前文档在后"场景直接套 ADR 0002 模板
+- **XFAIL strict 守护模式标准化** — `pytest.mark.xfail(strict=True, reason="...")` 让 fix ship 时强制提醒维护者移除标记；T2 当前 XFAIL 反映"已知 bug + 等 §17 PR 修"，fix 后 T2 转 PASS 必须显式去 `strict=True` 标记，防止 silent regression。比 `# TODO: 等 #559 修` 评论可执行度高，**比 skip 强 — XFAIL 跑了，只是允许 fail；fix 后 strict 会把"意外 pass"也变 fail**
+- **architect agent 在 proposal-time 的价值** — PR #631 proposal 的"关键发现"（仓库已有真 PG 反测基建）是 architect agent read-only 分析得出，主代理初读 audit doc §8.3 "用 pytest-postgresql + asyncio.gather" 误以为是"另起炉灶"。Lesson: 写 proposal 前先 architect 调研既有基建，避免"重复造轮子"误判 / `feedback_smoke_test_must_verify_functionality.md` 模式扩展（agent 不仅 fix-time 用，proposal-time 也值得花 ~10min architect run）
+- **DRAFT proposal vs ACCEPTED 决策** — PR #631 proposal 状态 DRAFT (§13 "待 architect / 创始人评审签字 → 翻 ACCEPTED → PR-1 启动")，但用户 cold-start "0 + A" 路径明确授权 PR-1 实施。Lesson: DRAFT 标签是文档自身状态字段，user explicit-ask "实施 PR-1" 是独立授权信号，二者不冲突；proposal ship 后立即转 PR-1 实施完全合规（user 已读 proposal 内容 + 给 explicit 信号）
+- **真 PG 测试基建复用而非新建** — `shared/test_utils/integration_pg.py` (39-78 行 INTEGRATION_PG_DSN + requires_integration_pg + set_tenant_guc 事务级 GUC) + `tests/tier1/test_rls_runtime_p0_tier1.py` (413 行 service-level multi-session 范本) + `infra/compose/test-pg.yml` + `infra/docker/init-rls.sql` + `.github/workflows/rls-runtime-p0-pg-tests.yml` + `.github/workflows/integration-pg-tests.yml` 已 ship。PR #631 proposal §11 关联表完整 cross-ref，PR-1 实施时 import 这些基建 + 加 `concurrent_runner.py` 即可
+
+### 下一步
+
+- 优先 PR-1 infra (concurrent_runner + conftest_pg + tier1-row-lock-concurrent.yml) — 本 session "0 + A" 路径已 user explicit-ask 实施
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复 — audit doc §11 已落表)
+- 或 PR-2 cashier 框架金标准 (PR-1 ship 后即可启动)
+- 或 Mac mini M4 真机部署 (~3-4h, 物理工程, 需 SSH/现场)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- 本 batch 4 PR 总 +958 / -0 跨 4 文件 (audit doc §11 / ADR 0002 NEW / order_service tier1 test / concurrent proposal NEW)，**全 docs-only / test-only**，blast radius 0，源码 0 改动
+- **PR #631 proposal 状态 DRAFT** → ACCEPTED 翻转条件：architect / 创始人评审签字；本 session "0 + A" cold-start user explicit-ask 等价 runtime ACCEPTED 信号驱动 PR-1 实施
+- **30 PR/单日新历史** 远超 `feedback_proactive_session_split.md` 4+ 阈值 (7.5 倍)，但本 session 仅 ship 4 PR + 1 architect 调研 + 准备 DEVLOG，上下文消费可控；若 PR-1 infra 继续在本 session 实施 + §19 reviewer 后，session 上下文累积可能临界（需 PR-1 round-1 后判断分 session）
+- pre-existing CI 漂移 11+ 项 (python-lint-test / Ruff / Test Changed Services / TypeScript Check / RLS Runtime — 7 P0 表 / nightly-offline-e2e.yml stale npm-ci) 全 PR 一律 fail — 与本批无关，`project_tunxiang_ci_gates.md` 已登记
+
+---
+
 ## 2026-05-14 下午段晚 14:46 · P0 nightly 修复 + tx-supply 可观测性收口 + §19 P2 测试补遗 3 PR batch ship (5/14 累计 25 PR)
 
 ### 完成状态
