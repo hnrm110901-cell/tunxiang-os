@@ -112,8 +112,8 @@ class TestWecomCallbackUnhandledStructlogCollision:
         assert len(unhandled_logs) == 1, f"应捕获 1 条 wecom_callback_unhandled log; 实际 {len(unhandled_logs)} 条: {logs!r}"
         entry = unhandled_logs[0]
         assert entry.get("wecom_event") == "approval"
-        assert entry["event"] == "wecom_callback_received" or entry["event"] == "wecom_callback_unhandled", (
-            f"event 应是 structlog event_name; 实际={entry['event']!r}"
+        assert entry["event"] == "wecom_callback_unhandled", (
+            f"event 应是 structlog event_name 'wecom_callback_unhandled'; 实际={entry['event']!r}"
         )
         # wire return dict 中 'event' 字段必须保留 (caller 路由层消费)
         assert result["event"] == "approval", (
