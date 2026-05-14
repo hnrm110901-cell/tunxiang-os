@@ -1,4 +1,4 @@
-"""v419 — doc_number wave1 回填：5 类高频单据 doc_number 字段
+"""v419 — doc_number wave1 回填：4 类高频单据 doc_number 字段
 
 PRD-03 Wave1：为 4 类高频单据新增 doc_number 列，允许 NULL（兼容历史行）。
 历史行回填为 'LEGACY-' + id 前 8 位，便于财务对账定位。

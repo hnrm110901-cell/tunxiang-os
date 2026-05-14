@@ -1,12 +1,13 @@
-"""Tier 1 — doc_number wave1：5 类高频单据写路径接入契约测试（PRD-03 / 审计+财务）
+"""Tier 1 — doc_number wave1：4 类高频单据写路径接入契约测试（PRD-03 / 审计+财务）
+
+§19 round-1 P0#1 之后：申购单移出 wave1，留 PRD-07（Phase 2）一并做建表 + 持久化。
 
 测试场景基于真实餐厅操作（CLAUDE.md §20）：
 
   1. 采购单：徐记 2026-05-14 早晨第 1 个采购单 → doc_number 形如 PO20260514-001
-  2. 申购单：5/14 早晨厨师长申购食材 → doc_number 形如 RQ20260514-001
-  3. 盘点单：长沙总店 5 月月末盘点 → doc_number 形如 STK-202605-0001
-  4. 收货单：供应商送货 → doc_number 形如 RV20260514-001
-  5. 出入库流水：BOM 扣料 / 盘点调整 → doc_number 形如 IO20260514-0001
+  2. 盘点单：长沙总店 5 月月末盘点 → doc_number 形如 STK-202605-0001
+  3. 收货单：供应商送货 → doc_number 形如 RV20260514-001
+  4. 出入库流水：BOM 扣料 / 盘点调整 → doc_number 形如 IO20260514-0001
 
 mock 风格：参考 test_doc_number_tier1.py AsyncMock 模式（PR-03A）。
 不需要真 PG fixture（沿用 PR-03A 同约定）。
