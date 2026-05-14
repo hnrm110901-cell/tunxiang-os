@@ -379,9 +379,17 @@ class TestCalcOrderCostLockInvariantAudit:
             ):
                 return True
 
-            # raw SQL FOR UPDATE 字符串
-            if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and "FOR UPDATE" in sub.value.upper():
-                return True
+            # raw SQL FOR UPDATE — 仅识别 text("...") 调用参数, 排除 docstring 等位置
+            if (
+                isinstance(sub, ast.Call)
+                and (
+                    (isinstance(sub.func, ast.Name) and sub.func.id == "text")
+                    or (isinstance(sub.func, ast.Attribute) and sub.func.attr == "text")
+                )
+            ):
+                for arg in sub.args:
+                    if isinstance(arg, ast.Constant) and isinstance(arg.value, str) and "FOR UPDATE" in arg.value.upper():
+                        return True
 
         return False
 
@@ -412,4 +420,60 @@ class TestCalcOrderCostLockInvariantAudit:
             + "\n  - ".join(violations)
             + "\n\n修复: 在调 _calc_order_cost 前加 `await self._get_order(order_id, lock=True)`."
             + "\n参考: cashier_engine.py `apply_discount` L587-614 + audit doc §4.1."
+        )
+
+    def test_docstring_for_update_not_counted_as_lock(self):
+        """反向 verify (issue #594): docstring 含 'FOR UPDATE' 字符串不被误计为锁.
+
+        修前行为: raw SQL 分支匹配任意 ast.Constant str, 包括 docstring.
+        修后行为: 仅识别 text("...FOR UPDATE...") 调用参数.
+        喂一个函数 — docstring 含 FOR UPDATE 但没有任何真锁调用 — 断言返回 False.
+        """
+        import ast
+
+        source = '''
+async def _calc_order_cost(self, db, order_id):
+    """计算订单成本. 注意: 调用方必须持有 FOR UPDATE 锁."""
+    items = await db.execute(select(OrderItem))
+    return sum(i.cost for i in items.scalars())
+'''
+        tree = ast.parse(source)
+        func_node = next(
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and n.name == "_calc_order_cost"
+        )
+        # 目标行号设为函数末尾之后, 使所有语句都在 target_lineno 之前
+        target_lineno = func_node.end_lineno + 1
+        result = self._function_has_lock_before(func_node, target_lineno)
+        assert result is False, (
+            "docstring 中含 'FOR UPDATE' 字符串不应被识别为锁获取语句 (issue #594 false-positive)"
+        )
+
+    def test_text_call_with_for_update_counted_as_lock(self):
+        """反向 verify (issue #594): text("...FOR UPDATE...") 调用参数正确被识别为锁.
+
+        喂一个函数 — 函数体含 db.execute(text("SELECT ... FOR UPDATE")) —
+        断言 _function_has_lock_before 返回 True.
+        """
+        import ast
+
+        source = '''
+async def settle_order(self, db, order_id):
+    result = await db.execute(text("SELECT * FROM orders WHERE id = :id FOR UPDATE"))
+    order = result.scalar_one_or_none()
+    order.status = "settled"
+    await db.flush()
+'''
+        tree = ast.parse(source)
+        func_node = next(
+            n for n in ast.walk(tree)
+            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and n.name == "settle_order"
+        )
+        # target_lineno 指向 flush 行, text() 调用在其之前
+        target_lineno = func_node.end_lineno
+        result = self._function_has_lock_before(func_node, target_lineno)
+        assert result is True, (
+            "db.execute(text('... FOR UPDATE')) 应被识别为锁获取语句 (issue #594 回归)"
         )
