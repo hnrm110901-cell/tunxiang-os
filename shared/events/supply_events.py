@@ -38,6 +38,9 @@ class SupplyEventType(str, Enum):
     # ── 采购类 ─────────────────────────────────────────────────────
     PROCUREMENT_SUGGESTED = "supply.procurement.suggested"  # 智能补货建议
 
+    # ── 扣秤类（PRD-02 / Tier 1 毛利底线）────────────────────────────
+    WEIGHT_DEDUCTION_ANOMALY = "supply.weight_deduction.anomaly"  # 扣秤异常（实测 vs 标准超 tolerance）
+
 
 @dataclass
 class SupplyEvent:

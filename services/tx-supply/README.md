@@ -474,6 +474,82 @@ class WarehouseRequisitionTemplateBinding(Base):
 
 ---
 
+### Phase 2 W7-W12 决策落地（2026-05-14 创始人 deep-interview 锁定）
+
+> SoT：`~/.claude/projects/-Users-lichun/memory/project_tunxiang_supply_phase2_w7w12.md`
+> 本节为 README 接续段落 — 决策表 + 阻塞依赖图 + Migration 链规划 + W7 首发参数
+
+#### D1 — Phase 2 入口：方案 A（README 原计划）
+- W7-W8 = Phase 1 P0 收尾 21 人日（PRD-02 扣秤 8 + PRD-06 出料率 7 + PRD-05 补货时间窗 6）
+- W9-W12 = Phase 2 原计划 46 人日（PRD-04 询价 18 + PRD-07 申购 8 + PRD-08 用料白名单 4 + PRD-11 销售分成 4 + PRD-13 市场调研 12）
+- 总 67 人日 / 6 周 / 2-3 人
+
+#### D2 — §17 桌台并发对齐：架构 default 1A / 2A / 3B
+- **1A 强一致** (`open_table` FOR UPDATE + rowcount check)：桌台物理资源，LWW 不可接受
+- **2A 双锁排序** (`transfer_table` table_id 升序锁防 ABBA)
+- **3B 幂等释放** (`_release_table` WHERE `current_order_id=:id AND status='occupied'`)
+- 4 段 §17 PR 走 explicit-ask + §19 reviewer + 200 桌并发 regression（Tier 1 fund/源 第 17-20 例）
+
+#### D3 — Wave1/Wave2 拆分：≥10 人日强制 3 sub-PR
+- **PRD-04 询价 (18 人日)** 拆 3 sub-PR（sub-A v426 schema → sub-B Tier 1 award + #579 嵌入 → sub-C 前端）
+- **PRD-13 市场调研 (12 人日)** 拆 3 sub-PR（sub-A v427 schema → sub-B 早市上传 → sub-C 调研列表）
+- **PRD-02/06/05/07/08/11** 全 ≤8 人日，单 PR ship
+
+#### D4 — Sprint H DEMO 前必修 4 issue 嵌入 sub-PR
+- **#579** → PRD-04 sub-B（Tier 1 award 200 桌并发压测同期跑）
+- **#589** → PRD-07 v426（申购单 doc_number namespace cleanup）
+- **#613** → §17 PR ship 同期 v428 patch
+- **#615** → §17 PR ship 同期 pytest-postgresql 嵌入
+
+T2 推 Phase 3 W13-16: #577/#578/#580/#591/#592/#598/#604/#557/#559/#562/#549/#535/#537/#626/#627
+T3 obs Phase 4 W17+: #599/#600/#605/#614
+
+#### Migration 版本号链规划（W7-W12）
+- v418-v424 Phase 1 W6 ✅ ship
+- v425 supplier_portal_messages UNIQUE 索引（§17 patch / #613）
+- v426 RFQ schema 5 表（PRD-04 sub-A）
+- v427 MarketSurvey schema（PRD-13 sub-A）
+- **v428 PRD-02 ingredient_weight_standards + receiving_weight_deductions（W7 首发，本 PR 已落盘）**
+- v429 PRD-05 SupplierDeliveryWindow（W8）+ PRD-06 IngredientYieldStandard 合并落 v428 / v429 视实现
+- v430 PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+
+#### W7 首发 PR 立项参数（PRD-02 商品扣秤标准库）
+**Tier 级别**：Tier 1（毛利底线 → TDD 必须）／**Tier 1 explicit-ask**：第 17 例（不在 8 类 carve-out）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
+
+- **范围**：v428 `ingredient_weight_standards` + `receiving_weight_deductions` 表 + RLS / `weight_standard_service.py` CRUD + 二级审批 + `calculate_net_weight()` / `receiving_v2_service.apply_weight_deduction_for_item()` enhancement layer / `weight_deduction_anomaly` 事件 / 5 endpoint API / Web UI `IngredientWeightStandardsPage.tsx`
+- **Ontology 不动**：ReceivingOrderItem 缺 `gross_weight_kg` 字段 — 用新表 `receiving_weight_deductions` 关联 receiving_order_items.id（更安全，符合 §18 ontology 冻结规则）
+- **测试**：`test_weight_standard_service_tier1.py` 14 用例（CRUD 6 + 二级审批 2 + RLS 1 + calculate 6） + `test_receiving_v2_net_weight_tier1.py` 5 用例（gross 单类 + 向后兼容 + 多扣秤叠加 + anomaly emit）
+- **预计 7 commits**（migrate + service + receiving 集成 + routes + Web UI + tests + docs）
+
+#### 阻塞依赖图
+```
+W7 PRD-02 扣秤 (单 PR, Tier 1) ─┐
+W7 PRD-06 出料率 (单 PR, Tier 1) ─┼─→ W8 PRD-05 时间窗 (单 PR, Tier 1) + 集成测试 + 200 桌并发 regression
+                              │
+                              ├─→ W9-W10 PRD-04 sub-A v426 (T2) → sub-B (T1 + #579 嵌入) → sub-C (T2)
+                              │
+                              ├─→ W10 PRD-07 (单 PR, T2 + #589 嵌入)
+                              │
+                              ├─→ W11 PRD-08 用料白名单 (单 PR, T2) + PRD-11 销售分成 (单 PR, T2)
+                              │
+                              └─→ W11-W12 PRD-13 sub-A v427 → sub-B 早市上传 → sub-C 调研列表
+
+§17 PR 4 段（D2 锁定后可并行启动）：
+  §17-A cashier 桌台 3 路径 (1A/2A) → Tier 1 explicit-ask 第 18 例
+  §17-B settle 终态保护 4 路径 (3B 幂等释放) → 第 19 例
+  §17-C OrderItem lock 4 路径 → 第 20 例（独立于创始人答复）
+  §17-D follow-up 合并 (#549 ABBA + #557 + #559) → 第 21 例
+```
+
+#### Sprint H DEMO 验收门槛对齐
+- Tier 1 全绿 100%（PRD-02/06/05 + §17-A/B + PR-01B/01C 累积测试）
+- P99 < 200ms（#579 200 桌并发实测）
+- 支付成功率 > 99.9%（5/13 6-PR row-lock roadmap 承接）
+- 断网 4h 无数据丢失（依赖 edge sync_engine，非 supply scope）
+- 收银员无技术培训可用（PRD-07 申购模板 + PRD-01 证件管理 + PRD-02 扣秤管理 UI 三方支撑）
+
+---
+
 ## 八、长期价值沉淀地图（5 大数据资产）
 
 **第一性原理**：短期合规 + 长期数据飞轮才是 AI-Native 的真意。

@@ -28,6 +28,7 @@ from shared.ontology.src.entities import (
     ReceivingOrder,
     ReceivingOrderItem,
 )
+from . import weight_standard_service as _wss
 from shared.ontology.src.enums import (
     InventoryStatus,
     ReceivingItemStatus,
@@ -775,4 +776,136 @@ def _item_to_dict(i: ReceivingOrderItem) -> dict:
         "expiry_date": i.expiry_date.isoformat() if i.expiry_date else None,
         "rejection_reason": i.rejection_reason,
         "status": i.status,
+    }
+
+
+# ─── PRD-02 自动扣秤集成（Tier 1 毛利底线） ──────────────────────────
+#
+# 设计：作为 enhancement layer，不修改主流程 inspect_item / complete_receiving。
+# 调用方在 inspect_item 后显式调 apply_weight_deduction_for_item 传入毛重，
+# 缺 gross_weight_kg 时跳过（向后兼容）。
+
+
+async def apply_weight_deduction_for_item(
+    *,
+    order_id: str,
+    item_id: str,
+    tenant_id: str,
+    ingredient_id: str,
+    gross_weight_kg: Optional[Decimal],
+    actual_total_deduction_kg: Optional[Decimal] = None,
+    db: AsyncSession,
+    today: Optional[date] = None,
+) -> Optional[dict]:
+    """收货明细应用扣秤标准。
+
+    GIVEN  gross_weight_kg 给出（毛重 kg）
+    WHEN   该 ingredient 有 active 扣秤标准
+    THEN   计算 net_weight_kg = gross - sum(deductions)
+           更新该 receiving_order_item.accepted_quantity = net_weight_kg
+           写入 receiving_weight_deductions 日志
+           如 actual_total_deduction_kg vs standard 偏差 > tolerance_pct
+           → emit weight_deduction_anomaly 旁路事件（不阻塞主流程）
+
+    Returns:
+        None — gross_weight_kg 为 None 时（向后兼容）
+        dict — {"net_weight_kg": Decimal, "deductions": [...], "anomaly_detected": bool}
+    """
+    if gross_weight_kg is None:
+        return None
+    if gross_weight_kg <= 0:
+        raise ValueError("gross_weight_kg 必须 > 0")
+
+    anomaly_flag = {"detected": False}
+
+    async def _on_anomaly(payload: dict) -> None:
+        anomaly_flag["detected"] = True
+        # 旁路异步发射 weight_deduction_anomaly 事件（不阻塞收货主流程）
+        try:
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=SupplyEventType.WEIGHT_DEDUCTION_ANOMALY,
+                    tenant_id=_uuid(tenant_id),
+                    store_id=None,
+                    entity_id=_uuid(item_id),
+                    event_data={
+                        "order_id": order_id,
+                        "item_id": item_id,
+                        "ingredient_id": ingredient_id,
+                        **payload,
+                    },
+                    source_service="tx-supply",
+                )
+            )
+        except (RuntimeError, ValueError) as exc:  # pragma: no cover — 旁路 fail-open
+            logger.warning(
+                "weight_deduction_anomaly_emit_failed",
+                order_id=order_id,
+                error=str(exc),
+                exc_info=True,
+            )
+
+    net_weight, applied = await _wss.calculate_net_weight(
+        db,
+        tenant_id=tenant_id,
+        ingredient_id=ingredient_id,
+        gross_weight_kg=gross_weight_kg,
+        today=today,
+        actual_total_deduction_kg=actual_total_deduction_kg,
+        on_anomaly_callback=_on_anomaly,
+    )
+
+    # 写扣秤日志（即使无 active standard 也记一行 — gross=net 便于审计反查）
+    await _wss.record_weight_deduction(
+        db,
+        tenant_id=tenant_id,
+        receiving_order_id=order_id,
+        receiving_order_item_id=item_id,
+        ingredient_id=ingredient_id,
+        gross_weight_kg=gross_weight_kg,
+        net_weight_kg=net_weight,
+        deductions=applied,
+        anomaly_detected=anomaly_flag["detected"],
+    )
+
+    # 更新 ReceivingOrderItem.accepted_quantity = net（用净重入账）
+    # 沿用 PR-A/B/C/D/E row-lock pattern：mutation 路径 FOR UPDATE
+    await _set_tenant(db, tenant_id)
+    item_q = (
+        select(ReceivingOrderItem)
+        .where(
+            ReceivingOrderItem.id == _uuid(item_id),
+            ReceivingOrderItem.receiving_order_id == _uuid(order_id),
+            ReceivingOrderItem.is_deleted == False,  # noqa: E712
+        )
+        .with_for_update()
+    )
+    item = (await db.execute(item_q)).scalar_one_or_none()
+    if item is None:
+        raise ValueError(f"收货明细 {item_id} 不存在")
+
+    # 用净重覆盖 accepted_quantity / actual_quantity（毛重入账场景下扣秤生效）
+    item.actual_quantity = gross_weight_kg
+    item.accepted_quantity = net_weight
+    item.rejected_quantity = Decimal("0")  # 扣秤路径不算拒收
+    if item.status == ReceivingItemStatus.pending.value:
+        item.status = ReceivingItemStatus.accepted.value
+
+    await db.flush()
+
+    logger.info(
+        "weight_deduction_applied",
+        order_id=order_id,
+        item_id=item_id,
+        ingredient_id=ingredient_id,
+        gross_weight_kg=float(gross_weight_kg),
+        net_weight_kg=float(net_weight),
+        deduction_count=len(applied),
+        anomaly_detected=anomaly_flag["detected"],
+    )
+
+    return {
+        "net_weight_kg": net_weight,
+        "deductions": applied,
+        "anomaly_detected": anomaly_flag["detected"],
     }
