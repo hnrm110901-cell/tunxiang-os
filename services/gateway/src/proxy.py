@@ -165,7 +165,32 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
             params=dict(request.query_params),
             content=body if body else None,
         )
-        return JSONResponse(status_code=resp.status_code, content=resp.json())
+        try:
+            body_json = resp.json()
+        except (ValueError, UnicodeDecodeError):
+            # 下游返回非 JSON body（nginx 502 plain-text / KDS ESC/POS 二进制 / 异常文本）
+            # 保留下游 status code（不强制 502），log 原始 body 前 200 字节 + upstream URL
+            body_preview = resp.content[:200].decode("utf-8", errors="replace") if resp.content else ""
+            logger.warning(
+                "proxy_non_json_response",
+                target=target_url,
+                path=request.url.path,
+                upstream_status=resp.status_code,
+                body_preview=body_preview,
+            )
+            return JSONResponse(
+                status_code=resp.status_code,
+                content={
+                    "ok": False,
+                    "data": None,
+                    "error": {
+                        "code": "UPSTREAM_NON_JSON",
+                        "message": "Upstream returned non-JSON response",
+                        "upstream_status": resp.status_code,
+                    },
+                },
+            )
+        return JSONResponse(status_code=resp.status_code, content=body_json)
     except httpx.ConnectError:
         logger.warning("service_unreachable", target=target_url, path=request.url.path)
         # 回退到旧单体
