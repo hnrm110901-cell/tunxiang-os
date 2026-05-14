@@ -174,7 +174,7 @@ class _BaseSchema(BaseModel):
 class RFQItemCreate(_BaseSchema):
     """RFQ 明细行（创建 RFQ 时嵌入 items 列表）"""
 
-    ingredient_id: str
+    ingredient_id: uuid.UUID
     qty_required: Decimal = Field(gt=0)
     qty_unit: Optional[str] = None
     spec_notes: Optional[str] = None
@@ -186,7 +186,7 @@ class RFQCreate(_BaseSchema):
     deadline: datetime
     notes: Optional[str] = None
     items: list[RFQItemCreate] = Field(default_factory=list, min_length=1)
-    invited_supplier_ids: list[str] = Field(default_factory=list)
+    invited_supplier_ids: list[uuid.UUID] = Field(default_factory=list)
 
 
 class RFQUpdate(_BaseSchema):
@@ -234,8 +234,8 @@ class RFQInviteeRead(_BaseSchema):
 class RFQQuoteCreate(_BaseSchema):
     """供应商报价（供应商门户提交）"""
 
-    rfq_id: str
-    ingredient_id: str
+    rfq_id: uuid.UUID
+    ingredient_id: uuid.UUID
     unit_price_fen: int = Field(gt=0, description="单价（分）— 整数")
     qty_offered: Optional[Decimal] = Field(default=None, gt=0)
     valid_until: Optional[date] = None
@@ -258,7 +258,7 @@ class RFQQuoteRead(_BaseSchema):
 class RFQAwardCreate(_BaseSchema):
     """中标记录（sub-B Tier 1 award 路径写入）"""
 
-    selected_quote_id: str
+    selected_quote_id: uuid.UUID
     reason: str = Field(min_length=1, description="合规审计 — 选 A 不选 B 的理由")
     ai_recommendation_followed: Optional[bool] = Field(
         default=None, description="是否采纳 AI 推荐（RLHF 训练信号）"

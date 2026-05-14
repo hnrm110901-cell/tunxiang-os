@@ -110,6 +110,8 @@ def upgrade() -> None:
                 qty_unit            VARCHAR(16),
                 spec_notes          TEXT,
                 created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                is_deleted          BOOLEAN NOT NULL DEFAULT FALSE,
                 CONSTRAINT chk_rfq_items_qty_positive
                     CHECK (qty_required > 0),
                 CONSTRAINT fk_rfq_items_rfq
@@ -151,6 +153,9 @@ def upgrade() -> None:
                 supplier_id         UUID NOT NULL,
                 invited_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 responded_at        TIMESTAMPTZ,
+                created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                is_deleted          BOOLEAN NOT NULL DEFAULT FALSE,
                 CONSTRAINT fk_rfq_invitees_rfq
                     FOREIGN KEY (rfq_id) REFERENCES rfqs(id) ON DELETE CASCADE
             )
@@ -194,6 +199,9 @@ def upgrade() -> None:
                 valid_until         DATE,
                 notes               TEXT,
                 submitted_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                is_deleted          BOOLEAN NOT NULL DEFAULT FALSE,
                 CONSTRAINT chk_rfq_quotes_price_positive
                     CHECK (unit_price_fen > 0),
                 CONSTRAINT fk_rfq_quotes_rfq
@@ -239,6 +247,8 @@ def upgrade() -> None:
                 approved_at                 TIMESTAMPTZ,
                 created_by                  UUID NOT NULL,
                 created_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                is_deleted                  BOOLEAN NOT NULL DEFAULT FALSE,
                 CONSTRAINT fk_rfq_awards_rfq
                     FOREIGN KEY (rfq_id) REFERENCES rfqs(id) ON DELETE CASCADE,
                 CONSTRAINT fk_rfq_awards_quote

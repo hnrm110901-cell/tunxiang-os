@@ -9,12 +9,13 @@ sub-B 落 service + Tier 1 award + tier1 测试；sub-C 落前端 + UI。
   3. Pydantic Create schema extra='forbid' + 必填字段
   4. ai_recommendation_followed nullable (sub-B 写入时填，sub-A 草稿态不填)
   5. unit_price_fen BigInteger 整数 (分)
+  6. UUID 字段类型 (Pydantic vs ORM 对齐 — §19 round-1 P1-B 教训)
 """
 
 from __future__ import annotations
 
 import sys
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -37,6 +38,14 @@ from services.tx_supply.src.models.rfq_models import (  # noqa: E402
     RFQQuoteCreate,
     RFQStatus,
 )
+
+
+# ─── 测试 UUID 常量（§19 round-1 P1-B 教训 — Pydantic Create 字段必须 uuid.UUID）─
+
+_INGREDIENT_ID = "11111111-1111-1111-1111-111111111111"
+_RFQ_ID = "22222222-2222-2222-2222-222222222222"
+_QUOTE_ID = "33333333-3333-3333-3333-333333333333"
+_SUPPLIER_ID = "44444444-4444-4444-4444-444444444444"
 
 
 # ─── 1. RFQStatus 枚举与 v431 CHECK 约束对齐 ────────────────────────────────
@@ -79,7 +88,7 @@ class TestORMTableNames:
         assert RFQAward.__tablename__ == "rfq_awards"
 
 
-# ─── 3. Pydantic Create schemas: extra='forbid' + 必填字段 ──────────────────
+# ─── 3. Pydantic Create schemas: extra='forbid' + 必填字段 + UUID 类型 ──────
 
 
 class TestPydanticCreate:
@@ -88,7 +97,7 @@ class TestPydanticCreate:
         with pytest.raises(Exception):  # ValidationError
             RFQCreate(
                 deadline=datetime.now(timezone.utc) + timedelta(days=3),
-                items=[RFQItemCreate(ingredient_id="x", qty_required=Decimal("1.0"))],
+                items=[RFQItemCreate(ingredient_id=_INGREDIENT_ID, qty_required=Decimal("1.0"))],
                 rogue_field="should be rejected",  # type: ignore[call-arg]
             )
 
@@ -100,39 +109,39 @@ class TestPydanticCreate:
     def test_rfq_item_qty_required_must_be_positive(self):
         """qty_required gt=0 — 与 v431 chk_rfq_items_qty_positive CHECK 对齐。"""
         with pytest.raises(Exception):
-            RFQItemCreate(ingredient_id="x", qty_required=Decimal("0"))
+            RFQItemCreate(ingredient_id=_INGREDIENT_ID, qty_required=Decimal("0"))
         with pytest.raises(Exception):
-            RFQItemCreate(ingredient_id="x", qty_required=Decimal("-1"))
+            RFQItemCreate(ingredient_id=_INGREDIENT_ID, qty_required=Decimal("-1"))
 
     def test_rfq_quote_unit_price_must_be_positive_int(self):
         """unit_price_fen gt=0 + 整数（分）— 与 v431 chk_rfq_quotes_price_positive 对齐。"""
         with pytest.raises(Exception):
             RFQQuoteCreate(
-                rfq_id="r", ingredient_id="i", unit_price_fen=0
+                rfq_id=_RFQ_ID, ingredient_id=_INGREDIENT_ID, unit_price_fen=0
             )
         with pytest.raises(Exception):
             RFQQuoteCreate(
-                rfq_id="r", ingredient_id="i", unit_price_fen=-100
+                rfq_id=_RFQ_ID, ingredient_id=_INGREDIENT_ID, unit_price_fen=-100
             )
 
     def test_rfq_award_create_requires_reason(self):
         """reason min_length=1 — 合规审计必须给"选 A 不选 B"理由。"""
         with pytest.raises(Exception):
-            RFQAwardCreate(selected_quote_id="q", reason="")
+            RFQAwardCreate(selected_quote_id=_QUOTE_ID, reason="")
 
     def test_rfq_award_ai_recommendation_optional(self):
         """ai_recommendation_followed Optional — 非强制（RLHF 信号，未来才必填）。"""
         # 不传也能构造
-        award = RFQAwardCreate(selected_quote_id="q", reason="lowest price")
+        award = RFQAwardCreate(selected_quote_id=_QUOTE_ID, reason="lowest price")
         assert award.ai_recommendation_followed is None
 
     def test_rfq_award_ai_recommendation_accepts_bool(self):
         """ai_recommendation_followed True / False 均可。"""
         award_yes = RFQAwardCreate(
-            selected_quote_id="q", reason="AI picked", ai_recommendation_followed=True
+            selected_quote_id=_QUOTE_ID, reason="AI picked", ai_recommendation_followed=True
         )
         award_no = RFQAwardCreate(
-            selected_quote_id="q", reason="went lower", ai_recommendation_followed=False
+            selected_quote_id=_QUOTE_ID, reason="went lower", ai_recommendation_followed=False
         )
         assert award_yes.ai_recommendation_followed is True
         assert award_no.ai_recommendation_followed is False
@@ -145,25 +154,53 @@ class TestQuoteAmountUnit:
     def test_quote_accepts_int_fen(self):
         """unit_price_fen 必须是 int — 与 invoice/wine_storage Tier 1 资金路径一致。"""
         quote = RFQQuoteCreate(
-            rfq_id="r", ingredient_id="i", unit_price_fen=88800
+            rfq_id=_RFQ_ID, ingredient_id=_INGREDIENT_ID, unit_price_fen=88800
         )
         assert quote.unit_price_fen == 88800
         assert isinstance(quote.unit_price_fen, int)
 
 
-# ─── 5. RFQItemCreate qty_unit 可选 ──────────────────────────────────────────
+# ─── 5. Optional 字段 ──────────────────────────────────────────────────────
 
 
 class TestOptionalFields:
     def test_rfq_item_qty_unit_optional(self):
         """qty_unit Optional — 业务可只填 SKU + 数量，单位 sub-B 校验。"""
-        item = RFQItemCreate(ingredient_id="x", qty_required=Decimal("10"))
+        item = RFQItemCreate(ingredient_id=_INGREDIENT_ID, qty_required=Decimal("10"))
         assert item.qty_unit is None
         assert item.spec_notes is None
 
     def test_rfq_quote_valid_until_optional(self):
         """valid_until Optional — 默认报价"永久有效"，业务层判定。"""
         quote = RFQQuoteCreate(
-            rfq_id="r", ingredient_id="i", unit_price_fen=100
+            rfq_id=_RFQ_ID, ingredient_id=_INGREDIENT_ID, unit_price_fen=100
         )
         assert quote.valid_until is None
+
+
+# ─── 6. UUID 字段类型契约（§19 round-1 P1-B 教训）──────────────────────────
+
+
+class TestUUIDFieldTypes:
+    """Pydantic Create schemas 字段必须 uuid.UUID 而非 str，避免 sub-B 服务层
+    构建 ORM 对象时 asyncpg 绑参 'badly formed hexadecimal UUID string' 错。
+    """
+
+    def test_rfq_item_create_rejects_non_uuid_str(self):
+        """ingredient_id 必须 valid UUID 字符串 / uuid.UUID — 非 UUID 拒绝。"""
+        with pytest.raises(Exception):
+            RFQItemCreate(ingredient_id="not-a-uuid", qty_required=Decimal("1.0"))
+
+    def test_rfq_quote_create_rejects_non_uuid_str(self):
+        """rfq_id / ingredient_id 必须 valid UUID — 非 UUID 拒绝。"""
+        with pytest.raises(Exception):
+            RFQQuoteCreate(
+                rfq_id="not-a-uuid",
+                ingredient_id=_INGREDIENT_ID,
+                unit_price_fen=100,
+            )
+
+    def test_rfq_award_create_rejects_non_uuid_str(self):
+        """selected_quote_id 必须 valid UUID — 非 UUID 拒绝。"""
+        with pytest.raises(Exception):
+            RFQAwardCreate(selected_quote_id="not-a-uuid", reason="test")
