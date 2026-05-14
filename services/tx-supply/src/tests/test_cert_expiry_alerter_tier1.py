@@ -83,13 +83,26 @@ _TODAY = date(2026, 5, 14)
 # ─── helper: mock DB ─────────────────────────────────────────────────────────
 
 
+def _mk_savepoint_cm() -> MagicMock:
+    """构造 conn.begin_nested() / conn.begin() 返回的 async context manager 替身。
+
+    PR #608 round-2 P0 SAVEPOINT 修复后，`_push_supplier_portal` / `_log_alert`
+    内部用 `async with conn.begin_nested()` 隔离 INSERT 失败；mock 必须返回
+    支持 __aenter__/__aexit__ 的对象，否则触发 RuntimeWarning(coroutine never awaited)。
+    """
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=None)
+    ctx.__aexit__ = AsyncMock(return_value=False)  # 不吞异常
+    return ctx
+
+
 def _mk_db(
     *,
     already_alerted: bool = False,
     alertable_rows: Optional[list] = None,
     tenant_webhooks: Optional[dict] = None,
 ) -> AsyncMock:
-    """通用 mock DB，支持三类查询路径。"""
+    """通用 mock DB，支持三类查询路径 + SAVEPOINT 上下文管理器。"""
     db = AsyncMock()
 
     _webhooks = tenant_webhooks or {
@@ -127,6 +140,9 @@ def _mk_db(
 
     db.execute = AsyncMock(side_effect=execute_side_effect)
     db.flush = AsyncMock()
+    # SAVEPOINT / 外层 begin() 上下文管理器
+    db.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+    db.begin = MagicMock(side_effect=lambda: _mk_savepoint_cm())
     return db
 
 
@@ -407,6 +423,7 @@ class TestAlertLogIdempotentOnCeleryRetry:
 
         db = AsyncMock()
         db.execute = AsyncMock(side_effect=already_alerted_side_effect)
+        db.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         # 第一次 _already_alerted（push 失败前）→ False
         result1 = await _already_alerted(db, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY)
@@ -450,6 +467,9 @@ class TestNoWebhookSkippedLogged:
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock(return_value=MagicMock())
         mock_conn.commit = AsyncMock()
+        # SAVEPOINT / 外层 begin() 上下文管理器（PR #608 round-2 P0）
+        mock_conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+        mock_conn.begin = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_conn)
@@ -677,6 +697,7 @@ class TestPushChannelWiringTier1:
 
         conn = AsyncMock()
         conn.execute = AsyncMock(side_effect=execute_capture)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         success, error_msg = await _push_supplier_portal(
             conn, _TENANT_XUJI, cert, "D+0"
@@ -714,6 +735,7 @@ class TestPushChannelWiringTier1:
 
         conn = AsyncMock()
         conn.execute = AsyncMock(side_effect=execute_capture)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         await _push_supplier_portal(conn, _TENANT_XUJI, cert, "D-7")
         assert "临期" in captured["params"]["subject"]
@@ -732,6 +754,7 @@ class TestPushChannelWiringTier1:
 
         conn = AsyncMock()
         conn.execute = AsyncMock(side_effect=execute_raises)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         success, error_msg = await _push_supplier_portal(
             conn, _TENANT_XUJI, cert, "D+1"

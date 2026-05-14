@@ -160,6 +160,11 @@ async def _push_supplier_portal(
     """写入 supplier_portal_messages inbox 表（v424 schema：subject/body/metadata JSONB）。
 
     RLS：调用方 _scan_one_tenant 已 set_config('app.tenant_id') 生效，本函数不重复设置。
+
+    P0 防御（PR #608 round-2）：INSERT 包在 conn.begin_nested() SAVEPOINT 中，
+    单 cert 失败（如 RLS WITH CHECK / IntegrityError）只回滚 savepoint，
+    外层 _scan_one_tenant 事务保持干净，后续 _already_alerted / _log_alert
+    不会被 InFailedSqlTransaction 污染。
     """
     if threshold.startswith("D+"):
         subject = f"【已过期】{cert['cert_type']} 请立即续证"
@@ -181,25 +186,27 @@ async def _push_supplier_portal(
     }
 
     try:
-        await conn.execute(
-            text(
-                """
-                INSERT INTO supplier_portal_messages
-                    (tenant_id, supplier_id, message_type, subject, body, metadata)
-                VALUES
-                    (:tenant_id::uuid, :supplier_id::uuid, :message_type,
-                     :subject, :body, CAST(:metadata AS JSONB))
-                """
-            ),
-            {
-                "tenant_id": str(tenant_id),
-                "supplier_id": str(cert["supplier_id"]),
-                "message_type": "cert_expiry_alert",
-                "subject": subject,
-                "body": body,
-                "metadata": json.dumps(metadata, ensure_ascii=False),
-            },
-        )
+        # SAVEPOINT 隔离：INSERT 失败只回滚到 savepoint，不污染外层 txn
+        async with conn.begin_nested():
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO supplier_portal_messages
+                        (tenant_id, supplier_id, message_type, subject, body, metadata)
+                    VALUES
+                        (:tenant_id::uuid, :supplier_id::uuid, :message_type,
+                         :subject, :body, CAST(:metadata AS JSONB))
+                    """
+                ),
+                {
+                    "tenant_id": str(tenant_id),
+                    "supplier_id": str(cert["supplier_id"]),
+                    "message_type": "cert_expiry_alert",
+                    "subject": subject,
+                    "body": body,
+                    "metadata": json.dumps(metadata, ensure_ascii=False),
+                },
+            )
     except SQLAlchemyError as exc:
         logger.warning(
             "cert_alert_supplier_portal_insert_failed",
@@ -333,30 +340,35 @@ async def _log_alert(
     UNIQUE (cert_id, alert_threshold, channel)：冲突时 UPDATE success + error_msg + sent_at，
     允许"成功覆盖失败"和"再次失败覆盖前次失败"，确保幂等查询 _already_alerted(success=TRUE)
     在推送成功后能正确命中。
+
+    P0 防御（PR #608 round-2）：INSERT 包在 conn.begin_nested() SAVEPOINT 中，
+    单条 INSERT 失败（NOT NULL / RLS WITH CHECK）只回滚 savepoint，外层
+    _scan_one_tenant txn 保持干净；调用方仍以 SQLAlchemyError 捕获并跳过本 cert。
     """
-    await conn.execute(
-        text(
-            """
-            INSERT INTO cert_alert_log
-                (tenant_id, cert_id, alert_threshold, channel, success, error_msg)
-            VALUES
-                (:tenant_id::uuid, :cert_id::uuid, :threshold, :channel, :success, :error_msg)
-            ON CONFLICT (cert_id, alert_threshold, channel)
-            DO UPDATE SET
-                success   = EXCLUDED.success,
-                error_msg = EXCLUDED.error_msg,
-                sent_at   = NOW()
-            """
-        ),
-        {
-            "tenant_id": str(tenant_id),
-            "cert_id": str(cert_id),
-            "threshold": threshold,
-            "channel": channel,
-            "success": success,
-            "error_msg": error_msg,
-        },
-    )
+    async with conn.begin_nested():
+        await conn.execute(
+            text(
+                """
+                INSERT INTO cert_alert_log
+                    (tenant_id, cert_id, alert_threshold, channel, success, error_msg)
+                VALUES
+                    (:tenant_id::uuid, :cert_id::uuid, :threshold, :channel, :success, :error_msg)
+                ON CONFLICT (cert_id, alert_threshold, channel)
+                DO UPDATE SET
+                    success   = EXCLUDED.success,
+                    error_msg = EXCLUDED.error_msg,
+                    sent_at   = NOW()
+                """
+            ),
+            {
+                "tenant_id": str(tenant_id),
+                "cert_id": str(cert_id),
+                "threshold": threshold,
+                "channel": channel,
+                "success": success,
+                "error_msg": error_msg,
+            },
+        )
 
 
 # ─── 单 tenant 扫描 ───────────────────────────────────────────────────────────
@@ -377,13 +389,19 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
     sent = 0
 
     async with engine.connect() as conn:
-        # 设置 RLS 租户上下文
+      # 显式外层事务：set_config('app.tenant_id', true) 是 transaction-local，
+      # 必须在同一显式 txn 内完成所有 RLS-bound 操作；SAVEPOINT 由
+      # _push_supplier_portal / _log_alert 内部 conn.begin_nested() 提供
+      # 单 cert 隔离，避免 IntegrityError 污染外层 txn → 后续 cert 的
+      # _already_alerted / _log_alert 全部失败 → 下次 daily scan 重复推送。
+      async with conn.begin():
+        # 设置 RLS 租户上下文（true=transaction-local，依赖外层 begin()）
         await conn.execute(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
-        # 读 webhook URLs
+        # 读 webhook URLs（在显式 txn 内，set_config 生效）
         webhook_urls = await _get_tenant_webhook_urls(conn, tenant_id)
 
         # 查询临期 + 过期证件（list_alertable 接受 AsyncConnection — text() 层接口兼容）
@@ -470,6 +488,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                     )
 
                 # 落 cert_alert_log（无论成功/失败都记录）
+                # _log_alert 内部用 SAVEPOINT 隔离 INSERT 失败，外层 txn 不被污染
                 try:
                     await _log_alert(conn, tenant_id, cert_id, threshold, channel, success, error_msg)
                 except SQLAlchemyError as exc:
@@ -484,7 +503,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                 if success:
                     sent += 1
 
-        await conn.commit()
+      # async with conn.begin() 自动 commit；不再需要显式 conn.commit()
 
     return {"evaluated": evaluated, "sent": sent}
 
