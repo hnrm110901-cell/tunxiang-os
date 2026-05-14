@@ -41,6 +41,9 @@ class SupplyEventType(str, Enum):
     # ── 扣秤类（PRD-02 / Tier 1 毛利底线）────────────────────────────
     WEIGHT_DEDUCTION_ANOMALY = "supply.weight_deduction.anomaly"  # 扣秤异常（实测 vs 标准超 tolerance）
 
+    # ── 出料率类（PRD-06 / Tier 1 毛利底线）──────────────────────────
+    YIELD_ANOMALY = "supply.yield.anomaly"  # 出料率异常（实测 vs 标准超 tolerance）
+
 
 @dataclass
 class SupplyEvent:

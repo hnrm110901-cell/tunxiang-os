@@ -1,15 +1,26 @@
 """BOM 模板管理服务 — CRUD + 版本激活
 
 封装 bom_templates / bom_items 的查询与管理。
+
+PRD-06 增量（Tier 1 毛利底线）：
+  bom_purchase_qty_with_yield — BOM 反算购买量集成 yield_standard，使 BOM 用量
+  自动除以 yield_rate 得到毛菜采购量。yield_standard 缺失/草稿态时 fallback
+  使用 BOM 原值（不阻塞主 BOM 流程）。
 """
 
+import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+from decimal import Decimal
 from typing import Optional
 
 import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from shared.events import SupplyEventType, UniversalPublisher
+
+from . import yield_standard_service as _yss
 
 log = structlog.get_logger(__name__)
 
@@ -592,3 +603,83 @@ class BOMService:
             "version": row["version"],
             "is_active": True,
         }
+
+
+# ─── PRD-06：BOM 反算购买量集成 yield_standard ────────────────────────────────
+
+
+def _uuid(val: str | uuid.UUID) -> uuid.UUID:
+    return val if isinstance(val, uuid.UUID) else uuid.UUID(str(val))
+
+
+async def bom_purchase_qty_with_yield(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    ingredient_id: str,
+    bom_qty_kg: Decimal,
+    store_id: Optional[str] = None,
+    season: str = "all",
+    today: Optional[date] = None,
+    actual_yield_rate: Optional[Decimal] = None,
+) -> dict:
+    """BOM 反算：给定 BOM 用量（净菜 kg），返回应采购的毛菜量（kg）。
+
+    GIVEN  BOM 用量 60kg 净菜 + 春菠菜 active standard yield_rate=0.65
+    WHEN   bom_purchase_qty_with_yield(ingredient_id=菠菜, bom_qty_kg=60, season='spring')
+    THEN   返回 purchase_qty_kg = 60 / 0.65 ≈ 92.3kg
+
+    fallback：yield_standard 不存在 / 草稿态 → 返回 bom_qty_kg 原值（不阻塞 BOM 流程）。
+    如 actual_yield_rate 提供且偏差超 tolerance_pct → 旁路 emit yield_anomaly 事件。
+    """
+    if bom_qty_kg <= 0:
+        raise ValueError("bom_qty_kg 必须 > 0")
+
+    anomaly_flag = {"detected": False}
+
+    async def _on_anomaly(payload: dict) -> None:
+        anomaly_flag["detected"] = True
+        # 旁路异步发射 yield_anomaly 事件（不阻塞 BOM 主流程）
+        try:
+            asyncio.create_task(
+                UniversalPublisher.publish(
+                    event_type=SupplyEventType.YIELD_ANOMALY,
+                    tenant_id=_uuid(tenant_id),
+                    store_id=_uuid(store_id) if store_id else None,
+                    entity_id=_uuid(ingredient_id),
+                    event_data={
+                        "ingredient_id": ingredient_id,
+                        "bom_qty_kg": str(bom_qty_kg),
+                        **payload,
+                    },
+                    source_service="tx-supply",
+                )
+            )
+        except (RuntimeError, ValueError) as exc:  # pragma: no cover — 旁路 fail-open
+            log.warning(
+                "yield_anomaly_emit_failed",
+                ingredient_id=ingredient_id,
+                error=str(exc),
+                exc_info=True,
+            )
+
+    purchase_qty, meta = await _yss.calculate_purchase_qty(
+        db,
+        tenant_id=tenant_id,
+        ingredient_id=ingredient_id,
+        required_net_qty_kg=bom_qty_kg,
+        season=season,
+        today=today,
+        on_anomaly_callback=_on_anomaly,
+        actual_yield_rate=actual_yield_rate,
+    )
+
+    return {
+        "ingredient_id": ingredient_id,
+        "bom_qty_kg": bom_qty_kg,
+        "purchase_qty_kg": purchase_qty,
+        "standard_id": meta["standard_id"],
+        "yield_rate": meta["yield_rate"],
+        "season_matched": meta["season_matched"],
+        "anomaly_detected": meta["anomaly_detected"] or anomaly_flag["detected"],
+    }
