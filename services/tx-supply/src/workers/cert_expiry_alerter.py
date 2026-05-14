@@ -58,27 +58,38 @@ async def _push_wecom_safety_director(
     threshold: str,
     webhook_url: str,
 ) -> Tuple[bool, Optional[str]]:
-    """食安总监企微 webhook 推送：调 IMNotificationService 渲染模板 + send_wecom_bot。"""
-    # 懒 import 避免 cert_expiry_alerter 模块加载时强耦合 tx-org（仅 celery worker 容器需要）
-    from services.tx_org.src.services.im_notification_service import IMNotificationService
+    """食安总监企微 webhook 推送：调 IMNotificationService 渲染模板 + send_wecom_bot。
 
+    fail-open 契约：dict 读取 / 懒 import / IMNotificationService 调用全部包
+    在 try 内，避免 KeyError/TypeError/ImportError 漏出 escaping fail-open。
+    """
     try:
+        # 懒 import 在 try 内：未来 tx-org 包不可用时不直接抛 ImportError 给调用方
+        from services.tx_org.src.services.im_notification_service import IMNotificationService
+
+        supplier_name = cert.get("supplier_name") or "(未知供应商)"
+        cert_id_val = cert["cert_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = str(cert["expire_date"])
+        days_until_expiry = int(cert["days_until_expiry"])
+
         svc = IMNotificationService()
         message = await svc.notify_cert_expiry(
-            supplier_name=cert.get("supplier_name") or "(未知供应商)",
-            cert_type=cert["cert_type"],
-            cert_number=cert["cert_number"],
-            expire_date=str(cert["expire_date"]),
-            days_until_expiry=int(cert["days_until_expiry"]),
+            supplier_name=supplier_name,
+            cert_type=cert_type,
+            cert_number=cert_number,
+            expire_date=expire_date,
+            days_until_expiry=days_until_expiry,
             threshold=threshold,
             recipient_role="食安总监",
         )
         sent = await svc.send_wecom_bot(webhook_url, message)
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, ImportError) as exc:
         logger.warning(
             "cert_alert_wecom_safety_director_exception",
             tenant_id=str(tenant_id),
-            cert_id=str(cert["cert_id"]),
+            cert_id=str(cert.get("cert_id", "")),
             threshold=threshold,
             error=str(exc),
             exc_info=True,
@@ -89,14 +100,14 @@ async def _push_wecom_safety_director(
         logger.info(
             "cert_alert_wecom_safety_director_sent",
             tenant_id=str(tenant_id),
-            cert_id=str(cert["cert_id"]),
+            cert_id=str(cert_id_val),
             threshold=threshold,
         )
         return (True, None)
     logger.warning(
         "cert_alert_wecom_safety_director_failed",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
+        cert_id=str(cert_id_val),
         threshold=threshold,
     )
     return (False, "wecom_send_failed")
@@ -108,26 +119,37 @@ async def _push_wecom_purchaser(
     threshold: str,
     webhook_url: str,
 ) -> Tuple[bool, Optional[str]]:
-    """采购员企微 webhook 推送：模板 recipient_role='采购员'，复用 send_wecom_bot 通道。"""
-    from services.tx_org.src.services.im_notification_service import IMNotificationService
+    """采购员企微 webhook 推送：模板 recipient_role='采购员'，复用 send_wecom_bot 通道。
 
+    fail-open 契约：dict 读取 / 懒 import / IMNotificationService 调用全部包
+    在 try 内（与 _push_wecom_safety_director 同模式）。
+    """
     try:
+        from services.tx_org.src.services.im_notification_service import IMNotificationService
+
+        supplier_name = cert.get("supplier_name") or "(未知供应商)"
+        cert_id_val = cert["cert_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = str(cert["expire_date"])
+        days_until_expiry = int(cert["days_until_expiry"])
+
         svc = IMNotificationService()
         message = await svc.notify_cert_expiry(
-            supplier_name=cert.get("supplier_name") or "(未知供应商)",
-            cert_type=cert["cert_type"],
-            cert_number=cert["cert_number"],
-            expire_date=str(cert["expire_date"]),
-            days_until_expiry=int(cert["days_until_expiry"]),
+            supplier_name=supplier_name,
+            cert_type=cert_type,
+            cert_number=cert_number,
+            expire_date=expire_date,
+            days_until_expiry=days_until_expiry,
             threshold=threshold,
             recipient_role="采购员",
         )
         sent = await svc.send_wecom_bot(webhook_url, message)
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, ImportError) as exc:
         logger.warning(
             "cert_alert_wecom_purchaser_exception",
             tenant_id=str(tenant_id),
-            cert_id=str(cert["cert_id"]),
+            cert_id=str(cert.get("cert_id", "")),
             threshold=threshold,
             error=str(exc),
             exc_info=True,
@@ -138,14 +160,14 @@ async def _push_wecom_purchaser(
         logger.info(
             "cert_alert_wecom_purchaser_sent",
             tenant_id=str(tenant_id),
-            cert_id=str(cert["cert_id"]),
+            cert_id=str(cert_id_val),
             threshold=threshold,
         )
         return (True, None)
     logger.warning(
         "cert_alert_wecom_purchaser_failed",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
+        cert_id=str(cert_id_val),
         threshold=threshold,
     )
     return (False, "wecom_send_failed")
@@ -165,27 +187,36 @@ async def _push_supplier_portal(
     单 cert 失败（如 RLS WITH CHECK / IntegrityError）只回滚 savepoint，
     外层 _scan_one_tenant 事务保持干净，后续 _already_alerted / _log_alert
     不会被 InFailedSqlTransaction 污染。
+
+    fail-open 契约：dict 读取也在 try 内，避免 KeyError 漏出。
     """
-    if threshold.startswith("D+"):
-        subject = f"【已过期】{cert['cert_type']} 请立即续证"
-    else:
-        subject = f"【临期 {threshold}】{cert['cert_type']} 即将过期"
-
-    body = (
-        f"您的{cert['cert_type']}（编号 {cert['cert_number']}）"
-        f"将于 {cert['expire_date']} 过期，距今 {cert['days_until_expiry']} 天。"
-        f"请尽快上传续证文件至供应商门户。"
-    )
-    metadata = {
-        "cert_id": str(cert["cert_id"]),
-        "cert_type": cert["cert_type"],
-        "cert_number": cert["cert_number"],
-        "expire_date": str(cert["expire_date"]),
-        "days_until_expiry": int(cert["days_until_expiry"]),
-        "threshold": threshold,
-    }
-
     try:
+        cert_id_val = cert["cert_id"]
+        supplier_id_val = cert["supplier_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = cert["expire_date"]
+        days_until_expiry = int(cert["days_until_expiry"])
+
+        if threshold.startswith("D+"):
+            subject = f"【已过期】{cert_type} 请立即续证"
+        else:
+            subject = f"【临期 {threshold}】{cert_type} 即将过期"
+
+        body = (
+            f"您的{cert_type}（编号 {cert_number}）"
+            f"将于 {expire_date} 过期，距今 {days_until_expiry} 天。"
+            f"请尽快上传续证文件至供应商门户。"
+        )
+        metadata = {
+            "cert_id": str(cert_id_val),
+            "cert_type": cert_type,
+            "cert_number": cert_number,
+            "expire_date": str(expire_date),
+            "days_until_expiry": days_until_expiry,
+            "threshold": threshold,
+        }
+
         # SAVEPOINT 隔离：INSERT 失败只回滚到 savepoint，不污染外层 txn
         async with conn.begin_nested():
             await conn.execute(
@@ -200,7 +231,7 @@ async def _push_supplier_portal(
                 ),
                 {
                     "tenant_id": str(tenant_id),
-                    "supplier_id": str(cert["supplier_id"]),
+                    "supplier_id": str(supplier_id_val),
                     "message_type": "cert_expiry_alert",
                     "subject": subject,
                     "body": body,
@@ -211,17 +242,26 @@ async def _push_supplier_portal(
         logger.warning(
             "cert_alert_supplier_portal_insert_failed",
             tenant_id=str(tenant_id),
-            cert_id=str(cert["cert_id"]),
+            cert_id=str(cert.get("cert_id", "")),
             error=str(exc),
             exc_info=True,
         )
         return (False, f"portal_insert_failed: {exc.__class__.__name__}")
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        logger.warning(
+            "cert_alert_supplier_portal_payload_invalid",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert.get("cert_id", "")),
+            error=str(exc),
+            exc_info=True,
+        )
+        return (False, f"portal_payload_invalid: {exc.__class__.__name__}")
 
     logger.info(
         "cert_alert_supplier_portal_inserted",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
-        supplier_id=str(cert["supplier_id"]),
+        cert_id=str(cert_id_val),
+        supplier_id=str(supplier_id_val),
         threshold=threshold,
     )
     return (True, None)
@@ -474,7 +514,14 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                         success, error_msg = await _push_supplier_portal(
                             conn, tenant_id, cert, threshold
                         )
-                except (OSError, ValueError, RuntimeError) as exc:
+                except (
+                    OSError,
+                    ValueError,
+                    RuntimeError,
+                    KeyError,
+                    TypeError,
+                    AttributeError,
+                ) as exc:
                     success = False
                     error_msg = str(exc)
                     logger.warning(
