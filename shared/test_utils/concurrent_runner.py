@@ -41,6 +41,7 @@ session/transaction + SET LOCAL ROLE 非 superuser + 事务级 tenant GUC，让 
 from __future__ import annotations
 
 import asyncio
+import decimal
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, TypeVar
 
 from sqlalchemy import text
@@ -94,21 +95,38 @@ async def run_concurrent(
 
     async def _worker() -> T:
         async with session_factory() as session:
-            # SET LOCAL ROLE 必须在第一个业务 SQL 前；事务级 rollback 时自动清理。
-            # role 是模块级硬编码默认值（"tunxiang_rls_app"）或调用方显式传入；PG 不支持
-            # `SET LOCAL ROLE $1` 参数绑定，f-string 拼接是必要权衡，调用方传非默认值
-            # 需自行保证字面安全（白名单字符串，非用户输入）。
-            await session.execute(text(f"SET LOCAL ROLE {role}"))
-            await set_tenant_guc(session, tenant_id)
-            result = await operation(session)
-            await session.commit()
-            return result
+            # 显式 try/except: BaseException — timeout 时 wait_for 取消 task,
+            # CancelledError 路径下 async with __aexit__ 的 rollback 不保证完成
+            # (§19 P1-A: PR-2/3/4/5 200 桌并发 timeout 放宽场景真实风险)。
+            # 显式 rollback 让 session 端事务明确关闭, PG 端锁立即释放, 后续测试
+            # _cleanup DELETE 不被悬挂事务阻塞。
+            try:
+                # SET LOCAL ROLE 必须在第一个业务 SQL 前；事务级 rollback 时自动清理。
+                # role 默认 "tunxiang_rls_app" 锁定; 调用方传非默认值需自保字面安全。
+                # PG 不支持 `SET LOCAL ROLE $1` 参数绑定, f-string 拼接是必要权衡。
+                await session.execute(text(f"SET LOCAL ROLE {role}"))
+                await set_tenant_guc(session, tenant_id)
+                result = await operation(session)
+                await session.commit()
+                return result
+            except BaseException:
+                await session.rollback()
+                raise
 
-    coros = [_worker() for _ in range(n)]
-    return await asyncio.wait_for(
-        asyncio.gather(*coros, return_exceptions=True),
-        timeout=timeout_sec,
-    )
+    # 显式 create_task + timeout 时 cancel 收尾 — 防 timeout 路径下 session 资源泄漏
+    # (§19 P1-A 修法: tasks.cancel() + 二次 gather 等待 __aexit__ rollback 完成)
+    tasks = [asyncio.create_task(_worker()) for _ in range(n)]
+    try:
+        return await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True),
+            timeout=timeout_sec,
+        )
+    except asyncio.TimeoutError:
+        for t in tasks:
+            t.cancel()
+        # 二次 gather 等待所有 task 完成 cancel 路径下的 session rollback / __aexit__
+        await asyncio.gather(*tasks, return_exceptions=True)
+        raise
 
 
 async def assert_final_consistency(
@@ -151,9 +169,15 @@ async def assert_final_consistency(
                 text(f"SELECT COALESCE(SUM({col}), 0) {base_sql}"), where
             )
             actual = result.scalar()
-            assert actual == v, (
+            # §19 P1-B: PG SUM() 对 NUMERIC 列返回 Decimal, 对 BIGINT 返回 int。
+            # 调用方 expected 通常传 int (屯象 _fen BIGINT 规范), 但 PR-N 测 tx-finance
+            # NUMERIC 列时, Decimal('10.5') == 10.5 (float) 是 False (浮点精度), 会误报。
+            # 统一转 Decimal(str(...)) 防类型 + 精度双重 mismatch。
+            actual_dec = decimal.Decimal(str(actual))
+            v_dec = decimal.Decimal(str(v))
+            assert actual_dec == v_dec, (
                 f"sum({col}) mismatch on {table} where {where}: "
-                f"actual={actual} expected={v}"
+                f"actual={actual} (Decimal={actual_dec}) expected={v} (Decimal={v_dec})"
             )
 
     if "status_set" in expected:

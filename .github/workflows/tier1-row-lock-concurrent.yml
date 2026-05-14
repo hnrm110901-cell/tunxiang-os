@@ -130,9 +130,18 @@ jobs:
         # PR-1 scope: tests/concurrent/test_runner_smoke_tier1.py (3 用例: T1 INSERT
         # 无 race + T2 FOR UPDATE 串行化 + T3 assert_final_consistency 助手)
         # PR-2+ scope: tests/concurrent/test_<service>_concurrent_tier1.py 业务真行为测
+        #
+        # --confcutdir tests/concurrent: 阻止 pytest 向上加载 tests/conftest.py
+        # (mock fixtures, import httpx 等 tier1-gate workflow 不装的 dep);
+        # tests/concurrent/conftest.py 自含 fixture, 无需父 conftest。
+        #
+        # --override-ini asyncio_mode=auto: 防御性显式设置 (即便 pyproject 默认是 auto,
+        # 也确保 workflow 不受 working-directory 探测变化影响)。
         run: |
           python -m pytest \
             tests/concurrent/ \
+            --confcutdir tests/concurrent \
+            --override-ini asyncio_mode=auto \
             -v --tb=short
 
       - name: Verify RLS policy state (debug aid, always run)

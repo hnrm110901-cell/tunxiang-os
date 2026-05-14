@@ -133,7 +133,7 @@ async def test_settle_order_no_double_payment(session_factory):
 `tests/concurrent/conftest.py` 的 `_CONCURRENT_TABLES` 决定 cleanup 范围。PR-1 默认仅
 `stores`。新业务表需:
 
-**方式 A — 主 conftest 加入**（推荐 PR-2/3/4/5）:
+**方式 A — 主 conftest 直接加入**（推荐 PR-2/3/4/5 简单场景）:
 
 ```python
 # tests/concurrent/conftest.py
@@ -144,20 +144,45 @@ _CONCURRENT_TABLES: tuple[str, ...] = (
 )
 ```
 
-注意 FK 拓扑顺序: 子表 → 父表（payments → orders → stores）。
+**FK 拓扑顺序**: 子表 → 父表（payments → orders → stores）。当前 `_cleanup` 用
+`session_replication_role=replica` 绕 FK 触发器, 即使乱序 DELETE 不 fail, 但若
+后续切回 `TRUNCATE ... CASCADE` 模式则要求严格拓扑顺序 — 建议从一开始就维护正确顺序。
 
-**方式 B — 子目录 conftest 覆盖**（pytest 继承机制）:
+**方式 B — 子目录 conftest 覆盖**（需将 module-level 变量重构为 fixture）:
+
+⚠️ **重要**: `_CONCURRENT_TABLES` 当前是 conftest.py 的 **module-level 变量**，**不是 pytest
+fixture**。子目录 conftest.py 定义同名 `_CONCURRENT_TABLES` **不会** 被父 conftest 的
+`_cleanup` 看到（这是 Python 模块作用域规则, 与 pytest 无关）。要支持子目录覆盖, 需先把
+`_CONCURRENT_TABLES` 重构为 fixture, 让 `_cleanup` 通过 fixture 注入接收:
 
 ```python
-# tests/concurrent/cashier/conftest.py
-_CONCURRENT_TABLES: tuple[str, ...] = (
-    "payments",
-    "orders",
-    "order_items",
-)
+# tests/concurrent/conftest.py  — 重构步骤 (留给 PR-N 实施)
+@pytest_asyncio.fixture
+def concurrent_tables() -> tuple[str, ...]:
+    return ("stores",)
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _cleanup(engine, concurrent_tables):  # ← 接收 fixture
+    async def _do_cleanup():
+        async with engine.begin() as conn:
+            await conn.execute(text("SET LOCAL row_security = off"))
+            await conn.execute(text("SET LOCAL session_replication_role = replica"))
+            for tbl in concurrent_tables:
+                # ... (to_regclass 守卫 + DELETE FROM)
+    await _do_cleanup()
+    yield
+    await _do_cleanup()
+
+
+# tests/concurrent/cashier/conftest.py — 子目录 fixture override
+@pytest_asyncio.fixture
+def concurrent_tables() -> tuple[str, ...]:
+    return ("payments", "orders", "order_items", "stores")
 ```
 
-子 conftest 仅作用于子目录测试文件, 不影响其他 service test。
+PR-1 暂未做此重构（YAGNI — 方式 A 足够覆盖 PR-2/3/4/5）；当首次需要"同 workflow 内
+分服务测试隔离不同表集"时再做（属 PR-N follow-up）。
 
 ### 3.4 扩展 workflow paths
 
