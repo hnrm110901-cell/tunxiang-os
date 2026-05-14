@@ -489,11 +489,19 @@ services:
     build:
       context: ../..
       dockerfile: services/tx-ops/Dockerfile
-    command: >
-      celery -A services.tx_ops.src.celery_tasks_sync worker
-      --loglevel=info
-      --concurrency=4
-      --queues=default,daily_ops,schedule,notifications
+    # ENV guard: ENABLE_TX_SUPPLY_CERT_ALERTER 未设时等同原命令（blast radius 0）
+    # 设为任意非空值时追加 tx-supply celery_tasks 模块（sub-PR B merge 后启用）
+    command:
+      - "sh"
+      - "-c"
+      - >-
+        celery
+        -A services.tx_ops.src.celery_tasks_sync
+        ${ENABLE_TX_SUPPLY_CERT_ALERTER:+-A services.tx_supply.src.celery_tasks}
+        worker
+        --loglevel=info
+        --concurrency=4
+        --queues=default,daily_ops,schedule,notifications
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres/${POSTGRES_DB:?required}
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379/0
@@ -530,10 +538,18 @@ services:
     build:
       context: ../..
       dockerfile: services/tx-ops/Dockerfile
-    command: >
-      celery -A services.tx_ops.src.celery_tasks_sync beat
-      --loglevel=info
-      --schedule=/tmp/celerybeat-schedule
+    # ENV guard: ENABLE_TX_SUPPLY_CERT_ALERTER 未设时等同原命令（blast radius 0）
+    # 设为任意非空值时追加 tx-supply celery_tasks 模块（sub-PR B merge 后启用）
+    command:
+      - "sh"
+      - "-c"
+      - >-
+        celery
+        -A services.tx_ops.src.celery_tasks_sync
+        ${ENABLE_TX_SUPPLY_CERT_ALERTER:+-A services.tx_supply.src.celery_tasks}
+        beat
+        --loglevel=info
+        --schedule=/tmp/celerybeat-schedule
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres/${POSTGRES_DB:?required}
       REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required}@redis:6379/0
