@@ -1,3 +1,90 @@
+## 2026-05-14 下午段晚 — P0 nightly 修复 + tx-supply 可观测性收口 + §19 P2 测试补遗 3 PR batch ship (5/14 累计 25 PR)
+
+### 今日完成
+
+5/14 下午段晚 ship 3 PR — 闭环上午-下午 §19 reviewer round-1 全部 P0/P1/P2 follow-up + 供应链 W6 PR-03D 收口（Phase 1 完成 8/9，剩 PR-01C）。**5/14 单日累计 ship 25 PR**（上午-中午 13 batch + #602 + #603 + #227 + #609 + #612 + #608 并发 + 下午段 #617/#619/#618/#616 + #620 devlog + **#621 + #622 + #623** = 25 PR）。
+
+**PR #621 — pnpm-lock.yaml resync after PR #619 e2e/ workspace add MERGED** `9fc1d844` (admin squash, **frontend lockfile resync 候选首例 carve-out 第 10 类**, 与 PR #619 第 9 类配对, Closes #601 真正修复路径):
+- 1 file / +29 / -0: `pnpm-lock.yaml` only — 5 行 e2e importer (`@playwright/test` 1.59.1) + 24 行 pnpm 10.x `libc: [glibc/musl]` 平台标签元数据副产物
+- 修前问题：PR #619 加 `e2e` 入 workspace 未同 PR 跑 `pnpm install`，CI `--frozen-lockfile` 立即拒装 `ERR_PNPM_OUTDATED_LOCKFILE Cannot install ... <ROOT>/e2e/package.json * 1 dependencies were added: @playwright/test@^1.40.0`
+- 修法：本地 `pnpm install` 干净跑（12.8s） + lockfile 自动重生 + git add only `pnpm-lock.yaml`。Part 2 native binding libc 标签人工 revert 会破坏工具链一致性 + 下次任何 `pnpm install` 又恢复，与 `feedback_dependabot_bump_resyncs_lock.md` 同模式
+- workflow_dispatch on PR head 验证 `Offline E2E (Sprint A2 P0-2)` step 5 "Install workspace dependencies" + step 6 Playwright browsers 双 success（注意：必须 dispatch `offline-e2e.yml` 不是 stale `nightly-offline-e2e.yml`，见新落 memory `project_tunxiang_offline_e2e_workflows.md`）
+- **新教训落 memory** `feedback_workspace_lockfile_sync.md` — pnpm-workspace.yaml 加/删 packages 必须同 PR sync lockfile；PR #619 漏 sync → PR #621 7h 后补救（5/14 03:08 first nightly fail → 06:22 ship）
+
+**PR #622 — tx-supply doc_number fallback Prometheus counter + admin UI MERGED** `78d96d9a` (admin squash, **Tier 1 邻接 explicit-ask 第 13 例**, 不在 10 类 carve-out, PR-03D / Closes #592):
+- 11 files / +906 / -0 (4-part atomic commits): `metrics.py` Counter+helper +90 / `doc_number_admin_routes.py` +113 / `purchase_order_routes.py`+`inventory_io.py`+`receiving_v2_service.py`+`stocktake_service.py` 6 catch site 接线 +10 / `main.py` 路由挂载 +5 / `DocNumberRulesPage.tsx` Ant Design 仪表板 +252 + `App.tsx` 路由 +2 / `doc-number-fallback-runbook.md` on-call 处置 +194 / `test_doc_number_fallback_tier1.py` 8 测试 +240
+- **graceful degradation 监控收口** — PR #586 PR-03B Wave1 §19 round-2 reviewer 建议落地：doc_number infra 失败之前仅 structlog warn 无主动告警 → 现在 Prometheus Counter `doc_number_fallback_total{service, doc_type}` + admin `GET /api/v1/doc-number/fallback-stats` + 仪表板 + 2 告警规则（Burst 5min>10 critical / Slow 15min>0 warning）+ runbook
+- **labels cardinality 封闭** — `service × doc_type` ≤ 6 个固定组合，无 `tenant_id` label 防爆炸（聚合视角，租户拆分通过 PromQL Grafana）
+- **DocNumberError vs Exception 分流** — sentinel（模板未配置）只 log 不计数；真 infra 异常才触发告警，避免告警噪音
+- **fail-open 契约** — `record_doc_number_fallback` 内部 try/except 包裹 + counter.inc() 不能 raise，与 `feedback_graceful_degradation_pattern.md` 契约一致
+- **§19 round-1**: 1 P0 (X-Role gate bypass — X-Role 不在 gateway `_STRIP` 列表客户端可伪造) + 1 P1 (`_name` 私属性) + 2 P2 (`_value.get()` 私属性 + dead `prev_line` 断言)
+- **§19 round-2 APPROVE 0 P0 / 0 P1** — 修法：① X-Role → X-Internal-Role (proxy.py L130 `_STRIP` + L142 gateway 注入 trusted role 不可伪造) ② `_name`/`_value` → `metric_family.samples` 公开 API 防 prometheus_client 主版本升级断裂 ③ verifier 顺手修 2 P2 docstring 旧 X-Role 字面残留
+- **CI 真门禁绿** — 8 tier1 测试本地 + CI 双绿，`test_main_import_smoke_tier1.py` 1 xfailed pre-existing 不退化
+
+**PR #623 — gateway+tx-trade §19 round-1 E 项 P2 follow-up unit tests MERGED** `a33d8771` (admin squash, **双 carve-out 同 PR 历史首例 — 类 4 *tier1* 后缀 tx-trade + 类 8 test-only Tier 1 邻接 non-*tier1* gateway** PR #536 之后第 2 例, Closes #606 / 闭 #610 + #611):
+- 2 NEW test files / 0 source / 0 migration / +319 / -0 / blast radius 0
+  - `services/gateway/src/tests/test_proxy_non_json.py` (4 用例 mock-driven) — T1 text/plain `ValueError` / T2 application/octet-stream `httpx.DecodingError` (锁 PR #616 §19 round-1 P1 防回归 — MRO 不继承 ValueError) / T3 GBK `UnicodeDecodeError` / T4 合法 JSON 控制组
+  - `services/tx-trade/src/tests/test_main_lifespan_nonce_close_tier1.py` (3 用例 AST 守护) — T1 startup yield 前含 `get_nonce_store()` warmup / T2 shutdown yield 后含 `await close()` / T3 close() 必须包 try/except 不向 SIGTERM 传播
+- **AST 守护而非 runtime mock 选型** — lifespan 端到端需 init_db (real PG) + schedulers + payment consumer 多重 fixture，P2 priority ROI 不划算；跟 `test_lifespan_payment_consumer_tier1.py` T4-T6 PR #128 silent failure 守护同模式
+- mock 技巧：`shared.security.src.internal_jwt` 注入 fake module 避免 mint_internal_jwt 真实 jwt secret 依赖
+- 本地 pytest **7/7 PASSED** (~0.5s) + CI 真门禁 19/19 全绿（tier1-gate paths 命中 *tier1* 后缀触发全 17 service matrix）
+- **user "merge it" → §19 reviewer agent 运行中被 stopped** (partial 验证已确认 mock 路径达 resp.json() — blast radius 0 + 双 carve-out 接受跳完整 §19)
+- **自然闭环 issues**: #606 (PR #616 §19 P1-1 follow-up) / #610 + #611 (PR #618 §19 round-1 E 项 P2 follow-up，5/14 上午 #618 直接实现，#623 是源码守护补遗)
+
+### 关键决策（跨 session 价值）
+
+- **3 新 lesson memory 落盘** — 本 batch 副产物，下 session cold-start 可直接读：
+  - `feedback_workspace_lockfile_sync.md`: pnpm-workspace.yaml 加/删 packages 必须同 PR sync pnpm-lock.yaml，否则 CI `--frozen-lockfile` 拒装。修复链断 ~7h (PR #619 漏 sync → PR #621)
+  - `project_tunxiang_offline_e2e_workflows.md`: 屯象OS 双 offline E2E workflow 文件陷阱 — `offline-e2e.yml` (pnpm@10 真 sprint check) vs `nightly-offline-e2e.yml` (npm-ci stale 跑必 fail)。按文件路径而非 workflow name 选；PR #621 A.1 dispatch 错 workflow 实证
+  - `feedback_gh_pr_merge_worktree_cosmetic_fail.md`: `gh pr merge --admin --delete-branch` 报 "fatal: 'main' is already used by worktree at..." 是 cosmetic local cleanup fail，server merge 已成。先 `gh pr view --json state,mergedAt` 看真相，不要 panic/retry/destructive action。规避法：merge 时省 `--delete-branch`，事后手动 `git push origin --delete <branch>`。PR #621 + #623 实证 2 次
+- **新 carve-out 候选 (10 类 + 11 类候选)**:
+  - **第 10 类候选 "frontend lockfile resync after workspace add"** (PR #621 首例) — 与第 9 类 frontend workspace config (PR #619) 配对，blast radius 0，lockfile-only 改动
+  - **第 11 类候选 "双 carve-out 同 PR (test-only blast radius 0)"** (PR #623 首例) — 单 PR 同时命中类 4 (*tier1* 后缀) + 类 8 (test-only Tier 1 邻接 non-*tier1*)，blast radius 0 接受跳完整 §19
+- **PR #623 双 carve-out 实证 §19 简化路径** — user "merge it" 接受跳完整 reviewer agent run，因 2 NEW test files / 0 source / blast radius 0 满足"test-only Tier 1 邻接"+"AST/mock 守护已自验"双重豁免条件。这是 §19 reviewer scope 分级在 test-only PR 上的极简边界
+- **PR #622 graceful degradation 监控闭环** — `feedback_graceful_degradation_pattern.md` 契约（辅助标识 infra 失败 fail-open 静默 fallback + structlog warn + Prometheus counter + 监控告警）首次完整落地 4 件套（Counter + 6 catch site 接线 + 仪表板 + runbook + 告警规则草稿），为后续 SKU 编码 / 单据可读编号类 graceful degradation 模式建立范本
+- **issue tracking 自然闭环模式** — PR #623 同时 Closes #606 + 闭 #610 + #611：3 issues 在 5/14 上午 PR #616 (#606) / PR #618 (#610+#611) 已实质性 fix（生产代码已修），#623 补的是 source-protection AST 测试守护，不是 fix 本身。tracking lifecycle "fix-in-prod → guard-in-test → tracking-close" 三段式
+
+### 数据变化
+
+- 迁移版本：无（3 PR 都 0 migration）
+- 新增 API 模块：1 个（tx-supply `GET /api/v1/doc-number/fallback-stats`, X-Internal-Role gated）
+- 新增前端页面：1 个（web-admin `/supply/doc-number-rules` Ant Design 仪表板）
+- 新增测试：3 file 总 +559 (test_doc_number_fallback_tier1.py 8 用例 +240 + test_proxy_non_json.py 4 用例 + test_main_lifespan_nonce_close_tier1.py 3 用例 +319)
+- 修改源：6 file 总 +212 (`metrics.py` +90 / `doc_number_admin_routes.py` +113 NEW / `main.py` +5 + 6 catch site +10 / `App.tsx` +2 / `DocNumberRulesPage.tsx` +252 NEW)
+- 修改 lockfile：1 file +29 / docs +194 NEW (doc-number-fallback runbook)
+
+### 累计 tally 更新 (5/14 下午段晚)
+
+- **本 batch ship**: 3 PR (#621 + #622 + #623) + 3 lesson memory 落盘
+- **5/14 单日累计 ship 25 PR**: 13 上午-中午 batch + #602 + #603 + #227 + #609 + #612 + #608 (并发 session) + 下午段 #617 + #619 + #618 + #616 + #620 devlog + **#621 + #622 + #623**
+- **Tier 1 fund/源/邻接 explicit-ask 累计**: 13 例 (5/13-5/14 #271/#272/#544/#547/#553/#556/#560/#563 + 5/14 PR #227 + #609 + #618 + #616 + **#622 第 13 例 Tier 1 邻接 (tx-supply 库存 io / 收货 / 盘点 / 采购单)**)
+- **carve-out 矩阵扩展 9 类 → 11 类候选**: 第 9 类 frontend workspace config (PR #619) / **第 10 类候选 frontend lockfile resync (PR #621 首例)** / **第 11 类候选 双 carve-out 同 PR test-only blast radius 0 (PR #623 首例)** — `feedback_carveout_admin_merge_pattern.md` 待扩展记录新两类
+- **3 new lesson memory**: `feedback_workspace_lockfile_sync.md` / `project_tunxiang_offline_e2e_workflows.md` / `feedback_gh_pr_merge_worktree_cosmetic_fail.md`
+
+### 遗留问题
+
+- **§17 桌台并发语义对齐 PR**: 合并 #549/#557/#559 + cashier 6 P1/P2 + order 3 P1 = ~11 路径，前提创始人 3 选择题答复
+- **PR #240 D2-D5 真机 smoke**: head `2f270c5d` CONFLICTING 200+ commits behind，硬件已就位。**#619 + #621 ship 后 main nightly Offline E2E 应转绿；PR #240 web-pos offline cashier check 应转绿**（待 #240 rebase 后 verify）
+- **供应链 Phase 1 W6 剩 PR-01C** 证件管理 UI — Phase 1 完成 8/9（PR-03D #622 收口后）
+- **stale `nightly-offline-e2e.yml`** workflow 删除/迁 pnpm@10 — low-priority follow-up，归 `project_tunxiang_ci_gates.md` 预存漂移列表
+- pre-existing CI 漂移 11+ 项与本批无关，`project_tunxiang_ci_gates.md` 已登记
+
+### 明日计划
+
+- 优先 PR #240 D2-D5 真机 smoke (rebase 到 `a33d8771` + 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini M4 + Core ML 模型部署 + #619/#621 ship 后 web-pos offline cashier check 应转绿)
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复)
+- 或 PR-01C 供应链证件管理 UI 收尾 Phase 1 W6 9/9
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 关键 takeaway (跨 session 价值)
+
+- **lessons-as-memory 三件套** — 本 batch 3 PR 产出 3 个独立 lesson memory，每个都有具体实证（PR # + 失败模式 + 修法）。这是"事故驱动 memory 增长"模式的实证：每个 cosmetic/silent fail 都值得提取，下 session 直接避坑
+- **§19 reviewer 分级矩阵补完** — PR #621 (lockfile-only blast radius 0 跳) + PR #622 (Tier 1 邻接 +906 / 11 files 3 round 完整跑) + PR #623 (双 carve-out test-only user 授权跳)。三级分级标准：① 实质 logic 改动 → 完整 §19 + 多 round；② T2 infra/邻接 config → §19 + group explicit-ask；③ blast radius 0 test-only / lockfile / docs-only → 跳 §19 + explicit-ask 单点 confirm
+- **25 PR/单日 ship tally** — 远超 `feedback_proactive_session_split.md` 4+ 阈值（6.25 倍），但本 session 仅 ship 3 PR + 3 memory，属可控；上下文消费在 PR fetch + DEVLOG/progress 写入两块，可继续小批次推进
+- **carve-out 矩阵 9 → 11 类候选** — `feedback_carveout_admin_merge_pattern.md` 持续扩展中，已有候选两类待正式收录。建议下次 sediment session 一并并入 + 给每类首例 PR 编号 + 判定条件统一
+
+---
+
 ## 2026-05-14 下午段 — 轻量 P0/P1/P2 follow-up 4 PR batch ship (B/C 路径完整闭环, 5 issues 全 CLOSED)
 
 ### 今日完成
