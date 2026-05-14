@@ -19,6 +19,7 @@ from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import InventoryStatus, TransactionType
 
+from ..metrics import record_doc_number_fallback
 from .doc_number_service import DocNumberError
 from .doc_number_service import generate as gen_doc_number
 
@@ -143,6 +144,7 @@ async def receive_stock(
         logger.warning("doc_number_generate_skipped", reason=str(e))
     except Exception as e:  # noqa: BLE001 — 兜底，doc_number infra 异常不阻塞 Tier 1 业务
         logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+        record_doc_number_fallback(service="inventory_io", doc_type="inventory_io")
     # Tier 1 行锁（audit doc §4.3 P0）：防加权平均单价并发错算（毛利底线硬约束）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
@@ -326,6 +328,7 @@ async def issue_stock(
             logger.warning("doc_number_generate_skipped", reason=str(e))
         except Exception as e:  # noqa: BLE001 — doc_number 是辅助标识 infra fallback，参考 feedback_graceful_degradation_pattern.md
             logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+            record_doc_number_fallback(service="inventory_io", doc_type="waste")
 
     # Tier 1 行锁（audit doc §4.3 P0）：防 FIFO 出库并发丢更新（食安/成本）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
@@ -460,6 +463,7 @@ async def adjust_stock(
         logger.warning("doc_number_generate_skipped", reason=str(e))
     except Exception as e:  # noqa: BLE001 — doc_number 是辅助标识 infra fallback，参考 feedback_graceful_degradation_pattern.md
         logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+        record_doc_number_fallback(service="inventory_io", doc_type="adjustment")
 
     # Tier 1 行锁（audit doc §4.3 P1）：盘点调整与日常 IO 并发丢更新，与其他 mutation 路径统一
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)

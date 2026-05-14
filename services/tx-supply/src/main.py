@@ -169,6 +169,11 @@ from .api.yield_alert_routes import router as yield_alert_router
 
 app.include_router(yield_alert_router)  # 损耗告警：理论vs实际超标/班次归因/采购反馈闭环（8端点）
 
+# ── doc_number 健康度 admin API（issue #592 / PR-03D）──
+from .api.doc_number_admin_routes import router as doc_number_admin_router
+
+app.include_router(doc_number_admin_router)  # /api/v1/doc-number/fallback-stats — 跨租户 admin only
+
 
 @app.get("/health")
 async def health():

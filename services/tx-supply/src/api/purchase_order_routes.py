@@ -90,6 +90,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
+from ..metrics import record_doc_number_fallback
 from ..services.doc_number_service import DocNumberError
 from ..services.doc_number_service import generate as gen_doc_number
 
@@ -274,6 +275,7 @@ async def create_purchase_order(
             logger.warning(
                 "doc_number_generate_failed_fallback_null", error=str(e), exc_info=True
             )
+            record_doc_number_fallback(service="purchase_order", doc_type="purchase_order")
 
         # 计算总金额（分）
         total_amount_fen = sum(int(item.quantity * item.unit_price_fen) for item in body.items)

@@ -35,6 +35,7 @@ from shared.ontology.src.enums import (
     TransactionType,
 )
 
+from ..metrics import record_doc_number_fallback
 from .doc_number_service import DocNumberError
 from .doc_number_service import generate as gen_doc_number
 
@@ -135,6 +136,7 @@ async def create_receiving_order(
         logger.warning("doc_number_generate_skipped", reason=str(e))
     except Exception as e:  # noqa: BLE001 — doc_number 辅助标识 infra fallback
         logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+        record_doc_number_fallback(service="receiving_v2", doc_type="receiving")
 
     order = ReceivingOrder(
         id=uuid.uuid4(),
