@@ -507,12 +507,23 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 #### Migration 版本号链规划（W7-W12）
 - v418-v424 Phase 1 W6 ✅ ship
 - v425 supplier_portal_messages UNIQUE 索引（§17 patch / #613）
-- v426 RFQ schema 5 表（PRD-04 sub-A）
-- v427 MarketSurvey schema（PRD-13 sub-A）
+- v425-v427 slot abandon（原 supplier_portal_messages UNIQUE / RFQ / MarketSurvey 预留，实际迁移跳至 v428+）
 - **v428 PRD-02 ingredient_weight_standards + receiving_weight_deductions（W7-1 PR #633 ✅ ship）**
 - **v429 PRD-06 ingredient_yield_standards（W7-2 PR #637 ✅ ship）**
-- **v430 PRD-05 supplier_delivery_windows + supplier_delivery_violations（W8，本 PR）**
-- v431+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+- **v430 PRD-05 supplier_delivery_windows + supplier_delivery_violations（W8 PR #641 ✅ ship）**
+- **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 本 PR）**
+- v432 PRD-13 sub-A MarketSurvey schema（W11-W12）
+- v433+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+
+#### W9 PR 立项参数（PRD-04 sub-A RFQ schema + #613 supplier_portal_messages UNIQUE）
+
+**Tier 级别**：T2 infra ADD（schema-only，sub-B/C 落业务）／**explicit-ask**：不需要（T2 carve-out type 7 auto admin-merge）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
+
+- **范围**：v431 5 表 schema (rfqs/rfq_items/rfq_invitees/rfq_quotes/rfq_awards) + RLS 四联 / FK 子→父级联 (items/invitees/quotes CASCADE → rfqs；awards.selected_quote_id RESTRICT) / UNIQUE 约束 (rfq_id+ingredient_id / rfq_id+supplier_id / rfq_id 一单一中标) / RFQStatus 状态机字典 (6 值) / 5 ORM SQLAlchemy 2.0 typed Mapped[] + 12 Pydantic V2 schemas
+- **#613 闭环**：supplier_portal_messages partial UNIQUE 索引 (tenant_id, supplier_id, message_type, metadata->>'cert_id', metadata->>'threshold') WHERE message_type='cert_expiry_alert' + cert_expiry_alerter._push_supplier_portal 加 ON CONFLICT DO NOTHING（防 _log_alert 失败-after-INSERT 次日 re-scan 重复入 inbox）
+- **测试**：`test_rfq_schema.py` 16 用例（非 *_tier1.py — T2 carve-out 7 不强求）— RFQStatus 与 v431 CHECK 对齐 / 5 ORM __tablename__ / Pydantic extra='forbid' + 必填 / 金额分整数 / Optional 字段
+- **不在 sub-A 范围**：service / route / UI / Tier 1 业务逻辑（sub-B 落 award + 二级审批 + #579 200 桌并发；sub-C 落前端比价表 + AI 推荐 UI）
+- **预计 4 commits**（migrate + ORM/Pydantic + schema test + README）
 
 #### W8 PR 立项参数（PRD-05 供应商配送时间窗 + 集成测试 + 200 桌并发 regression）
 
