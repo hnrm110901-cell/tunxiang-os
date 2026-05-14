@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import date, datetime, timezone
 from typing import List, Optional, Union
@@ -218,6 +219,258 @@ async def list_alertable(
         },
     )
     return [dict(r) for r in result.mappings()]
+
+
+async def list_certificates(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    supplier_id: Optional[str] = None,
+    status: str = "all",
+    include_deleted: bool = False,
+    limit: int = 100,
+    offset: int = 0,
+) -> List[dict]:
+    """管理后台证件列表查询（PR-01C / PRD-01 食安合规）.
+
+    status:
+      - active:        expire_date >= today
+      - expiring_30d:  today <= expire_date <= today + 30
+      - expired:       expire_date < today
+      - all:           不过滤 expire_date
+
+    ORDER BY expire_date ASC（最早到期在前），LIMIT/OFFSET 分页。
+    LEFT JOIN supplier_accounts 拉 supplier_name（便于管理后台展示）。
+    """
+    await _set_tenant(db, tenant_id)
+
+    today = date.today()
+    where_clauses = ["sc.tenant_id = :tenant_id"]
+    params: dict = {
+        "tenant_id": _uuid_str(tenant_id),
+        "today": today,
+        "limit": int(limit),
+        "offset": int(offset),
+    }
+    if not include_deleted:
+        where_clauses.append("sc.is_deleted = FALSE")
+    if supplier_id is not None:
+        where_clauses.append("sc.supplier_id = :supplier_id")
+        params["supplier_id"] = _uuid_str(supplier_id)
+
+    if status == "active":
+        where_clauses.append("sc.expire_date >= :today")
+    elif status == "expiring_30d":
+        where_clauses.append("sc.expire_date BETWEEN :today AND (:today + INTERVAL '30 day')")
+    elif status == "expired":
+        where_clauses.append("sc.expire_date < :today")
+    elif status != "all":
+        raise ValueError(f"status={status!r} 不合法 — 必须是 all/active/expiring_30d/expired 之一")
+
+    where_sql = " AND ".join(where_clauses)
+    sql = f"""
+        SELECT
+            sc.id::text                                 AS id,
+            sc.supplier_id::text                        AS supplier_id,
+            (SELECT sa.name FROM supplier_accounts sa
+             WHERE sa.id = sc.supplier_id AND sa.is_deleted = FALSE
+             LIMIT 1)                                   AS supplier_name,
+            sc.cert_type,
+            sc.cert_number,
+            sc.issuer,
+            sc.expire_date,
+            sc.warning_days,
+            sc.auto_block_on_expire,
+            sc.attachment_url,
+            sc.is_deleted,
+            sc.created_at,
+            sc.updated_at
+        FROM supplier_certificates sc
+        LEFT JOIN supplier_accounts sa ON sa.id = sc.supplier_id
+        WHERE {where_sql}
+        ORDER BY sc.expire_date ASC
+        LIMIT :limit OFFSET :offset
+    """
+    result = await db.execute(text(sql), params)
+    rows = result.mappings().all()
+    return [dict(r) for r in rows]
+
+
+async def get_certificate_by_id(
+    db: AsyncSession,
+    tenant_id: str,
+    cert_id: str,
+) -> Optional[dict]:
+    """单条证件查询（含 supplier_name）.
+
+    不存在 / 被软删 / 跨租户 → 返回 None.
+    """
+    await _set_tenant(db, tenant_id)
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                sc.id::text                                 AS id,
+                sc.supplier_id::text                        AS supplier_id,
+                (SELECT sa.name FROM supplier_accounts sa
+                 WHERE sa.id = sc.supplier_id AND sa.is_deleted = FALSE
+                 LIMIT 1)                                   AS supplier_name,
+                sc.cert_type,
+                sc.cert_number,
+                sc.issuer,
+                sc.expire_date,
+                sc.warning_days,
+                sc.auto_block_on_expire,
+                sc.attachment_url,
+                sc.is_deleted,
+                sc.created_at,
+                sc.updated_at
+            FROM supplier_certificates sc
+            WHERE sc.id        = :cert_id
+              AND sc.tenant_id = :tenant_id
+              AND sc.is_deleted = FALSE
+            LIMIT 1
+            """
+        ),
+        {"cert_id": cert_id, "tenant_id": _uuid_str(tenant_id)},
+    )
+    row = result.mappings().first()
+    return dict(row) if row is not None else None
+
+
+def _validate_warning_days(warning_days: Optional[List[int]]) -> None:
+    """warning_days 必须是 list[int] 且每项 1..365 之间. None 跳过（用 DB 默认）."""
+    if warning_days is None:
+        return
+    if not isinstance(warning_days, list) or not warning_days:
+        raise ValueError("warning_days 必须是非空 list[int]")
+    for d in warning_days:
+        if not isinstance(d, int) or isinstance(d, bool):
+            raise ValueError(f"warning_days 包含非 int 项: {d!r}")
+        if d < 1 or d > 365:
+            raise ValueError(f"warning_days={d} 越界 — 必须 1..365 之间")
+
+
+async def create_certificate(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    supplier_id: str,
+    cert_type: str,
+    cert_number: str,
+    expire_date: date,
+    issuer: Optional[str] = None,
+    warning_days: Optional[List[int]] = None,
+    auto_block_on_expire: bool = True,
+    attachment_url: Optional[str] = None,
+) -> dict:
+    """新建证件 INSERT ... RETURNING.
+
+    expire_date 允许过去日期（补录已过期证件场景，立即阻断收货，正常业务）.
+    warning_days 若提供必须 list[int] 且每项 1..365；None 用 DB 默认 [30,15,7].
+    """
+    _validate_warning_days(warning_days)
+
+    await _set_tenant(db, tenant_id)
+
+    now = datetime.now(timezone.utc)
+    new_id = str(uuid.uuid4())
+
+    result = await db.execute(
+        text(
+            """
+            INSERT INTO supplier_certificates (
+                id, tenant_id, supplier_id, cert_type, cert_number, issuer,
+                expire_date, warning_days, auto_block_on_expire, attachment_url,
+                created_at, updated_at, is_deleted
+            )
+            VALUES (
+                :id, :tenant_id, :supplier_id, :cert_type, :cert_number, :issuer,
+                :expire_date,
+                COALESCE(CAST(:warning_days AS JSONB), '[30, 15, 7]'::jsonb),
+                :auto_block_on_expire, :attachment_url,
+                :now, :now, FALSE
+            )
+            RETURNING
+                id::text,
+                supplier_id::text,
+                cert_type,
+                cert_number,
+                issuer,
+                expire_date,
+                warning_days,
+                auto_block_on_expire,
+                attachment_url,
+                created_at,
+                updated_at,
+                is_deleted
+            """
+        ),
+        {
+            "id": new_id,
+            "tenant_id": _uuid_str(tenant_id),
+            "supplier_id": _uuid_str(supplier_id),
+            "cert_type": cert_type,
+            "cert_number": cert_number,
+            "issuer": issuer,
+            "expire_date": expire_date,
+            "warning_days": json.dumps(warning_days) if warning_days is not None else None,
+            "auto_block_on_expire": auto_block_on_expire,
+            "attachment_url": attachment_url,
+            "now": now,
+        },
+    )
+    row = result.mappings().first()
+    if row is None:
+        raise ValueError("create_certificate failed — RETURNING 无结果（DB 异常）")
+
+    logger.info(
+        "cert_created",
+        cert_id=new_id,
+        tenant_id=str(tenant_id),
+        supplier_id=str(supplier_id),
+        cert_type=cert_type,
+    )
+    return dict(row)
+
+
+async def soft_delete_certificate(
+    db: AsyncSession,
+    tenant_id: str,
+    cert_id: str,
+) -> bool:
+    """软删证件（is_deleted=TRUE + updated_at=now）.
+
+    返回 True 如果实际 UPDATE 了一行；False 如果不存在 / 已删 / 跨租户.
+    is_supplier_blocked 已过滤 is_deleted=FALSE，所以软删后自动不再阻断收货.
+    """
+    await _set_tenant(db, tenant_id)
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        text(
+            """
+            UPDATE supplier_certificates
+            SET is_deleted = TRUE,
+                updated_at = :now
+            WHERE id        = :cert_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            """
+        ),
+        {"cert_id": cert_id, "tenant_id": _uuid_str(tenant_id), "now": now},
+    )
+    affected = result.rowcount if result.rowcount is not None else 0
+    deleted = affected > 0
+
+    if deleted:
+        logger.info(
+            "cert_soft_deleted",
+            cert_id=cert_id,
+            tenant_id=str(tenant_id),
+        )
+    return deleted
 
 
 async def renew_cert(
