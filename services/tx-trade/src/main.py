@@ -163,6 +163,14 @@ async def lifespan(app: FastAPI):
     app.state.register_background_task = _register_background_task
 
     await init_db()
+
+    # PR #609 §19 P2-1 follow-up (#610)：EdgeSyncNonceStore 工厂预热 — fail-fast startup
+    # 生产环境 EDGE_SYNC_HMAC_REQUIRED=true + 缺 Redis URL 时立即 RuntimeError，让
+    # k8s readiness probe 失败；不预热的话错误会延迟到首次 edge sync 请求 503 才暴露。
+    from .edge_sync_nonce_store import get_nonce_store
+
+    get_nonce_store()
+
     _register_background_task(asyncio.create_task(start_daily_scheduler(async_session_factory)))
     _register_background_task(asyncio.create_task(start_group_buy_expiry_scheduler(async_session_factory)))
 
@@ -291,6 +299,15 @@ async def lifespan(app: FastAPI):
             await asyncio.wait_for(audit_outbox_flusher_task, timeout=10.0)
         except asyncio.TimeoutError:
             audit_outbox_flusher_task.cancel()
+
+        # PR #609 §19 P2-2 follow-up (#611)：EdgeSyncNonceStore graceful close
+        # RedisNonceStore.close() 释放连接池，避免 k8s rolling update 高频部署
+        # 累积 Redis maxclients 耗尽。InProcessNonceStore.close() 是 no-op。
+        # close 失败不阻塞 SIGTERM —— graceful shutdown 优先 audit/payment 关键路径。
+        try:
+            await get_nonce_store().close()
+        except Exception:
+            pass
 
 
 app = FastAPI(
