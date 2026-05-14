@@ -41,21 +41,26 @@ _RLS_TEST_ROLE = "tunxiang_rls_app"
 #   PR-2 (cashier_engine): + orders, payments, order_items ✅ ship (#638)
 #   PR-3 (payment_saga):   + payment_sagas ✅ ship (#642)
 #   PR-4 (inventory):      + ingredient_transactions, dish_ingredients, ingredients,
-#                            dishes ✅ 本 PR (注: 真表名是 ingredient_transactions/
+#                            dishes ✅ ship (#644 — 真表名是 ingredient_transactions/
 #                            dish_ingredients/ingredients/dishes, 不是 PR-1 注释占位
-#                            "ingredient_movements", 本 PR 同步修正)
-#   PR-5 (order+delivery): + delivery_orders
+#                            "ingredient_movements", PR-4 同步修正)
+#   PR-5 (order+delivery): + delivery_orders ✅ 本 PR
+#                          (order_service 复用 PR-2 已有 orders / order_items 表;
+#                           delivery_adapter 加 delivery_orders v058 创建表无 FK 依赖)
 #
 # **FK 拓扑顺序（子→父序，DELETE 时遵循）**:
 #   ingredient_transactions → ingredients → dish_ingredients → dishes
 #   payment_sagas → payments → order_items → orders → stores
+#   delivery_orders → stores（v058 store_id 无 FK constraint，应用层关联；放
+#                            stores 之前与 orders 同层）
 #   (ingredient_transactions.ingredient_id FK→ingredients / .store_id FK→stores v010;
 #    ingredients.store_id FK→stores;
 #    dish_ingredients.dish_id FK→dishes (.ingredient_id 是 String(50) 非 FK);
 #    dishes 无业务 FK 依赖 stores;
 #    payment_sagas.order_id 逻辑→orders / .payment_id 逻辑→payments — v091 未声明
 #    FK constraint 但语义子表; payments.order_id FK→orders / order_items.order_id
-#    FK→orders / orders.store_id FK→stores)
+#    FK→orders / orders.store_id FK→stores;
+#    delivery_orders.store_id 是 UUID 无 FK constraint v058 — 应用层关联 stores)
 #
 # Issue #635 P2-B follow-up：当前 cleanup 用 SET LOCAL session_replication_role=replica
 # 绕 FK 触发器，PR-2/3/4 起本 _CONCURRENT_TABLES 真正含 FK 链；顺序错时不会 fail
@@ -80,6 +85,11 @@ _CONCURRENT_TABLES: tuple[str, ...] = (
     "payments",       # 子 (FK → orders)
     "order_items",    # 子 (FK → orders)
     "orders",         # 中间 (FK → stores)
+    # PR-5 (本 PR) order_service + delivery_adapter
+    # delivery_orders.store_id 是 UUID 无 FK constraint v058 — 应用层关联 stores,
+    # 拓扑序放 stores 之前 (与 orders 同层) 即可; cleanup `session_replication_role=replica`
+    # 绕 FK trigger，顺序错也 no-op (Issue #635 P2-B 短期方案 A)
+    "delivery_orders",
     "stores",         # 父
     # PRD-04 sub-B W9 v431 RFQ 5 表 — Tier 1 award 资金路径 + #579 200 桌并发
     # FK 子→父序: rfq_awards → rfq_quotes → rfq_invitees → rfq_items → rfqs
