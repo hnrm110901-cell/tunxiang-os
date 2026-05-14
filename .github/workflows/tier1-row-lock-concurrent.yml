@@ -1,0 +1,155 @@
+name: Tier 1 Row-Lock Concurrent — 真 PG 并发反测
+
+# PR-1 infra (#631 proposal §6.1) — 让 tests/concurrent/ 真 PG N 路并发 row-lock 测试
+# 在 per-PR 触发跑。**不扩 tier1-gate** —— tier1-gate 故意 ~10 包 minimal install
+# (`feedback_tier1_ci_minimal_deps_trap.md`)，加 PG service / alembic / asyncpg / psycopg2-binary
+# 会拖慢全部 tier1 PR 的关键路径。本 workflow 复用 rls-runtime-p0-pg-tests.yml 同款骨架,
+# 独立 paths + 独立 dependencies + PG service container + alembic upgrade head from v001 base.
+#
+# 第 2 期优化（#631 proposal §6.2）: pg_dump schema snapshot cache 加速 ~5min → ~30s,
+# key = hashFiles('shared/db-migrations/versions/**')。本 PR-1 不实施, 接受 ~5min。
+#
+# PR-2/3/4/5 应扩展 paths.row-lock-sources 列表 + tests/concurrent/<新文件>.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Test 本身改动 + runner 改动
+      - 'tests/concurrent/**'
+      - 'shared/test_utils/concurrent_runner.py'
+      - 'shared/test_utils/integration_pg.py'
+      # 6 row-lock 源文件 (PR-2/3/4/5 业务路径) — Tier 1 critical, 任一改动触发真 PG 反测
+      - 'services/tx-trade/src/services/cashier_engine.py'
+      - 'services/tx-trade/src/services/order_service.py'
+      - 'services/tx-trade/src/services/payment_saga_service.py'
+      - 'services/tx-trade/src/services/delivery_adapter.py'
+      - 'services/tx-supply/src/services/inventory_io.py'
+      - 'services/tx-supply/src/services/auto_deduction.py'
+      # RLS 基建 + alembic chain 基础 (foundation 改动可能影响 RLS policy / 表结构)
+      - 'infra/docker/init-rls.sql'
+      - 'shared/db-migrations/versions/v001_rls_foundation_and_core_entities.py'
+      # workflow 自身 + compose 基建
+      - '.github/workflows/tier1-row-lock-concurrent.yml'
+      - 'infra/compose/test-pg.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  tier1-row-lock-concurrent-tests:
+    name: Tier 1 Row-Lock — 真 PG N 路并发反测
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: tunxiang_test
+          POSTGRES_PASSWORD: test_password_dev_only
+          POSTGRES_DB: tunxiang_os_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tunxiang_test -d tunxiang_os_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+      INTEGRATION_PG_DSN: postgresql://tunxiang_test:test_password_dev_only@localhost:5432/tunxiang_os_test
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install deps
+        # 与 rls-runtime-p0-pg-tests.yml 同款依赖集 — 不扩 tier1-gate
+        # (tier1-gate ~10 包 minimal install 不动, 见 feedback_tier1_ci_minimal_deps_trap.md)
+        run: |
+          pip install \
+            "alembic>=1.13" "sqlalchemy[asyncio]>=2.0" \
+            "asyncpg>=0.29" "psycopg2-binary>=2.9" \
+            pytest "pytest-asyncio>=0.23" \
+            structlog cryptography pyyaml
+
+      - name: Apply init-rls.sql + init-pgvector.sql
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-rls.sql
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -f infra/docker/init-pgvector.sql
+
+      - name: Alembic upgrade head (legacy chain from v001 base, drift-tolerant)
+        # v001 创建 stores + 11 RLS 表（含 customers/orders/payments/dishes/employees）。
+        # **drift-tolerant 设计** — `continue-on-error: true` 让 pre-existing legacy chain
+        # drift (e.g. v301 projector_checkpoints.last_processed_at, 详 MEMORY.md
+        # `project_tunxiang_ci_gates.md` 预存漂移列表) 不阻塞本 workflow:
+        #   - 与 rls-runtime-p0-pg-tests.yml 的"接受全 fail"convention 故意分歧;
+        #   - 真 gate 是下一步"Verify required tables"硬校验;
+        #   - PR-1 smoke 只需 stores (v001 创建, 在 v301 drift 之前);
+        #   - PR-2/3/4/5 业务表 (orders/payments/order_items 等也在 v001)。
+        # 真要修 drift 走独立 issue 修复链路, 不在本 workflow scope。
+        working-directory: shared/db-migrations
+        continue-on-error: true
+        run: python -m alembic upgrade head
+
+      - name: Verify required tables exist + RLS enabled (PR-1 hard gate)
+        # 真 gate — alembic 上一步成功/失败不重要, 关键是 smoke test 需要的 stores 表
+        # 必须存在 + RLS 启用。失败时本 step 硬 fail, 阻塞 workflow。
+        #
+        # PR-2/3/4/5 扩展时加入业务表 (orders/payments/order_items/ingredients 等)。
+        # 当前 PR-1 只要求 stores（最小 smoke 范围）。
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            --set ON_ERROR_STOP=1 \
+            -c "SELECT
+                  CASE WHEN COUNT(*) = 1 AND BOOL_AND(relrowsecurity)
+                       THEN 'stores OK (RLS enabled)'
+                       ELSE 'stores MISSING or RLS disabled — PR-1 smoke 前置不满足'
+                  END AS status
+                FROM pg_class
+                WHERE relname = 'stores' AND relkind='r';" \
+            -c "SELECT relname, relrowsecurity FROM pg_class
+                WHERE relname = 'stores' AND relkind='r';"
+          # Assert exit 1 if stores missing
+          STORES_EXISTS=$(PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -tA -c "SELECT COUNT(*) FROM pg_class WHERE relname='stores' AND relkind='r' AND relrowsecurity")
+          if [ "$STORES_EXISTS" != "1" ]; then
+            echo "::error::stores 表不存在或 RLS 未启用 — PR-1 smoke 前置不满足"
+            exit 1
+          fi
+
+      - name: Run Tier 1 Row-Lock Concurrent tests
+        # PR-1 scope: tests/concurrent/test_runner_smoke_tier1.py (3 用例: T1 INSERT
+        # 无 race + T2 FOR UPDATE 串行化 + T3 assert_final_consistency 助手)
+        # PR-2+ scope: tests/concurrent/test_<service>_concurrent_tier1.py 业务真行为测
+        #
+        # --confcutdir tests/concurrent: 阻止 pytest 向上加载 tests/conftest.py
+        # (mock fixtures, import httpx 等 tier1-gate workflow 不装的 dep);
+        # tests/concurrent/conftest.py 自含 fixture, 无需父 conftest。
+        #
+        # --override-ini asyncio_mode=auto: 防御性显式设置 (即便 pyproject 默认是 auto,
+        # 也确保 workflow 不受 working-directory 探测变化影响)。
+        run: |
+          python -m pytest \
+            tests/concurrent/ \
+            --confcutdir tests/concurrent \
+            --override-ini asyncio_mode=auto \
+            -v --tb=short
+
+      - name: Verify RLS policy state (debug aid, always run)
+        if: always()
+        run: |
+          PGPASSWORD=test_password_dev_only psql \
+            -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
+            -c "SELECT tablename, policyname, cmd, qual IS NOT NULL AS has_using, with_check IS NOT NULL AS has_check
+                FROM pg_policies
+                WHERE tablename = 'stores'
+                ORDER BY cmd;"
