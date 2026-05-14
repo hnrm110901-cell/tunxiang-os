@@ -167,7 +167,7 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
         )
         try:
             body_json = resp.json()
-        except (ValueError, UnicodeDecodeError):
+        except (ValueError, UnicodeDecodeError, httpx.DecodingError):
             # 下游返回非 JSON body（nginx 502 plain-text / KDS ESC/POS 二进制 / 异常文本）
             # 保留下游 status code（不强制 502），log 原始 body 前 200 字节 + upstream URL
             body_preview = resp.content[:200].decode("utf-8", errors="replace") if resp.content else ""
