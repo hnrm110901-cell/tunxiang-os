@@ -60,6 +60,7 @@ from services.tx_supply.src.workers.cert_expiry_alerter import (
     _classify_threshold,
     _already_alerted,
     _log_alert,
+    _scan_one_tenant,
     CHANNEL_WECOM_SAFETY,
     CHANNEL_WECOM_PURCHASER,
     CHANNEL_SUPPLIER_PORTAL,
@@ -101,7 +102,7 @@ def _mk_db(
         if "set_config" in sql:
             return MagicMock()
 
-        # cert_alert_log 幂等查询
+        # cert_alert_log 幂等查询（SELECT ... AND success = TRUE）
         if "cert_alert_log" in sql and "SELECT" in sql.upper() and "INSERT" not in sql.upper():
             if already_alerted:
                 result.first.return_value = MagicMock()
@@ -109,15 +110,12 @@ def _mk_db(
                 result.first.return_value = None
             return result
 
-        # cert_alert_log INSERT
+        # cert_alert_log INSERT/UPSERT
         if "cert_alert_log" in sql and "INSERT" in sql.upper():
             return MagicMock()
 
         # tenants webhook 查询
         if "tenants" in sql and "extra_data" in sql:
-            mapping = MagicMock()
-            mapping.__getitem__ = lambda self, k: _webhooks.get(k)
-            mapping.get = lambda k, default=None: _webhooks.get(k, default)
             row_mock = MagicMock()
             row_mock.mappings.return_value.first.return_value = _webhooks
             return row_mock
@@ -164,6 +162,26 @@ class TestClassifyThreshold:
     def test_non_threshold_d10_returns_none(self):
         """D-10（非阈值天数） → None，不推。"""
         assert _classify_threshold(10) is None
+
+    def test_d30_window_day_28_pushes(self):
+        """D-28（task 跑漏两天，补救场景） → D-30 阈值（±2 天容错窗口）。"""
+        assert _classify_threshold(28) == "D-30"
+
+    def test_d30_window_day_29_pushes(self):
+        """D-29（task 跑漏一天，补救场景） → D-30 阈值（±2 天容错窗口）。"""
+        assert _classify_threshold(29) == "D-30"
+
+    def test_d15_window_day_13_pushes(self):
+        """D-13（task 跑漏两天，补救场景） → D-15 阈值。"""
+        assert _classify_threshold(13) == "D-15"
+
+    def test_d7_window_day_5_pushes(self):
+        """D-5（task 跑漏两天，补救场景） → D-7 阈值。"""
+        assert _classify_threshold(5) == "D-7"
+
+    def test_between_windows_returns_none(self):
+        """D-27（窗口间隙） → None，不推。"""
+        assert _classify_threshold(27) is None
 
 
 # ─── 2. D-30 推一次后再扫跳过（幂等去重）──────────────────────────────────────
@@ -361,16 +379,45 @@ class TestWebhookFailureFailOpen:
 class TestAlertLogIdempotentOnCeleryRetry:
     @pytest.mark.asyncio
     async def test_alert_log_idempotent_on_celery_retry(self):
-        """_log_alert 在 ON CONFLICT DO NOTHING 保护下，同日同 cert 重复调用不报错。"""
-        db = _mk_db(already_alerted=False)
+        """_log_alert UPSERT 语义：同日同 cert 重复调用不报错，success 可被覆盖。
 
-        # 第一次调用
-        await _log_alert(db, _TENANT_XUJI, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY, True, None)
-        # 第二次调用（模拟 Celery retry）
-        await _log_alert(db, _TENANT_XUJI, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY, True, None)
+        Day 1 推送失败（success=False）→ _log_alert 落 success=False
+        Day 1 retry（Celery）→ _log_alert UPSERT 更新 success=True
+        _already_alerted（success=TRUE）第一次返回 False（失败记录不算"已告知"）
+        _already_alerted（success=TRUE）第二次（retry 成功后）返回 True
+        """
+        # 模拟两次 _already_alerted：第一次返回 False（失败记录），第二次返回 True（成功记录）
+        call_count = 0
 
-        # 两次都成功执行（底层 DB 靠 ON CONFLICT DO NOTHING 去重，mock 层均被调用）
-        assert db.execute.call_count >= 2
+        async def already_alerted_side_effect(query, params=None):
+            nonlocal call_count
+            sql = str(query)
+            result = MagicMock()
+            if "cert_alert_log" in sql and "INSERT" not in sql.upper():
+                call_count += 1
+                if call_count == 1:
+                    result.first.return_value = None   # 失败记录不触发 success=TRUE 命中
+                else:
+                    result.first.return_value = MagicMock()  # 成功覆盖后命中
+                return result
+            return MagicMock()
+
+        db = AsyncMock()
+        db.execute = AsyncMock(side_effect=already_alerted_side_effect)
+
+        # 第一次 _already_alerted（push 失败前）→ False
+        result1 = await _already_alerted(db, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY)
+        assert result1 is False, "推送失败时不算已告知，应可重推"
+
+        # 模拟推送成功后再次查询 → True
+        result2 = await _already_alerted(db, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY)
+        assert result2 is True, "推送成功后 retry 应被幂等过滤"
+
+        # _log_alert UPSERT 两次都不报错（语义验证）
+        db2 = _mk_db(already_alerted=False)
+        await _log_alert(db2, _TENANT_XUJI, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY, False, "5xx")
+        await _log_alert(db2, _TENANT_XUJI, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY, True, None)
+        assert db2.execute.call_count >= 2, "两次 _log_alert UPSERT 均应执行"
 
 
 # ─── 9. 无 webhook URL 时跳过该 channel 并 log warn ────────────────────────
@@ -379,22 +426,73 @@ class TestAlertLogIdempotentOnCeleryRetry:
 class TestNoWebhookSkippedLogged:
     @pytest.mark.asyncio
     async def test_no_safety_director_webhook_skipped(self):
-        """tenant 无 safety_director_webhook → CHANNEL_WECOM_SAFETY 跳过，不 raise。"""
-        # 空 webhook URLs（D2 决策：无配置 = 不推该 channel）
-        db = _mk_db(
-            already_alerted=False,
-            tenant_webhooks={"safety_director_webhook": None, "purchaser_webhook": None},
-        )
+        """tenant 无 safety_director_webhook → CHANNEL_WECOM_SAFETY 跳过，不 raise。
 
-        # _get_tenant_webhook_urls 返回空 webhook
-        webhooks = {"safety_director_webhook": None, "purchaser_webhook": None}
+        验证：
+        1. _push_wecom_safety_director 不被调用（webhook 缺失时跳过）
+        2. logger.warning 事件名 cert_alert_no_safety_director_webhook 存在于代码路径
+        3. 无异常抛出，_scan_one_tenant 正常返回
+        """
+        cert_d30 = {
+            "cert_id": _CERT_A,
+            "supplier_id": _SUPPLIER_A,
+            "supplier_name": "徐记海鲜供应商A",
+            "cert_type": "食品经营许可证",
+            "cert_number": "XJ-2024-001",
+            "expire_date": date(2026, 6, 13),
+            "days_until_expiry": 30,
+        }
 
-        safety_url = webhooks.get("safety_director_webhook") or ""
-        # 验证：空 URL 不触发推送
-        assert not safety_url  # 应跳过
+        # 构造 mock async context manager for engine.connect()
+        mock_conn = AsyncMock()
+        mock_conn.execute = AsyncMock(return_value=MagicMock())
+        mock_conn.commit = AsyncMock()
 
-        purchaser_url = webhooks.get("purchaser_webhook") or ""
-        assert not purchaser_url  # 同样跳过
+        mock_cm = MagicMock()
+        mock_cm.__aenter__ = AsyncMock(return_value=mock_conn)
+        mock_cm.__aexit__ = AsyncMock(return_value=False)
 
-        # 不应 raise：直接验证逻辑分支
-        # （webhook 为空时 continue 到下一个 channel，无异常抛出）
+        mock_engine = MagicMock()
+        mock_engine.connect = MagicMock(return_value=mock_cm)
+
+        with patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._get_engine",
+            return_value=mock_engine,
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._get_tenant_webhook_urls",
+            new=AsyncMock(return_value={"safety_director_webhook": None, "purchaser_webhook": "https://qyapi.weixin.qq.com/purchaser"}),
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._already_alerted",
+            new=AsyncMock(return_value=False),
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._log_alert",
+            new=AsyncMock(),
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._push_wecom_safety_director",
+        ) as mock_push_safety, patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter._push_wecom_purchaser",
+            new=AsyncMock(return_value=(True, None)),
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter.logger"
+        ) as mock_logger:
+            # list_alertable は _scan_one_tenant 内でローカルインポートされる
+            with patch(
+                "services.tx_supply.src.services.cert_service.list_alertable",
+                new=AsyncMock(return_value=[cert_d30]),
+            ):
+                result = await _scan_one_tenant(_TENANT_XUJI, _TODAY)
+
+        # safety push は呼ばれない（webhook URL なし）
+        assert not mock_push_safety.called, "webhook URL 不在时不应调用 _push_wecom_safety_director"
+
+        # logger.warning が cert_alert_no_safety_director_webhook イベントで呼ばれる
+        warning_events = [
+            str(call_args)
+            for call_args in mock_logger.warning.call_args_list
+        ]
+        assert any(
+            "cert_alert_no_safety_director_webhook" in ev for ev in warning_events
+        ), f"应记录 safety director webhook 缺失 warning，实际: {warning_events}"
+
+        # 无异常，returned dict 结构正确
+        assert "evaluated" in result and "sent" in result
