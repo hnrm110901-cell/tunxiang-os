@@ -19,7 +19,7 @@ from decimal import Decimal
 from typing import Optional
 
 import structlog
-from sqlalchemy import func, select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -35,6 +35,9 @@ from shared.ontology.src.enums import (
     TransactionType,
     TransferOrderStatus,
 )
+
+from .doc_number_service import DocNumberError
+from .doc_number_service import generate as gen_doc_number
 
 logger = structlog.get_logger(__name__)
 
@@ -55,8 +58,6 @@ def _now() -> datetime:
 
 
 async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
-    from sqlalchemy import text
-
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
         {"tid": str(tenant_id)},
@@ -171,6 +172,21 @@ async def create_transfer_order(
     db.add(order)
     await db.flush()
 
+    # 生成调拨单可读单号（PRD-03 Wave2）— 失败 graceful degradation（辅助标识 infra 失败
+    # 不阻塞 Tier 1 调拨业务，参考 feedback_graceful_degradation_pattern.md）
+    doc_number: Optional[str] = None
+    try:
+        doc_number = await gen_doc_number(db, tenant_id=tenant_id, doc_type="transfer", now=now)
+    except DocNumberError as e:
+        logger.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — doc_number 是辅助标识 infra fallback，参考 feedback_graceful_degradation_pattern.md
+        logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+    if doc_number is not None:
+        await db.execute(
+            text("UPDATE transfer_orders SET doc_number = :doc_number WHERE id = :id"),
+            {"doc_number": doc_number, "id": str(order.id)},
+        )
+
     for item_data in items:
         item = TransferOrderItem(
             id=uuid.uuid4(),
@@ -192,6 +208,7 @@ async def create_transfer_order(
         to_store_id=to_store_id,
         tenant_id=tenant_id,
         item_count=len(items),
+        doc_number=doc_number,
     )
 
     return {
@@ -201,6 +218,7 @@ async def create_transfer_order(
         "to_store_id": to_store_id,
         "item_count": len(items),
         "created_at": now.isoformat(),
+        "doc_number": doc_number,
     }
 
 

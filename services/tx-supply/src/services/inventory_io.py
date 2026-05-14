@@ -8,7 +8,7 @@ reference_id 存批次号，notes 存 JSON 扩展信息（含 expiry_date）。
 import asyncio
 import json
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Optional
 
 import structlog
@@ -312,6 +312,21 @@ async def issue_stock(
         raise ValueError(f"出库原因必须是 {valid_reasons} 之一")
 
     await _set_tenant(db, tenant_id)
+
+    # 生成报废单可读单号（PRD-03 Wave2）— 仅 waste reason 分配单号；
+    # "usage" 不需要单号；"transfer" 由 transfer_service 主单号承载，子流水留 NULL。
+    # 失败 graceful degradation（辅助标识 infra 失败不阻塞 Tier 1 出库业务）
+    doc_number: Optional[str] = None
+    if reason == TransactionType.waste.value:
+        try:
+            doc_number = await gen_doc_number(
+                db, tenant_id=tenant_id, doc_type="waste", now=datetime.now(timezone.utc)
+            )
+        except DocNumberError as e:
+            logger.warning("doc_number_generate_skipped", reason=str(e))
+        except Exception as e:  # noqa: BLE001 — doc_number 是辅助标识 infra fallback，参考 feedback_graceful_degradation_pattern.md
+            logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+
     # Tier 1 行锁（audit doc §4.3 P0）：防 FIFO 出库并发丢更新（食安/成本）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
@@ -362,10 +377,23 @@ async def issue_stock(
     await db.flush()
     status = _update_status(ingredient)
 
+    # 写入 doc_number（ORM 实体冻结，用 raw SQL UPDATE，同 receive_stock 模式）
+    # ANY(:ids::uuid[]) 单条 SQL 覆盖所有 batch，N→1 round-trip（与 Wave1 receive_stock 风格一致）
+    if doc_number is not None and transactions:
+        tx_ids = [t["transaction_id"] for t in transactions]
+        await db.execute(
+            text(
+                "UPDATE ingredient_transactions SET doc_number = :doc_number"
+                " WHERE id = ANY(:ids::uuid[])"
+            ),
+            {"doc_number": doc_number, "ids": tx_ids},
+        )
+
     logger.info(
         "stock_issued",
         ingredient_id=ingredient_id,
         reason=reason,
+        doc_number=doc_number,
         total_quantity=quantity,
         batches_affected=len(transactions),
         new_quantity=ingredient.current_quantity,
@@ -395,6 +423,7 @@ async def issue_stock(
         "transactions": transactions,
         "new_quantity": ingredient.current_quantity,
         "status": status,
+        "doc_number": doc_number,
     }
 
 
@@ -419,6 +448,19 @@ async def adjust_stock(
         raise ValueError("调整数量不能为0")
 
     await _set_tenant(db, tenant_id)
+
+    # 生成盘点调整单可读单号（PRD-03 Wave2）— 失败 graceful degradation（辅助标识 infra 失败
+    # 不阻塞 Tier 1 盘点调整业务，参考 feedback_graceful_degradation_pattern.md）
+    doc_number: Optional[str] = None
+    try:
+        doc_number = await gen_doc_number(
+            db, tenant_id=tenant_id, doc_type="adjustment", now=datetime.now(timezone.utc)
+        )
+    except DocNumberError as e:
+        logger.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — doc_number 是辅助标识 infra fallback，参考 feedback_graceful_degradation_pattern.md
+        logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+
     # Tier 1 行锁（audit doc §4.3 P1）：盘点调整与日常 IO 并发丢更新，与其他 mutation 路径统一
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
@@ -449,11 +491,21 @@ async def adjust_stock(
     db.add(tx)
     await db.flush()
 
+    # 写入 doc_number（ORM 实体冻结，用 raw SQL UPDATE，同 receive_stock 模式）
+    if doc_number is not None:
+        await db.execute(
+            text(
+                "UPDATE ingredient_transactions SET doc_number = :doc_number WHERE id = :id"
+            ),
+            {"doc_number": doc_number, "id": str(tx.id)},
+        )
+
     logger.info(
         "stock_adjusted",
         ingredient_id=ingredient_id,
         adjustment=quantity,
         reason=reason,
+        doc_number=doc_number,
         new_quantity=qty_after,
         store_id=store_id,
         tenant_id=tenant_id,
@@ -463,6 +515,7 @@ async def adjust_stock(
         "transaction_id": str(tx.id),
         "new_quantity": qty_after,
         "status": status,
+        "doc_number": doc_number,
     }
 
 
