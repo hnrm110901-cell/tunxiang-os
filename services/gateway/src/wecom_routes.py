@@ -69,7 +69,7 @@ async def _handle_customer_add(event: dict) -> None:
     state: str = event.get("State", "")  # 扫码来源，通常为 store_id
 
     if not external_userid:
-        logger.warning("wecom_customer_add_missing_external_userid", event=event)
+        logger.warning("wecom_customer_add_missing_external_userid", wecom_payload=event)
         return
 
     log = logger.bind(
@@ -138,7 +138,7 @@ async def _handle_customer_del(event: dict) -> None:
     follow_user: str = event.get("UserID", "")
 
     if not external_userid:
-        logger.warning("wecom_customer_del_missing_external_userid", event=event)
+        logger.warning("wecom_customer_del_missing_external_userid", wecom_payload=event)
         return
 
     log = logger.bind(
