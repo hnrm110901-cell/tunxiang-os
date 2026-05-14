@@ -140,9 +140,9 @@ async def receive_stock(
             db, tenant_id=tenant_id, doc_type="inventory_io", now=now
         )
     except DocNumberError as e:
-        log.warning("doc_number_generate_skipped", reason=str(e))
+        logger.warning("doc_number_generate_skipped", reason=str(e))
     except Exception as e:  # noqa: BLE001 — 兜底，doc_number infra 异常不阻塞 Tier 1 业务
-        log.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
+        logger.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
     # Tier 1 行锁（audit doc §4.3 P0）：防加权平均单价并发错算（毛利底线硬约束）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 
