@@ -304,3 +304,112 @@ class TestGetOrderHelperContract:
         assert locked, (
             f"_get_order(lock=True) 必须加 FOR UPDATE。captured: {captured}"
         )
+
+
+class TestCalcOrderCostLockInvariantAudit:
+    """Issue #557 audit: `_calc_order_cost` 隐式锁不变量静态扫描.
+
+    _calc_order_cost 读 OrderItem 不加显式锁, 依赖调用方持有 Order 行锁来串行化
+    OrderItem mutation. 这是 Tier 1 三条硬约束#1 (毛利底线) 的隐式架构约束.
+
+    本测试用 ast 静态扫描 cashier_engine.py, 锁定所有 _calc_order_cost caller
+    在调用前必有 `_get_order(lock=True)` 或 `with_for_update()` Order 锁.
+
+    任何新增 caller 路径若绕过 Order 锁 → 本测试 fail, 强制走 §17 桌台 / 架构
+    review 评估. 见 services/tx-trade/src/services/cashier_engine.py
+    `_calc_order_cost` docstring 完整不变量描述.
+    """
+
+    @staticmethod
+    def _find_calc_order_cost_callers():
+        """ast 扫 cashier_engine.py, 返回 caller 函数列表.
+
+        每个 caller 是 (func_name, ast.FunctionDef/AsyncFunctionDef, calc_call_lineno).
+        """
+        import ast
+
+        src_path = os.path.join(SRC, "services", "cashier_engine.py")
+        with open(src_path, encoding="utf-8") as f:
+            tree = ast.parse(f.read(), filename=src_path)
+
+        callers = []
+        for node in ast.walk(tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for sub in ast.walk(node):
+                if (
+                    isinstance(sub, ast.Call)
+                    and isinstance(sub.func, ast.Attribute)
+                    and sub.func.attr == "_calc_order_cost"
+                ):
+                    callers.append((node.name, node, sub.lineno))
+                    break  # 1 caller record per function (first call)
+        return callers
+
+    @staticmethod
+    def _function_has_lock_before(func_node, target_lineno):
+        """检查函数体内 target_lineno 之前是否有锁获取语句:
+          - `_get_order(...lock=True...)` 或 `_get_order(...lock True...)`
+          - `.with_for_update(...)` 调用
+          - raw SQL 含 'FOR UPDATE' 的字符串字面量
+
+        排除自身 (target_lineno) 之后的语句.
+        """
+        import ast
+
+        for sub in ast.walk(func_node):
+            if not hasattr(sub, "lineno") or sub.lineno >= target_lineno:
+                continue
+
+            # _get_order(..., lock=True)
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Attribute)
+                and sub.func.attr == "_get_order"
+            ):
+                for kw in sub.keywords:
+                    if kw.arg == "lock" and isinstance(kw.value, ast.Constant) and kw.value.value is True:
+                        return True
+
+            # .with_for_update(...)
+            if (
+                isinstance(sub, ast.Call)
+                and isinstance(sub.func, ast.Attribute)
+                and sub.func.attr == "with_for_update"
+            ):
+                return True
+
+            # raw SQL FOR UPDATE 字符串
+            if isinstance(sub, ast.Constant) and isinstance(sub.value, str) and "FOR UPDATE" in sub.value.upper():
+                return True
+
+        return False
+
+    def test_calc_order_cost_has_at_least_one_caller(self):
+        """前置健全性: cashier_engine 至少有 1 个 _calc_order_cost caller
+        （apply_discount). 若 0 caller, 函数可删除（不再是隐式约束）."""
+        callers = self._find_calc_order_cost_callers()
+        assert callers, (
+            "cashier_engine.py 未发现 _calc_order_cost caller. "
+            "若函数已无 caller, 应一并删除函数 + 本 audit test."
+        )
+
+    def test_all_calc_order_cost_callers_hold_order_lock(self):
+        """audit: 所有 _calc_order_cost caller 在调用前必须持有 Order 行锁.
+
+        若 fail, 表示新增的 caller 路径绕过 Order 锁, 引入毛利底线 race.
+        修复路径: caller 入口加 `_get_order(order_uuid, lock=True)`,
+        或与 architect 评估 OrderItem 独立 FOR UPDATE 方案 (issue #557 §架构选项).
+        """
+        callers = self._find_calc_order_cost_callers()
+        violations = []
+        for func_name, func_node, calc_lineno in callers:
+            if not self._function_has_lock_before(func_node, calc_lineno):
+                violations.append(f"{func_name} (L{func_node.lineno}-) 调 _calc_order_cost@L{calc_lineno} 未持 Order 锁")
+
+        assert not violations, (
+            "issue #557 锁不变量违反 — _calc_order_cost caller 缺 Order 行锁:\n  - "
+            + "\n  - ".join(violations)
+            + "\n\n修复: 在调 _calc_order_cost 前加 `await self._get_order(order_id, lock=True)`."
+            + "\n参考: cashier_engine.py `apply_discount` L587-614 + audit doc §4.1."
+        )
