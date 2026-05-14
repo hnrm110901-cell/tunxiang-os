@@ -13,7 +13,31 @@ main.py 已挂 prometheus_fastapi_instrumentator，本模块只需 import 即注
 
 from __future__ import annotations
 
-from prometheus_client import Counter
+# PR #227 round-2 fix：CI Tier 1 test runner 不装 requirements.txt（仅
+# pytest/pytest-asyncio/pydantic/fastapi/httpx/sqlalchemy/structlog/asyncpg/
+# pyyaml/aiosqlite/cryptography），但 prometheus_client 是 metrics 真依赖
+# （prod 通过 prometheus-fastapi-instrumentator transitive 引入）。Tier 1
+# tests import payment_saga_service → metrics 链路触发 ModuleNotFoundError，
+# 导致 12 个 payment_saga tier1 测试集体 fail。
+#
+# 应用 graceful degradation pattern（feedback_graceful_degradation_pattern.md）：
+# observability 是辅助层，fail-open 不阻塞业务。test runtime 用 no-op stub，
+# prod runtime 用真 Counter — 监控 SLO 由 prometheus-fastapi-instrumentator
+# 在 main.py 启动时挂载。
+try:
+    from prometheus_client import Counter
+except ImportError:  # pragma: no cover — CI Tier 1 fallback
+    class Counter:  # type: ignore[no-redef]
+        """no-op stub for environments without prometheus_client。"""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def labels(self, *args: object, **kwargs: object) -> "Counter":
+            return self
+
+        def inc(self, *args: object, **kwargs: object) -> None:
+            pass
 
 # 支付 Saga 总计数（按最终结果维度）
 # 告警规则消费方：
