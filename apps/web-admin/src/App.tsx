@@ -69,6 +69,7 @@ import { DocNumberRulesPage } from './pages/supply/DocNumberRulesPage';
 import { SupplierCertificatesPage } from './pages/supply/SupplierCertificatesPage';
 import { IngredientWeightStandardsPage } from './pages/supply/IngredientWeightStandardsPage';
 import { IngredientYieldStandardsPage } from './pages/supply/IngredientYieldStandardsPage';
+import { SupplierDeliveryWindowsPage } from './pages/supply/SupplierDeliveryWindowsPage';
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
@@ -299,6 +300,7 @@ function AppContent() {
           <Route path="/supply/supplier-certificates" element={<SupplierCertificatesPage />} />
           <Route path="/supply/ingredient-weight-standards" element={<IngredientWeightStandardsPage />} />  {/* PRD-02 商品扣秤标准库 / Tier 1 */}
           <Route path="/supply/ingredient-yield-standards" element={<IngredientYieldStandardsPage />} />  {/* PRD-06 商品出料率标准库 / Tier 1 */}
+          <Route path="/supply/supplier-delivery-windows" element={<SupplierDeliveryWindowsPage />} />  {/* PRD-05 供应商配送时间窗 / Tier 1 */}
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
