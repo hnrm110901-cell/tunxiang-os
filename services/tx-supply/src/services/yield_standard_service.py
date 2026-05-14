@@ -1,0 +1,486 @@
+"""yield_standard_service — 商品出料率标准库（PRD-06 / Tier 1 毛利底线）
+
+核心业务逻辑：
+  1. CRUD（草稿态 approved_by=NULL，必须独立 approve 才生效）
+  2. 二级审批 approve_yield_standard（不允许 self-approve：approver_id != created_by）
+  3. calculate_purchase_qty — BOM 反算购买量（输入净菜量 → 输出毛菜采购量）
+     - 多个 active standard（季节）按优先级：具体 season > 'all' fallback
+     - actual_yield_rate 与 standard 差超 tolerance_pct 时触发 anomaly callback
+     - effective_from <= today AND (effective_to IS NULL OR today < effective_to)
+     - approved_by=NULL 草稿态不生效（必须审批后才参与计算）
+
+设计要点：
+  - RLS 标准模式：每次操作前 set_config('app.tenant_id', :tid, true)
+  - lock 参数沿用 PR-A/B/C/D/E 行锁 pattern（mutation 路径默认 False，调用方 lock=True）
+  - raw SQL text() 路径与 cert_service / weight_standard_service 对齐
+  - 出料率用 Decimal(5,4)，购买量 Decimal kg
+"""
+
+from __future__ import annotations
+
+import uuid
+from datetime import date, datetime, timezone
+from decimal import Decimal
+from typing import Awaitable, Callable, Optional, Union
+
+import structlog
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
+
+logger = structlog.get_logger(__name__)
+
+_DBConn = Union[AsyncConnection, AsyncSession]
+
+# 异常 callback 签名：接收 payload dict，返回 awaitable 或 None
+AnomalyCallback = Callable[[dict], Optional[Awaitable[None]]]
+
+
+def _uuid_str(val: str | uuid.UUID) -> str:
+    return str(val)
+
+
+async def _set_tenant(db: _DBConn, tenant_id: str) -> None:
+    """设置 RLS 租户上下文（与 cert_service / weight_standard_service 同 pattern）。"""
+    await db.execute(
+        text("SELECT set_config('app.tenant_id', :tid, true)"),
+        {"tid": str(tenant_id)},
+    )
+
+
+def _season_priority(season: str) -> int:
+    """季节匹配优先级：具体 > 'all' fallback。"""
+    return 1 if season == "all" else 0
+
+
+# ─── CRUD ─────────────────────────────────────────────────────────────────────
+
+
+async def list_yield_standards(
+    db: AsyncSession,
+    tenant_id: str,
+    ingredient_id: str,
+    *,
+    season: Optional[str] = None,
+    only_active: bool = True,
+    today: Optional[date] = None,
+) -> list[dict]:
+    """列出某 ingredient 的出料率标准。
+
+    only_active=True 时：
+      - approved_by IS NOT NULL（已审批生效）
+      - is_deleted = FALSE
+      - effective_from <= today AND (effective_to IS NULL OR today < effective_to)
+
+    season 给出时按 (季节匹配 OR 'all' fallback) 过滤 — 调用方按优先级筛选。
+    only_active=False 时返回包含草稿/已删的所有记录（管理后台列表用）。
+    """
+    await _set_tenant(db, tenant_id)
+
+    today_val = today or date.today()
+    where_clauses = [
+        "tenant_id = :tenant_id",
+        "ingredient_id = :ingredient_id",
+    ]
+    if only_active:
+        where_clauses.append("approved_by IS NOT NULL")
+        where_clauses.append("is_deleted = FALSE")
+        where_clauses.append("effective_from <= :today")
+        where_clauses.append("(effective_to IS NULL OR :today < effective_to)")
+    if season is not None:
+        where_clauses.append("(season = :season OR season = 'all')")
+
+    where_sql = " AND ".join(where_clauses)
+    sql = f"""
+        SELECT
+            id::text                   AS id,
+            tenant_id::text            AS tenant_id,
+            ingredient_id::text        AS ingredient_id,
+            process_id::text           AS process_id,
+            yield_rate,
+            season,
+            effective_from,
+            effective_to,
+            tolerance_pct,
+            approved_by::text          AS approved_by,
+            approved_at,
+            notes,
+            created_by::text           AS created_by,
+            created_at,
+            updated_at,
+            is_deleted
+        FROM ingredient_yield_standards
+        WHERE {where_sql}
+        ORDER BY effective_from DESC, created_at DESC
+    """
+    params: dict = {
+        "tenant_id": _uuid_str(tenant_id),
+        "ingredient_id": _uuid_str(ingredient_id),
+        "today": today_val,
+    }
+    if season is not None:
+        params["season"] = season
+
+    result = await db.execute(text(sql), params)
+    return [dict(r) for r in result.mappings()]
+
+
+async def get_yield_standard(
+    db: AsyncSession,
+    tenant_id: str,
+    std_id: str,
+    *,
+    lock: bool = False,
+) -> Optional[dict]:
+    """单条出料率标准查询。
+
+    lock=True 时加 FOR UPDATE 行锁（mutation 路径 — approve / soft_delete 用）。
+    沿用 PR-A/B/C/D/E row-lock pattern：read-only 入口 lock=False 默认。
+    """
+    await _set_tenant(db, tenant_id)
+
+    lock_clause = " FOR UPDATE" if lock else ""
+    result = await db.execute(
+        text(
+            f"""
+            SELECT
+                id::text                   AS id,
+                tenant_id::text            AS tenant_id,
+                ingredient_id::text        AS ingredient_id,
+                process_id::text           AS process_id,
+                yield_rate,
+                season,
+                effective_from,
+                effective_to,
+                tolerance_pct,
+                approved_by::text          AS approved_by,
+                approved_at,
+                notes,
+                created_by::text           AS created_by,
+                created_at,
+                updated_at,
+                is_deleted
+            FROM ingredient_yield_standards
+            WHERE id        = :std_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            LIMIT 1{lock_clause}
+            """
+        ),
+        {"std_id": std_id, "tenant_id": _uuid_str(tenant_id)},
+    )
+    row = result.mappings().first()
+    return dict(row) if row is not None else None
+
+
+async def create_yield_standard(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    ingredient_id: str,
+    yield_rate: Decimal,
+    season: str,
+    effective_from: date,
+    created_by: str,
+    tolerance_pct: Decimal = Decimal("5.0"),
+    effective_to: Optional[date] = None,
+    process_id: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> dict:
+    """新建出料率标准（草稿态 — approved_by=NULL，必须调 approve 才生效）。"""
+    if effective_to is not None and effective_to <= effective_from:
+        raise ValueError("effective_to 必须晚于 effective_from")
+    if yield_rate <= 0 or yield_rate > 1:
+        raise ValueError("yield_rate 必须在 (0, 1] 范围")
+    if tolerance_pct < 0 or tolerance_pct > 100:
+        raise ValueError("tolerance_pct 必须在 [0, 100] 范围")
+    if season not in ("spring", "summer", "autumn", "winter", "all"):
+        raise ValueError(f"未知 season={season!r}")
+
+    await _set_tenant(db, tenant_id)
+
+    new_id = str(uuid.uuid4())
+    now = datetime.now(timezone.utc)
+
+    result = await db.execute(
+        text(
+            """
+            INSERT INTO ingredient_yield_standards (
+                id, tenant_id, ingredient_id, process_id,
+                yield_rate, season,
+                effective_from, effective_to, tolerance_pct,
+                approved_by, approved_at,
+                notes, created_by, created_at, updated_at, is_deleted
+            )
+            VALUES (
+                :id, :tenant_id, :ingredient_id, :process_id,
+                :yield_rate, :season,
+                :effective_from, :effective_to, :tolerance_pct,
+                NULL, NULL,
+                :notes, :created_by, :now, :now, FALSE
+            )
+            RETURNING
+                id::text                   AS id,
+                tenant_id::text            AS tenant_id,
+                ingredient_id::text        AS ingredient_id,
+                process_id::text           AS process_id,
+                yield_rate,
+                season,
+                effective_from,
+                effective_to,
+                tolerance_pct,
+                approved_by::text          AS approved_by,
+                approved_at,
+                notes,
+                created_by::text           AS created_by,
+                created_at,
+                updated_at,
+                is_deleted
+            """
+        ),
+        {
+            "id": new_id,
+            "tenant_id": _uuid_str(tenant_id),
+            "ingredient_id": _uuid_str(ingredient_id),
+            "process_id": _uuid_str(process_id) if process_id else None,
+            "yield_rate": yield_rate,
+            "season": season,
+            "effective_from": effective_from,
+            "effective_to": effective_to,
+            "tolerance_pct": tolerance_pct,
+            "notes": notes,
+            "created_by": _uuid_str(created_by),
+            "now": now,
+        },
+    )
+    row = result.mappings().first()
+    if row is None:
+        raise ValueError("create_yield_standard failed — RETURNING 无结果")
+
+    logger.info(
+        "yield_standard_created",
+        std_id=new_id,
+        tenant_id=str(tenant_id),
+        ingredient_id=str(ingredient_id),
+        yield_rate=str(yield_rate),
+        season=season,
+    )
+    return dict(row)
+
+
+async def approve_yield_standard(
+    db: AsyncSession,
+    tenant_id: str,
+    std_id: str,
+    approver_id: str,
+) -> dict:
+    """二级审批：approver_id 必须 != created_by（防 self-approve）。
+
+    审批前 approved_by IS NULL（草稿态）；审批后 approved_by + approved_at 写入。
+    UPDATE 用 FOR UPDATE 行锁串行化重复审批请求。
+    """
+    await _set_tenant(db, tenant_id)
+
+    # 先 lock=True 查到 created_by + approved_by 状态
+    existing = await get_yield_standard(db, tenant_id, std_id, lock=True)
+    if existing is None:
+        raise ValueError(f"std_id={std_id} 不存在或已删除")
+
+    if existing.get("approved_by") is not None:
+        raise ValueError(f"std_id={std_id} 已审批，不能重复审批")
+
+    if str(existing["created_by"]) == str(approver_id):
+        raise ValueError(
+            f"approver_id={approver_id} 不能与 created_by 相同（二级审批必须独立签字）"
+        )
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        text(
+            """
+            UPDATE ingredient_yield_standards
+            SET approved_by = :approver_id,
+                approved_at = :now,
+                updated_at  = :now
+            WHERE id        = :std_id
+              AND tenant_id = :tenant_id
+              AND approved_by IS NULL
+              AND is_deleted = FALSE
+            RETURNING
+                id::text                   AS id,
+                tenant_id::text            AS tenant_id,
+                ingredient_id::text        AS ingredient_id,
+                process_id::text           AS process_id,
+                yield_rate,
+                season,
+                effective_from,
+                effective_to,
+                tolerance_pct,
+                approved_by::text          AS approved_by,
+                approved_at,
+                notes,
+                created_by::text           AS created_by,
+                created_at,
+                updated_at,
+                is_deleted
+            """
+        ),
+        {
+            "std_id": std_id,
+            "tenant_id": _uuid_str(tenant_id),
+            "approver_id": _uuid_str(approver_id),
+            "now": now,
+        },
+    )
+    row = result.mappings().first()
+    if row is None:
+        raise ValueError(f"approve_yield_standard failed — std_id={std_id} 并发已审批")
+
+    logger.info(
+        "yield_standard_approved",
+        std_id=std_id,
+        tenant_id=str(tenant_id),
+        approver_id=str(approver_id),
+    )
+    return dict(row)
+
+
+async def soft_delete_yield_standard(
+    db: AsyncSession,
+    tenant_id: str,
+    std_id: str,
+) -> bool:
+    """软删出料率标准。
+
+    软删后 list_yield_standards(only_active=True) 不再返回，calculate_purchase_qty 自动忽略。
+    """
+    await _set_tenant(db, tenant_id)
+
+    now = datetime.now(timezone.utc)
+    result = await db.execute(
+        text(
+            """
+            UPDATE ingredient_yield_standards
+            SET is_deleted = TRUE,
+                updated_at = :now
+            WHERE id        = :std_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            """
+        ),
+        {"std_id": std_id, "tenant_id": _uuid_str(tenant_id), "now": now},
+    )
+    affected = result.rowcount if result.rowcount is not None else 0
+    deleted = affected > 0
+    if deleted:
+        logger.info(
+            "yield_standard_soft_deleted",
+            std_id=std_id,
+            tenant_id=str(tenant_id),
+        )
+    return deleted
+
+
+# ─── BOM 反算购买量 ───────────────────────────────────────────────────────────
+
+
+def _pick_standard(standards: list[dict], season: str) -> Optional[dict]:
+    """从 active standards 中按季节优先级挑一条：
+      - 具体 season（spring/summer/autumn/winter）优先
+      - 同 season 多条时取 effective_from 最近的（list 已按 effective_from DESC 排序）
+      - 没有具体匹配时取 'all' fallback
+    """
+    if not standards:
+        return None
+
+    # 先找具体 season 匹配
+    specific = [s for s in standards if s["season"] == season]
+    if specific:
+        return specific[0]
+
+    # fallback 到 'all'
+    fallback = [s for s in standards if s["season"] == "all"]
+    if fallback:
+        return fallback[0]
+
+    return None
+
+
+async def calculate_purchase_qty(
+    db: AsyncSession,
+    tenant_id: str,
+    ingredient_id: str,
+    required_net_qty_kg: Decimal,
+    *,
+    season: str = "all",
+    today: Optional[date] = None,
+    on_anomaly_callback: Optional[AnomalyCallback] = None,
+    actual_yield_rate: Optional[Decimal] = None,
+) -> tuple[Decimal, dict]:
+    """根据 yield_rate 反算购买量（输入净菜 → 输出毛菜采购量）。
+
+    GIVEN ingredient 的 active standards [菠菜春 65%, 菠菜夏 50%, 通用 60%]
+          required_net_qty_kg = 60kg, season = 'summer'
+    THEN  按季节优先级选 50% → purchase_qty = 60 / 0.5 = 120kg
+          返回 (purchase_qty_kg, {standard_id, yield_rate, season_matched, anomaly_detected})
+
+    若 actual_yield_rate 提供且与 standard 差超 tolerance_pct → emit anomaly callback。
+    若无 active standard 或 standard 未审批 → fallback：purchase = required_net（不反算）。
+    """
+    if required_net_qty_kg <= 0:
+        raise ValueError("required_net_qty_kg 必须 > 0")
+
+    standards = await list_yield_standards(
+        db,
+        tenant_id,
+        ingredient_id,
+        season=season,
+        only_active=True,
+        today=today,
+    )
+
+    picked = _pick_standard(standards, season)
+
+    if picked is None:
+        # fallback：无标准 → 不反算（与 BOM 原值一致）
+        return required_net_qty_kg.quantize(Decimal("0.0001")), {
+            "standard_id": None,
+            "yield_rate": None,
+            "season_matched": None,
+            "anomaly_detected": False,
+        }
+
+    yield_rate = Decimal(str(picked["yield_rate"]))
+    purchase_qty = (required_net_qty_kg / yield_rate).quantize(Decimal("0.0001"))
+
+    anomaly_detected = False
+    if actual_yield_rate is not None and on_anomaly_callback is not None:
+        tol = Decimal(str(picked["tolerance_pct"]))
+        # 偏差以 yield_rate 为基数的百分比
+        diff_pct = (
+            (actual_yield_rate - yield_rate).copy_abs()
+            * Decimal("100")
+            / yield_rate
+        ).quantize(Decimal("0.01"))
+        if diff_pct > tol:
+            anomaly_detected = True
+            payload = {
+                "ingredient_id": str(ingredient_id),
+                "standard_id": picked["id"],
+                "season_matched": picked["season"],
+                "standard_yield_rate": str(yield_rate),
+                "actual_yield_rate": str(actual_yield_rate),
+                "diff_pct": str(diff_pct),
+                "tolerance_pct": str(tol),
+                "required_net_qty_kg": str(required_net_qty_kg),
+                "purchase_qty_kg": str(purchase_qty),
+            }
+            cb_result = on_anomaly_callback(payload)
+            if cb_result is not None:
+                await cb_result
+
+    return purchase_qty, {
+        "standard_id": picked["id"],
+        "yield_rate": yield_rate,
+        "season_matched": picked["season"],
+        "anomaly_detected": anomaly_detected,
+    }
