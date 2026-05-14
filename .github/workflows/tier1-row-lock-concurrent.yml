@@ -26,6 +26,13 @@ on:
       - 'services/tx-trade/src/services/delivery_adapter.py'
       - 'services/tx-supply/src/services/inventory_io.py'
       - 'services/tx-supply/src/services/auto_deduction.py'
+      # W7-W8 Tier 1 供应链标准库 (PRD-02 扣秤 / PRD-06 出料率 / PRD-05 时间窗)
+      - 'services/tx-supply/src/services/weight_standard_service.py'
+      - 'services/tx-supply/src/services/yield_standard_service.py'
+      - 'services/tx-supply/src/services/delivery_window_service.py'
+      - 'shared/db-migrations/versions/v428_ingredient_weight_standards.py'
+      - 'shared/db-migrations/versions/v429_ingredient_yield_standards.py'
+      - 'shared/db-migrations/versions/v430_supplier_delivery_windows.py'
       # RLS 基建 + alembic chain 基础 (foundation 改动可能影响 RLS policy / 表结构)
       - 'infra/docker/init-rls.sql'
       - 'shared/db-migrations/versions/v001_rls_foundation_and_core_entities.py'

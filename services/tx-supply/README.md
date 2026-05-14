@@ -509,9 +509,24 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - v425 supplier_portal_messages UNIQUE 索引（§17 patch / #613）
 - v426 RFQ schema 5 表（PRD-04 sub-A）
 - v427 MarketSurvey schema（PRD-13 sub-A）
-- **v428 PRD-02 ingredient_weight_standards + receiving_weight_deductions（W7 首发，本 PR 已落盘）**
-- v429 PRD-05 SupplierDeliveryWindow（W8）+ PRD-06 IngredientYieldStandard 合并落 v428 / v429 视实现
-- v430 PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+- **v428 PRD-02 ingredient_weight_standards + receiving_weight_deductions（W7-1 PR #633 ✅ ship）**
+- **v429 PRD-06 ingredient_yield_standards（W7-2 PR #637 ✅ ship）**
+- **v430 PRD-05 supplier_delivery_windows + supplier_delivery_violations（W8，本 PR）**
+- v431+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+
+#### W8 PR 立项参数（PRD-05 供应商配送时间窗 + 集成测试 + 200 桌并发 regression）
+
+**Tier 级别**：Tier 1（食安 + 客户体验 → TDD 必须）／**Tier 1 explicit-ask**：第 19 例（不在 8 类 carve-out）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
+
+- **范围**：v430 `supplier_delivery_windows`（配置表）+ `supplier_delivery_violations`（违约日志，UNIQUE 幂等）+ RLS / `delivery_window_service.py` CRUD + 二级审批 + `check_delivery_window` + `record_violation` + `count_violations` / `receiving_v2_service.complete_receiving` 完成路径集成（check + record + emit `DELIVERY_LATE`）/ `supplier_scoring_engine` 接入扣分（`delivery_rate` 公式扩展）/ 5 endpoint API / Web UI `SupplierDeliveryWindowsPage.tsx`（含合规检查工具）
+- **Ontology 不动**：违约日志独立表 `supplier_delivery_violations`，不修改 ReceivingOrder ontology（§18 冻结）
+- **测试**：
+  - `test_delivery_window_service_tier1.py` 18 用例（CRUD 6 + 二级审批 2 + RLS 1 + check_window 6 + violation 2 + count 1 + helpers）
+  - `test_receiving_delivery_window_integration_tier1.py` 8 用例（源码静态契约 — receiving_v2 集成 5 + supplier_scoring 接入 3）
+  - `test_w8_supply_e2e_tier1.py` 19 用例（PRD-02/06/05 三表 + 三事件 + 三 UI + 三 router + receiving + scoring 集成）
+  - `tests/concurrent/test_w7_w8_supply_standards_concurrent_tier1.py` 3 用例（W7-1/W7-2 二级审批 FOR UPDATE 串行化 + W8 violations UNIQUE 幂等串行化）
+- **集成测试 + 200 桌并发 regression**（用户决策 D2/D3）：合入本 PR — 不分 sibling PR / 不推 W12 收尾
+- **预计 8 commits**（migrate + service+model + receiving 集成 + routes + Web UI + tests + concurrent + README/baseline）
 
 #### W7 首发 PR 立项参数（PRD-02 商品扣秤标准库）
 **Tier 级别**：Tier 1（毛利底线 → TDD 必须）／**Tier 1 explicit-ask**：第 17 例（不在 8 类 carve-out）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only

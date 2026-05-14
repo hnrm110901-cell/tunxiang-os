@@ -17,7 +17,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import func, select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -504,6 +504,76 @@ async def complete_receiving(
                         source_service="tx-supply",
                     )
                 )
+
+    # ── 配送时间窗硬约束（PRD-05 / Tier 1 食安）──────────────────
+    # 仅 supplier_id + signed_at 都可达时检查；fail-open（基建未就绪不阻塞收货）
+    if order.supplier_id is not None and order.signed_at is not None:
+        try:
+            from . import delivery_window_service as _dws
+
+            check_result = await _dws.check_delivery_window(
+                db,
+                tenant_id,
+                supplier_id=str(order.supplier_id),
+                store_id=str(order.store_id),
+                signed_at=order.signed_at,
+            )
+            if (
+                not check_result["within_window"]
+                and check_result["weekday_matched"]
+            ):
+                # 写违约日志（幂等 — UNIQUE(tenant, receiving_order_id)）
+                await _dws.record_violation(
+                    db,
+                    tenant_id,
+                    supplier_id=str(order.supplier_id),
+                    store_id=str(order.store_id),
+                    receiving_order_id=str(order.id),
+                    window_id=check_result["window_id"],
+                    scheduled_earliest=check_result["scheduled_earliest"],
+                    scheduled_latest=check_result["scheduled_latest"],
+                    actual_signed_at=order.signed_at,
+                    violation_minutes=check_result["violation_minutes"],
+                    violation_kind=check_result["violation_kind"],
+                )
+                # 旁路异步事件（不阻塞收货主流程）
+                asyncio.create_task(
+                    UniversalPublisher.publish(
+                        event_type=SupplyEventType.DELIVERY_LATE,
+                        tenant_id=_uuid(tenant_id),
+                        store_id=order.store_id,
+                        entity_id=order.id,
+                        event_data={
+                            "supplier_id": str(order.supplier_id),
+                            "receiving_order_id": str(order.id),
+                            "window_id": check_result["window_id"],
+                            "scheduled_earliest": (
+                                check_result["scheduled_earliest"].isoformat()
+                                if check_result["scheduled_earliest"]
+                                else None
+                            ),
+                            "scheduled_latest": (
+                                check_result["scheduled_latest"].isoformat()
+                                if check_result["scheduled_latest"]
+                                else None
+                            ),
+                            "actual_signed_at": order.signed_at.isoformat(),
+                            "violation_minutes": check_result["violation_minutes"],
+                            "violation_kind": check_result["violation_kind"],
+                        },
+                        source_service="tx-supply",
+                    )
+                )
+        except (RuntimeError, ValueError, ProgrammingError, OperationalError) as exc:
+            # OperationalError 覆盖连接超时 / 池耗尽 / 网络抖动 — fail-open 不阻塞 Tier 1 收货
+            # (§19 round-1 P0 教训：连接级异常穿透原 (RuntimeError, ValueError, ProgrammingError)
+            # 会回滚整 complete_receiving 事务，破坏 PRD-05 "无配置不阻塞收货" 语义)
+            logger.warning(
+                "delivery_window_check_failed",
+                order_id=order_id,
+                error=str(exc),
+                exc_info=True,
+            )
 
     # ── 价格台账（v366）：每个有效入库的明细写一条价格快照 ──
     if order.supplier_id is not None:

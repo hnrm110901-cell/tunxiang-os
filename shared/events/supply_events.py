@@ -44,6 +44,9 @@ class SupplyEventType(str, Enum):
     # ── 出料率类（PRD-06 / Tier 1 毛利底线）──────────────────────────
     YIELD_ANOMALY = "supply.yield.anomaly"  # 出料率异常（实测 vs 标准超 tolerance）
 
+    # ── 配送时间窗类（PRD-05 / Tier 1 食安）────────────────────────────
+    DELIVERY_LATE = "supply.delivery.late"  # 配送窗口违约（晚到 / 早到）
+
 
 @dataclass
 class SupplyEvent:

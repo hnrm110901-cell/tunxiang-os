@@ -342,6 +342,40 @@ class SupplierScoringEngine:
             total = row.total_cnt if row and row.total_cnt else 0
             delivery_rate = (row.on_time_cnt / total) if total > 0 else 0.0
 
+            # ── PRD-05 / Tier 1 食安：配送时间窗违约扣分 ──
+            # supplier_delivery_violations 表存 supplier 在 period 内每单违约（每单至多 1 条）
+            # 公式：effective_delivery_rate = max(0, (on_time_cnt - violation_cnt) / total_cnt)
+            # 表缺失或查询失败 fail-open（保留原 delivery_rate，不阻塞评分计算）
+            try:
+                violation_sql = text(
+                    """
+                    SELECT COUNT(*) AS violation_cnt
+                    FROM supplier_delivery_violations
+                    WHERE tenant_id   = :tenant_id
+                      AND supplier_id = :supplier_id::TEXT
+                      AND recorded_at::DATE BETWEEN :start AND :end
+                    """
+                )
+                v_row = (await db.execute(violation_sql, params)).fetchone()
+                violation_cnt = int(v_row.violation_cnt) if v_row and v_row.violation_cnt else 0
+                if total > 0 and violation_cnt > 0:
+                    # §19 round-1 P1 教训：on_time_cnt 来自 purchasing_orders.created_at,
+                    # violation_cnt 来自 supplier_delivery_violations.recorded_at — 跨表日期基
+                    # 错位（PO 创建日 vs 收货日通常差 1-3 天），极端场景 on_time=10/violation=10
+                    # 会把 adjusted 归零（错把"日期按时 + 窗违约"等价于"完全不按时"）。
+                    # PRD-05 语义：window violation 是 on_time 子集（在按时到货的单子里再分窗内/窗外），
+                    # 故用 min cap 防跨表日期偏移惩罚突破上限。
+                    capped_violations = min(violation_cnt, row.on_time_cnt or 0)
+                    adjusted_on_time = (row.on_time_cnt or 0) - capped_violations
+                    delivery_rate = adjusted_on_time / total
+            except (ProgrammingError, OperationalError) as v_exc:
+                log.warning(
+                    "supplier_scoring.delivery_violations_query_failed",
+                    reason="supplier_delivery_violations 表可能未迁移（v430）— 跳过窗口扣分",
+                    supplier_id=supplier_id,
+                    error=str(v_exc),
+                )
+
             # ── quality_rate ──
             row = (await db.execute(quality_sql, params)).fetchone()
             total = row.total_cnt if row and row.total_cnt else 0
