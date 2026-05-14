@@ -100,6 +100,11 @@ configMap:
   enabled: false
   data: {}
 
+# PR-01B sub-PR A — 证件临期预警 Celery 任务开关
+# 默认 false（sub-PR B celery_tasks.py 未 merge 时保持 OFF，避免 ImportError）
+# sub-PR B merge 后由运维设 ENABLE_TX_SUPPLY_CERT_ALERTER=1 或切 true 激活
+cert_alerter_enabled: false
+
 # F#2 安全上下文（CSO 2026-05-11 整改 — Helm 层兜底）
 # pod 级：UID/GID 10001，禁 root；fsGroup 自动 chown 挂载卷
 # container 级：禁权限提升 + drop ALL cap（PSA restricted 基线）

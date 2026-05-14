@@ -223,6 +223,99 @@ services:
         SERVICE_NAME: tx-predict
         SERVICE_PORT: "8019"
 
+  # ── Celery Worker（staging 首次加入，资源减半）──────────────
+  # ENV guard: ENABLE_TX_SUPPLY_CERT_ALERTER 未设时等同 tx-ops 模块（blast radius 0）
+  celery-worker:
+    build:
+      context: ../..
+      dockerfile: services/tx-ops/Dockerfile
+    command:
+      - "sh"
+      - "-c"
+      - >-
+        celery
+        -A services.tx_ops.src.celery_tasks_sync
+        ${ENABLE_TX_SUPPLY_CERT_ALERTER:+-A services.tx_supply.src.celery_tasks}
+        worker
+        --loglevel=info
+        --concurrency=2
+        --queues=default,daily_ops,schedule,notifications
+    environment:
+      TX_ENV: staging
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres/${POSTGRES_DB:?required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/2
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A services.tx_ops.src.celery_tasks_sync inspect ping --timeout 5"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-staging}"
+
+  # ── Celery Beat（staging 首次加入）────────────────────────
+  # 定时任务：4 时间点推送 / 日结 / 排班 / 工资条（staging 单实例）
+  celery-beat:
+    build:
+      context: ../..
+      dockerfile: services/tx-ops/Dockerfile
+    command:
+      - "sh"
+      - "-c"
+      - >-
+        celery
+        -A services.tx_ops.src.celery_tasks_sync
+        ${ENABLE_TX_SUPPLY_CERT_ALERTER:+-A services.tx_supply.src.celery_tasks}
+        beat
+        --loglevel=info
+        --schedule=/tmp/celerybeat-schedule
+    environment:
+      TX_ENV: staging
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres/${POSTGRES_DB:?required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD required for staging}@redis:6379/2
+      PYTHONPATH: /app
+      PYTHONUNBUFFERED: "1"
+      TZ: Asia/Shanghai
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat-schedule"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-staging}"
+
 volumes:
   pg_staging_data:
   redis_staging_data:
