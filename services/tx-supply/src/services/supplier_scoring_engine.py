@@ -359,7 +359,14 @@ class SupplierScoringEngine:
                 v_row = (await db.execute(violation_sql, params)).fetchone()
                 violation_cnt = int(v_row.violation_cnt) if v_row and v_row.violation_cnt else 0
                 if total > 0 and violation_cnt > 0:
-                    adjusted_on_time = max(0, (row.on_time_cnt or 0) - violation_cnt)
+                    # §19 round-1 P1 教训：on_time_cnt 来自 purchasing_orders.created_at,
+                    # violation_cnt 来自 supplier_delivery_violations.recorded_at — 跨表日期基
+                    # 错位（PO 创建日 vs 收货日通常差 1-3 天），极端场景 on_time=10/violation=10
+                    # 会把 adjusted 归零（错把"日期按时 + 窗违约"等价于"完全不按时"）。
+                    # PRD-05 语义：window violation 是 on_time 子集（在按时到货的单子里再分窗内/窗外），
+                    # 故用 min cap 防跨表日期偏移惩罚突破上限。
+                    capped_violations = min(violation_cnt, row.on_time_cnt or 0)
+                    adjusted_on_time = (row.on_time_cnt or 0) - capped_violations
                     delivery_rate = adjusted_on_time / total
             except (ProgrammingError, OperationalError) as v_exc:
                 log.warning(

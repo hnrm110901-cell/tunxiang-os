@@ -17,7 +17,7 @@ from typing import Optional
 
 import structlog
 from sqlalchemy import func, select
-from sqlalchemy.exc import ProgrammingError
+from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -564,7 +564,10 @@ async def complete_receiving(
                         source_service="tx-supply",
                     )
                 )
-        except (RuntimeError, ValueError, ProgrammingError) as exc:
+        except (RuntimeError, ValueError, ProgrammingError, OperationalError) as exc:
+            # OperationalError 覆盖连接超时 / 池耗尽 / 网络抖动 — fail-open 不阻塞 Tier 1 收货
+            # (§19 round-1 P0 教训：连接级异常穿透原 (RuntimeError, ValueError, ProgrammingError)
+            # 会回滚整 complete_receiving 事务，破坏 PRD-05 "无配置不阻塞收货" 语义)
             logger.warning(
                 "delivery_window_check_failed",
                 order_id=order_id,

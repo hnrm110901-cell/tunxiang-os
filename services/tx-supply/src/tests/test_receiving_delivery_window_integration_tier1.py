@@ -85,6 +85,10 @@ class TestReceivingV2Integration:
         assert "ProgrammingError" in block, (
             "fail-open 必须 catch ProgrammingError（表缺失 / migration 未运行）"
         )
+        assert "OperationalError" in block, (
+            "fail-open 必须 catch OperationalError（连接超时 / 池耗尽 / 网络抖动 — "
+            "§19 round-1 P0 教训）"
+        )
         assert "delivery_window_check_failed" in block or "warning" in block, (
             "fail-open 必须 logger.warning 记录失败"
         )
