@@ -143,7 +143,11 @@ _TIER1_TEXT_FSTRING_BASELINES: dict[str, int] = {
     # text(f"... WHERE {where_sql}") 触发两条 baseline（FSTRING + SQLVAR），where_sql 由
     # only_active / ingredient_id / season 等硬编码字面量条件 + 参数占位 :tenant_id/:ingredient_id/
     # :today/:season 组成，无用户输入注入面（season 由 FastAPI Enum 校验），与同模式一致。
-    "services/tx-supply/src": 81,  # PK.3 / PK.2-fix + PR-01C count_certificates + PR #633 weight_standard + PRD-06 yield_standard
+    # PR-PRD-05 (delivery_window_service.list_delivery_windows) 加 1 — 同 PR-01C/PR #633/PRD-06 模式
+    # text(f"... WHERE {where_sql}") 触发两条 baseline（FSTRING + SQLVAR），where_sql 由
+    # only_active / supplier_id / store_id 等硬编码字面量条件 + 参数占位 :tenant_id/:supplier_id/
+    # :store_id 组成，无用户输入注入面。
+    "services/tx-supply/src": 82,  # PK.3 / PK.2-fix + PR-01C + PR #633 weight + PRD-06 yield + PRD-05 delivery_window
 }
 
 
@@ -220,7 +224,10 @@ _TIER1_TEXT_SQLVAR_BASELINES: dict[str, int] = {
     # PR-PRD-06 (yield_standard_service.list_yield_standards) 加 1 — 同 PR-01C / PR #633 模式
     # 同一处 text(f"... WHERE {where_sql}") 触发，only_active / ingredient_id / season 条件由
     # 硬编码字面量 + 参数占位组成，无用户输入注入面（season 由 FastAPI Enum 校验）。
-    "services/tx-supply/src": 10,
+    # PR-PRD-05 (delivery_window_service.list_delivery_windows) 加 1 — 同 PR-01C/PR #633/PRD-06 模式
+    # 同一处 text(f"... WHERE {where_sql}") 触发，only_active / supplier_id / store_id 条件由
+    # 硬编码字面量 + 参数占位组成，无用户输入注入面。
+    "services/tx-supply/src": 11,
 }
 
 
