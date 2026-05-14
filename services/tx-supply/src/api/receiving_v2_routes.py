@@ -17,13 +17,17 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
+from ..services.cert_service import (
+    is_supplier_blocked,
+    is_supplier_blocked_via_po,
+)
 from ..services.receiving_v2_service import (
     complete_receiving,
     create_receiving_order,
@@ -88,6 +92,48 @@ async def create_order(
 
     若传入 procurement_order_id，系统会从采购单预填预期数量。
     """
+    # ── PRD-01 食安合规阻断（Tier 1 / §19 P0-2 修复 fail-closed）────────────────
+    # 若供应商有任意证件过期（auto_block_on_expire=TRUE），阻断收货入库。
+    # 续证后 expire_date 更新到未来，下次查询自动解除阻断，无需手动操作。
+    #
+    # §19 P0-2 修复：原代码 `if body.supplier_id:` 让 supplier_id=None 静默通过 —
+    # 收货员匿名收货 = 食安硬约束 bypass。改 fail-closed：
+    #   - supplier_id 直接给 → 走 is_supplier_blocked
+    #   - 仅 procurement_order_id → 走 is_supplier_blocked_via_po（PO 反查）
+    #   - 两者都缺 → 422（匿名收货禁止）
+    today = date.today()
+    if body.supplier_id:
+        blocked = await is_supplier_blocked(
+            db,
+            tenant_id=x_tenant_id,
+            supplier_id=body.supplier_id,
+            today=today,
+        )
+    elif body.procurement_order_id:
+        blocked = await is_supplier_blocked_via_po(
+            db,
+            tenant_id=x_tenant_id,
+            purchase_order_id=body.procurement_order_id,
+            today=today,
+        )
+    else:
+        # 两者都缺 → fail-closed（食药监不接受匿名收货）
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SUPPLIER_REQUIRED",
+                "message": "必须提供 supplier_id 或 procurement_order_id（食安合规要求）",
+            },
+        )
+    if blocked:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SUPPLIER_CERT_EXPIRED",
+                "message": "供应商证件已过期，无法收货",
+            },
+        )
+    # ── 业务逻辑 ─────────────────────────────────────────────────────────────────
     try:
         result = await create_receiving_order(
             tenant_id=x_tenant_id,
