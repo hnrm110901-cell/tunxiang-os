@@ -65,6 +65,7 @@ import { MemberTierPage } from './pages/member/MemberTierPage';
 import { PurchaseOrderPage } from './pages/supply/PurchaseOrderPage';
 import { ExpiryAlertPage } from './pages/supply/ExpiryAlertPage';
 import { SupplyDashboardPage } from './pages/supply/SupplyDashboardPage';
+import { DocNumberRulesPage } from './pages/supply/DocNumberRulesPage';
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
@@ -291,6 +292,7 @@ function AppContent() {
           <Route path="/supply/purchase-orders" element={<PurchaseOrderPage />} />
           <Route path="/supply/expiry-alerts" element={<ExpiryAlertPage />} />
           <Route path="/supply/dashboard" element={<SupplyDashboardPage />} />
+          <Route path="/supply/doc-number-rules" element={<DocNumberRulesPage />} />
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />
