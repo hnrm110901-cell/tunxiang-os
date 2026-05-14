@@ -80,8 +80,8 @@ class TestReceivingV2Integration:
         marker = "check_delivery_window"
         idx = src.find(marker)
         assert idx > -1
-        # 取该位置之后 1500 字范围检查
-        block = src[idx : idx + 2000]
+        # 取该位置之后 4000 字范围检查（覆盖整个 try / event 发射 / except 块）
+        block = src[idx : idx + 4000]
         assert "ProgrammingError" in block, (
             "fail-open 必须 catch ProgrammingError（表缺失 / migration 未运行）"
         )
@@ -97,7 +97,7 @@ class TestReceivingV2Integration:
         src = _read_receiving_v2_source()
         marker = "check_delivery_window"
         idx = src.find(marker)
-        block = src[idx : idx + 2000]
+        block = src[idx : idx + 4000]
         # 必须含联合条件，否则 weekday 不匹配也会误记
         assert "weekday_matched" in block, (
             "record_violation 必须配 weekday_matched=True 条件，否则误记违约"
