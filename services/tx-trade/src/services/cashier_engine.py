@@ -462,11 +462,19 @@ class CashierEngine:
         notes: Optional[str] = None,
     ) -> dict:
         """改菜 — 修改数量或备注"""
+        # 独立 review P1-2：函数头一次性锁定订单 (lock=True)，避免原本两次
+        # _get_order（L482 / L497）的双锁顺序歧义；同事务内第二次锁是 no-op，
+        # 但跨请求竞争同 item 时存在 200 桌高峰下的死锁风险。
+        # PR #227 rebase §19 P0-1：原 _get_order 强制锁，rebase 选 main lock kwarg
+        # 后 caller 必须显式 lock=True，否则 200 桌并发改同桌订单 lost-update。
+        order_uuid = uuid.UUID(order_id)
         item_uuid = uuid.UUID(item_id)
+        order = await self._get_order(order_uuid, lock=True)
+
         result = await self.db.execute(
             select(OrderItem).where(
                 OrderItem.id == item_uuid,
-                OrderItem.order_id == uuid.UUID(order_id),
+                OrderItem.order_id == order_uuid,
             )
         )
         item = result.scalar_one_or_none()
@@ -485,23 +493,15 @@ class CashierEngine:
             item.quantity = quantity
             item.subtotal_fen = new_subtotal
 
-            # 更新订单总额
-            order = await self._get_order(item.order_id)
-            new_total = order.total_amount_fen + diff
-            new_final = new_total - order.discount_amount_fen
-            await self.db.execute(
-                update(Order)
-                .where(Order.id == item.order_id)
-                .values(total_amount_fen=new_total, final_amount_fen=new_final)
-            )
+            # 用已锁的 order 对象直接改属性，flush 时 SQLAlchemy 会发 UPDATE。
+            order.total_amount_fen = order.total_amount_fen + diff
+            order.final_amount_fen = order.total_amount_fen - order.discount_amount_fen
 
         if notes is not None:
             item.notes = notes
 
         await self.db.flush()
 
-        # 重新读取订单
-        order = await self._get_order(uuid.UUID(order_id))
         return {
             "item_id": item_id,
             "new_quantity": item.quantity,

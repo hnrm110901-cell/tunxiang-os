@@ -15,7 +15,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
+import re
+import time
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
@@ -32,6 +37,167 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/api/v1/sync", tags=["edge-sync"])
 
+
+# ─── 审计 S-03（P0）：edge sync 强制 per-store 鉴权 ─────────────────────────
+# 原本 edge sync-engine ↔ 云仅靠 Tailscale 网络层信任 + X-Tenant-ID header；
+# 任一 Mac mini 被攻陷或 Tailscale ACL 漂移即可任意写。
+# 此处增加 per-store HMAC token：边缘端启动时由 ops 注入 EDGE_STORE_SYNC_KEY，
+# 每次请求附 X-Edge-Store-Token = HMAC_SHA256(secret, f"{store_id}.{tenant_id}.{ts}.{nonce}")
+# 头部同时附 X-Edge-Store-Id / X-Edge-Tenant-Id / X-Edge-Sync-Ts / X-Edge-Sync-Nonce。
+# 服务侧从 EDGE_SYNC_HMAC_SECRET（K8s Secret）读密钥校验。
+#
+# Rollout：
+#   - 环境变量 EDGE_SYNC_HMAC_SECRET 未配置 → 仅 warn 不阻断（dev/staging 过渡期）
+#   - 配置后 → 缺 token / 校验失败 / 时钟偏差 > 300s / nonce 重放 → 401
+
+_EDGE_SYNC_TS_SKEW_DEFAULT = 300
+
+# WARNING（独立 review P1-1）：进程内 dict，**多副本部署下防重放失效**。
+# k8s HPA 副本 ≥ 2 时同一 nonce 打到不同 pod 无法共享检测；同一变更可被
+# 重放至多 (replica_count) 次直到被业务层 change_id 幂等去重救场。
+# 生产 follow-up：改用 Redis 共享存储（SETEX nonce → ttl），
+# 或显式接受"多副本下退化为时间窗口防重放"。
+_EDGE_SYNC_RECENT_NONCES: dict[str, float] = {}
+
+
+def _edge_sync_secret() -> str:
+    return os.environ.get("EDGE_SYNC_HMAC_SECRET", "").strip()
+
+
+def _edge_sync_required() -> bool:
+    """True = 必须带合法 HMAC token；False = 仅 warn（兼容老 client）。
+
+    独立 review NEW-P0：原来的"有 secret 即强制"逻辑会在 ops 配 secret 时立刻
+    打死所有未升级的 edge 客户端（仅发 X-Tenant-ID 不发 X-Edge-* headers），
+    Mac mini 离线同步功能直接中断 → 违反 4h 离线 SLA。
+    改为显式 env 开关，部署可分两步：
+      Step 1: 部署服务端代码 + 配 EDGE_SYNC_HMAC_SECRET（required=false 兼容老 client）
+      Step 2: 升级 edge sync-engine 客户端发 X-Edge-* HMAC headers
+      Step 3: 灰度验证 client 发的 token 能通过校验
+      Step 4: 设置 EDGE_SYNC_HMAC_REQUIRED=true 强制启用，正式 cutover
+    在 Step 1-3 阶段 secret 已配但未 required，verify_edge_sync_auth 走兼容
+    分支返回 X-Tenant-ID（与原行为一致），无功能性破坏。
+    """
+    explicit = os.environ.get("EDGE_SYNC_HMAC_REQUIRED", "").strip().lower()
+    return explicit in ("true", "1", "yes", "on")
+
+
+def _edge_sync_skew_seconds() -> int:
+    """时间戳容忍窗口（秒）。
+
+    独立 review P0-2：默认 300s 防重放足够，但与 4h 离线 SLA 矛盾 ——
+    边缘 sync-engine 离线 4h 重连时若签名 ts 是写入时的，全部请求被拒。
+
+    解决路径分两层：
+      1. 边缘客户端必须在 **send 时签名**（非 write 时），原始写入时间戳
+         放 payload `original_ts` 字段供业务层幂等使用（推荐）。
+      2. 服务端窗口可经 EDGE_SYNC_TS_SKEW_SECONDS 调到（如 14400 = 4h）以兜底
+         尚未升级的老 edge 客户端，但每多放宽 1s 都给攻击者 1s 重放窗口，
+         **必须搭配 Redis 共享 nonce store** 防重放被放大。
+
+    生产推荐：默认 300 + edge 客户端 send-time 签名（更安全）。
+    """
+    raw = os.environ.get("EDGE_SYNC_TS_SKEW_SECONDS", str(_EDGE_SYNC_TS_SKEW_DEFAULT))
+    try:
+        v = int(raw)
+        return max(60, min(v, 86400))  # clamp 1min..24h
+    except ValueError:
+        return _EDGE_SYNC_TS_SKEW_DEFAULT
+
+
+def _gc_old_nonces(now: float) -> None:
+    """清理超过 ts skew 窗口外的 nonce。"""
+    threshold = now - _edge_sync_skew_seconds()
+    expired = [k for k, v in _EDGE_SYNC_RECENT_NONCES.items() if v < threshold]
+    for k in expired:
+        _EDGE_SYNC_RECENT_NONCES.pop(k, None)
+
+
+async def verify_edge_sync_auth(
+    x_edge_store_id: Optional[str] = Header(default=None, alias="X-Edge-Store-Id"),
+    x_edge_tenant_id: Optional[str] = Header(default=None, alias="X-Edge-Tenant-Id"),
+    x_edge_sync_ts: Optional[str] = Header(default=None, alias="X-Edge-Sync-Ts"),
+    x_edge_sync_nonce: Optional[str] = Header(default=None, alias="X-Edge-Sync-Nonce"),
+    x_edge_store_token: Optional[str] = Header(default=None, alias="X-Edge-Store-Token"),
+    x_tenant_id: Optional[str] = Header(default=None, alias="X-Tenant-ID"),
+) -> str:
+    """校验 edge sync 请求；返回校验通过的 tenant_id。"""
+    secret = _edge_sync_secret()
+    required = _edge_sync_required()
+
+    # 兼容 dev：未配置 secret 且非生产环境 — 仅 warn 不阻
+    if not secret:
+        if required:
+            logger.error("edge_sync_secret_missing_in_production")
+            raise HTTPException(status_code=500, detail="edge sync auth misconfigured")
+        logger.warning(
+            "edge_sync_auth_skipped_dev_mode",
+            note="EDGE_SYNC_HMAC_SECRET 未配置；生产必须配置",
+        )
+        # dev 模式回退到原 X-Tenant-ID 信任
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required (dev mode)")
+        return x_tenant_id
+
+    # PR #227 rebase §19 P1-2：Step 1-3 过渡期兼容分支 — secret 已配但
+    # required=False（部署计划 Step 1-3 阶段），旧 edge client 未发 X-Edge-*
+    # headers 时走 warn + 回退 X-Tenant-ID 信任，不阻断 4h 离线 SLA。
+    # Step 4 后 required=True，本分支跳过直接走强制校验。
+    if not required and not all(
+        [x_edge_store_id, x_edge_tenant_id, x_edge_sync_ts, x_edge_sync_nonce, x_edge_store_token]
+    ):
+        logger.warning(
+            "edge_sync_auth_skipped_legacy_client",
+            tenant=x_tenant_id,
+            note="Step 1-3 过渡期：secret 已配 + required=False + 旧客户端无 X-Edge-* headers",
+        )
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+        return x_tenant_id
+
+    # 强制校验
+    if not all([x_edge_store_id, x_edge_tenant_id, x_edge_sync_ts, x_edge_sync_nonce, x_edge_store_token]):
+        logger.warning("edge_sync_auth_missing_headers", store=x_edge_store_id)
+        raise HTTPException(status_code=401, detail="edge sync auth headers missing")
+
+    # 时间戳防重放
+    try:
+        ts = int(x_edge_sync_ts)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=401, detail="invalid X-Edge-Sync-Ts") from None
+    now = time.time()
+    if abs(now - ts) > _edge_sync_skew_seconds():
+        logger.warning("edge_sync_auth_ts_skew", store=x_edge_store_id, skew=int(now - ts))
+        raise HTTPException(status_code=401, detail="edge sync timestamp skew")
+
+    # nonce 防重放
+    nonce_key = f"{x_edge_store_id}:{x_edge_sync_nonce}"
+    _gc_old_nonces(now)
+    if nonce_key in _EDGE_SYNC_RECENT_NONCES:
+        logger.warning("edge_sync_auth_nonce_replay", store=x_edge_store_id, nonce=x_edge_sync_nonce)
+        raise HTTPException(status_code=401, detail="edge sync nonce replay")
+
+    # HMAC 校验
+    msg = f"{x_edge_store_id}.{x_edge_tenant_id}.{x_edge_sync_ts}.{x_edge_sync_nonce}".encode("utf-8")
+    expected = hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, x_edge_store_token or ""):
+        logger.warning("edge_sync_auth_signature_invalid", store=x_edge_store_id)
+        raise HTTPException(status_code=401, detail="edge sync signature invalid")
+
+    # tenant_id 一致性
+    if x_tenant_id and x_tenant_id != x_edge_tenant_id:
+        logger.warning(
+            "edge_sync_auth_tenant_mismatch",
+            store=x_edge_store_id,
+            header_tenant=x_tenant_id,
+            claim_tenant=x_edge_tenant_id,
+        )
+        raise HTTPException(status_code=401, detail="X-Tenant-ID claim mismatch")
+
+    _EDGE_SYNC_RECENT_NONCES[nonce_key] = now
+    logger.debug("edge_sync_auth_ok", store=x_edge_store_id, tenant=x_edge_tenant_id)
+    return x_edge_tenant_id  # type: ignore[return-value]
+
 # 云端 sync_changelog 允许写入的表白名单
 ALLOWED_TABLES: frozenset[str] = frozenset(
     {
@@ -42,6 +208,28 @@ ALLOWED_TABLES: frozenset[str] = frozenset(
         "inventory_records",
     }
 )
+
+# 审计 Tier1 F3（P0）：列名安全正则 — snake_case 字母数字下划线，最长 63
+# （PG identifier 上限 64）。防止 JSON key 含 `"`、`;`、`)` 等字符
+# 在 `f'"{c}"'` 处突破双引号标识符注入 SQL（如 `id") SELECT pg_sleep(10);--`）。
+# TODO（强烈建议）：改为按表的显式列白名单，详见
+# docs/audit-2026-05/03-tier1-critical-paths.md F3 修复建议。
+_SAFE_COL_NAME_RE = re.compile(r"^[a-z_][a-z0-9_]{0,62}$")
+
+
+def _validate_columns(columns: list[str], table_name: str) -> None:
+    """校验全部列名形式安全；任一非法即 raise HTTPException(400)。"""
+    for c in columns:
+        if not _SAFE_COL_NAME_RE.match(c):
+            logger.warning(
+                "sync_ingest.unsafe_column_name",
+                column=c,
+                table=table_name,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=f"unsafe column name in sync payload: {c!r}",
+            )
 
 
 # ─── 请求/响应模型 ────────────────────────────────────────────────────────
@@ -147,7 +335,7 @@ def _require_tenant(
 )
 async def ingest_changes(
     req: IngestRequest,
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     response = IngestResponse(accepted=[], conflicts=[], errors=[], error_messages=[])
@@ -257,7 +445,7 @@ async def get_cloud_changes(
     ),
     page: int = Query(default=1, ge=1, description="页码"),
     size: int = Query(default=500, ge=1, le=500, description="每页条数"),
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     try:
@@ -385,7 +573,7 @@ async def pull_events(
         ),
     ),
     limit: int = Query(default=500, ge=1, le=500),
-    tenant_id: str = Depends(_require_tenant),
+    tenant_id: str = Depends(verify_edge_sync_auth),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     try:
@@ -599,6 +787,8 @@ async def _upsert_record(db: AsyncSession, change: ChangeRecordIn) -> None:
     data["tenant_id"] = change.tenant_id
 
     columns = list(data.keys())
+    # 审计 Tier1 F3（P0）：在拼 SQL 前严格校验列名形式，防 JSON key 注入。
+    _validate_columns(columns, change.table_name)
     col_list = ", ".join(f'"{c}"' for c in columns)
     placeholders = ", ".join(f":{c}" for c in columns)
     update_set = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
@@ -617,6 +807,11 @@ async def _apply_soft_delete(
     changed_at: datetime,
 ) -> None:
     """软删除：设置 is_deleted=TRUE"""
+    # PR #227 rebase §19 P0-2：函数级表名白名单防御，与 _upsert_record 模式对齐。
+    # 外层 ingest_changes L341 已有白名单拦截，本处加防御避免内部函数被拆分
+    # 调用时开放 SQL 注入攻击面（f-string 拼表名）。
+    if change.table_name not in ALLOWED_TABLES:
+        raise ValueError(f"table not allowed: {change.table_name!r}")
     await db.execute(
         text(
             f"""
