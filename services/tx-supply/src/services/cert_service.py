@@ -16,20 +16,23 @@ from __future__ import annotations
 
 import uuid
 from datetime import date, datetime, timezone
-from typing import List, Optional
+from typing import List, Optional, Union
 
 import structlog
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncConnection, AsyncSession
 
 logger = structlog.get_logger(__name__)
+
+# AsyncConnection 和 AsyncSession 共用相同的 execute() 接口（text() 层兼容）
+_DBConn = Union[AsyncConnection, AsyncSession]
 
 
 def _uuid_str(val: str | uuid.UUID) -> str:
     return str(val)
 
 
-async def _set_tenant(db: AsyncSession, tenant_id: str) -> None:
+async def _set_tenant(db: _DBConn, tenant_id: str) -> None:
     """设置 RLS 租户上下文（标准模式，参考 receiving_v2_service）。"""
     await db.execute(
         text("SELECT set_config('app.tenant_id', :tid, true)"),
@@ -166,7 +169,7 @@ async def list_expiring(
 
 
 async def list_alertable(
-    db: AsyncSession,
+    db: _DBConn,
     tenant_id: str,
     *,
     today: date,
@@ -178,8 +181,10 @@ async def list_alertable(
     - expire_date BETWEEN today AND today + lookahead_days  （临期窗口）
     - 或 expire_date < today                                （已过期）
 
-    每行返回 dict 含：cert_id, supplier_id, cert_type, cert_number,
+    每行返回 dict 含：cert_id, supplier_id, supplier_name, cert_type, cert_number,
     expire_date, days_until_expiry（signed int — 负数表示已过期 N 天）。
+
+    接受 AsyncConnection 或 AsyncSession（text() 层接口兼容）。
     """
     await _set_tenant(db, tenant_id)
 
@@ -187,20 +192,23 @@ async def list_alertable(
         text(
             """
             SELECT
-                id::text           AS cert_id,
-                supplier_id::text  AS supplier_id,
-                cert_type,
-                cert_number,
-                expire_date,
-                (expire_date - :today)::int AS days_until_expiry
-            FROM supplier_certificates
-            WHERE tenant_id   = :tenant_id
-              AND is_deleted  = FALSE
+                sc.id::text           AS cert_id,
+                sc.supplier_id::text  AS supplier_id,
+                (SELECT sa.name FROM supplier_accounts sa
+                 WHERE sa.id = sc.supplier_id AND sa.is_deleted = FALSE
+                 LIMIT 1)             AS supplier_name,
+                sc.cert_type,
+                sc.cert_number,
+                sc.expire_date,
+                (sc.expire_date - :today)::int AS days_until_expiry
+            FROM supplier_certificates sc
+            WHERE sc.tenant_id   = :tenant_id
+              AND sc.is_deleted  = FALSE
               AND (
-                (expire_date BETWEEN :today AND :today + (:lookahead_days || ' days')::interval)
-                OR expire_date < :today
+                (sc.expire_date BETWEEN :today AND :today + (:lookahead_days * INTERVAL '1 day'))
+                OR sc.expire_date < :today
               )
-            ORDER BY expire_date ASC
+            ORDER BY sc.expire_date ASC
             """
         ),
         {
