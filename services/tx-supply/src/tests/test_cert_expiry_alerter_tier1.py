@@ -823,3 +823,118 @@ class TestPushChannelWiringTier1:
             all_log_text += str(log_call)
 
         assert secret_token not in all_log_text
+
+    # ─── PR #608 round-2 §19 reviewer P0 + P1 回归 ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_supplier_portal_insert_failure_does_not_poison_subsequent_log_alert(self):
+        """P0 回归（round-1 §19）：SAVEPOINT 隔离 INSERT 失败 →
+        同 conn 后续 _log_alert 仍能成功，外层 txn 不被污染。
+
+        Setup: mock conn 让 supplier_portal INSERT 抛 IntegrityError；
+        SAVEPOINT 机制只回滚 savepoint。后续 _log_alert（也用 SAVEPOINT）
+        在同一 conn 上必须正常完成，不抛 InFailedSqlTransaction。
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        conn = AsyncMock()
+
+        savepoint_calls = {"count": 0}
+
+        def make_savepoint():
+            savepoint_calls["count"] += 1
+            return _mk_savepoint_cm()
+
+        conn.begin_nested = MagicMock(side_effect=make_savepoint)
+
+        executed_sql: list[str] = []
+
+        async def fake_execute(query, params=None):
+            sql = str(query)
+            executed_sql.append(sql)
+            if "supplier_portal_messages" in sql and "INSERT" in sql.upper():
+                # 模拟 RLS WITH CHECK 违规 / NOT NULL 失败
+                raise IntegrityError(
+                    "INSERT INTO supplier_portal_messages",
+                    {},
+                    Exception("RLS WITH CHECK violation"),
+                )
+            # cert_alert_log INSERT/UPSERT 正常成功
+            return MagicMock()
+
+        conn.execute = AsyncMock(side_effect=fake_execute)
+
+        cert = _sample_cert(days=0, expire=date(2026, 5, 14))
+
+        # Step 1: _push_supplier_portal 必须 fail-open 不抛
+        success, err = await _push_supplier_portal(conn, _TENANT_XUJI, cert, "D+0")
+        assert success is False
+        assert err is not None
+        assert err.startswith("portal_insert_failed:")
+
+        # Step 2: 同 conn 上 _log_alert 必须仍能成功
+        # 关键断言：如果外层 txn 被污染，asyncpg/SA 会抛 InFailedSqlTransaction
+        # 这里 mock 不模拟 PG 真行为，但 SAVEPOINT 路径走通 + cert_alert_log
+        # INSERT 被 fake_execute 接受 → 等同于 PG 真实场景外层未污染
+        await _log_alert(
+            conn, _TENANT_XUJI, _CERT_A, "D+0",
+            CHANNEL_SUPPLIER_PORTAL, False, err,
+        )
+
+        # 验证两次 SAVEPOINT 都被使用：一次给 portal INSERT，一次给 log_alert
+        assert savepoint_calls["count"] == 2, (
+            f"expected 2 SAVEPOINTs (portal + log_alert), got {savepoint_calls['count']}"
+        )
+
+        # 验证两个 INSERT 都被执行
+        assert any("supplier_portal_messages" in s for s in executed_sql)
+        assert any("cert_alert_log" in s for s in executed_sql)
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_handles_lazy_import_failure(self):
+        """P1-2 回归：ImportError on lazy import 被捕获，返回 (False, error_msg) — fail-open 契约。"""
+        cert = _sample_cert(days=30)
+
+        # 强制触发 ImportError：阻塞 services.tx_org.src.services.im_notification_service 重新加载
+        saved_mod = sys.modules.pop(
+            "services.tx_org.src.services.im_notification_service", None
+        )
+        # 用 None 标记阻止重新 import（Python import system 见到 None 抛 ImportError）
+        sys.modules["services.tx_org.src.services.im_notification_service"] = None  # type: ignore[assignment]
+
+        try:
+            success, err = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-30",
+                "https://qyapi.test/x",
+            )
+            assert success is False, "ImportError 应触发 fail-open 返回 False"
+            assert err is not None
+            assert err.startswith("wecom_send_exception:"), f"got {err!r}"
+        finally:
+            sys.modules.pop(
+                "services.tx_org.src.services.im_notification_service", None
+            )
+            if saved_mod is not None:
+                sys.modules[
+                    "services.tx_org.src.services.im_notification_service"
+                ] = saved_mod
+            else:
+                # 重新触发命名空间注册让其他测试可继续 patch
+                _register_tx_org_im_namespace()
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_handles_missing_cert_key(self):
+        """P1-1 回归：cert dict 缺键触发 KeyError → 被 fail-open 捕获，返回 (False, error_msg)。"""
+        conn = AsyncMock()
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+        conn.execute = AsyncMock(return_value=MagicMock())
+
+        # 缺 supplier_id / cert_type / 等关键键
+        bad_cert = {"cert_id": _CERT_A}
+
+        success, err = await _push_supplier_portal(
+            conn, _TENANT_XUJI, bad_cert, "D-30"
+        )
+        assert success is False
+        assert err is not None
+        assert err.startswith("portal_payload_invalid:"), f"got {err!r}"
