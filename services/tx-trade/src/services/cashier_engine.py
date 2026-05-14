@@ -462,12 +462,14 @@ class CashierEngine:
         notes: Optional[str] = None,
     ) -> dict:
         """改菜 — 修改数量或备注"""
-        # 独立 review P1-2：函数头一次性锁定订单，避免原本两次 _get_order
-        # （L482 / L497）的双锁顺序歧义；同事务内第二次锁是 no-op，但跨请求
-        # 竞争同 item 时存在 200 桌高峰下的死锁风险。
+        # 独立 review P1-2：函数头一次性锁定订单 (lock=True)，避免原本两次
+        # _get_order（L482 / L497）的双锁顺序歧义；同事务内第二次锁是 no-op，
+        # 但跨请求竞争同 item 时存在 200 桌高峰下的死锁风险。
+        # PR #227 rebase §19 P0-1：原 _get_order 强制锁，rebase 选 main lock kwarg
+        # 后 caller 必须显式 lock=True，否则 200 桌并发改同桌订单 lost-update。
         order_uuid = uuid.UUID(order_id)
         item_uuid = uuid.UUID(item_id)
-        order = await self._get_order(order_uuid)
+        order = await self._get_order(order_uuid, lock=True)
 
         result = await self.db.execute(
             select(OrderItem).where(

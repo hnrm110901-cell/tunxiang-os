@@ -139,6 +139,22 @@ async def verify_edge_sync_auth(
             raise HTTPException(status_code=400, detail="X-Tenant-ID required (dev mode)")
         return x_tenant_id
 
+    # PR #227 rebase §19 P1-2：Step 1-3 过渡期兼容分支 — secret 已配但
+    # required=False（部署计划 Step 1-3 阶段），旧 edge client 未发 X-Edge-*
+    # headers 时走 warn + 回退 X-Tenant-ID 信任，不阻断 4h 离线 SLA。
+    # Step 4 后 required=True，本分支跳过直接走强制校验。
+    if not required and not all(
+        [x_edge_store_id, x_edge_tenant_id, x_edge_sync_ts, x_edge_sync_nonce, x_edge_store_token]
+    ):
+        logger.warning(
+            "edge_sync_auth_skipped_legacy_client",
+            tenant=x_tenant_id,
+            note="Step 1-3 过渡期：secret 已配 + required=False + 旧客户端无 X-Edge-* headers",
+        )
+        if not x_tenant_id:
+            raise HTTPException(status_code=400, detail="X-Tenant-ID required")
+        return x_tenant_id
+
     # 强制校验
     if not all([x_edge_store_id, x_edge_tenant_id, x_edge_sync_ts, x_edge_sync_nonce, x_edge_store_token]):
         logger.warning("edge_sync_auth_missing_headers", store=x_edge_store_id)
@@ -791,6 +807,11 @@ async def _apply_soft_delete(
     changed_at: datetime,
 ) -> None:
     """软删除：设置 is_deleted=TRUE"""
+    # PR #227 rebase §19 P0-2：函数级表名白名单防御，与 _upsert_record 模式对齐。
+    # 外层 ingest_changes L341 已有白名单拦截，本处加防御避免内部函数被拆分
+    # 调用时开放 SQL 注入攻击面（f-string 拼表名）。
+    if change.table_name not in ALLOWED_TABLES:
+        raise ValueError(f"table not allowed: {change.table_name!r}")
     await db.execute(
         text(
             f"""
