@@ -378,15 +378,16 @@ async def issue_stock(
     status = _update_status(ingredient)
 
     # 写入 doc_number（ORM 实体冻结，用 raw SQL UPDATE，同 receive_stock 模式）
+    # ANY(:ids::uuid[]) 单条 SQL 覆盖所有 batch，N→1 round-trip（与 Wave1 receive_stock 风格一致）
     if doc_number is not None and transactions:
         tx_ids = [t["transaction_id"] for t in transactions]
-        for tid in tx_ids:
-            await db.execute(
-                text(
-                    "UPDATE ingredient_transactions SET doc_number = :doc_number WHERE id = :id"
-                ),
-                {"doc_number": doc_number, "id": tid},
-            )
+        await db.execute(
+            text(
+                "UPDATE ingredient_transactions SET doc_number = :doc_number"
+                " WHERE id = ANY(:ids::uuid[])"
+            ),
+            {"doc_number": doc_number, "ids": tx_ids},
+        )
 
     logger.info(
         "stock_issued",
