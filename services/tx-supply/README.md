@@ -514,8 +514,8 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 PR #645 ✅ ship）**
 - **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 PR #647 ✅ ship，复用 v431 schema 无新 migration）**
 - **PRD-04 sub-C state transitions + supplier-portal scope + 前端 RFQManagementPage/QuotePage + AI 推荐 UI（W9-W10 本 PR，复用 v431 schema 无新 migration）**
-- v432 PRD-13 sub-A MarketSurvey schema（W11-W12）
-- v433+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
+- **v432 PRD-07 RequisitionTemplate 3 表 + #589 purchase_orders 3 表 建表（W10 本 PR ship）**
+- v433+ PRD-13 sub-A MarketSurvey schema（W11-W12）
 
 #### W9 sub-B PR 立项参数（PRD-04 RFQ award 路径 + 二级审批 + #579 200 桌并发）
 
@@ -568,6 +568,29 @@ Closes #579
   - AI 推荐综合评分（引入 PRD-05 配送时间窗扣分 + supplier_score 综合排序 — sub-D 或独立 PR）
   - 邮件/IM 推送邀请通知（依赖 #485 supplier_portal_messages 通用入箱 — 独立 PR）
 - **预计 4 commits**（service 扩展 + routes/models 扩展 + 前端 + tests/README）
+
+#### W10 PRD-07 申购模板 PR 立项参数（含 #589 purchase_orders 建表）— ✅ ship
+
+**Tier 级别**：T2 normal（不在 Tier 1 source patterns；操作效率 → NPS 决定客户留存）／**T2 carve-out type 7 auto admin-merge**（不 explicit-ask）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
+
+- **PRD-07 范围**：
+  - v432 6 表 migration：
+    - PRD-07: requisition_templates / requisition_template_items / warehouse_requisition_template_bindings
+    - #589 闭环: purchase_orders / purchase_order_items / ingredient_batches
+  - 所有表 RLS 四联 inline (ENABLE + FORCE + POLICY + WITH CHECK)
+  - FK CASCADE 子→父 (FK 依赖序: ingredient_batches → POI → PO / template_items+bindings → templates)
+  - PRD-03 doc_number VARCHAR(64) + po_number 兼容字段 + 索引 (tenant_id, store_id, status) + (tenant_id, supplier_id) per #589 提议
+  - `requisition_template_service.py` — CRUD 模板 + 仓库绑定 + 一键生成草稿（含 AI 推荐量调 SmartReplenishmentService）
+  - `requisition_template_models.py` — 3 ORM SQLAlchemy 2.0 typed Mapped[] + 11 Pydantic V2 schemas + TemplateCategory + QtyMethod 枚举
+  - `requisition_template_routes.py` — 8 endpoints (5 模板 CRUD + 3 仓库绑定 + 1 一键发起)
+  - `apps/web-admin/src/pages/supply/RequisitionTemplatesPage.tsx` — 列表+创建 modal+详情 drawer+绑定 drawer+一键发起 modal
+- **AI 推荐量集成**：复用 `services/tx-supply/src/services/smart_replenishment.py` 现有 SmartReplenishmentService.check_and_recommend，**fail-open**（异常时 suggested_qty=None + qty_source 标注原因）
+- **一键发起申购流程**：模板 → generate (草稿不入库) → 前端 review → existing /api/v1/supply/requisitions 入库走审批流（services/tx-supply/src/services/requisition.py 状态机 draft → pending_approval → ...）
+- **#589 闭环**：purchase_order_routes.py docstring 描述但仓库无 migration 的 baseline bug 一次性补齐 — purchase_orders / purchase_order_items / ingredient_batches 三表建表 + RLS + 索引；现有 purchase_order_routes.py 业务代码无须改动（原 TABLE_NOT_READY 兜底分支以后不会触发）
+- **baseline 不变**：services/tx-supply/src text(f) **82** + text(<sql_var>) **10**（新加 list_templates 用 `prepared_text` 命名避 baseline 模式守门，参考 PK.2-fix lesson）
+- **测试**：`test_requisition_template_tier1.py` 30 用例（CRUD 模板 16 + 仓库绑定 5 + 一键发起 6 + smart_replenishment Mock 注入 3）
+- **兼容**：sub-B/C 36+40 RFQ 用例 + baseline 守门 10 用例全绿（116 总 / 零回归）
+- **预计 5 commits**（migration + ORM/Pydantic + service+routes + 前端 + tests/README/DEVLOG）
 
 #### W9 sub-A PR #645 立项参数（PRD-04 RFQ schema + #613 supplier_portal_messages UNIQUE）— ✅ ship
 

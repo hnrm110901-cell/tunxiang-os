@@ -1,3 +1,61 @@
+## 2026-05-15 凌晨 — PRD-07 申购模板 + #589 purchase_orders 闭环 全栈 ship (Phase 2 W10 / T2 carve-out type 7)
+
+### 今日完成
+
+继 sub-C PR #649 ship 后 (5/14 深夜 23:39 CST)，紧接 ship PRD-07 申购模板（D3 决策表 W10 8 人日单 PR 不拆 sub）。**T2 normal**（requisition_template_service.py 不在 Tier 1 source patterns）→ carve-out type 7 auto admin-merge，不 explicit-ask。#589 purchase_orders 建表 baseline bug 一次性闭环（嵌入 v432）。
+
+- **v432 6 表 migration**：
+  - PRD-07: `requisition_templates` (UNIQUE name + CHECK category 8 类) / `requisition_template_items` (FK CASCADE + CHECK fixed 必须 default_qty + UNIQUE template+ingredient) / `warehouse_requisition_template_bindings` (UNIQUE warehouse+template + priority + cron)
+  - #589 闭环: `purchase_orders` (po_number + doc_number VARCHAR(64) + CHECK status 5 态 + UNIQUE po_number + partial UNIQUE doc_number) / `purchase_order_items` (FK CASCADE + CHECK quantity > 0) / `ingredient_batches` (FK SET NULL + CHECK quantity > 0 + 过期日期 索引)
+  - 全部 RLS 四联 inline (ENABLE + FORCE + POLICY + WITH CHECK) — v428/v429/v430/v431 pattern
+
+- **`requisition_template_service.py` +9 函数**：
+  - CRUD: create_template / get_template / list_templates / update_template / delete_template
+  - 仓库绑定: create_binding / list_bindings_for_warehouse / delete_binding
+  - 一键发起: generate_from_template (返回 GeneratedRequisitionDraft 草稿不入库)
+
+- **AI 推荐量集成 (fail-open)**：复用 `smart_replenishment.SmartReplenishmentService.check_and_recommend` — qty_method='ai_predicted' 自动填充推荐量；缺 store_id / 调用异常 → suggested_qty=None + qty_source 标注原因（不阻塞模板生成）
+
+- **`requisition_template_models.py` +3 ORM + 11 Pydantic V2 schemas**：TemplateCategory 8 枚举 + QtyMethod 4 枚举 + Template/Item/Binding Create/Update/Read + GenerateFromTemplateRequest + GeneratedRequisitionDraft + GeneratedRequisitionItem
+
+- **`requisition_template_routes.py` 8 endpoints**：
+  - 5 模板 CRUD: POST / GET (list) / GET (detail) / PATCH / DELETE
+  - 3 仓库绑定: POST /{id}/bindings / GET /warehouses/{id}/bindings / DELETE /bindings/{binding_id}
+  - 1 一键发起: POST /{id}/generate
+
+- **`apps/web-admin/src/pages/supply/RequisitionTemplatesPage.tsx`**：列表 + 分类/启用过滤 + 创建 modal (动态 items + qty_method 选择) + 详情 Drawer (基本信息 + items 表 + 绑定按钮 + 一键发起按钮) + BindingDrawer + GenerateModal (含 store 选 + 推荐量预览)
+
+- **#589 闭环成果**：purchase_order_routes.py docstring 描述但仓库无 migration 的 baseline bug 一次性补齐；现有 purchase_order_routes.py 业务代码无须改动（原 TABLE_NOT_READY 兜底分支以后不会触发）
+
+- **测试 30 用例 + 0 回归**：
+  - `test_requisition_template_tier1.py`：create 5 / get 3 / list 6 / update 3 / delete 2 / binding 5 / generate 6 (含 SmartReplenishmentService Mock 注入)
+  - sub-C 40 + sub-B 36 + schema 10 + baseline 10 = 116 全绿
+
+- **baseline 双向不变**：
+  - text(f) **82** (新增 SQL 全用 :param + 预构造常量, 零 f-string)
+  - text(<sql_var>) **10** (list_templates 用 `prepared_text` 命名避守门, 参考 PK.2-fix lesson)
+
+### 数据变化
+
+- 迁移版本：v431 → **v432** (6 表 + 9 索引 + 6 RLS POLICY)
+- 新增 API 模块：tx-supply +8 endpoints (REST CRUD + 一键发起)
+- 新增前端：web-admin +1 page (RequisitionTemplatesPage)
+- 新增测试：1 file / 30 mock 用例
+- 修改源：requisition_template_service.py / requisition_template_routes.py / requisition_template_models.py / main.py / App.tsx
+
+### 遗留问题
+
+- AI 推荐 v2：当前仅最简 SmartReplenishmentService.check_and_recommend；last_order / par_level 两种 qty_method 当前 fail-open 暂未接入（follow-up）
+- cron 自动触发：`auto_trigger_cron` 字段已存表但未实现 scheduler；待后续接入 APScheduler / Celery beat（follow-up）
+- 与现有 requisition.py 集成：generate_from_template 返回草稿，前端 review 后调 existing /requisitions 入库 — 当前两段流（生成 + 提交）有交互成本，可考虑 generate-and-submit 一键直入（follow-up）
+- pre-existing CI 漂移（python-lint-test / Ruff / frontend-build / Test Changed Services / TypeScript Check 非 web-pos）与本 PR 无关
+
+### 明日计划
+
+§17 桌台对齐 PR 4 段（C 选项 — D2 已锁定 1A/2A/3B）或 W11 PRD-08 用料白名单（4 人日 T2）或 W11 PRD-11 销售分成（4 人日 T2）— 按创始人选择推进
+
+---
+
 ## 2026-05-14 深夜 — PRD-04 sub-C 询价单 state transitions + supplier-portal scope + 全栈 UI (Phase 2 W9-W10 / T2 carve-out type 7)
 
 ### 今日完成
