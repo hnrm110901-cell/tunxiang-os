@@ -1,3 +1,63 @@
+## 2026-05-14 上午–中午 11:00 · 13 PR ship batch (PR-03 doc_number 完整链路 + PR-01 supplier_certs 双 sub + structlog 跨服务全仓扫净 + §19 follow-up + npm deps batch 2)
+
+### 完成状态
+
+PR-03 doc_number 单号引擎链路：
+- [x] **PR #575 MERGED** `c7a51ea1` (5/14 07:38, PR-03A 起步, **Tier 1 fund/源 explicit-ask 第 12 例**) — `doc_number_service.py` + v418 表 + 17 类系统默认模板 + 32 用例 (前节 5/14 凌晨 节有完整细节)
+- [x] **PR #586 MERGED** `6fe69f83` (5/14 10:11, PR-03B Wave1 v419, **Tier 1 fund/源 explicit-ask 第 13 例**) — 5 类高频单据 receiving_v2/inventory_io/requisition/stocktake/purchase_order doc_number 回填. graceful degradation fail-open NULL 模式应用
+- [x] **PR #596 MERGED** `026586b0` (5/14 11:00, PR-03C Wave2 v422, **Tier 1 fund/源 explicit-ask 第 14 例**) — transfer_orders create/list/get 3 callsite 方案 A INSERT-then-UPDATE. §19 reviewer 出 2 P2 → #598 (`_order_to_dict` 缺 doc_number) + #599 (DocNumberError 缺 exc_info=True)
+
+PR-01 supplier_certificates 资质阻断：
+- [x] **PR #584 MERGED** `31cc0f73` (5/14 09:51, PR-01A, **Tier 1 食安硬约束 explicit-ask 第 15 例**) — `supplier_certificates` 新表 (v421) + 收货阻断. 创始人 Q2 决策：新建独立表（非扩展 supplier）
+- [x] **PR #597 MERGED** `cb5a88e8` (5/14 11:00, PR-01B sub-A, T2 infra) — tx-supply Celery beat/worker ENV-gated 模块接入，准备承接 sub-B 资质告警调度（创始人 Q5 30 天前 OR + 过期当天 AND + Q6 独立 container）
+
+structlog `event=` 字段冲突跨服务全仓扫净（4-PR batch）：
+- [x] **PR #574 MERGED** `55da116e` (5/13 23:05, **Tier 1 fund/源 explicit-ask 第 12 例**已 ship 5/13) — `tx-trade/own_rider_adapter._publish_to_rider_app` → `dispatch_event=`
+- [x] **PR #583 MERGED** `33a51070` (5/14 09:57, Closes #582, **P1 webhook 每次触发**) — tx-org `im_webhook_handler.handle_wecom_callback` L57+L66 → `wecom_event=`
+- [x] **PR #588 MERGED** `e6539be1` (5/14 09:57, Closes #585, P2/P3) — tx-growth `main._run_calendar_trigger_check` L503 → `trigger_event=`. 2-layer 测试策略（源静态 regex + structlog 行为）避 main.py import 链拖
+- [x] **PR #581 MERGED** `0b8a4ae6` (5/14 09:57, Closes #576, P2 边界) — gateway `wecom_routes._handle_customer_add/del` → `wecom_payload=`
+
+§19 reviewer follow-up（3 PR）：
+- [x] **PR #590 MERGED** `f229572e` (5/14 10:16, Closes #557, **Tier 1**) — cashier_engine `_calc_order_cost` 锁不变量文档化 + audit test 守门
+- [x] **PR #593 MERGED** `452feb92` (5/14 10:16, PR #583 §19 P1) — tx-org `test_im_webhook_handler` 删冗余 `or` 分支断言
+- [x] **PR #595 MERGED** `909e17ff` (5/14 10:44, Closes #594, **Tier 1**, 8 类 carve-out 第 4 类 test-only) — `_function_has_lock_before` audit 收紧仅识别 `text()` Call 参数 + 2 反向 verify 测试
+
+npm deps batch 2（首次跨 deps 批量 §19 + explicit-ask）：
+- [x] **PR #428 MERGED** `778b8a3d` (5/14 10:48) — eslint 10.2.1 → 10.3.0 (minor). §19 0/0 APPROVE
+- [x] **PR #425 MERGED** `8d6ff654` (5/14 10:50) — vite 5.4.21 → 8.0.12 (major bump, Dependabot @rebase 后 1 min push 新 OID 应对). §19 0/0 APPROVE
+
+新落盘 issue：
+- [x] **7 个 issue 落盘**：#577 WS 前缀双重占用 / #580 doc_number seq 跳号无补偿 / #589 purchase_orders 无 CREATE TABLE baseline / #591 doc_number Wave2 INSERT-then-UPDATE → ORM 单步替代 / #592 PR-03D admin UI Prometheus counter / #598 _order_to_dict 缺 doc_number / #599 DocNumberError 缺 exc_info=True
+
+### 关键决策
+
+- **创始人 Q1-Q6 一次性授权（5/14 凌晨）批量执行** — 主线 ① PR-03 doc_number + 主线 ② PR-01 supplier_cert 共 5 PR 全程沿用同一决策树，无中间 hand-off 损耗。Q4 系统默认模板表 + tenant 覆盖（PR #575 实现） / Q2 supplier_certificates 独立表（PR #584） / Q3 Wave1 5 类操作（PR #586） / Q5 30 天前 OR + 过期当天 AND（PR-01B sub-B 待续） / Q6 独立 Celery container（PR #597）
+- **graceful degradation 模式应用（doc_number infra fail-open）** — `feedback_graceful_degradation_pattern.md` 实战：doc_number 生成失败时返回 NULL + structlog warn + exc_info=True + Prometheus counter 监控，不阻塞 Tier 1 资金写路径。与"食安/资金硬约束 fail-closed"互补
+- **structlog `event=` 全仓扫净的多 round 教训** — 5/13 末段 #566/#570 自评"全仓扫净"是单行 grep 假象；本 session cold-start `rg --multiline 'CALL\(([^)]|\n)*?KWARG='` 抓出 4 PR 真漏（gateway/tx-org/tx-growth/tx-trade.own_rider）。**新落 feedback `feedback_multiline_grep_kwargs.md`**
+- **L3 explore agent root-cause 误判推翻** — PR #240 web-pos offline agent 初判"e2e 包未在 pnpm-workspace 注册"被 on-disk SoT 推翻（real error: `ERR_PNPM_OUTDATED_LOCKFILE` on `packages/tx-touch/package.json`）. 应用 `feedback_smoke_test_must_verify_functionality.md` 模式：agent hypothesis 必须主代理 verify SoT
+- **npm deps batch 2 新模式确立** — 区别于 deps(actions) 分类，独立纳入 §19 + explicit-ask review 流程。每 PR §19，可 batch-merge，lockfile 冲突时小 PR 先 ship + @rebase race 应对
+- **PR-03 Wave2 方案 A（INSERT-then-UPDATE）务实推进** — 表层创始人决策快推，§19 reviewer 仍尽职出 2 P2 → #598/#599. 流程未因决策快推而漏审
+
+### 下一步
+
+A 路径已超 4+ PR 阈值（本 session 13 PR），转 new session 选项：
+- **选项 1（next）：PR #227 squash rebase** — 23 项 P0/SECURITY/Tier1, 5/6 创建 stale 8d, CONFLICTING, 249 commits behind main. 本 session 起手 step 1
+- **选项 2：PR-01B sub-B 资质告警 task 化** — 基础设施 #597 已 merge，sub-B 实现 30 天前 OR + 过期当天 AND 告警逻辑 + Celery task / worker / beat schedule（已在 `.tunxiang-p0-worktrees/tx-supply-pr01b-subB-cert-alerter-2026-05-14/` worktree 待续）
+- **选项 3：等创始人 §17 桌台并发 3 选择题答复** — 合并 #549/#557(PR #590 部分文档化)/#559/cashier 6 P1/P2/order 3 P1 = ~11 路径
+
+### 已知风险
+
+- **PR #596 §19 P2 → #598/#599** 是 arch debt + obs gap，列入 W6 收尾 backlog（非阻塞）
+- **PR-01B sub-B 30 天前 OR 逻辑实现细节未冻结** — Celery beat 触发频率 + 多通道（短信/IM/邮件）+ 跨租户合规未敲定，待 sub-B 实现时与创始人对齐
+- **doc_number sequence 跳号无补偿机制（#580）** — caller 失败时 seq 消耗不可逆，影响审计连续性。短期由 graceful degradation NULL fallback mitigate
+- **doc_number `{store_code}` DSL 参数 wire 强约束** — 17 类回填 PR (-03B/-03C) 必须显式 wire `store_code` 参数，否则 422. Wave1/Wave2 已 wire，未来新 callsite 必检
+- **`Offline E2E (Sprint A2 P0-2)` 应加入 CI 预存漂移登记列表** — nightly schedule fail 5+ 天（5/9-5/13），real error `ERR_PNPM_OUTDATED_LOCKFILE`。`project_tunxiang_ci_gates.md` 待更新
+- **pre-existing CI 漂移 12+ 项与本 batch 无关** — `python-lint-test (*)` / `Ruff` / `frontend-build` / `TypeScript Check` / `Test Changed Services` / `RLS Runtime — 7 P0 表`，已落 `project_tunxiang_ci_gates.md`
+- **session 切分阈值早已突破** — 本 session 13 PR 远超 4+ 阈值，下次 session 主动给 starter prompt 让 user 开新 session
+- 主 worktree (`/Users/lichun/tunxiang-os`) 当前 stale 分支 `docs/tx-supply-readme-upgrade-plan-2026-05-14`，本 DEVLOG PR 用独立 worktree `.tunxiang-p0-worktrees/devlog-2026-05-14-noon/`，不动主 worktree
+
+---
+
 ## 2026-05-14 凌晨 · PR-03A 起步 — doc_number 单号引擎核心 (PRD-03 / 供应链 Phase 1 W6)
 
 ### 完成状态

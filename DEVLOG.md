@@ -1,3 +1,96 @@
+## 2026-05-14 上午–中午 — 13 PR ship batch (PR-03 doc_number 完整链路 + PR-01 supplier_certs 双 sub-PR + structlog 跨服务 4-PR + §19 follow-up 3-PR + deps 2-PR)
+
+### 今日完成
+
+5/14 单日单 session 13 PR ship（5/13 23:05 PR #574 + 5/14 07:38 → 11:00 共 12 PR），全部 squash MERGED 主线。窗口聚焦三条主线：① **PR-03 doc_number 单号引擎完整链路**（PR-03A 凌晨 #575 起步 → Wave1 #586 / Wave2 #596 / Celery 接入 #597）② **PR-01 supplier_certificates 资质阻断 + 异步告警**（PR-01A #584 + PR-01B sub-A #597）③ **structlog `event=` 字段冲突跨服务全仓扫净**（#574 own_rider / #581 gateway / #583 tx-org / #588 tx-growth 4-PR batch + §19 follow-up #590/#593/#595）+ npm deps batch 2（#428 eslint / #425 vite）。
+
+**主线 ① — PR-03 doc_number 引擎完整链路（Tier 1 fund/源 explicit-ask 第 9/10/11 例 / 1 例 T2 infra）**：
+
+- **PR #575** `c7a51ea1` (5/14 07:38) PR-03A 起步 — `doc_number_service.py` + v418 `doc_number_rules` / `doc_number_sequences` + 17 类系统默认模板 + PG advisory_xact_lock 并发安全 + 32 用例 (完整细节见前一节 5/14 凌晨 PR-03A)
+- **PR #586** `6fe69f83` (5/14 10:11) Wave1 5 类高频单据回填 (v419) — receiving_v2 / inventory_io / requisition / stocktake / purchase_order 5 callsite 全部 wire `gen_doc_number(...)` + `store_code` 参数. **graceful degradation 模式应用**（DocNumberError fail-open NULL）防 doc_number infra fail 阻塞 Tier 1 资金写路径
+- **PR #596** `026586b0` (5/14 11:00) Wave2 transfer_orders (v422 + 3 callsite) 方案 A — INSERT-then-UPDATE 拆 transfer_orders create / list / get 3 处. **§19 reviewer 出 2 P2 follow-up**：#598 `_order_to_dict` 缺 doc_number (T2 arch debt, get/list 创建-查询不一致) + #599 4 处 DocNumberError 缺 exc_info=True (T3 obs)
+- **PR #597** `cb5a88e8` (5/14 11:00) tx-supply Celery beat/worker ENV-gated 模块接入 (PR-01B sub-A) [T2] — supports PR-01B 后续 sub-B 资质告警调度
+
+**主线 ② — PR-01 supplier_certificates 资质阻断**：
+
+- **PR #584** `31cc0f73` (5/14 09:51) PR-01A — `supplier_certificates` 新表 (v421) + 收货阻断 (Tier 1 食安硬约束). Q2 创始人决策应用：新建独立表而非扩展 supplier，单一职责
+- **PR #597**（同上）Celery scaffold 准备承接 sub-B 30 天前 OR / 过期当天 AND 告警逻辑
+
+**主线 ③ — structlog `event=` 字段冲突跨服务全仓扫净**：
+
+- **PR #574** `55da116e` (5/13 23:05) `tx-trade/own_rider_adapter.py` L43-48 → `dispatch_event=` (Tier 1, 5/13 末段 PR #566/#570 自评"全仓扫净"被本 session cold-start `rg --multiline` 推翻的实证, 教训落 `feedback_multiline_grep_kwargs.md`)
+- **PR #583** `33a51070` (5/14 09:57) tx-org `im_webhook_handler.handle_wecom_callback` L57+L66 → `wecom_event=` (Closes #582, **P1 webhook 每次触发**, 非边界)
+- **PR #588** `e6539be1` (5/14 09:57) tx-growth `main._run_calendar_trigger_check` L503 → `trigger_event=` (Closes #585, P2/P3 周期任务). **2-layer 测试策略**：Layer 1 源码静态 regex + Layer 2 structlog 行为，避 main.py import 链拖 apscheduler/httpx/fastapi
+- **PR #581** `0b8a4ae6` (5/14 09:57) gateway `wecom_routes._handle_customer_add/del` L72+L141 → `wecom_payload=` (Closes #576, P2 边界场景)
+- **3 PR batch admin-merge 模式** 应用 — #583→#588→#581 按 P1 优先序，跨 4 服务而非同服务（同 5/13 carve-out 模式 ① 4 PR batch 扩展）
+
+**主线 ④ — §19 reviewer follow-up（3 PR）**：
+
+- **PR #590** `f229572e` (5/14 10:16) `cashier_engine._calc_order_cost` 锁不变量文档化 + audit test (Closes #557, PR-D §19 P1) — apply_discount 依赖"OrderItem mutation 必经 Order 行锁"隐式不变量，加 docstring + 一条 audit test 守门防 regression
+- **PR #593** `452feb92` (5/14 10:16) tx-org `test_im_webhook_handler` 删冗余 `or` 分支断言 (PR #583 §19 P1) — 测试清理 minor
+- **PR #595** `909e17ff` (5/14 10:44) `_function_has_lock_before` audit 收紧仅识别 `text()` Call 参数 (Closes #594, 8 类 carve-out 第 4 类 test-only Tier 1 *tier1* 后缀) — 排除 docstring / 注释里出现 "FOR UPDATE" 字面文字的 false-positive (PR-A raw SQL audit 自评不可信被该 PR 修正)
+
+**主线 ⑤ — npm deps batch 2（首次跨 deps 批量 §19 + explicit-ask）**：
+
+- **PR #428** `778b8a3d` (5/14 10:48) eslint 10.2.1 → 10.3.0 (minor, suggestion enhancement, 无新默认 rule). §19 0/0 APPROVE
+- **PR #425** `8d6ff654` (5/14 10:50) vite 5.4.21 → 8.0.12 (major bump, Dependabot 自动跨大版). §19 0/0 APPROVE, rolldown RC mitigate by frontend-build SUCCESS. Dependabot @rebase 后 1 min push 新 OID `78d5af9d` (race 应对)
+- **新模式：npm patch/minor/major bumps batch §19 + explicit-ask** — **不在 8 类 carve-out 内**，跟 deps(actions) 分类不同（actions 是 GitHub Actions workflow runner bumps，npm 是 frontend tooling）。每 PR §19 + explicit-ask，可 batch-merge，lockfile 冲突时小 PR 先 ship + @rebase
+
+### 数据变化
+
+- **迁移版本**：v417 (origin/main 5/13 末段) → **v422** (5/14 11:00) — 累计 +5 迁移
+  - v418 `doc_number_rules + doc_number_sequences` (PR #575)
+  - v419 Wave1 5 表 doc_number 列回填 (PR #586)
+  - v420 (skip, in-flight reservation)
+  - v421 `supplier_certificates` (PR #584)
+  - v422 `transfer_orders.doc_number` (PR #596)
+- **新增 API**：tx-supply `doc_number_routes` POST /generate + GET/POST/DELETE /doc-number-rules（PR #575）；其他 callsite 用 internal Python API
+- **新增测试**：~70 用例（test_doc_number_tier1.py 32 + test_supplier_cert_block_tier1.py ~10 + test_doc_number_wave1_tier1.py ~15 + test_doc_number_wave2_tier1.py ~8 + structlog 4 PR 各 3-4 用例 + audit raw SQL 2 反向）
+- **新增 issue**：7 个（#577 WS 前缀双重占用 / #580 doc_number seq 跳号无补偿 / #589 purchase_orders 无 CREATE TABLE baseline / #591 doc_number Wave2 ORM 单步替代 INSERT-then-UPDATE / #592 PR-03D admin UI Prometheus counter / #598 _order_to_dict 缺 doc_number / #599 DocNumberError 缺 exc_info=True）
+
+### 关键决策 / 教训
+
+- **创始人 Q1-Q6 一次性授权（5/14 凌晨）** → 主线 ① + ② 5 PR 全程沿用. Q4 系统默认模板表 + tenant 覆盖 / Q2 supplier_certificates 独立表 / Q3 Wave1 5 类操作 / Q5 30 天前 OR + 过期当天 AND / Q6 独立 Celery container — 6 个决策点一次性敲定后批量执行，无中间 hand-off 损耗
+- **graceful degradation 模式 — doc_number infra fail-open** — `feedback_graceful_degradation_pattern.md` 应用：辅助标识 infra 失败 fallback NULL 不阻塞 Tier 1 业务（结合 structlog warn + exc_info + Prometheus counter 监控，与"食安/资金硬约束 fail-closed"互补）
+- **structlog `event=` 全仓扫净的多 round 教训** — 5/13 末段 #566/#570 ship 后自评"全仓扫净"是单行 grep 假象；本 session cold-start `rg --multiline` 抓出 4 PR 真漏（gateway/tx-org/tx-growth/tx-trade.own_rider）。**新落 feedback `feedback_multiline_grep_kwargs.md`**：跨服务 structlog/API kwarg 扫描必须 `rg --multiline 'CALL\(([^)]|\n)*?KWARG='`
+- **L3 explore agent root-cause 误判教训** — 调研 PR #240 web-pos offline 失败时，agent 初判"e2e 包未在 pnpm-workspace 注册"被 on-disk SoT 推翻。real error 是 `ERR_PNPM_OUTDATED_LOCKFILE` on `packages/tx-touch/package.json`. **应用 `feedback_smoke_test_must_verify_functionality.md` 模式**：agent hypothesis 必须主代理 verify SoT，不能盲信 agent 报告. **`Offline E2E (Sprint A2 P0-2)` 加入 CI 预存漂移列表**
+- **npm deps batch 2 新模式确立** — PR #428/#425 首次按 §19 + explicit-ask + lockfile 冲突 @rebase race 应对 batch ship. 区别于 deps(actions) 分类，独立纳入 review 流程
+- **§19 reviewer P2 follow-up 双 issue 出（PR #596）** — 创始人决策表层 PR 走方案 A 务实推进，§19 reviewer 仍尽职抓 P2 落 #598 + #599. 流程未因决策快推而漏审
+
+### §19 reviewer 评审记录
+
+`code-reviewer` agent (opus, B 选项真 BUG only) 12 PR 全程：
+- **0 P0** — 全 batch 无回滚级 BUG
+- **0 P1（除 PR #574/#583 webhook 实际 P1 但已 ship）** — 主线 ① 5 PR 全 P0 = 0
+- **2 P2 → #598/#599**（PR #596）— PR-03 doc_number Wave2 arch debt + obs gap
+- **CodeRabbit** — npm deps 2 PR 触发完整审，业务 PR 多数 incremental pending（memory `feedback_coderabbit_incremental_policy.md` 印证）
+
+### 累计 tally 更新（5/14 中午）
+
+- **Tier 1 fund/源 explicit-ask（不在 8 carve-out）**：5/13 末段 11 + 本 batch 4 (#575/#586/#596 PR-03 系列 + #584 PR-01A) = **15 例**（PR-01B/03A/B/C/D 均算 Tier 1，食安硬约束 + 资金路径辅助标识）
+- **T2 infra carve-out**：5/13 末段累计 + 本 batch 1 (#597 Celery scaffold) = +1
+- **8 类 carve-out 第 4 类 test-only Tier 1**：+1 (#595)
+- **本 session ship 累计**：13 PR / 7 issue create / 0 issue close（PR-03 系列 issue 全为 follow-up arch debt 不当 close）
+
+### 遗留问题
+
+- **PR-01B sub-B 资质告警 task 化**：基础设施 #597 已 merge，下一步实现 30 天前 OR + 过期当天 AND 告警逻辑 + Celery task / worker / beat schedule（已在 `.tunxiang-p0-worktrees/tx-supply-pr01b-subB-cert-alerter-2026-05-14/` worktree 待续）
+- **PR-01C 收货阻断 reset 流程**：补一条解除阻断的运营路径（创始人 Q3 决策后续）
+- **§19 P2 follow-up #598/#599**：PR-03 arch debt 2 项独立修 PR（非阻塞，列入 W6 收尾 backlog）
+- **§17 桌台并发语义对齐 PR**（仍在等创始人 3 选择题答复）— 合并 #549/#557（PR #590 已部分文档化但 hot path 未改）/#559 + cashier 6 P1/P2 + order 3 P1 = ~11 路径
+- **L3 explore agent 误判 follow-up**：`Offline E2E (Sprint A2 P0-2)` 加入 `project_tunxiang_ci_gates.md` 预存漂移登记列表（real error: `ERR_PNPM_OUTDATED_LOCKFILE`, nightly schedule fail 5+ 天）
+- **pre-existing CI 漂移 12+ 项**（`python-lint-test (*)` / `Ruff` / `frontend-build` / `TypeScript Check` / `Test Changed Services` / `RLS Runtime — 7 P0 表`）与本 batch 无关，已落 `project_tunxiang_ci_gates.md`
+- **session 切分提示触发** — `feedback_proactive_session_split.md` 4+ PR 阈值早已突破（本 session 13 PR）。下次 session 主动给 starter prompt 让 user 开新 session
+
+### 明日计划
+
+A 路径 5-10d sprint 已超阈值（13 PR），转 new session：
+- 选项 1：PR-01B sub-B 资质告警 task 化（已起 worktree 待续）
+- 选项 2：PR #227 squash rebase（23 项 P0/SECURITY/Tier1, 5/6 创建 stale 8d, CONFLICTING, 249 commits behind main）— 本 session 起手 step 1
+- 选项 3：等创始人 §17 桌台并发 3 选择题答复
+
+---
+
 ## 2026-05-13 末段 — structlog `event=` 字段冲突 2 PR follow-up ship (#566 + #570)
 
 ### 今日完成
