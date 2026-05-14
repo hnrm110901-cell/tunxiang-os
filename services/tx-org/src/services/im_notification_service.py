@@ -151,6 +151,49 @@ class IMNotificationService:
             f"> 登录后台查看详情"
         )
 
+    async def notify_cert_expiry(
+        self,
+        *,
+        supplier_name: str,
+        cert_type: str,
+        cert_number: str,
+        expire_date: str,
+        days_until_expiry: int,
+        threshold: str,
+        recipient_role: str,
+    ) -> str:
+        """供应商证件临期/过期推送模板（PR-01B sub-PR C）
+
+        threshold 分级：
+          - D+N (N>=0) 已过期 → CRITICAL（停止验收 + 立即推动续证）
+          - D-7        7 日内 → WARNING（紧急预警）
+          - D-15/D-30  临期窗口 → 普通预警
+
+        recipient_role: '食安总监' / '采购员'，决定 action hint 文案。
+        """
+        if threshold.startswith("D+"):
+            heading = "### [CRITICAL] 供应商证件已过期"
+            action = (
+                "证件已过期，请立即暂停从该供应商验收，并推动尽快补齐续证文件。"
+            )
+        elif threshold == "D-7":
+            heading = "### [WARNING] 供应商证件即将过期（7 日内）"
+            action = "请尽快推动供应商续证，避免证件过期影响验收。"
+        else:
+            heading = "### 供应商证件临期预警"
+            action = "请通知供应商提前准备续证材料，避免临期断档。"
+
+        return (
+            f"{heading}\n"
+            f"**供应商**：{supplier_name}\n"
+            f"**证件类型**：{cert_type}\n"
+            f"**证件编号**：{cert_number}\n"
+            f"**到期日**：{expire_date}\n"
+            f"**距过期**：{days_until_expiry} 天（阈值 {threshold}）\n"
+            f"**收件角色**：{recipient_role}\n\n"
+            f"{action}"
+        )
+
     async def notify_contribution_update(
         self,
         employee_name: str,
