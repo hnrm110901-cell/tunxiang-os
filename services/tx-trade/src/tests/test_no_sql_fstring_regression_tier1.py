@@ -134,7 +134,10 @@ def _count_text_fstring_in_dir(rel_dir: str) -> int:
 _TIER1_TEXT_FSTRING_BASELINES: dict[str, int] = {
     "services/tx-trade/src": 139,  # PK.1 / PK.2-fix 校准
     "services/tx-finance/src": 59,  # PK.2 / PK.2-fix 校准
-    "services/tx-supply/src": 78,  # PK.3 / PK.2-fix 校准
+    # PR #625 (PR-01C round-2 P1-3) 加 1 — cert_service.count_certificates
+    # 同 _TIER1_TEXT_SQLVAR_BASELINES 注释（同一处 text(f"...") 触发两条 baseline），
+    # where_sql 由硬编码字面量 + 参数占位组成，无用户输入注入面。
+    "services/tx-supply/src": 79,  # PK.3 / PK.2-fix 校准 + PR-01C count_certificates
 }
 
 
