@@ -826,7 +826,7 @@ async def apply_weight_deduction_for_item(
                 UniversalPublisher.publish(
                     event_type=SupplyEventType.WEIGHT_DEDUCTION_ANOMALY,
                     tenant_id=_uuid(tenant_id),
-                    store_id=_uuid(tenant_id),  # store_id 由调用方覆盖（见下方 _publish）
+                    store_id=None,
                     entity_id=_uuid(item_id),
                     event_data={
                         "order_id": order_id,
