@@ -90,6 +90,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
+from ..services.doc_number_service import generate as gen_doc_number
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(
@@ -259,6 +261,9 @@ async def create_purchase_order(
         po_number = _po_number()
         now = _now()
 
+        # 生成可读单号（PRD-03 Wave1）
+        doc_number = await gen_doc_number(db, tenant_id=x_tenant_id, doc_type="purchase_order")
+
         # 计算总金额（分）
         total_amount_fen = sum(int(item.quantity * item.unit_price_fen) for item in body.items)
 
@@ -267,13 +272,13 @@ async def create_purchase_order(
             text(
                 """
                 INSERT INTO purchase_orders (
-                    id, tenant_id, store_id, supplier_id, po_number, status,
+                    id, tenant_id, store_id, supplier_id, po_number, doc_number, status,
                     total_amount_fen, expected_delivery_date, notes,
                     created_at, updated_at
                 ) VALUES (
                     :id::uuid, :tenant_id::uuid, :store_id::uuid,
                     :supplier_id::uuid,
-                    :po_number, 'draft',
+                    :po_number, :doc_number, 'draft',
                     :total_amount_fen, :expected_delivery_date, :notes,
                     :now, :now
                 )
@@ -285,6 +290,7 @@ async def create_purchase_order(
                 "store_id": body.store_id,
                 "supplier_id": body.supplier_id,
                 "po_number": po_number,
+                "doc_number": doc_number,
                 "total_amount_fen": total_amount_fen,
                 "expected_delivery_date": body.expected_delivery_date,
                 "notes": body.notes,
@@ -328,6 +334,7 @@ async def create_purchase_order(
             "purchase_order_created",
             po_id=po_id,
             po_number=po_number,
+            doc_number=doc_number,
             tenant_id=x_tenant_id,
             store_id=body.store_id,
             total_amount_fen=total_amount_fen,
@@ -338,6 +345,7 @@ async def create_purchase_order(
             "data": {
                 "po_id": po_id,
                 "po_number": po_number,
+                "doc_number": doc_number,
                 "status": "draft",
                 "total_amount_fen": total_amount_fen,
             },

@@ -72,6 +72,9 @@ async def create_requisition(
     requester_id: str,
     tenant_id: str,
     db: Any,
+    *,
+    doc_number: Optional[str] = None,
+    now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
     """创建申购单。
 
@@ -81,6 +84,8 @@ async def create_requisition(
         requester_id: 申请人 ID
         tenant_id: 租户 ID
         db: 数据库会话
+        doc_number: 可读单号（PRD-03 Wave1，由 route 层生成后传入）
+        now: 单据时间（默认当前 UTC，测试注入用）
 
     Returns:
         申购单字典
@@ -89,7 +94,7 @@ async def create_requisition(
         raise ValueError("申购单必须包含至少一项商品")
 
     req_id = _gen_id("req")
-    now = _now_iso()
+    now_iso = now.isoformat() if now else _now_iso()
     total_fen = sum(i.get("estimated_price_fen", 0) * i.get("quantity", 1) for i in items)
     approval_level = _determine_approval_level(total_fen)
 
@@ -99,18 +104,20 @@ async def create_requisition(
         "requester_id": requester_id,
         "tenant_id": tenant_id,
         "status": "draft",
+        "doc_number": doc_number,
         "items": items,
         "item_count": len(items),
         "total_estimated_fen": int(total_fen),
         "approval_level": approval_level,
         "approval_log": [],
-        "created_at": now,
-        "updated_at": now,
+        "created_at": now_iso,
+        "updated_at": now_iso,
     }
 
     log.info(
         "requisition_created",
         requisition_id=req_id,
+        doc_number=doc_number,
         store_id=store_id,
         tenant_id=tenant_id,
         item_count=len(items),

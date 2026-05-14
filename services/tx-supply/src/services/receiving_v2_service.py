@@ -35,6 +35,9 @@ from shared.ontology.src.enums import (
     TransactionType,
 )
 
+from .doc_number_service import DocNumberError
+from .doc_number_service import generate as gen_doc_number
+
 logger = structlog.get_logger(__name__)
 
 # ─── 内部工具 ─────────────────────────────────────────────
@@ -104,6 +107,7 @@ async def create_receiving_order(
     items: list[dict],
     db: AsyncSession,
     procurement_order_id: Optional[str] = None,
+    now: Optional[datetime] = None,
 ) -> dict:
     """创建收货单。
 
@@ -111,12 +115,23 @@ async def create_receiving_order(
       ingredient_id, ingredient_name, expected_quantity, expected_unit
     可选：unit_price_fen（到货单价分）
 
+    Args:
+        now: 收货时间（默认当前 UTC，测试注入用）
+
     Returns 收货单基本信息 dict。
     """
     if not items:
         raise ValueError("收货单至少包含一项")
 
     await _set_tenant(db, tenant_id)
+
+    # 生成可读单号（PRD-03 Wave1）
+    try:
+        doc_number: Optional[str] = await gen_doc_number(
+            db, tenant_id=tenant_id, doc_type="receiving", now=now
+        )
+    except DocNumberError:
+        doc_number = None
 
     order = ReceivingOrder(
         id=uuid.uuid4(),
@@ -153,9 +168,21 @@ async def create_receiving_order(
 
     await db.flush()
 
+    # 写入 doc_number（ORM 实体冻结，用 raw SQL UPDATE）
+    if doc_number is not None:
+        from sqlalchemy import text as _text
+
+        await db.execute(
+            _text(
+                "UPDATE receiving_orders SET doc_number = :doc_number WHERE id = :id"
+            ),
+            {"doc_number": doc_number, "id": str(order.id)},
+        )
+
     logger.info(
         "receiving_order_created",
         order_id=str(order.id),
+        doc_number=doc_number,
         store_id=store_id,
         tenant_id=tenant_id,
         item_count=len(items),
@@ -163,6 +190,7 @@ async def create_receiving_order(
 
     return {
         "order_id": str(order.id),
+        "doc_number": doc_number,
         "status": order.status,
         "store_id": store_id,
         "supplier_id": supplier_id,
