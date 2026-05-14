@@ -276,3 +276,28 @@ class RFQAwardRead(_BaseSchema):
     approved_at: Optional[datetime]
     created_by: uuid.UUID
     created_at: datetime
+
+
+# ── sub-C state transitions / supplier portal ──────────────────────────────
+
+
+class RFQCancelRequest(_BaseSchema):
+    """取消询价单 — reason 必填 (合规审计)"""
+
+    reason: str = Field(min_length=1, max_length=500, description="取消原因 — 合规审计")
+
+
+class RFQSupplierQuoteSubmit(_BaseSchema):
+    """供应商门户报价提交 (路径参数 rfq_id, 不在 body 内)
+
+    §19 round-1 P1-1: valid_until 类型与 ORM `Date` 列 + RFQQuoteCreate.valid_until 对齐 (date)，
+    避免 datetime 经 asyncpg 静默截断到 DATE 列导致行为不一致。
+    """
+
+    ingredient_id: uuid.UUID
+    unit_price_fen: int = Field(gt=0, le=10_000_000_000, description="单价 (分) — 整数, (0, 1e10]")
+    qty_offered: Optional[Decimal] = Field(default=None, gt=0)
+    valid_until: Optional[date] = Field(
+        default=None, description="报价有效期 (DATE, 通常 deadline 前)"
+    )
+    notes: Optional[str] = Field(default=None, max_length=1000)

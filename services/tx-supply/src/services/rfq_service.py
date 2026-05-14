@@ -20,7 +20,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from typing import Optional, Union
 
@@ -424,3 +424,553 @@ async def award_rfq(
     )
 
     return dict(award_row)
+
+
+# ─── State transitions (sub-C) ────────────────────────────────────────────────
+#
+# 状态机：draft → published → quoting → comparing → awarded / cancelled
+#   - publish_rfq   : draft → published      (采购员草稿写完, 发出邀请)
+#   - submit_quote  : published → quoting    (供应商首报进入 quoting; 后续报价覆盖)
+#   - close_rfq     : quoting → comparing    (截止后, 进入比价审核)
+#   - cancel_rfq    : 任何非终态 → cancelled  (除 awarded/cancelled 外)
+#
+# award_rfq (sub-B) 已落: comparing → awarded (含二级审批 + UNIQUE 防重 + RLHF).
+# 所有写入路径走 FOR UPDATE 行锁（PR-A/B/C/D/E pattern），即使非 Tier 1 资金路径，
+# 也防 200 桌并发场景下的状态机竞态。
+
+
+async def publish_rfq(
+    db: AsyncSession,
+    tenant_id: str,
+    rfq_id: str,
+) -> dict:
+    """draft → published — 锁定明细 + 邀请, 公开给被邀供应商。
+
+    业务场景: 采购员录完 SKU + 选完供应商 → 点"发布" → 系统对被邀供应商可见。
+    幂等性: 重复 publish 已 published 抛 409, 非 draft 抛 409。
+    """
+    await _set_tenant(db, tenant_id)
+
+    rfq = await get_rfq(db, tenant_id, rfq_id, lock=True)
+    if rfq is None:
+        raise ValueError(f"rfq_id={rfq_id} 不存在或已删除")
+    if rfq["status"] != "draft":
+        raise ValueError(
+            f"rfq_id={rfq_id} 当前状态为 '{rfq['status']}', 仅 'draft' 可 publish"
+        )
+
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text(
+            """
+            UPDATE rfqs
+            SET status     = 'published',
+                updated_at = :now
+            WHERE id        = :rfq_id
+              AND tenant_id = :tenant_id
+              AND status    = 'draft'
+              AND is_deleted = FALSE
+            """
+        ),
+        {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id), "now": now},
+    )
+
+    logger.info(
+        "rfq_published",
+        rfq_id=rfq_id,
+        tenant_id=str(tenant_id),
+        prev_status=rfq["status"],
+    )
+    return {**rfq, "status": "published", "updated_at": now}
+
+
+async def close_rfq(
+    db: AsyncSession,
+    tenant_id: str,
+    rfq_id: str,
+) -> dict:
+    """quoting → comparing — 截止后停止收新报价, 进入比价审核。
+
+    业务场景: deadline 到 / 采购员手动判断报价已足 → 点"截止收报价" → 进入比价表。
+    允许过早 close (deadline 未到也可手动 close), 但 published (无任何报价) 拒绝
+    (拒绝空比价审核场景, 引导走 cancel 路径)。
+    """
+    await _set_tenant(db, tenant_id)
+
+    rfq = await get_rfq(db, tenant_id, rfq_id, lock=True)
+    if rfq is None:
+        raise ValueError(f"rfq_id={rfq_id} 不存在或已删除")
+    if rfq["status"] != "quoting":
+        raise ValueError(
+            f"rfq_id={rfq_id} 当前状态为 '{rfq['status']}', 仅 'quoting' 可 close 进入比价"
+        )
+
+    now = datetime.now(timezone.utc)
+    await db.execute(
+        text(
+            """
+            UPDATE rfqs
+            SET status     = 'comparing',
+                updated_at = :now
+            WHERE id        = :rfq_id
+              AND tenant_id = :tenant_id
+              AND status    = 'quoting'
+              AND is_deleted = FALSE
+            """
+        ),
+        {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id), "now": now},
+    )
+
+    logger.info(
+        "rfq_closed",
+        rfq_id=rfq_id,
+        tenant_id=str(tenant_id),
+        prev_status=rfq["status"],
+    )
+    return {**rfq, "status": "comparing", "updated_at": now}
+
+
+async def cancel_rfq(
+    db: AsyncSession,
+    tenant_id: str,
+    rfq_id: str,
+    *,
+    reason: str,
+) -> dict:
+    """任何非终态 → cancelled — 终止询价单 (审计 reason 必填)。
+
+    业务场景: 采购员发现 SKU 录错 / 截止后无供应商报价 / 业务原因撤销。
+    硬约束: awarded / cancelled 均为终态, 不可 cancel (FOR UPDATE 串行化 + 状态机校验)。
+    """
+    if not reason or not reason.strip():
+        raise ValueError("cancel reason 必填 — 合规审计")
+
+    await _set_tenant(db, tenant_id)
+
+    rfq = await get_rfq(db, tenant_id, rfq_id, lock=True)
+    if rfq is None:
+        raise ValueError(f"rfq_id={rfq_id} 不存在或已删除")
+    if rfq["status"] == "awarded":
+        raise ValueError(f"rfq_id={rfq_id} 已 awarded (终态), 不可 cancel")
+    if rfq["status"] == "cancelled":
+        raise ValueError(f"rfq_id={rfq_id} 已 cancelled (幂等拒绝)")
+
+    now = datetime.now(timezone.utc)
+    # §19 round-1 P1-4: notes 拼接简化 — 去除冗余 COALESCE+CASE 双重判断。
+    # 单一 CASE 表达：notes 空/NULL 直接写 reason_log; 否则 notes || '\n' || reason_log。
+    await db.execute(
+        text(
+            """
+            UPDATE rfqs
+            SET status     = 'cancelled',
+                notes      = CASE
+                                WHEN notes IS NULL OR notes = '' THEN :reason_log
+                                ELSE notes || E'\n' || :reason_log
+                             END,
+                updated_at = :now
+            WHERE id        = :rfq_id
+              AND tenant_id = :tenant_id
+              AND status   != 'awarded'
+              AND status   != 'cancelled'
+              AND is_deleted = FALSE
+            """
+        ),
+        {
+            "rfq_id": rfq_id,
+            "tenant_id": _uuid_str(tenant_id),
+            "now": now,
+            "reason_log": f"[cancel@{now.isoformat()}] {reason.strip()}",
+        },
+    )
+
+    logger.info(
+        "rfq_cancelled",
+        rfq_id=rfq_id,
+        tenant_id=str(tenant_id),
+        prev_status=rfq["status"],
+        reason=reason.strip(),
+    )
+    return {**rfq, "status": "cancelled", "updated_at": now}
+
+
+# ─── 供应商报价 (sub-C supplier-portal scope) ─────────────────────────────────
+
+
+async def submit_quote(
+    db: AsyncSession,
+    tenant_id: str,
+    rfq_id: str,
+    *,
+    supplier_id: str,
+    ingredient_id: str,
+    unit_price_fen: int,
+    qty_offered: Optional[Decimal] = None,
+    valid_until: Optional[date] = None,
+    notes: Optional[str] = None,
+) -> dict:
+    """供应商报价 — 必须被邀 + ingredient 属本 RFQ + RFQ 状态可报价。
+
+    硬约束 (全部强制):
+      1. RFQ 存在 + status in ('published', 'quoting') + is_deleted=FALSE
+      2. (rfq_id, supplier_id) 必须有 rfq_invitees 记录 (拒绝非邀报价 — 合规审计)
+      3. (rfq_id, ingredient_id) 必须有 rfq_items 记录 (拒绝跨 SKU 报价)
+      4. unit_price_fen > 0 (CHECK 约束兜底)
+      5. UNIQUE(tenant_id, rfq_id, supplier_id, ingredient_id) 通过 ON CONFLICT 覆盖
+         — 供应商可修改报价直到 deadline (业务允许)
+
+    副作用:
+      - RFQ status 从 'published' 自动跃迁到 'quoting' (首报)
+      - rfq_invitees.responded_at = NOW() (邀请已响应)
+      - rfq_quotes ON CONFLICT DO UPDATE (覆盖旧报价)
+
+    FOR UPDATE 行锁: 200 桌并发场景下多供应商同时报价 — 锁 rfqs 行串行化 status 跃迁。
+    """
+    if unit_price_fen <= 0:
+        raise ValueError(f"unit_price_fen 必须 > 0, 实际 {unit_price_fen}")
+    if qty_offered is not None and qty_offered <= 0:
+        raise ValueError(f"qty_offered 必须 > 0 或留空, 实际 {qty_offered}")
+
+    await _set_tenant(db, tenant_id)
+
+    # 1. SELECT rfq FOR UPDATE — 行锁串行化 status 跃迁
+    rfq = await get_rfq(db, tenant_id, rfq_id, lock=True)
+    if rfq is None:
+        raise ValueError(f"rfq_id={rfq_id} 不存在或已删除")
+    if rfq["status"] not in ("published", "quoting"):
+        raise ValueError(
+            f"rfq_id={rfq_id} 当前状态为 '{rfq['status']}', "
+            "仅 'published' / 'quoting' 可报价"
+        )
+
+    # 2. 邀请校验 (rfq_invitees) — 拒绝非邀报价
+    invitee_check = await db.execute(
+        text(
+            """
+            SELECT id::text AS id
+            FROM rfq_invitees
+            WHERE tenant_id   = :tenant_id
+              AND rfq_id      = :rfq_id
+              AND supplier_id = :supplier_id
+              AND is_deleted  = FALSE
+            LIMIT 1
+            """
+        ),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "rfq_id": rfq_id,
+            "supplier_id": _uuid_str(supplier_id),
+        },
+    )
+    if invitee_check.mappings().first() is None:
+        raise ValueError(
+            f"supplier_id={supplier_id} 未被邀请 rfq_id={rfq_id} — 拒绝非邀报价"
+        )
+
+    # 3. SKU 校验 (rfq_items) — 拒绝跨 SKU 报价
+    item_check = await db.execute(
+        text(
+            """
+            SELECT id::text AS id
+            FROM rfq_items
+            WHERE tenant_id     = :tenant_id
+              AND rfq_id        = :rfq_id
+              AND ingredient_id = :ingredient_id
+              AND is_deleted    = FALSE
+            LIMIT 1
+            """
+        ),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "rfq_id": rfq_id,
+            "ingredient_id": _uuid_str(ingredient_id),
+        },
+    )
+    if item_check.mappings().first() is None:
+        raise ValueError(
+            f"ingredient_id={ingredient_id} 不在 rfq_id={rfq_id} 的明细范围内"
+        )
+
+    # 4. INSERT / UPDATE rfq_quotes — 覆盖旧报价 (UNIQUE 约束触发 ON CONFLICT)
+    now = datetime.now(timezone.utc)
+    quote_id = str(uuid.uuid4())
+    quote_result = await db.execute(
+        text(
+            """
+            INSERT INTO rfq_quotes (
+                id, tenant_id, rfq_id, supplier_id, ingredient_id,
+                unit_price_fen, qty_offered, valid_until, notes, submitted_at,
+                created_at, updated_at, is_deleted
+            )
+            VALUES (
+                :id, :tenant_id, :rfq_id, :supplier_id, :ingredient_id,
+                :unit_price_fen, :qty_offered, :valid_until, :notes, :now,
+                :now, :now, FALSE
+            )
+            ON CONFLICT (tenant_id, rfq_id, supplier_id, ingredient_id)
+            DO UPDATE SET
+                unit_price_fen = EXCLUDED.unit_price_fen,
+                qty_offered    = EXCLUDED.qty_offered,
+                valid_until    = EXCLUDED.valid_until,
+                notes          = EXCLUDED.notes,
+                submitted_at   = EXCLUDED.submitted_at,
+                updated_at     = EXCLUDED.updated_at,
+                is_deleted     = FALSE
+            RETURNING
+                id::text                AS id,
+                tenant_id::text         AS tenant_id,
+                rfq_id::text            AS rfq_id,
+                supplier_id::text       AS supplier_id,
+                ingredient_id::text     AS ingredient_id,
+                unit_price_fen,
+                qty_offered,
+                valid_until,
+                notes,
+                submitted_at
+            """
+        ),
+        {
+            "id": quote_id,
+            "tenant_id": _uuid_str(tenant_id),
+            "rfq_id": rfq_id,
+            "supplier_id": _uuid_str(supplier_id),
+            "ingredient_id": _uuid_str(ingredient_id),
+            "unit_price_fen": int(unit_price_fen),
+            "qty_offered": qty_offered,
+            "valid_until": valid_until,
+            "notes": notes,
+            "now": now,
+        },
+    )
+    quote_row = quote_result.mappings().first()
+    if quote_row is None:
+        raise ValueError(f"submit_quote failed — rfq_id={rfq_id} RETURNING 无结果")
+
+    # 5. 更新 rfq_invitees.responded_at (响应记录)
+    await db.execute(
+        text(
+            """
+            UPDATE rfq_invitees
+            SET responded_at = COALESCE(responded_at, :now),
+                updated_at   = :now
+            WHERE tenant_id   = :tenant_id
+              AND rfq_id      = :rfq_id
+              AND supplier_id = :supplier_id
+              AND is_deleted  = FALSE
+            """
+        ),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "rfq_id": rfq_id,
+            "supplier_id": _uuid_str(supplier_id),
+            "now": now,
+        },
+    )
+
+    # 6. 首报跃迁 published → quoting (status 已 quoting 不变 — UPDATE WHERE status='published')
+    # §19 round-1 P1-2: transitioned 用 rowcount > 0 而非内存 status — 并发场景下
+    # 两个供应商同时首报，仅 1 个 UPDATE 影响 1 行（另一个被前一 worker 跃迁后影响 0
+    # 行静默成功），rowcount 反映真实 DB 跃迁状态。
+    transitioned = False
+    if rfq["status"] == "published":
+        update_result = await db.execute(
+            text(
+                """
+                UPDATE rfqs
+                SET status     = 'quoting',
+                    updated_at = :now
+                WHERE id        = :rfq_id
+                  AND tenant_id = :tenant_id
+                  AND status    = 'published'
+                  AND is_deleted = FALSE
+                """
+            ),
+            {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id), "now": now},
+        )
+        transitioned = update_result.rowcount > 0
+
+    logger.info(
+        "rfq_quote_submitted",
+        rfq_id=rfq_id,
+        tenant_id=str(tenant_id),
+        supplier_id=str(supplier_id),
+        ingredient_id=str(ingredient_id),
+        unit_price_fen=int(unit_price_fen),
+        status_transitioned_to_quoting=transitioned,
+    )
+    return dict(quote_row)
+
+
+# ─── 比价表 + AI 推荐 (sub-C admin-side) ──────────────────────────────────────
+
+
+async def get_rfq_comparison(
+    db: AsyncSession,
+    tenant_id: str,
+    rfq_id: str,
+) -> dict:
+    """比价表 — 按 SKU 汇总所有供应商报价 + AI 推荐 (lowest price heuristic)。
+
+    返回结构:
+      {
+        "rfq": <RFQ row>,
+        "items": [
+          {
+            "ingredient_id": ...,
+            "qty_required": ...,
+            "qty_unit": ...,
+            "quotes": [
+              {"supplier_id": ..., "unit_price_fen": ..., "qty_offered": ..., "valid_until": ..., "quote_id": ...},
+              ...  # 按 unit_price_fen 升序
+            ],
+            "ai_recommended_quote_id": <最低价 quote.id, 或 None>,
+            "ai_recommendation_reason": "最低单价 (XX 分/单位)" or "无报价"
+          },
+          ...
+        ]
+      }
+
+    AI 推荐 v1: 单纯最低价 heuristic (sub-C scope)。
+    sub-D follow-up: 引入 supplier_score (PRD-05 配送时间窗扣分) 综合排序。
+    """
+    await _set_tenant(db, tenant_id)
+
+    rfq = await get_rfq(db, tenant_id, rfq_id)
+    if rfq is None:
+        raise ValueError(f"rfq_id={rfq_id} 不存在或已删除")
+
+    # 1. 加载 items
+    items_result = await db.execute(
+        text(
+            """
+            SELECT
+                id::text                AS id,
+                ingredient_id::text     AS ingredient_id,
+                qty_required,
+                qty_unit,
+                spec_notes
+            FROM rfq_items
+            WHERE rfq_id    = :rfq_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            ORDER BY created_at
+            """
+        ),
+        {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id)},
+    )
+    items = [dict(r) for r in items_result.mappings().all()]
+
+    # 2. 加载所有 quotes (按 ingredient_id + unit_price_fen 升序)
+    quotes_result = await db.execute(
+        text(
+            """
+            SELECT
+                id::text                AS quote_id,
+                supplier_id::text       AS supplier_id,
+                ingredient_id::text     AS ingredient_id,
+                unit_price_fen,
+                qty_offered,
+                valid_until,
+                notes,
+                submitted_at
+            FROM rfq_quotes
+            WHERE rfq_id    = :rfq_id
+              AND tenant_id = :tenant_id
+              AND is_deleted = FALSE
+            ORDER BY ingredient_id, unit_price_fen ASC
+            """
+        ),
+        {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id)},
+    )
+    all_quotes = [dict(r) for r in quotes_result.mappings().all()]
+
+    # 3. 按 ingredient 分组 + AI 推荐 (最低价)
+    quotes_by_ingredient: dict[str, list[dict]] = {}
+    for q in all_quotes:
+        quotes_by_ingredient.setdefault(q["ingredient_id"], []).append(q)
+
+    enriched_items: list[dict] = []
+    for it in items:
+        ing_id = it["ingredient_id"]
+        ing_quotes = quotes_by_ingredient.get(ing_id, [])
+        ai_quote_id = ing_quotes[0]["quote_id"] if ing_quotes else None
+        if ing_quotes:
+            ai_reason = (
+                f"最低单价 {int(ing_quotes[0]['unit_price_fen'])} 分 "
+                f"(共 {len(ing_quotes)} 家供应商报价)"
+            )
+        else:
+            ai_reason = "无报价"
+        enriched_items.append(
+            {
+                **it,
+                "quotes": ing_quotes,
+                "ai_recommended_quote_id": ai_quote_id,
+                "ai_recommendation_reason": ai_reason,
+            }
+        )
+
+    return {"rfq": rfq, "items": enriched_items}
+
+
+# ─── List (sub-C admin-side) ──────────────────────────────────────────────────
+
+
+async def list_rfqs(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    status_filter: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """RFQ 列表 — 按 deadline 倒序; 支持 status 精确过滤。"""
+    if limit <= 0 or limit > 200:
+        raise ValueError(f"limit 必须 in (0, 200], 实际 {limit}")
+    if offset < 0:
+        raise ValueError(f"offset 必须 >= 0, 实际 {offset}")
+
+    await _set_tenant(db, tenant_id)
+
+    # 两个预构造 SQL — 避 f-string (L011 + baseline 守门)
+    result = await db.execute(
+        text(
+            _LIST_RFQS_WITH_STATUS_SQL
+            if status_filter is not None
+            else _LIST_RFQS_ALL_SQL
+        ),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "status": status_filter,
+            "limit": limit,
+            "offset": offset,
+        },
+    )
+    return [dict(r) for r in result.mappings().all()]
+
+
+_LIST_RFQS_BASE_SQL = """
+    SELECT
+        id::text                   AS id,
+        tenant_id::text            AS tenant_id,
+        rfq_number,
+        initiator_id::text         AS initiator_id,
+        deadline,
+        status,
+        notes,
+        created_by::text           AS created_by,
+        created_at,
+        updated_at,
+        is_deleted
+    FROM rfqs
+    WHERE tenant_id  = :tenant_id
+      AND is_deleted = FALSE
+"""
+
+_LIST_RFQS_ALL_SQL = (
+    _LIST_RFQS_BASE_SQL
+    + " ORDER BY deadline DESC LIMIT :limit OFFSET :offset"
+)
+_LIST_RFQS_WITH_STATUS_SQL = (
+    _LIST_RFQS_BASE_SQL
+    + " AND status = :status ORDER BY deadline DESC LIMIT :limit OFFSET :offset"
+)
