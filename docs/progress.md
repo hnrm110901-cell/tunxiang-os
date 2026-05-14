@@ -1,3 +1,44 @@
+## 2026-05-14 中午–下午 12:07–13:19 · PR #227 + PR #609 双 ship · edge sync nonce store 完整闭环 (Tier 1 fund/源 explicit-ask 第 8 + 第 9 例)
+
+### 完成状态
+
+- [x] **PR #227 23 项 P0/SECURITY/Tier 1 batch MERGED** `3a6b230c` (5/14 12:07, admin squash, **Tier 1 fund/源 explicit-ask 第 8 例**, #195 squash rebase 8 天 stale 249 commits 跨 14 files)
+- [x] **3 round §19 reviewer 流程奠基** — round-1 2P0+1P1 → fix → round-2 0P0/P1 → round-3 CI gate fix verify。`feedback_multi_round_19_reviewer_flow.md` + `feedback_post_rebase_caller_audit.md` + `feedback_tier1_ci_minimal_deps_trap.md` 3 memory 文件落
+- [x] **CI 真门禁 22/22 SUCCESS** (#227) — Tier 1 门禁判定 + 14+4 服务 tier1 + RLS 严格 + 源-test 配对 全绿
+- [x] **PR #228 → GitHub auto-close** (5/14 04:07Z) — base branch `rebase/pr-195-clean` 在 PR #227 squash-merge 时被 GitHub 自动删，触发 base ref 失效 auto-close
+- [x] **PR #609 EdgeSyncNonceStore abstraction MERGED** `4d2b4c3c` (5/14 13:19, admin squash, **Tier 1 fund/源 explicit-ask 第 9 例**, supersedes #228, 闭 PR #227 P1-1 follow-up)
+- [x] **方案 2 重建实证** — 独立 worktree + 新 branch from `origin/main` + cherry-pick `52df07ee` clean + cherry-pick `945fa9fe` **auto-merge 0 conflict**（nonce 段 vs PR #227 改动段互不冲突）
+- [x] **15/15 tier1 测试 passed in 0.04s** 本机 Python 3.9.6
+- [x] **Round-1 §19 reviewer APPROVED 0 P0 / 0 P1** (#609) — 5 维评审 (A 安全 / B HMAC 顺序 / C PR #227 不退化 / D CI 依赖 / E 测试 robust) 全 PASS。无 fix commit，符合 `feedback_multi_round_19_reviewer_flow.md` 流程跳 round-2
+- [x] **CI 真门禁 22+ SUCCESS** (#609) — 含 `tx-trade/src/tests` (新测试) + `tx-trade/tests` (PR #227 测试不退化) 双路径
+- [x] **§19 follow-up 4 P2 issue 落盘**: #606 proxy JSON guard / #607 Prometheus NaN guard / #610 startup warmup / #611 close shutdown hook
+- [x] **PR #227 features 全保留** (#609 cherry-pick auto-merge 验证): 4h 离线 SLA L85-100 + Step 1-3 兼容 L131-141 + soft_delete 白名单 L377+L802
+- [x] **17 PR 单日 ship tally**: 13 上午-中午 batch + #602 + #603 + #227 + #609
+
+### 关键决策
+
+- **PR #228 重建 vs reopen** — base branch 已删，reopen 路径需 GitHub API 改 base ref + 底层 head 仍含已 merged commit，复杂度高且 history 不干净。**选方案 2 重建**：从 main HEAD 起新 branch + cherry-pick PR #228 unique 2 commits + 关闭原 PR with supersede comment。1-2h 工作量 vs reopen 3-4h
+- **PR #227 conflict 都选 HEAD** — cashier_engine + order_service 两 Tier 1 文件 conflict, main 5/13 row-lock 6-PR roadmap (#553/#556/#560) 用 `_get_order(*, lock: bool=False)` kwarg pattern 更优（read-only caller 性能不回归），强制锁会破坏。`feedback_post_rebase_caller_audit.md` 配套：rebase 选 HEAD 后必须全 PR caller audit 是否需要传新 kwarg — round-1 §19 抓到 update_item 缺 `lock=True` silent bug
+- **HMAC 前置 / nonce mark 后置** (PR #609 P1-3 修复) — 失败请求不污染 nonce store。Redis 故障 → 503 (后端不可用要求运维介入) 而非 401 (客户端鉴权失败)，语义清晰
+- **生产 fail-closed 设计** (PR #609) — `EDGE_SYNC_HMAC_REQUIRED=true` + `TX_ENV=production` 时不允许 InProcess (除非 `EDGE_SYNC_ALLOW_INPROCESS_NONCE=true` explicit opt-out)。`get_nonce_store()` 工厂 RuntimeError 在 router 转 503，无需扩 Tier 1 CI install 列表 (`feedback_tier1_ci_minimal_deps_trap.md` module-local pattern)
+- **Multi-round §19 流程** (`feedback_multi_round_19_reviewer_flow.md` 奠基) — 大 SECURITY/Tier 1 stale PR rebase 后必须多轮 §19: round-1 检查整体 rebased state (含 caller audit) → fix → round-2 verify 无回归 → round-3 verify CI gate fix (如有)。每轮 reviewer 独立 agent，主代理不自审
+
+### 下一步
+
+- 优先 PR #240 D2-D5 真机 smoke (rebase 到 `4d2b4c3c` + 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini M4 + Core ML 模型部署)
+- 或并行 4 P2 follow-up batch ship (#606 + #607 + #610 + #611)，清 issue queue
+- 或 §17 桌台并发语义对齐 PR (前提：创始人 3 选择题答复)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- **17 PR/单日** 远超 `feedback_proactive_session_split.md` 4+ 阈值，下次 session 必须新启动 (cold-start prompt 已含)
+- pre-existing CI 漂移 11 项 (python-lint-test / Ruff / Test Changed Services) 全 PR 一律 fail — 与本批无关，`project_tunxiang_ci_gates.md` 已登记
+- PR #240 base 落后 200+ commits，rebase 难度大于 PR #227 (PR #227 14 files 跨 249 commits vs PR #240 27 files 跨 200+ commits)，下 session 可能多轮 fix
+- §19 流程独立 reviewer agent 不可省 — 自评 + 本地 + CI 都绿仍可能漏 P0 (PR #227 round-1 抓到 silent bug 的 update_item 缺 `lock=True` 即实例)
+
+---
+
 ## 2026-05-14 上午–中午 11:00 · 13 PR ship batch (PR-03 doc_number 完整链路 + PR-01 supplier_certs 双 sub + structlog 跨服务全仓扫净 + §19 follow-up + npm deps batch 2)
 
 ### 完成状态
