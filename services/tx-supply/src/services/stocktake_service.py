@@ -102,13 +102,16 @@ async def create_stocktake(
 
     await _set_tenant(db, tenant_id)
 
-    # 生成可读单号（PRD-03 Wave1）
+    # 生成可读单号（PRD-03 Wave1）— graceful degradation 见 inventory_io 同模式
+    doc_number: Optional[str] = None
     try:
-        doc_number: Optional[str] = await gen_doc_number(
+        doc_number = await gen_doc_number(
             db, tenant_id=tenant_id, doc_type="stocktake", now=now
         )
-    except DocNumberError:
-        doc_number = None
+    except DocNumberError as e:
+        log.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — doc_number 辅助标识 infra fallback
+        log.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
 
     # 查询门店所有未删除的库存原料
     result = await db.execute(

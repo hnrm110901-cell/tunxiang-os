@@ -90,6 +90,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
+from ..services.doc_number_service import DocNumberError
 from ..services.doc_number_service import generate as gen_doc_number
 
 logger = structlog.get_logger(__name__)
@@ -261,8 +262,18 @@ async def create_purchase_order(
         po_number = _po_number()
         now = _now()
 
-        # 生成可读单号（PRD-03 Wave1）
-        doc_number = await gen_doc_number(db, tenant_id=x_tenant_id, doc_type="purchase_order")
+        # 生成可读单号（PRD-03 Wave1）— graceful degradation 见 inventory_io 同模式
+        doc_number = None
+        try:
+            doc_number = await gen_doc_number(
+                db, tenant_id=x_tenant_id, doc_type="purchase_order"
+            )
+        except DocNumberError as e:
+            logger.warning("doc_number_generate_skipped", reason=str(e))
+        except Exception as e:  # noqa: BLE001 — doc_number 辅助标识 infra fallback
+            logger.warning(
+                "doc_number_generate_failed_fallback_null", error=str(e), exc_info=True
+            )
 
         # 计算总金额（分）
         total_amount_fen = sum(int(item.quantity * item.unit_price_fen) for item in body.items)

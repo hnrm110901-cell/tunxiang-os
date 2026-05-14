@@ -132,13 +132,17 @@ async def receive_stock(
 
     await _set_tenant(db, tenant_id)
 
-    # 生成可读单号（PRD-03 Wave1）
+    # 生成可读单号（PRD-03 Wave1）— 失败 graceful degradation（doc_number 是辅助
+    # 标识，infra 失败不阻塞 Tier 1 出入库业务，参考 issue #580 sequence gap 处理）
+    doc_number: Optional[str] = None
     try:
-        doc_number: Optional[str] = await gen_doc_number(
+        doc_number = await gen_doc_number(
             db, tenant_id=tenant_id, doc_type="inventory_io", now=now
         )
-    except DocNumberError:
-        doc_number = None
+    except DocNumberError as e:
+        log.warning("doc_number_generate_skipped", reason=str(e))
+    except Exception as e:  # noqa: BLE001 — 兜底，doc_number infra 异常不阻塞 Tier 1 业务
+        log.warning("doc_number_generate_failed_fallback_null", error=str(e), exc_info=True)
     # Tier 1 行锁（audit doc §4.3 P0）：防加权平均单价并发错算（毛利底线硬约束）
     ingredient = await _get_ingredient(db, ingredient_id, store_id, tenant_id, lock=True)
 

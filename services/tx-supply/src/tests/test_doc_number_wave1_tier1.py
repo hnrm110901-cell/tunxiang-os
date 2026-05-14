@@ -215,74 +215,11 @@ class TestPurchaseOrderDocNumber:
 # ─── 2. 申购单写路径 ──────────────────────────────────────────────────────────
 
 
-class TestRequisitionDocNumber:
-    """申购单创建时 doc_number 由 route 层生成并传入 service，结果必须含 doc_number 字段"""
-
-    @pytest.mark.asyncio
-    async def test_create_requisition_with_doc_number_in_result(self):
-        """厨师长 5/14 早晨申购食材：结果包含 doc_number='RQ20260514-001'。
-
-        GIVEN 徐记长沙总店厨师长 08:30 发起食材申购
-        WHEN  申购单创建（猪骨 100kg），route 层生成 doc_number 传入 service
-        THEN  返回结果含 doc_number='RQ20260514-001'
-        AND   后续审批流程可按 doc_number 查单
-        """
-        from services.tx_supply.src.services.requisition import create_requisition
-
-        db = AsyncMock()
-
-        # route 层已生成 doc_number，直接传入 service
-        result = await create_requisition(
-            store_id=_STORE_CS,
-            items=[
-                {"ingredient_id": _INGREDIENT_ID, "name": "猪骨", "quantity": 100, "unit": "kg", "estimated_price_fen": 800},
-            ],
-            requester_id="chef-001",
-            tenant_id=_TENANT_XUJI,
-            db=db,
-            doc_number=_DOC_NUMBER_RQ,
-            now=_NOW,
-        )
-
-        assert "doc_number" in result, "申购单结果必须含 doc_number 字段"
-        assert result["doc_number"] == _DOC_NUMBER_RQ
-
-    @pytest.mark.asyncio
-    async def test_create_requisition_seq_increments_second_call(self):
-        """同租户当天再次申购 → doc_number 序号 +1（RQ20260514-002）。
-
-        GIVEN 徐师长 08:30 申购了一次（seq=1）
-        WHEN  08:45 再次申购（追加蒜薹）
-        THEN  第 2 个申购单 doc_number = 'RQ20260514-002'（序号累加）
-        AND   不重复、不跳号（财务对账连续性要求）
-        """
-        from services.tx_supply.src.services.requisition import create_requisition
-
-        db = AsyncMock()
-
-        # route 层按序传入不同 doc_number（模拟序号递增效果）
-        result1 = await create_requisition(
-            store_id=_STORE_CS,
-            items=[{"ingredient_id": _INGREDIENT_ID, "name": "猪骨", "quantity": 100, "unit": "kg", "estimated_price_fen": 800}],
-            requester_id="chef-001",
-            tenant_id=_TENANT_XUJI,
-            db=db,
-            doc_number="RQ20260514-001",
-            now=_NOW,
-        )
-        result2 = await create_requisition(
-            store_id=_STORE_CS,
-            items=[{"ingredient_id": _INGREDIENT_ID, "name": "蒜薹", "quantity": 20, "unit": "kg", "estimated_price_fen": 300}],
-            requester_id="chef-001",
-            tenant_id=_TENANT_XUJI,
-            db=db,
-            doc_number="RQ20260514-002",
-            now=_NOW,
-        )
-
-        assert result1["doc_number"] == "RQ20260514-001"
-        assert result2["doc_number"] == "RQ20260514-002"
-        assert result1["doc_number"] != result2["doc_number"], "同天两张申购单 doc_number 不能相同"
+# ─── 2. 申购单（已移除 — §19 P0#2）────────────────────────────────────────────
+# 申购单接入 doc_number 移交 PRD-07 申购模板系统（Phase 2 W9-W12）一并做：
+#   - 仓库内无 CREATE TABLE requisitions migration（现有 service 是纯内存字典）
+#   - 建表 + service 持久化是 PRD-07 自然范围
+# 本 PR (PR-03B Wave1) 范围降为 4 类：PO / stocktake / receiving / inventory_io
 
 
 # ─── 3. 盘点单写路径 ──────────────────────────────────────────────────────────
@@ -443,7 +380,7 @@ class TestReceivingOrderDocNumber:
                 store_id=_STORE_CS,
                 supplier_id=_SUPPLIER_ID,
                 delivery_note_no="DN-20260514-001",
-                receiver_id="staff-001",
+                receiver_id="77777777-aaaa-bbbb-cccc-777777777777",
                 items=[
                     {
                         "ingredient_id": _INGREDIENT_ID,
