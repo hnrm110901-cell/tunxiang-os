@@ -215,7 +215,7 @@ function CreateRFQModal({ open, ingredients, suppliers, onClose, onSuccess }: Cr
         showIcon
         style={{ marginBottom: 16 }}
         message="询价流程"
-        description="创建为草稿态 → 点"发布"通知被邀供应商 → 供应商门户提交报价 → 截止后点"收尾比价" → 比价表选定供应商 → 二级审批中标。"
+        description="创建为草稿态 → 点【发布】通知被邀供应商 → 供应商门户提交报价 → 截止后点【收尾比价】 → 比价表选定供应商 → 二级审批中标。"
       />
       <Form
         form={form}
