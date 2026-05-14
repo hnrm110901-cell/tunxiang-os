@@ -327,6 +327,108 @@ class TestWasteDocNumber:
         ), "doc_number 必须通过 SQL UPDATE 写入 ingredient_transactions"
 
     @pytest.mark.asyncio
+    async def test_waste_issue_multi_batch_all_get_doc_number(self):
+        """报废出库跨多 batch FIFO：ANY(:ids::uuid[]) 单条 SQL 写入全部 batch 流水。
+
+        GIVEN 五花肉有两个 FIFO batch（batch-A remaining=3.0, batch-B remaining=10.0）
+        WHEN  报废 8.0kg（跨两个 batch：扣尽 batch-A 3.0 + 从 batch-B 扣 5.0）
+        THEN  UPDATE ingredient_transactions 只执行 1 条 SQL（ANY(:ids::uuid[]) 批量）
+        AND   该 SQL 的 ids 参数含 2 个事务 ID，doc_number == _DOC_NUMBER_WS
+        （不应退化为 per-batch 逐条 UPDATE — P1#1 修法 invariant）
+        """
+        from services.tx_supply.src.services.inventory_io import issue_stock
+
+        mock_ingredient = _mk_ingredient_mock(qty=200.0)
+        updated_rows: list[dict] = []
+
+        db = AsyncMock()
+
+        async def execute_side(query, params=None):
+            sql = str(query)
+            mock_result = MagicMock()
+            if "set_config" in sql:
+                return mock_result
+            if "doc_number_rules" in sql and "SELECT" in sql.upper():
+                mock_result.mappings.return_value.first.return_value = {
+                    "tenant_id": "00000000-0000-0000-0000-000000000000",
+                    "doc_type": "waste",
+                    "template": "WS{yyyy}{MM}{dd}-{seq:03d}",
+                    "seq_scope": "daily",
+                    "is_active": True,
+                }
+                return mock_result
+            if "pg_advisory_xact_lock" in sql:
+                return mock_result
+            if "doc_number_sequences" in sql and "INSERT" in sql.upper():
+                mock_result.mappings.return_value.first.return_value = {"current_seq": 1}
+                return mock_result
+            if "ingredient_transactions" in sql and "UPDATE" in sql.upper() and "doc_number" in sql:
+                captured_params = dict(params) if params else {}
+                updated_rows.append(captured_params)
+                return mock_result
+            # FIFO batch query
+            mock_result.all.return_value = []
+            # ORM ingredient select
+            mock_result.scalar_one_or_none.return_value = mock_ingredient
+            return mock_result
+
+        db.execute = AsyncMock(side_effect=execute_side)
+        db.add = MagicMock()
+        db.flush = AsyncMock()
+
+        # 两个 FIFO batch：batch-A remaining=3.0, batch-B remaining=10.0
+        # quantity=8.0 → FIFO 扣 3.0（batch-A 耗尽）+ 5.0（batch-B 部分）= 2 条 ingredient_transactions
+        with patch(
+            "services.tx_supply.src.services.inventory_io._get_batch_remaining",
+            new=AsyncMock(
+                return_value=[
+                    {
+                        "batch_no": "BATCH-A",
+                        "remaining": 3.0,
+                        "unit_cost_fen": 2800,
+                        "expiry_date": None,
+                        "created_at": _NOW,
+                    },
+                    {
+                        "batch_no": "BATCH-B",
+                        "remaining": 10.0,
+                        "unit_cost_fen": 2900,
+                        "expiry_date": None,
+                        "created_at": _NOW,
+                    },
+                ]
+            ),
+        ), patch(
+            "services.tx_supply.src.services.inventory_io.gen_doc_number",
+            new=AsyncMock(return_value=_DOC_NUMBER_WS),
+        ):
+            result = await issue_stock(
+                ingredient_id=_INGREDIENT_ID,
+                quantity=8.0,
+                reason="waste",
+                store_id=_STORE_CS,
+                tenant_id=_TENANT_XUJI,
+                db=db,
+            )
+
+        assert result.get("doc_number") == _DOC_NUMBER_WS, (
+            f"多 batch 报废结果应含 doc_number='{_DOC_NUMBER_WS}'，实际: {result}"
+        )
+        # P1#1 核心 invariant：ANY(:ids::uuid[]) — 只有 1 条 UPDATE SQL
+        assert len(updated_rows) == 1, (
+            f"ANY(:ids::uuid[]) 修法应只执行 1 条 UPDATE SQL，实际执行了 {len(updated_rows)} 条"
+            "（如果 >1 说明退化为 per-batch loop，P1#1 修法未生效）"
+        )
+        # 该单条 SQL 的 ids 参数应含 2 个事务 ID（2 个 batch 各生成 1 条 ingredient_transaction）
+        ids_param = updated_rows[0].get("ids", [])
+        assert len(ids_param) == 2, (
+            f"ANY(:ids::uuid[]) 的 ids 参数应含 2 个事务 ID（对应 2 个 batch），实际: {ids_param}"
+        )
+        assert updated_rows[0].get("doc_number") == _DOC_NUMBER_WS, (
+            f"UPDATE SQL 的 doc_number 参数应为 '{_DOC_NUMBER_WS}'，实际: {updated_rows[0]}"
+        )
+
+    @pytest.mark.asyncio
     async def test_usage_issue_no_doc_number(self):
         """BOM 扣料（reason='usage'）不分配报废单号 — doc_number 应为 None。
 
