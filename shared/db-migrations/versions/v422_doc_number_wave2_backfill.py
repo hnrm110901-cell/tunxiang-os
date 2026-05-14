@@ -13,16 +13,19 @@ PRD-03 Wave2 方案 A（tx-supply 安全切片）：
   - inspector-and-skip 防重运行（参考 v296 / v418 / v419 模式）
   - downgrade 反向 DROP COLUMN
 
-⚠ down_revision 说明：
-  本 PR 使用 v421_supplier_certificates 作为 down_revision（PRD-01 证件管理表），
-  链路：v418 → v419 (Wave1) ／ v418 → v421 → v422 (Wave2)。
-  两分支并存，无对应建表 migration 冲突。
+⚠ down_revision 说明（merge revision）：
+  PR-01A v421 chain v418 / PR-03B v419 chain v418 → 形成两个 dangling heads。
+  本 v422 作为 merge revision 同时 chain 两个 head，使 alembic chain
+  收敛回单 head（CI Verify Migration Chain Integrity 要求）。
+  链路：
+      v418 → v419 (Wave1) ─┐
+      v418 → v421 (PR-01A) ┴→ v422 (Wave2 + merge)
 
 ⚠ 注意：`transfer_orders` 表 DDL 已在仓库历史 migration 中建立，
   本 migration 仅做 ADD COLUMN，无对应建表操作。
 
 Revision ID: v422_doc_number_wave2_backfill
-Revises: v421_supplier_certificates
+Revises: v421_supplier_certificates, v419_doc_number_wave1_backfill
 Create Date: 2026-05-14
 """
 from typing import Sequence, Union
@@ -31,7 +34,10 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "v422_doc_number_wave2_backfill"
-down_revision: Union[str, Sequence[str], None] = "v421_supplier_certificates"
+down_revision: Union[str, Sequence[str], None] = (
+    "v421_supplier_certificates",
+    "v419_doc_number_wave1_backfill",
+)
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
