@@ -38,12 +38,24 @@ from shared.test_utils.integration_pg import INTEGRATION_PG_DSN
 _RLS_TEST_ROLE = "tunxiang_rls_app"
 
 # PR-1 smoke test 用表。PR-2/3/4/5 扩展请加入或子目录 conftest 覆盖:
-#   PR-2 (cashier_engine): + orders, payments, order_items
+#   PR-2 (cashier_engine): + orders, payments, order_items ✅ 本 PR
 #   PR-3 (payment_saga): + payment_saga_state
 #   PR-4 (inventory): + ingredient_movements, ingredients
 #   PR-5 (order+delivery): + delivery_orders
+#
+# **FK 拓扑顺序（子→父序，DELETE 时遵循）**:
+#   payments → order_items → orders → stores
+#   (payments.order_id FK→orders / order_items.order_id FK→orders / orders.store_id FK→stores)
+#
+# Issue #635 P2-B follow-up：当前 cleanup 用 SET LOCAL session_replication_role=replica
+# 绕 FK 触发器，PR-2 起本 _CONCURRENT_TABLES 真正含 FK 链；顺序错时不会 fail（trigger
+# 已绕过）。**未来 PR-2+ 修法**: 切 TRUNCATE...CASCADE 或 CI lint 守顺序。当前注释
+# 标明子→父序，按 issue #635 短期方案 A 处理。
 _CONCURRENT_TABLES: tuple[str, ...] = (
-    "stores",
+    "payments",       # 子 (FK → orders)
+    "order_items",    # 子 (FK → orders)
+    "orders",         # 中间 (FK → stores)
+    "stores",         # 父
 )
 
 
