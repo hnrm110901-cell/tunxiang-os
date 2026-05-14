@@ -296,6 +296,43 @@ async def list_certificates(
     return [dict(r) for r in rows]
 
 
+async def count_certificates(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    supplier_id: Optional[str] = None,
+    status: str = "all",
+    include_deleted: bool = False,
+) -> int:
+    """与 list_certificates 同 where 子句的 COUNT(*)，供分页 total 用。"""
+    await _set_tenant(db, tenant_id)
+
+    today = date.today()
+    where_clauses = ["sc.tenant_id = :tenant_id"]
+    params: dict = {"tenant_id": _uuid_str(tenant_id), "today": today}
+    if not include_deleted:
+        where_clauses.append("sc.is_deleted = FALSE")
+    if supplier_id is not None:
+        where_clauses.append("sc.supplier_id = :supplier_id")
+        params["supplier_id"] = _uuid_str(supplier_id)
+
+    if status == "active":
+        where_clauses.append("sc.expire_date >= :today")
+    elif status == "expiring_30d":
+        where_clauses.append("sc.expire_date BETWEEN :today AND (:today + INTERVAL '30 day')")
+    elif status == "expired":
+        where_clauses.append("sc.expire_date < :today")
+    elif status != "all":
+        raise ValueError(f"status={status!r} 不合法 — 必须是 all/active/expiring_30d/expired 之一")
+
+    where_sql = " AND ".join(where_clauses)
+    result = await db.execute(
+        text(f"SELECT COUNT(*) FROM supplier_certificates sc WHERE {where_sql}"),
+        params,
+    )
+    return int(result.scalar() or 0)
+
+
 async def get_certificate_by_id(
     db: AsyncSession,
     tenant_id: str,

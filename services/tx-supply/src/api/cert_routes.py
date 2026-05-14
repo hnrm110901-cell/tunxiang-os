@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db as _get_db
 
 from ..services.cert_service import (
+    count_certificates,
     create_certificate,
     get_certificate_by_id,
     list_certificates,
@@ -145,7 +146,13 @@ async def list_supplier_certificates(
         limit=size,
         offset=(page - 1) * size,
     )
-    return {"ok": True, "data": {"items": items, "page": page, "size": size}}
+    total = await count_certificates(
+        db=db,
+        tenant_id=x_tenant_id,
+        supplier_id=supplier_id,
+        status=status,
+    )
+    return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
 
 
 @router.get("/certificates/{cert_id}")

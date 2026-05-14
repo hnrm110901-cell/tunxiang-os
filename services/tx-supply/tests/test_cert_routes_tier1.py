@@ -106,7 +106,10 @@ def test_list_supplier_certificates_returns_filtered_by_status(client):
     with patch(
         "services.tx_supply.src.api.cert_routes.list_certificates",
         new=AsyncMock(return_value=mock_items),
-    ) as m:
+    ) as m, patch(
+        "services.tx_supply.src.api.cert_routes.count_certificates",
+        new=AsyncMock(return_value=1),
+    ):
         resp = client.get(
             f"/api/v1/supply/suppliers/{SUPPLIER_ID}/certificates?status=expiring_30d",
             headers=HEADERS,
@@ -128,7 +131,10 @@ def test_list_certificates_pagination_params_passthrough(client):
     with patch(
         "services.tx_supply.src.api.cert_routes.list_certificates",
         new=AsyncMock(return_value=[]),
-    ) as m:
+    ) as m, patch(
+        "services.tx_supply.src.api.cert_routes.count_certificates",
+        new=AsyncMock(return_value=0),
+    ):
         resp = client.get(
             f"/api/v1/supply/suppliers/{SUPPLIER_ID}/certificates?page=2&size=50",
             headers=HEADERS,
@@ -137,6 +143,32 @@ def test_list_certificates_pagination_params_passthrough(client):
     _, kwargs = m.call_args
     assert kwargs["limit"] == 50
     assert kwargs["offset"] == 50
+
+
+def test_list_certificates_returns_total_field_for_pagination(client):
+    """list endpoint 返 data.total = count_certificates 结果（修 P1-3 分页假死）.
+
+    bug 复现：未修前 route 仅返 items，前端 setTotal(items.length) 导致
+    pagination total 永远 ≤ size，第 21 张证件起看不到，徐记督导漏看过期证 → 食药监查到.
+    """
+    with patch(
+        "services.tx_supply.src.api.cert_routes.list_certificates",
+        new=AsyncMock(return_value=[]),
+    ), patch(
+        "services.tx_supply.src.api.cert_routes.count_certificates",
+        new=AsyncMock(return_value=42),
+    ) as m_count:
+        resp = client.get(
+            f"/api/v1/supply/suppliers/{SUPPLIER_ID}/certificates?status=expired&page=1&size=20",
+            headers=HEADERS,
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["data"]["total"] == 42
+    # count_certificates 必须收到与 list 同 status / supplier_id（避免列表与分页不一致）
+    _, kwargs = m_count.call_args
+    assert kwargs["status"] == "expired"
+    assert kwargs["supplier_id"] == SUPPLIER_ID
 
 
 # ══════════════════════════════════════════════════════════════════════════════
