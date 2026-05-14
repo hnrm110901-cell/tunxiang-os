@@ -1,3 +1,41 @@
+## 2026-05-15 上午 · "0 + A" 第二轮 ship 收尾 sediment：PR #636 ("0 + A" 第一轮 sediment) + PR #638 (PR-2 cashier_engine 框架金标准) + 并发 PR #633 (PRD-02 W7-1) + PR #637 (PRD-06 W7-2) 4 PR ship (5/14 单日累计 36 PR)
+
+### 完成状态
+
+- [x] **PR #636** docs(devlog) "0 + A" 第一轮 sediment MERGED `f9bdb511` (**docs-only carve-out 类 2 第 15 例**, 5/14 19:41 CST, +98 / 2 files)
+- [x] **PR #638** infra(test) cashier_engine concurrent Tier 1 测试 PR-2 MERGED `712b7431` (**Tier 1 fund/源/邻接 explicit-ask 第 20 例**, 5/14 20:19 CST, 3 files / +537 / -22)
+- [x] **本地真 PG 6/6 PASS in 1.12s** — 3 cashier 用例 (T1 add_item / T2 apply_discount / T3 settle_order N=10 并发) + 3 smoke 不退化
+- [x] **§19 reviewer round-1 APPROVE-WITH-FOLLOWUP** (0 P0 / 2 P1 PR 内 fix / 2 P2 → **Issue #639** 落 follow-up)
+- [x] **CI `Tier 1 Row-Lock — 真 PG N 路并发反测` PASS in 39s** — drift-tolerant CI 第 2 次实战
+- [x] **audit doc §8.3「框架金标准」milestone ✅ 实施完成**
+- [x] **并发 session ship 双 PR ack** — PR #633 PRD-02 W7-1 (`cb9c348f`, 5/14 18:30, +2709/-4 / 13 files, 第 18 例) + PR #637 PRD-06 W7-2 (`6cec59d4`, 5/14 20:00, +2457/-3 / 12 files, 第 19 例)
+- [x] **5/14 单日累计 ship 36 PR** = 32 末段 prior + 4 本批 (#636 + #638 + 并发 #633 + #637)
+
+### 关键决策
+
+- **"0 + A" 第二轮路径执行 + sediment-first 优势复利** — sediment (#636) 走 docs-only 快通道 ~25min 不阻塞 PR-2 主线；PR-2 (#638) 走 §19 reviewer + Tier 1 explicit-ask 全流程 ~3h（含 round-1 P1 fix 2 commits）。第二轮验证：sediment-first 不仅避免漂移，**还能让 sediment session 上下文集中于"前一轮反映 + tally 重校准"**，与 PR-N 实施 session 解耦
+- **Tier 1 explicit-ask tally 重校准（关键）** — 5/14 末段 sediment 与并发 Phase 2 W7-1 双方独立计数冲突（双 17/18 例）。**按 merge timestamp 排序权威序号**：16 prior → 17=#634 (18:22) → 18=#633 (18:30) → 19=#637 (20:00) → 20=#638 (20:19)。Lesson：并发 session sediment 必须重排 tally + 一次性公布
+- **PR-2 cashier 框架金标准 milestone 达成** — `audit doc §8.3` 三 P0 路径从 mock-driven 升真行为 race 验证。后续 PR-3+ payment_saga / inventory_io / auto_deduction 全部参照 PR-2 模板：`_get_<Entity>(lock=True)` helper kwarg + `_CONCURRENT_TABLES` FK 子→父序 + `_ensure_<vXXX>_schema` 兜底 + `assert_final_consistency()` 终态断言四件套
+- **drift-tolerant CI workflow 第 2 次实战 + 模式稳定** — `tier1-row-lock-concurrent.yml` PR-2 加 4 表 RLS HARD gate + install httpx + pydantic。CI 真绿 39s 与 PR-1 一致；模式从首次实战升级稳定，**满足 `feedback_drift_tolerant_workflow.md` 累积二例 → 提议 carve-out 第 12 类候选**（待 PR-3 第 3 例确认后正式纳入）
+- **Issue #635 P2-B FK 拓扑 lesson 已应用 PR-2** — `_CONCURRENT_TABLES` 显式注释"子→父序: payments → order_items → orders → stores" + 4 表入序顺正确。**Lesson**：deferred P2/P3 follow-up 不必等独立 issue 修，下一 PR 启动时如有触碰直接顺手套用
+
+### 下一步
+
+- 优先 **PR-3 payment_saga SKIP LOCKED concurrent 框架** (~1day) — audit doc §4.1.3 payment_saga 2 P0 路径真行为 (PR #553 ship 后 mock-only)：T1 N=10 concurrent compensate 同 saga 真验证 3 状态分支 + T2 N=10 recover_pending_sagas 多 worker SKIP LOCKED 真生效。本 session "0 + A" 第二轮 cold-start 已 user explicit-ask 实施 → **Tier 1 explicit-ask 第 21 例**
+- 或 PR-4 inventory_io + auto_deduction (验证 ADR 0002 跨 dish 锁排序死锁防护)
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复 — audit doc §11 已落表)
+- 或 Mac mini M4 真机部署 / 等创始人 P0 输入
+
+### 已知风险
+
+- **Issue #639 P2-A**：PR-3 启动前必须扫 `shared/db-migrations/versions/v2*/v3*/v4*.py` 找 `ALTER TABLE payments` / `ALTER TABLE payment_saga_state` — 扩展 `_ensure_v342_schema` 兜底（或重命名 `_ensure_post_v206_schema` 共享 fixture），否则 T1/T2 settle/recover 路径 INSERT Payment 触发 ProgrammingError
+- **Issue #639 P2-B**：PR-2 T1 add_item dish_id="" fragile — 未来 add_item 重构 raise ValueError 会导致 T1 全 fail 错误信息不指向行锁问题；PR-3 启动前考虑选项 A 真 Dish seed 升级
+- **drift-tolerant CI 模式 2 例 + 待 3 例正式 carve-out** — PR-1 + PR-2 已稳定，PR-3 启动后第 3 例落定即可 sediment 收录正式 carve-out 第 12 类
+- pre-existing CI 漂移 12+ 项 与本批无关，`project_tunxiang_ci_gates.md` 已登记
+- **5/14 36 PR/单日新历史** 远超 `feedback_proactive_session_split.md` 4+ 阈值 (9x)，但本 session 仅 ship 2 PR + sediment + §19 round-1，上下文消费可控；PR-3 启动前评估是否拆 session
+
+---
+
 ## 2026-05-14 末段 18:30 · "0 + A" 路径执行 sediment：PR #632 (5/14 夜段 batch sediment) + PR #634 (concurrent_runner PR-1 infra 真 PG 反测基建) 2 PR ship (5/14 累计 32 PR)
 
 ### 完成状态
