@@ -9,9 +9,9 @@ PRD-03 Wave1：为 4 类高频单据新增 doc_number 列，允许 NULL（兼容
   3. receiving_orders    — 收货单（ORM entity）
   4. ingredient_transactions — 出入库流水
 
-申购单（requisitions）移除原因：仓库内无 CREATE TABLE requisitions migration，
-申购 service 是纯内存字典实现。建表 + 持久化 + doc_number 接入留给 PRD-07
-申购模板系统（Phase 2 W9-W12 范围）。
+申购单（requisitions）移除原因：仓库内无对应建表 migration（无 requisitions 表
+DDL），申购 service 是纯内存字典实现。建表 + 持久化 + doc_number 接入留给
+PRD-07 申购模板系统（Phase 2 W9-W12 范围）。
 
 设计约束：
   - 不加 UNIQUE 约束（历史 LEGACY- 行 NULL 初态 → 回填后可能重复文件名）
@@ -36,8 +36,8 @@ depends_on: Union[str, Sequence[str], None] = None
 
 _TABLES = [
     "purchase_orders",
-    # §19 P0#2：requisitions 表在仓库内无 CREATE TABLE migration（申购单 service
-    # 是纯内存字典实现），故移除。申购单 doc_number 接入留给 PRD-07 申购模板系统时
+    # §19 P0#2：requisitions 表在仓库内无对应建表 migration（申购 service 是纯
+    # 内存字典实现），故移除。申购单 doc_number 接入留给 PRD-07 申购模板系统时
     # 一并做（建表 + service 持久化 + doc_number 接入）。
     "stocktakes",
     "receiving_orders",
