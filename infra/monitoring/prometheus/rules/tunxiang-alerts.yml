@@ -127,6 +127,7 @@ groups:
             sum(rate(payment_saga_total{result="success"}[10m]))
             / sum(rate(payment_saga_total[10m]))
           ) < 0.999
+          and sum(rate(payment_saga_total[10m])) > 0
         for: 10m
         labels:
           severity: critical
