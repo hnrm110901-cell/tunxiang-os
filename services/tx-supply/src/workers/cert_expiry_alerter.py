@@ -16,7 +16,7 @@ from typing import Optional, Tuple
 import structlog
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, AsyncEngine
+from sqlalchemy.ext.asyncio import AsyncConnection, create_async_engine, AsyncEngine
 
 logger = structlog.get_logger(__name__)
 
@@ -78,7 +78,7 @@ async def _push_wecom_purchaser(
 
 
 async def _push_supplier_portal(
-    db: AsyncSession,
+    conn: AsyncConnection,
     tenant_id: str,
     cert: dict,
     threshold: str,
@@ -99,14 +99,16 @@ async def _push_supplier_portal(
 def _classify_threshold(days_until_expiry: int) -> Optional[str]:
     """返回推送阈值标签，不在任何阈值时返回 None（不推）。
 
-    D-30 / D-15 / D-7：临期预警（各推一次）
+    D-30 / D-15 / D-7：临期预警（窗口模式 ±2 天容错）
+      - 窗口模式防止 Celery task 当天未跑（infra down）导致阈值永久丢失
+      - 依赖 _already_alerted(success=TRUE) 过滤：窗口内多天触发只推一次
     D+0 / D+1 / D+2 / ...：过期每日催续证（threshold 按日区分以支持去重）
     """
-    if days_until_expiry == 30:
+    if 28 <= days_until_expiry <= 30:
         return "D-30"
-    if days_until_expiry == 15:
+    if 13 <= days_until_expiry <= 15:
         return "D-15"
-    if days_until_expiry == 7:
+    if 5 <= days_until_expiry <= 7:
         return "D-7"
     if days_until_expiry <= 0:
         return f"D+{-days_until_expiry}"
@@ -134,13 +136,13 @@ async def _fetch_active_tenants() -> list[str]:
         return [row.tenant_id for row in rows.fetchall()]
 
 
-async def _get_tenant_webhook_urls(db: AsyncSession, tenant_id: str) -> dict:
+async def _get_tenant_webhook_urls(conn: AsyncConnection, tenant_id: str) -> dict:
     """从 tenants.extra_data 读取企微 webhook URLs（D2 决策：2a JSON 存储）。
 
     返回 {"safety_director_webhook": str | None, "purchaser_webhook": str | None}
     """
     row = (
-        await db.execute(
+        await conn.execute(
             text(
                 """
                 SELECT
@@ -162,14 +164,17 @@ async def _get_tenant_webhook_urls(db: AsyncSession, tenant_id: str) -> dict:
 
 
 async def _already_alerted(
-    db: AsyncSession, cert_id: str, threshold: str, channel: str
+    conn: AsyncConnection, cert_id: str, threshold: str, channel: str
 ) -> bool:
-    """检查 cert_alert_log 是否已有该 (cert_id, threshold, channel) 记录。
+    """检查 cert_alert_log 是否已有推送成功记录（cert_id, threshold, channel, success=TRUE）。
+
+    仅 success=TRUE 的行算"已告知"。推送失败（success=FALSE）不阻断重试，
+    次日 daily scan 仍可重推。
 
     RLS 已由调用层 _scan_one_tenant 设置（set_config app.tenant_id）。
     """
     row = (
-        await db.execute(
+        await conn.execute(
             text(
                 """
                 SELECT 1
@@ -177,6 +182,7 @@ async def _already_alerted(
                 WHERE cert_id         = :cert_id::uuid
                   AND alert_threshold = :threshold
                   AND channel         = :channel
+                  AND success         = TRUE
                 LIMIT 1
                 """
             ),
@@ -187,7 +193,7 @@ async def _already_alerted(
 
 
 async def _log_alert(
-    db: AsyncSession,
+    conn: AsyncConnection,
     tenant_id: str,
     cert_id: str,
     threshold: str,
@@ -195,18 +201,24 @@ async def _log_alert(
     success: bool,
     error_msg: Optional[str],
 ) -> None:
-    """写入 cert_alert_log 推送记录（INSERT OR IGNORE on conflict）。
+    """写入 cert_alert_log 推送记录（UPSERT — 结果可覆盖）。
 
-    UNIQUE (cert_id, alert_threshold, channel)：重复时忽略（Celery retry 安全）。
+    UNIQUE (cert_id, alert_threshold, channel)：冲突时 UPDATE success + error_msg + sent_at，
+    允许"成功覆盖失败"和"再次失败覆盖前次失败"，确保幂等查询 _already_alerted(success=TRUE)
+    在推送成功后能正确命中。
     """
-    await db.execute(
+    await conn.execute(
         text(
             """
             INSERT INTO cert_alert_log
                 (tenant_id, cert_id, alert_threshold, channel, success, error_msg)
             VALUES
                 (:tenant_id::uuid, :cert_id::uuid, :threshold, :channel, :success, :error_msg)
-            ON CONFLICT (cert_id, alert_threshold, channel) DO NOTHING
+            ON CONFLICT (cert_id, alert_threshold, channel)
+            DO UPDATE SET
+                success   = EXCLUDED.success,
+                error_msg = EXCLUDED.error_msg,
+                sent_at   = NOW()
             """
         ),
         {
@@ -226,6 +238,9 @@ async def _log_alert(
 async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
     """单 tenant 扫描 + 推送 + cert_alert_log 落表。
 
+    使用 conn.execute() 直接模式（与 tx-ops celery_tasks_sync.py 一致）。
+    不再用 AsyncSession(bind=conn) SA 1.x 遗留写法，避免资源泄漏。
+
     Returns: {"evaluated": N, "sent": N}
     """
     from ..services.cert_service import list_alertable
@@ -235,21 +250,17 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
     sent = 0
 
     async with engine.connect() as conn:
-        # 创建 AsyncSession 包装 conn（不用 sessionmaker 避免复杂依赖）
-        from sqlalchemy.ext.asyncio import AsyncSession as _AsyncSession
-        db = _AsyncSession(bind=conn)
-
         # 设置 RLS 租户上下文
-        await db.execute(
+        await conn.execute(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
         # 读 webhook URLs
-        webhook_urls = await _get_tenant_webhook_urls(db, tenant_id)
+        webhook_urls = await _get_tenant_webhook_urls(conn, tenant_id)
 
-        # 查询临期 + 过期证件
-        alertable_certs = await list_alertable(db, tenant_id, today=today)
+        # 查询临期 + 过期证件（list_alertable 接受 AsyncConnection — text() 层接口兼容）
+        alertable_certs = await list_alertable(conn, tenant_id, today=today)
 
         for cert in alertable_certs:
             evaluated += 1
@@ -274,7 +285,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
             for (channel,) in channels_to_push:
                 # 幂等检查
                 try:
-                    if await _already_alerted(db, cert_id, threshold, channel):
+                    if await _already_alerted(conn, cert_id, threshold, channel):
                         continue
                 except SQLAlchemyError as exc:
                     logger.warning(
@@ -316,7 +327,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                         )
                     elif channel == CHANNEL_SUPPLIER_PORTAL:
                         success, error_msg = await _push_supplier_portal(
-                            db, tenant_id, cert, threshold
+                            conn, tenant_id, cert, threshold
                         )
                 except (OSError, ValueError, RuntimeError) as exc:
                     success = False
@@ -333,8 +344,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
 
                 # 落 cert_alert_log（无论成功/失败都记录）
                 try:
-                    await _log_alert(db, tenant_id, cert_id, threshold, channel, success, error_msg)
-                    await db.flush()
+                    await _log_alert(conn, tenant_id, cert_id, threshold, channel, success, error_msg)
                 except SQLAlchemyError as exc:
                     logger.warning(
                         "cert_alerter_log_write_failed",
