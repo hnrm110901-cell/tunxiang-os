@@ -24,6 +24,7 @@ logger = structlog.get_logger(__name__)
 
 from .api.bom_routes import router as bom_router
 from .api.cert_routes import router as cert_router
+from .api.weight_standard_routes import router as weight_standard_router
 from .api.central_kitchen_routes import router as ck_router
 from .api.ck_production_routes import router as ck_production_router
 from .api.ck_recipe_routes import router as ck_recipe_router
@@ -132,6 +133,7 @@ app.include_router(edi_router)  # 供应商EDI对接（v217表）
 app.include_router(smart_procurement_router)  # 预测驱动智能采购（v219表，对标Fourth iQ）
 app.include_router(doc_number_router)  # 业务单号定制规则引擎（PRD-03 / v418 / Tier 1）
 app.include_router(cert_router)  # 供应商证件管理（PRD-01 食安合规 / v421 / Tier 1）
+app.include_router(weight_standard_router)  # 商品扣秤标准库（PRD-02 毛利底线 / v428 / Tier 1）
 app.include_router(mobile_supply_router)  # 移动端供应链：扫码采购/收货/盘点（模块3.3）
 app.include_router(transfer_ext_router)  # 调拨扩展：execute 端点
 app.include_router(edi_ext_router)  # EDI 扩展：供应商查看订单 + 确认发货
