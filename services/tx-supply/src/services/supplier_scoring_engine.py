@@ -342,6 +342,33 @@ class SupplierScoringEngine:
             total = row.total_cnt if row and row.total_cnt else 0
             delivery_rate = (row.on_time_cnt / total) if total > 0 else 0.0
 
+            # ── PRD-05 / Tier 1 食安：配送时间窗违约扣分 ──
+            # supplier_delivery_violations 表存 supplier 在 period 内每单违约（每单至多 1 条）
+            # 公式：effective_delivery_rate = max(0, (on_time_cnt - violation_cnt) / total_cnt)
+            # 表缺失或查询失败 fail-open（保留原 delivery_rate，不阻塞评分计算）
+            try:
+                violation_sql = text(
+                    """
+                    SELECT COUNT(*) AS violation_cnt
+                    FROM supplier_delivery_violations
+                    WHERE tenant_id   = :tenant_id
+                      AND supplier_id = :supplier_id::TEXT
+                      AND recorded_at::DATE BETWEEN :start AND :end
+                    """
+                )
+                v_row = (await db.execute(violation_sql, params)).fetchone()
+                violation_cnt = int(v_row.violation_cnt) if v_row and v_row.violation_cnt else 0
+                if total > 0 and violation_cnt > 0:
+                    adjusted_on_time = max(0, (row.on_time_cnt or 0) - violation_cnt)
+                    delivery_rate = adjusted_on_time / total
+            except (ProgrammingError, OperationalError) as v_exc:
+                log.warning(
+                    "supplier_scoring.delivery_violations_query_failed",
+                    reason="supplier_delivery_violations 表可能未迁移（v430）— 跳过窗口扣分",
+                    supplier_id=supplier_id,
+                    error=str(v_exc),
+                )
+
             # ── quality_rate ──
             row = (await db.execute(quality_sql, params)).fetchone()
             total = row.total_cnt if row and row.total_cnt else 0
