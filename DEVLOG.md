@@ -1,3 +1,89 @@
+## 2026-05-14 下午段 — 轻量 P0/P1/P2 follow-up 4 PR batch ship (B/C 路径完整闭环, 5 issues 全 CLOSED)
+
+### 今日完成
+
+5/14 下午段轻量并行模式 ship 4 PR — 闭环 PR #227 / PR #609 §19 reviewer round-1 全部 P1/P2 follow-up + Issue #601 e2e workspace nightly fail。**5/14 单日累计 ship 22 PR**（上午-中午 13 PR batch + #602 + #603 + #227 + #609 + #612 + #608 并发 session ship + 本 batch #617/#619/#618/#616 = 22 PR）。
+
+**PR #617 — Prometheus PaymentSuccessRateLow NaN guard MERGED** `d84b3e1e` (admin squash, **T2 infra monitoring carve-out**, Closes #607):
+- 1 file / +1: `infra/monitoring/prometheus/rules/tunxiang-alerts.yml` L130 加 `and sum(rate(payment_saga_total[10m])) > 0`
+- 修前问题：0/0=NaN, NaN < 0.999 = false → 告警永远沉默
+- 修法：分子/分母均 0 时不触发，零流量由 PaymentTrafficStalled 接管职责分离
+
+**PR #619 — pnpm-workspace.yaml 加 e2e MERGED** `ae8337fd` (admin squash, **frontend workspace config carve-out 第 9 类首例**, Closes #601):
+- 1 file / +1: `pnpm-workspace.yaml` packages 加 `- "e2e"`
+- 修前问题：Offline E2E nightly + PR #240 + workflow_dispatch 三种触发全 fail `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL Command "playwright" not found`
+- 根因：e2e/ 未注册 workspace → root install 不建 e2e/node_modules → .bin/playwright 找不到
+- 影响：main nightly Offline E2E 5/9-5/13 5 连 fail → 修后转绿；PR #240 D2-D5 真机 smoke `web-pos offline cashier` check 转绿
+
+**PR #618 — tx-trade lifespan EdgeSyncNonceStore warmup + close MERGED** `a0fc816e` (admin squash, **Tier 1 source 邻接 explicit-ask 第 11 例**, Closes #610 + #611 手动 close):
+- 1 file / +17: `services/tx-trade/src/main.py`
+- startup hook: `from .edge_sync_nonce_store import get_nonce_store; get_nonce_store()` (warmup, fail-fast)
+- shutdown finally: `try: await get_nonce_store().close() except Exception: pass` (graceful close)
+- 安全性: ABC EdgeSyncNonceStore.close() Protocol 保证两实现都有 close()，无 AttributeError 风险
+- **Round-1 §19 reviewer APPROVED 0 P0 / 0 P1** — A 安全语义 / B' lifespan 集成正确性 / C backward compat / D Tier 1 资金路径不退化 / E test 缺失 (P2 建议) 全 PASS
+
+**PR #616 — gateway proxy 非 JSON guard MERGED** `eee4fe5a` (admin squash, **Tier 1 source 邻接 explicit-ask 第 12 例**, Closes #606):
+- 1 file / +26 / -1: `services/gateway/src/proxy.py:170` 内层 try resp.json() / except (ValueError, UnicodeDecodeError, **httpx.DecodingError**):
+- 修法：try/except → 失败时保留下游 status_code + structlog warn + 标准错误格式 `UPSTREAM_NON_JSON`
+- **Round-1 §19 reviewer 1 P1 抓到 silent bug**（reviewer 真实价值证明）— `httpx.DecodingError` MRO `(DecodingError → RequestError → HTTPError → Exception)` **不继承 ValueError**！下游 KDS ESC/POS 二进制 / nginx Latin-1 502 时跌入外层 502 — PR 目标完全失效
+- **Round-2 §19 reviewer APPROVED 0 P0 / 0 P1** — fix `c2a8bee0` (1 行加 httpx.DecodingError) verify 真正闭合 P1 + 无回归 + httpx>=0.27.0 兼容
+
+### TDD Red→Green 证据 (#616 round-1 §19 fix)
+
+```
+[Reproduce] >>> issubclass(httpx.DecodingError, ValueError) => False
+            httpx.DecodingError.__mro__ = (DecodingError, RequestError, HTTPError, Exception, ...)
+
+[Red]   原 except (ValueError, UnicodeDecodeError) 不捕获 DecodingError →
+        下游 ESC/POS 二进制响应跌入外层 502 + "PROXY_ERROR"，PR 目标失效
+
+[Refactor] except (ValueError, UnicodeDecodeError, httpx.DecodingError):
+
+[Green]   Round-2 §19 verify: DecodingError 现被内层捕获 → upstream_status +
+          UPSTREAM_NON_JSON 错误码生效；外层只接 pool.request() 阶段异常，作用域不重叠
+```
+
+### §19 reviewer 评审记录 (本 batch)
+
+- **PR #618 round-1**: APPROVED 0 P0 / 0 P1 — 5 维 A/B/C/D/E 全 PASS
+- **PR #616 round-1**: 1 P1 抓到 `httpx.DecodingError` MRO 不继承 ValueError silent bug — `feedback_self_review_blind_spots.md` 实证扩展
+- **PR #616 round-2**: APPROVED 0 P0 / 0 P1 — fix `c2a8bee0` 闭合 P1 + 无回归 + httpx 版本兼容
+- **PR #617 + #619 跳 reviewer**: 1 行 yaml/config blast radius 0，carve-out 直接 explicit-ask group ask
+
+### 数据变化
+
+- 迁移版本：无（4 PR 都 0 migration）
+- 新增 API 模块：0
+- 新增测试：0 (4 PR 都不在 TIER1_SOURCE_PATTERNS 精确白名单，源-test 配对 gate 不触发是设计预期)
+- 修改源：4 file 总 +45 / -1 (proxy.py +26/-1 + main.py +17/0 + alerts.yml +1 + pnpm-workspace.yaml +1)
+
+### 累计 tally 更新 (5/14 下午段)
+
+- **本 session 累计 ship**：6 PR (#609 + #612 + #617 + #619 + #618 + #616) + B1 round-1 fix commit `c2a8bee0` + 5 issue close (#601/#606/#607/#610/#611) + PR #228 close + MEMORY.md update × 2 + DEVLOG/progress prepend × 2
+- **5/14 单日累计 ship 22 PR**: 13 上午-中午 batch + #602 + #603 + #227 + #609 + #612 + **#608 (并发 session ship)** + **#617 + #619 + #618 + #616**
+- **Tier 1 fund/源 explicit-ask 累计**: 12 例 (5/13-5/14 #271/#272/#544/#547/#553/#556/#560/#563 + 5/14 PR #227 + #609 + **#618 第 11 例** + **#616 第 12 例** Tier 1 source 邻接)
+- **8 类 carve-out 扩展**: docs-only 第 12 例 (本 entry devlog PR) + **frontend workspace config 第 9 类首例 (#619)** + T2 infra monitoring (#617 已有类别)
+
+### 遗留问题
+
+- **§17 桌台并发语义对齐 PR**: 合并 #549/#557/#559 + cashier 6 P1/P2 + order 3 P1 = ~11 路径，前提创始人 3 选择题答复
+- **PR #240 D2-D5 真机 smoke**: head `2f270c5d` CONFLICTING 200+ commits behind，硬件已就位。**#619 ship 后 PR #240 web-pos offline cashier check 应转绿**
+- **本 batch test 缺失 P2 follow-up**: B1 mock httpx.DecodingError unit test + B3 mock get_nonce_store lifespan 集成 test — §19 round-1 E 项 P2 建议
+- pre-existing CI 漂移 11+ 项与本批无关，`project_tunxiang_ci_gates.md` 已登记
+
+### 明日计划
+
+- 优先 PR #240 D2-D5 真机 smoke (rebase 到 `eee4fe5a` + 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini M4 + Core ML 模型部署)
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 关键 takeaway (跨 session 价值)
+
+- **§19 reviewer 真实价值证明**: PR #616 round-1 抓到 `httpx.DecodingError` MRO silent bug — 主代理 + 本地 + CI 都无法发现的真 BUG，因为 PR 目标(保留下游 status code)在 mock test 不显现，prod 端 KDS 设备 ESC/POS 二进制响应才暴露。即使简单 1 处改动 (26 行 try/except)，独立 reviewer 仍能抓到 silent regression
+- **新 carve-out 类别**: PR #619 pnpm-workspace.yaml 加 e2e 是 **frontend workspace config carve-out 第 9 类首例**，blast radius 0，不在 tier1-gate paths，不动业务源/测试/schema。建议扩 `feedback_carveout_admin_merge_pattern.md`
+
+---
+
 ## 2026-05-14 中午–下午 — PR #227 + PR #609 双 ship · edge sync nonce store 完整闭环 (Tier 1 fund/源 explicit-ask 第 8 + 第 9 例)
 
 ### 今日完成

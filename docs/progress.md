@@ -1,3 +1,43 @@
+## 2026-05-14 下午段 13:44 · 轻量 P0/P1/P2 follow-up 4 PR batch ship (B/C 路径完整闭环, 5 issues 全 CLOSED)
+
+### 完成状态
+
+- [x] **PR #617** Prometheus PaymentSuccessRateLow NaN guard MERGED `d84b3e1e` (T2 infra carve-out, Closes #607, 1 行 yaml)
+- [x] **PR #619** pnpm-workspace.yaml 加 e2e MERGED `ae8337fd` (**frontend workspace config carve-out 第 9 类首例**, Closes #601, 1 行 yaml)
+- [x] **PR #618** tx-trade lifespan EdgeSyncNonceStore warmup + close MERGED `a0fc816e` (Tier 1 source 邻接 explicit-ask 第 11 例, Closes #610 + #611 手动, +17 行)
+- [x] **PR #616** gateway proxy 非 JSON guard MERGED `eee4fe5a` (Tier 1 source 邻接 explicit-ask 第 12 例, Closes #606, +26/-1 行 + round-1 §19 P1 fix `c2a8bee0` 1 行)
+- [x] **§19 reviewer round-1 双跑** (B1 + B3, B2/C 1 行 yaml 跳 reviewer) — B3 APPROVED 0 P0/P1 + B1 抓到 1 P1 silent bug (`httpx.DecodingError` MRO 不继承 ValueError)
+- [x] **§19 reviewer round-2** (B1 only, fix commit scope) APPROVED 0 P0/P1 — fix `c2a8bee0` 真正闭合 P1 + 无回归 + httpx>=0.27.0 兼容
+- [x] **CI 真门禁全绿** (4 PR Tier 1 门禁判定不触发是设计预期 + frontend-build + edge-mac-station + Analyze Changes & Label SUCCESS)
+- [x] **Race guard** main HEAD 4d72fe90 → eee4fe5a (PR #608 并发 session ship 不动主题)
+- [x] **5 issues 全 CLOSED**: #601 + #606 + #607 + #610 + #611 (PR #618 body Closes 多关键字解析失败 → 手动 close #611)
+- [x] **17 → 22 PR 单日 ship tally** (上 session 17 PR + 本 session 6 PR - 重复计数 + #608 并发 = 22 PR)
+
+### 关键决策
+
+- **轻量并行 group-ask 模式** (5/13 carve-out 同主题 4 PR batch pattern 跨主题扩展) — 4 PR 起独立 worktree + 改动 + push + create PR + (§19 + race guard) → 一次 group explicit-ask user "B1+B2+B3+C 4 PR 批量授权 admin-merge"，sequential ship。比 4 单 PR ship friction 低 4 倍
+- **§19 reviewer scope 分级** — 实质 logic 改动 (B1 26 行 try/except + B3 17 行 lifespan) 走 §19 reviewer；1 行 yaml/config blast radius 0 (B2 + C) 跳 reviewer 走 group ask + 自评。验证：B1 reviewer 抓到 silent bug (httpx.DecodingError MRO) — 实质 logic 改动 reviewer 不可省
+- **carve-out 类别区分** — B2 T2 infra monitoring (alerts.yml YAML config) / C **frontend workspace config 第 9 类首例** (pnpm-workspace.yaml root config) / B1+B3 Tier 1 source 邻接 (gateway/proxy.py + tx-trade/main.py 都不在 TIER1_SOURCE_PATTERNS 精确白名单但触碰 Tier 1 服务关键路径). carve-out 矩阵从 8 类扩展到 9 类
+- **silent bug 教训** (PR #616 round-1) — `httpx.DecodingError` MRO `(DecodingError → RequestError → HTTPError → Exception)` **不继承 ValueError**，下游 KDS ESC/POS 二进制响应才触发，mock test 不显现。修法仅加 `httpx.DecodingError` 到 except tuple 1 行。`feedback_self_review_blind_spots.md` 实证扩展 — 即使简单 try/except 改动，独立 reviewer 仍能抓 silent regression
+- **issue 自动 close 不全** — PR #618 body 写 "Closes #610 #611" 但 GitHub 只 close #610，#611 OPEN。手动 `gh issue close 611 --comment "Closed by PR #618"`. 教训：多 issue 一 PR 时验证 closed 状态，必要时手动 close
+
+### 下一步
+
+- 优先 PR #240 D2-D5 真机 smoke (rebase 到 main `eee4fe5a` + 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini M4 + Core ML 模型部署 + #619 ship 后 web-pos offline cashier check 应转绿)
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复)
+- 或本 batch P2 follow-up unit test (B1 mock httpx.DecodingError + B3 mock get_nonce_store lifespan 集成)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- 本 batch 4 PR 总 +45/-1 跨 4 服务 (gateway/tx-trade/infra/root)，无源-test 配对 gate 触发但 P2 test 缺失留 follow-up
+- pre-existing CI 漂移 11+ 项 (python-lint-test / Ruff / Test Changed Services / TypeScript Check) 全 PR 一律 fail — 与本批无关，`project_tunxiang_ci_gates.md` 已登记
+- **22 PR/单日** 远超 `feedback_proactive_session_split.md` 4+ 阈值，下次 session 必须新启动 (cold-start prompt 已含)。本 session 已 ship 6 PR + 7 issue/manual close + 2 devlog PR，session 上下文累积成本接近临界
+- PR #619 frontend workspace config 是新 carve-out 类别首例，归类待 `feedback_carveout_admin_merge_pattern.md` 后续扩展。建议归"frontend workspace config"或扩 T2 infra
+- B1/B3 触碰 Tier 1 服务关键路径文件 (gateway proxy + tx-trade main.py lifespan) 但都不在 TIER1_SOURCE_PATTERNS 精确白名单 — design gap 候选：source 配对 gate paths 是否需要扩到 gateway proxy / tx-trade main.py？议题需创始人决策
+
+---
+
 ## 2026-05-14 中午–下午 12:07–13:19 · PR #227 + PR #609 双 ship · edge sync nonce store 完整闭环 (Tier 1 fund/源 explicit-ask 第 8 + 第 9 例)
 
 ### 完成状态
