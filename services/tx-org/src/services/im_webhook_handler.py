@@ -54,7 +54,7 @@ async def handle_wecom_callback(data: dict[str, Any]) -> dict[str, Any]:
 
     logger.info(
         "wecom_callback_received",
-        event=event,
+        wecom_event=event,
         change_type=change_type,
     )
 
@@ -63,7 +63,7 @@ async def handle_wecom_callback(data: dict[str, Any]) -> dict[str, Any]:
         return await _handle_wecom_contact_change(change_type, data)
 
     # 其他事件（审批回调等）暂记录日志
-    logger.info("wecom_callback_unhandled", event=event, change_type=change_type)
+    logger.info("wecom_callback_unhandled", wecom_event=event, change_type=change_type)
     return {"handled": False, "event": event, "change_type": change_type}
 
 
