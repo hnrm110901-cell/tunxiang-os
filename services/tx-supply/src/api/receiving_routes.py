@@ -5,15 +5,19 @@
 
 from __future__ import annotations
 
+from datetime import date
 from typing import List
 
-from fastapi import APIRouter, Header
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
 try:
     # 作为包导入时（FastAPI 运行时），使用相对导入
+    from ..services.cert_service import is_supplier_blocked_via_po
     from ..services.receiving_service import (
         confirm_transfer,
         create_receiving,
@@ -23,6 +27,9 @@ try:
     )
 except ImportError:
     # sys.path 直接指向 src/ 时（测试环境），使用绝对导入
+    from services.tx_supply.src.services.cert_service import (  # type: ignore[no-redef]
+        is_supplier_blocked_via_po,
+    )
     from services.tx_supply.src.services.receiving_service import (  # type: ignore[no-redef]
         confirm_transfer,
         create_receiving,
@@ -87,15 +94,36 @@ class ConfirmTransferRequest(BaseModel):
 async def create_receiving(
     body: CreateReceivingRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ):
-    """C5: 创建收货验收单"""
+    """C5: 创建收货验收单。
+
+    §19 P0-1 修复：v1 路径补 PRD-01 食安阻断。
+    通过 purchase_order_id 反查 supplier_id 后调 is_supplier_blocked。
+    PO 不存在 / supplier_id NULL → fail-closed 422（监管不接受匿名收货）。
+    """
+    # ── PRD-01 食安合规阻断（Tier 1 / fail-closed via PO lookup）─────────────
+    if await is_supplier_blocked_via_po(
+        db,
+        tenant_id=x_tenant_id,
+        purchase_order_id=body.purchase_order_id,
+        today=date.today(),
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "code": "SUPPLIER_CERT_EXPIRED",
+                "message": "供应商证件已过期或采购单无效，无法收货",
+            },
+        )
+    # ── 业务逻辑 ────────────────────────────────────────────────────────────
     try:
         result = await create_receiving(
             body.purchase_order_id,
             [i.model_dump() for i in body.items],
             body.receiver_id,
             x_tenant_id,
-            db=None,
+            db=db,
         )
         return {"ok": True, "data": result}
     except ValueError as e:

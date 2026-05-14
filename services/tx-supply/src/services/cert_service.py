@@ -76,6 +76,52 @@ async def is_supplier_blocked(
     return row is not None
 
 
+async def is_supplier_blocked_via_po(
+    db: AsyncSession,
+    tenant_id: str,
+    purchase_order_id: str,
+    today: date,
+) -> bool:
+    """通过 purchase_order_id 反查 supplier_id 后判断阻断（v1 收货路径 + v2 procurement 流入口）。
+
+    若 PO 不存在或 supplier_id 为 NULL → 食安路径 **fail-closed** 返回 True（阻断）。
+    这与"未知供应商不能收货"语义一致：监管视角，匿名收货违反 PRD-01。
+    """
+    await _set_tenant(db, tenant_id)
+
+    row = (
+        await db.execute(
+            text(
+                """
+                SELECT supplier_id::text AS supplier_id
+                FROM purchase_orders
+                WHERE id        = :po_id::uuid
+                  AND tenant_id = :tenant_id::uuid
+                  AND is_deleted = FALSE
+                LIMIT 1
+                """
+            ),
+            {"po_id": str(purchase_order_id), "tenant_id": _uuid_str(tenant_id)},
+        )
+    ).mappings().first()
+
+    if row is None or not row.get("supplier_id"):
+        # PO 不存在 / PO 无 supplier_id → fail-closed
+        logger.warning(
+            "cert_block_po_lookup_failed_fail_closed",
+            purchase_order_id=str(purchase_order_id),
+            tenant_id=str(tenant_id),
+        )
+        return True
+
+    return await is_supplier_blocked(
+        db,
+        tenant_id=tenant_id,
+        supplier_id=row["supplier_id"],
+        today=today,
+    )
+
+
 async def list_expiring(
     db: AsyncSession,
     tenant_id: str,
@@ -130,7 +176,15 @@ async def renew_cert(
 
     续证后 expire_date > today，is_supplier_blocked 下次查询自动返回 False。
     无需手动解锁。
+
+    §19 P1-2 修复：拒绝过去日期续证（督导手滑穿越续证导致"假成功"，
+    实际仍阻断，徐记早市进货全废）。要求 new_expire_date >= today。
     """
+    if new_expire_date < date.today():
+        raise ValueError(
+            f"new_expire_date={new_expire_date} 不能早于今天 — 续证必须指向未来"
+        )
+
     await _set_tenant(db, tenant_id)
 
     now = datetime.now(timezone.utc)

@@ -47,6 +47,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../../../.."))
 
 from services.tx_supply.src.services.cert_service import (
     is_supplier_blocked,
+    is_supplier_blocked_via_po,
     list_expiring,
     renew_cert,
 )
@@ -424,6 +425,122 @@ class TestListExpiring:
         result = await list_expiring(db=db, tenant_id=_TENANT_XUJI, within_days=7)
 
         assert result == []
+
+
+# ─── §19 P0/P1 修复回归测试 ────────────────────────────────────────────────────
+
+
+def _mk_db_for_po_lookup(
+    *, supplier_id_for_po: str | None, supplier_blocked: bool
+) -> AsyncMock:
+    """构造支持 PO 反查 + supplier_id 阻断查询的 AsyncMock。"""
+    db = AsyncMock()
+    call_count = {"po_lookup": 0, "block_check": 0}
+
+    async def execute_side_effect(query, params=None):
+        sql = str(query)
+        if "set_config" in sql:
+            return MagicMock()
+        if "FROM purchase_orders" in sql:
+            call_count["po_lookup"] += 1
+            r = MagicMock()
+            r.mappings.return_value.first.return_value = (
+                {"supplier_id": supplier_id_for_po} if supplier_id_for_po else None
+            )
+            return r
+        if "FROM supplier_certificates" in sql:
+            call_count["block_check"] += 1
+            r = MagicMock()
+            r.first.return_value = 1 if supplier_blocked else None
+            return r
+        return MagicMock()
+
+    db.execute = AsyncMock(side_effect=execute_side_effect)
+    return db
+
+
+class TestIsSupplierBlockedViaPo:
+    """§19 P0-1 修复回归 — v1 收货路径通过 PO 反查 supplier 阻断。"""
+
+    @pytest.mark.asyncio
+    async def test_po_lookup_then_supplier_blocked_returns_true(self):
+        """GIVEN PO 存在 + supplier_id 有效 + 证件过期 → 返回 True 阻断。"""
+        db = _mk_db_for_po_lookup(
+            supplier_id_for_po=_SUPPLIER_A, supplier_blocked=True
+        )
+        blocked = await is_supplier_blocked_via_po(
+            db,
+            tenant_id=_TENANT_XUJI,
+            purchase_order_id="po-00000000-0000-0000-0000-000000000001",
+            today=date(2026, 5, 14),
+        )
+        assert blocked is True
+
+    @pytest.mark.asyncio
+    async def test_po_lookup_then_supplier_clean_returns_false(self):
+        """GIVEN PO 存在 + supplier 证件正常 → 返回 False 通过。"""
+        db = _mk_db_for_po_lookup(
+            supplier_id_for_po=_SUPPLIER_B, supplier_blocked=False
+        )
+        blocked = await is_supplier_blocked_via_po(
+            db,
+            tenant_id=_TENANT_XUJI,
+            purchase_order_id="po-00000000-0000-0000-0000-000000000002",
+            today=date(2026, 5, 14),
+        )
+        assert blocked is False
+
+    @pytest.mark.asyncio
+    async def test_po_not_found_fail_closed(self):
+        """GIVEN PO 不存在（伪造 ID 或跨租户）→ fail-closed 返回 True。
+
+        徐记场景：攻击者直发 POST /api/v1/supply/receiving 带伪造 PO ID 试图
+        绕过证件阻断。fail-closed 默认拒绝 = 食安硬约束守门。
+        """
+        db = _mk_db_for_po_lookup(supplier_id_for_po=None, supplier_blocked=False)
+        blocked = await is_supplier_blocked_via_po(
+            db,
+            tenant_id=_TENANT_XUJI,
+            purchase_order_id="po-fake-deadbeef",
+            today=date(2026, 5, 14),
+        )
+        assert blocked is True
+
+    @pytest.mark.asyncio
+    async def test_po_has_null_supplier_fail_closed(self):
+        """GIVEN PO 存在但 supplier_id NULL（脏数据/迁移漏字段）→ fail-closed。"""
+        db = _mk_db_for_po_lookup(supplier_id_for_po=None, supplier_blocked=False)
+        blocked = await is_supplier_blocked_via_po(
+            db,
+            tenant_id=_TENANT_XUJI,
+            purchase_order_id="po-dirty-data",
+            today=date(2026, 5, 14),
+        )
+        assert blocked is True
+
+
+class TestRenewCertGuardrails:
+    """§19 P1-2 修复回归 — renew_cert 拒绝过去日期。"""
+
+    @pytest.mark.asyncio
+    async def test_renew_with_past_expire_date_rejected(self):
+        """督导手滑输入过去日期 → ValueError，UPDATE 不执行。
+
+        徐记场景：督导晚 10 点续证误填 2020-01-01，看似成功，但第二天早 6 点
+        is_supplier_blocked 仍 True 阻断收货员 — 早市进货全废。
+        必须 fail-fast 拒绝。
+        """
+        db = AsyncMock()
+        db.execute = AsyncMock()
+        with pytest.raises(ValueError, match="不能早于今天"):
+            await renew_cert(
+                db,
+                tenant_id=_TENANT_XUJI,
+                cert_id=_CERT_ID,
+                new_expire_date=date(2020, 1, 1),
+            )
+        # 关键：UPDATE 不应被调用
+        db.execute.assert_not_called()
 
 
 # ─── 7. 真 PG 并发用例占位（deferred 到 Sprint H DEMO）────────────────────────
