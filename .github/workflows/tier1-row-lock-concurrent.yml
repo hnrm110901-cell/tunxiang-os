@@ -66,14 +66,17 @@ jobs:
           python-version: '3.11'
 
       - name: Install deps
-        # 与 rls-runtime-p0-pg-tests.yml 同款依赖集 — 不扩 tier1-gate
-        # (tier1-gate ~10 包 minimal install 不动, 见 feedback_tier1_ci_minimal_deps_trap.md)
+        # 不扩 tier1-gate ~10 包 minimal install (feedback_tier1_ci_minimal_deps_trap.md)
+        # PR-1 基础: alembic/sqlalchemy/asyncpg/psycopg2-binary/pytest/asyncio/structlog/crypto/yaml
+        # PR-2 扩展: httpx (cashier_engine top-level import for marketing attribution) + pydantic (ontology models)
+        # PR-3/4/5 按需追加；fastapi 暂不需要 (test 不起 app)。
         run: |
           pip install \
             "alembic>=1.13" "sqlalchemy[asyncio]>=2.0" \
             "asyncpg>=0.29" "psycopg2-binary>=2.9" \
             pytest "pytest-asyncio>=0.23" \
-            structlog cryptography pyyaml
+            structlog cryptography pyyaml \
+            "httpx>=0.27" "pydantic>=2.0"
 
       - name: Apply init-rls.sql + init-pgvector.sql
         run: |
@@ -98,31 +101,31 @@ jobs:
         continue-on-error: true
         run: python -m alembic upgrade head
 
-      - name: Verify required tables exist + RLS enabled (PR-1 hard gate)
-        # 真 gate — alembic 上一步成功/失败不重要, 关键是 smoke test 需要的 stores 表
+      - name: Verify required tables exist + RLS enabled (PR-1+PR-2 hard gate)
+        # 真 gate — alembic 上一步成功/失败不重要, 关键是 smoke / 业务 test 需要的表
         # 必须存在 + RLS 启用。失败时本 step 硬 fail, 阻塞 workflow。
         #
-        # PR-2/3/4/5 扩展时加入业务表 (orders/payments/order_items/ingredients 等)。
-        # 当前 PR-1 只要求 stores（最小 smoke 范围）。
+        # PR-2 扩展（本 PR）: orders / order_items / payments (cashier_engine 3 P0 路径)
+        # PR-3/4/5 扩展时继续加入对应业务表 (payment_saga_state / ingredients 等)。
         run: |
+          # 4 表 (PR-1 smoke: stores; PR-2 cashier: orders/order_items/payments)
+          # 全 v001 创建（init-rls.sql / v001_rls_foundation_and_core_entities）, 在 v301
+          # drift 之前已可用。post-v206 列 (order_items.barcode etc) 由 test fixture
+          # `_ensure_v342_schema` ADD COLUMN IF NOT EXISTS 兜底, drift-tolerant 应对。
           PGPASSWORD=test_password_dev_only psql \
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
             --set ON_ERROR_STOP=1 \
-            -c "SELECT
-                  CASE WHEN COUNT(*) = 1 AND BOOL_AND(relrowsecurity)
-                       THEN 'stores OK (RLS enabled)'
-                       ELSE 'stores MISSING or RLS disabled — PR-1 smoke 前置不满足'
-                  END AS status
-                FROM pg_class
-                WHERE relname = 'stores' AND relkind='r';" \
             -c "SELECT relname, relrowsecurity FROM pg_class
-                WHERE relname = 'stores' AND relkind='r';"
-          # Assert exit 1 if stores missing
-          STORES_EXISTS=$(PGPASSWORD=test_password_dev_only psql \
+                WHERE relname IN ('stores', 'orders', 'order_items', 'payments') AND relkind='r'
+                ORDER BY relname;"
+          # Assert all 4 tables exist + RLS enabled
+          COUNT=$(PGPASSWORD=test_password_dev_only psql \
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
-            -tA -c "SELECT COUNT(*) FROM pg_class WHERE relname='stores' AND relkind='r' AND relrowsecurity")
-          if [ "$STORES_EXISTS" != "1" ]; then
-            echo "::error::stores 表不存在或 RLS 未启用 — PR-1 smoke 前置不满足"
+            -tA -c "SELECT COUNT(*) FROM pg_class
+                    WHERE relname IN ('stores', 'orders', 'order_items', 'payments')
+                      AND relkind='r' AND relrowsecurity")
+          if [ "$COUNT" != "4" ]; then
+            echo "::error::PR-2 hard gate fail: 期望 4 表 (stores/orders/order_items/payments) RLS 全启用, 实际 $COUNT 满足"
             exit 1
           fi
 
