@@ -39,22 +39,41 @@ _RLS_TEST_ROLE = "tunxiang_rls_app"
 
 # PR-1 smoke test 用表。PR-2/3/4/5 扩展请加入或子目录 conftest 覆盖:
 #   PR-2 (cashier_engine): + orders, payments, order_items ✅ ship (#638)
-#   PR-3 (payment_saga): + payment_sagas ✅ 本 PR (注: v091 真表名是 payment_sagas，
-#     PR-2 conftest 注释 "payment_saga_state" 是 PR-1 写时占位错误，本 PR 同步修正)
-#   PR-4 (inventory): + ingredient_movements, ingredients
+#   PR-3 (payment_saga):   + payment_sagas ✅ ship (#642)
+#   PR-4 (inventory):      + ingredient_transactions, dish_ingredients, ingredients,
+#                            dishes ✅ 本 PR (注: 真表名是 ingredient_transactions/
+#                            dish_ingredients/ingredients/dishes, 不是 PR-1 注释占位
+#                            "ingredient_movements", 本 PR 同步修正)
 #   PR-5 (order+delivery): + delivery_orders
 #
 # **FK 拓扑顺序（子→父序，DELETE 时遵循）**:
+#   ingredient_transactions → ingredients → dish_ingredients → dishes
 #   payment_sagas → payments → order_items → orders → stores
-#   (payment_sagas.order_id 逻辑→orders / .payment_id 逻辑→payments — v091 未声明 FK
-#    constraint 但语义子表; payments.order_id FK→orders / order_items.order_id FK→orders
-#    / orders.store_id FK→stores)
+#   (ingredient_transactions.ingredient_id FK→ingredients / .store_id FK→stores v010;
+#    ingredients.store_id FK→stores;
+#    dish_ingredients.dish_id FK→dishes (.ingredient_id 是 String(50) 非 FK);
+#    dishes 无业务 FK 依赖 stores;
+#    payment_sagas.order_id 逻辑→orders / .payment_id 逻辑→payments — v091 未声明
+#    FK constraint 但语义子表; payments.order_id FK→orders / order_items.order_id
+#    FK→orders / orders.store_id FK→stores)
 #
 # Issue #635 P2-B follow-up：当前 cleanup 用 SET LOCAL session_replication_role=replica
-# 绕 FK 触发器，PR-2/PR-3 起本 _CONCURRENT_TABLES 真正含 FK 链；顺序错时不会 fail
+# 绕 FK 触发器，PR-2/3/4 起本 _CONCURRENT_TABLES 真正含 FK 链；顺序错时不会 fail
 # （trigger 已绕过）。**未来 PR-2+ 修法**: 切 TRUNCATE...CASCADE 或 CI lint 守顺序。
 # 当前注释标明子→父序，按 issue #635 短期方案 A 处理。
 _CONCURRENT_TABLES: tuple[str, ...] = (
+    # PR-4 (本 PR) inventory (子→父序: ingredient_transactions + dish_ingredients →
+    # ingredients + dishes — 注: dish_ingredients.ingredient_id 是 String(50) 非 FK)
+    "ingredient_transactions",       # 子 (FK → ingredients + stores v010)
+    "dish_ingredients",              # 子 (FK → dishes)
+    "ingredients",                   # 子 (FK → stores)
+    "dishes",                        # 父 (无业务 FK 依赖 stores)
+    # PR #641 W7-W8 Tier 1 供应链标准库（v428/v429/v430）— 反测 row-lock + UNIQUE 幂等
+    # 无 DB-level FK 约束，但 violations 应用层依赖 windows（先清子）
+    "supplier_delivery_violations",  # 子 (应用层依赖 windows)
+    "supplier_delivery_windows",     # 父
+    "ingredient_yield_standards",    # 父 (与 ingredients 应用层关联)
+    "ingredient_weight_standards",   # 父
     # PR #642 (payment_saga, 逻辑 FK → orders + payments，v091 未声明 constraint)
     "payment_sagas",
     # PR #638 (cashier_engine, FK 子→父序): payments → order_items → orders → stores
@@ -62,12 +81,6 @@ _CONCURRENT_TABLES: tuple[str, ...] = (
     "order_items",    # 子 (FK → orders)
     "orders",         # 中间 (FK → stores)
     "stores",         # 父
-    # PR #641 W7-W8 Tier 1 供应链标准库（v428/v429/v430）— 反测 row-lock + UNIQUE 幂等
-    # 无 DB-level FK 约束，但 violations 应用层依赖 windows（先清子）
-    "supplier_delivery_violations",
-    "supplier_delivery_windows",
-    "ingredient_yield_standards",
-    "ingredient_weight_standards",
 )
 
 
