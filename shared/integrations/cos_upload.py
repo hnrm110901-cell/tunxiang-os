@@ -61,6 +61,7 @@ ALLOWED_FOLDERS = {
     "employee",
     "general",
     "contracts",
+    "supplier_certificates",
 }
 
 
