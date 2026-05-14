@@ -1,3 +1,77 @@
+## 2026-05-15 下午 — "0 + A" 第三-第四轮 ship 收尾 sediment：PR #642 (PR-3 payment_saga concurrent SKIP LOCKED 真行为) + PR #644 (PR-4 inventory + auto_deduction concurrent ABBA 真行为) + 并发 PR #641 (W8 PRD-05 时间窗 [Tier1]) + PR #645 (W9 PRD-04 sub-A RFQ [T2]) + 并发 PR #647 (W9 PRD-04 sub-B RFQ award [Tier1]) 5 PR ship (5/14 单日累计 42 PR)
+
+### 今日完成
+
+5/14 末段-末段晚（CST 21:04-22:31）继续 ship 5 PR — "0 + A" 第三-第四轮 路径执行：本 session 任务 A 落地 PR-3 payment_saga (#642) + PR-4 inventory_io + auto_deduction (#644)；同期并发 session 推进供应链 Phase 2 W8/W9 三 PR (#641 + #645 + #647)。**audit doc §4.1.3 (payment_saga SKIP LOCKED) + §4.3 (inventory + auto_deduction ABBA) 真行为反测覆盖完成 + RFQ award concurrent 跨服务真行为反测首例 (PR #647)**。**5/14 单日累计 ship 42 PR**（37 prior 末段晚 + 5 本批 = 42 PR / 单日新历史再创）。
+
+**PR #642 — payment_saga concurrent Tier 1 测试 PR-3 MERGED** `4eb37c89` (admin squash, **Tier 1 fund/源/邻接 explicit-ask 第 21 例**, 5/14 21:04 CST, 3 files / +551 / -19):
+- `tests/concurrent/test_payment_saga_concurrent_tier1.py` NEW — 2 P0 用例：T1 N=10 concurrent compensate 同 saga 验 `gateway.refund 调用次数 = 1`（FOR UPDATE + 3 状态幂等防双退款 P0 核心）+ T2 N=10 recover_pending_sagas 跨 worker SKIP LOCKED 处理总数 = 10
+- 本地真 PG **8/8 PASS in 1.69s**
+- §19 reviewer round-1 **0 P0 / 0 P1 / 4 P2 + 1 P3 → Issue #643** (与 PR #553 PR-C 完美 0/0 收尾对齐 — 超 PR-2 #638 0/2 P1 水位)
+- CI `Tier 1 Row-Lock — 真 PG N 路并发反测` PASS — drift-tolerant CI workflow 模式第 3 次实战
+- audit doc §4.1.3 payment_saga 2 P0 路径从 mock-only 升真行为 race 验证
+
+**PR #644 — inventory + auto_deduction concurrent Tier 1 测试 PR-4 MERGED** `4beeb1ef` (admin squash, **Tier 1 fund/源/邻接 explicit-ask 第 23 例**, 5/14 22:08 CST, 3 files / +640 / -27):
+- `tests/concurrent/test_inventory_concurrent_tier1.py` NEW — 2 P0 用例：T1 N=10 receive_stock 终态 `current_quantity = 100` (FOR UPDATE 真生效, 毛利底线) + T2 N=10 deduct_for_dish 单 dish 多 ingredient 反向序 BOM 0 PostgresDeadlockDetected (sorted(key=str) ADR 0002 真生效)
+- §19 reviewer round-1 **REQUEST-CHANGES (1 P0 + 1 P1)** → in-PR fix `be4f0b89` → round-2 **APPROVE 0/0** (P0-1 P1-1 fix VERIFIED real-signal closures, 与 PR #227 多轮 fix verify 同模式; 不如 PR #553/#642 一发即过)
+- **Issue #643 P2-A distinct-set 升级模板首次落地** — quantity 严格递增序列 `sorted(qty_after) == [10,20,...,100]` (FOR UPDATE 真生效证据) + T2 worker_idx distinct-set
+- CI `Tier 1 Row-Lock — 真 PG N 路并发反测` PASS — drift-tolerant CI workflow 模式第 4 次实战 ✅ 累积四例阈值达成
+- 4 项 round-1 deferred → **Issue #646** (Gap-A 跨 dish 预聚合 ABBA 测试覆盖空白 + P2-1 docstring path / P2-2 schema 漂移 unit test / P2-3 workflow gate 精度)
+
+**并发 session PR #641 — PRD-05 供应商配送时间窗 v430 (Phase 2 W8) MERGED** `eacbaca5` (admin squash, **Tier 1 fund/源/邻接 explicit-ask 第 22 例**, 5/14 21:13 CST, +3399 / -7) — 不在本 session scope，acknowledged for tally only。10 commits / §19 round-1 P0+P1+round-2 APPROVE / 3 路 race rebase 合并 PR #638/#642 conftest（W8 PRD-05 时间窗+集成+并发，Phase 2 W7-W12 第 3 PR）
+
+**并发 session PR #645 — PRD-04 sub-A RFQ 询价单 v431 schema (Phase 2 W9) MERGED** `07550131` (admin squash, **[T2] 不在 Tier 1 explicit-ask tally**, 5/14 21:52 CST, +825 / -4) — 不在本 session scope，acknowledged for tracking only（W9 RFQ + #613 supplier_portal_messages UNIQUE）
+
+**并发 session PR #647 — PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发 (Phase 2 W9) MERGED** `bf45aa3e` (admin squash, **Tier 1 fund/源/邻接 explicit-ask 第 24 例**, 5/14 22:31 CST, 8 files / +1364 / -2) — 不在本 session scope，acknowledged for tally only。RFQ award 路径 Tier 1 + 二级审批 + 200 桌并发反测；新增 `tests/concurrent/test_rfq_award_concurrent_tier1.py` (228 行, drift-tolerant CI **第 5 次实战**) + 扩 `_CONCURRENT_TABLES` 加 RFQ 表 + `services/tx-supply/src/tests/test_rfq_service_tier1.py` (529 行)
+
+### §19 reviewer 评审记录 (PR-3 + PR-4)
+
+**PR-3 #642**: ✅ APPROVED round-1 (0 P0 / 0 P1 / 4 P2 + 1 P3) — **首次零阻塞收尾，与 PR #553 PR-C 同 0/0 金标准对齐**
+- 4 P2: T2 SKIP LOCKED 真生效证据 distinct-set / T1 真 refund worker 区分 / drain sleep 显式化 / conftest scan SoT
+- 1 P3: T2 setup payment_id 文档化假设
+- 全部 → Issue #643 follow-up
+
+**PR-4 #644**: round-1 REQUEST-CHANGES (1 P0 + 1 P1) → in-PR fix `be4f0b89` → round-2 APPROVE (0 P0 / 0 P1)
+- P0-1 fix: T2 跨 dish 假绿（Python set hash-determinism + db.begin_nested savepoint reentrant）→ 重写 T2 改测 `deduct_for_dish` single dish 多 ingredient 反向序，真覆盖 L131 within-dish sort
+- P1-1 fix: T1 distinct-set 0 信号 → 加 quantity 严格递增序列 `sorted(qty_after) == [10,20,...,100]` 断言（FOR UPDATE 真生效证据）
+- 4 项 round-1 deferred → Issue #646 (Gap-A 跨 dish 预聚合 ABBA 测试覆盖空白 + 3 P2)
+
+### 关键决策（跨 session 价值）
+
+- **Tier 1 explicit-ask tally 重校准 第二次** — cold-start 称「PR #644 = 第 22 例」漏算 #641 (5/14 21:13 CST 在 #642/#644 之间) 与 PR #647 (5/14 22:31 CST sediment 进行中并发 ship)。**实际按 merge 时间戳 + 包含并发 session [Tier1] PR 排序权威序号**：16 prior → 17=#634 (5/14 18:22) → 18=#633 (5/14 18:30) → 19=#637 (5/14 20:00) → 20=#638 (5/14 20:19) → **21=#642** (5/14 21:04 sediment) → **22=#641** (5/14 21:13 concurrent W8 [Tier1]) → **23=#644** (5/14 22:08 sediment) → **24=#647** (5/14 22:31 concurrent W9 [Tier1])。**精确计数法**：[Tier1] tag + explicit-ask 模式 + 并发 session 同样统一计入（前 PR #640 sediment 已用此标准包括 #633/#637 两例并发 W7）；[T2] 不计入（如 PR #645）。**累计 24 例**（cold-start 称 22 例 + #641 漏算 + #647 sediment 进行中 ship = 24 reconciled）。MEMORY.md L287 列表本批 sediment 同步修正
+- **drift-tolerant CI workflow 累积五例正式启用 carve-out 第 12 类** — PR #634 PR-1 + PR #638 PR-2 + PR #642 PR-3 + PR #644 PR-4 + **PR #647 RFQ award concurrent** 五次实战稳定（PR #647 由并发 session 在 sediment 进行中 ship，自动满足第 5 例阈值）。**判定条件**：(i) workflow ADD 含 `continue-on-error: true` on `alembic upgrade head` (ii) 显式 HARD verify step 校验 smoke 真前置 (业务必须表 + RLS 启用) (iii) 真 drift 修走独立 issue 不阻塞新 gate。**正式纳入 carve-out 第 12 类**：未来类似 alembic-chain-dependent CI gate ADD 满足此三项可走 docs-only 等 carve-out 通道。`feedback_drift_tolerant_workflow.md` + `feedback_carveout_admin_merge_pattern.md` 同步更新（待本批 sediment 落 MEMORY.md L75 + 新建 carve-out 第 12 类条目）
+- **PR-3 / PR-4 audit doc §4.1.3 / §4.3 真行为反测覆盖闭环** — 6-PR concurrent_runner roadmap 第 3/6 + 第 4/6 完工，剩余 PR-5 order_service + delivery_adapter (~1day, audit §4.2.x) + PR-6 (可选) pg_dump cache 加速。**质量水位**：PR-3 0/0 一发即过（与 PR #553 PR-C 同金标准）+ PR-4 round-1 1 P0+1 P1 → round-2 APPROVE 0/0 (与 PR #227 多轮 fix verify 同模式)
+- **Issue #643 P2-A distinct-set 升级模板 PR-4 已实战** — PR-3 §19 round-1 deferred「P2-A T2 SKIP LOCKED 真生效证据 distinct-set assertion」教训在 PR-4 T1 立即应用：quantity 严格递增序列 `sorted(qty_after) == [10,20,...,100]` 是 FOR UPDATE 真生效的真信号（"自然分裂"vs"串行 FOR UPDATE 阻塞"区分）。**Lesson 复利**：deferred P2/P3 follow-up 不必等独立 PR 修，下一 PR 启动时如有触碰直接顺手套用 — 本次第二次实战印证（PR-2 已用 #635 P2-B FK 拓扑 lesson）
+- **新教训 `feedback_concurrent_session_workflow_conflict_silent_ci.md` 落盘** — PR-4 实战首例：并发 session ship workflow file → 后启 PR base 缺并发 paths → CONFLICTING/DIRTY → GHA 不跑任何 workflow（仅 CodeRabbit 反馈）→ 诊断 `gh pr view <N> --json mergeable,mergeStateStatus` → 修复 rebase + 保留两边 + force-push-with-lease。PR-4 base `4eb37c89` 落后 2 commit (#641 W8 + #645 W9)，先误判 GHA throttling，靠 mergeStateStatus=DIRTY 明确诊断后修复。MEMORY.md L77 已索引
+
+### 数据变化
+
+- 迁移版本：无（本批 4 PR 都 0 migration — PR #641 v430 + PR #645 v431 算 Phase 2 W8/W9 已 ship 进 main，sediment 不重复计入）
+- 新增源：0 file（本 session scope 内 — 并发 session 改动不计）
+- 新增测试 infra：2 file（test_payment_saga_concurrent_tier1.py + test_inventory_concurrent_tier1.py 共 +900 行）
+- 修改测试 infra：1 file（conftest.py `_CONCURRENT_TABLES` 累加至 13 表 by domain + FK 子→父序）
+- 修改 CI workflow：1 file（tier1-row-lock-concurrent.yml HARD gate 加 saga + inventory 表 RLS）
+
+### 累计 tally 更新 (5/14 末段-末段晚)
+
+- **Tier 1 fund/源/邻接 explicit-ask** (不在 12 类 carve-out): 5/14 末段-末段晚累计 **24 例** (16 Phase 1 prior + 17=#634 + 18=#633 + 19=#637 + 20=#638 + 21=#642 + 22=#641 + 23=#644 + 24=#647)
+- **5/14 单日累计 ship 42 PR** = 37 prior 末段晚 (32 prior + 4 第二轮 + 1 第三轮 #642) + 5 第四轮 (#644 + 并发 #641 + 并发 #645 + 并发 #647) = 42 PR / 单日新历史
+- **6-PR concurrent_runner roadmap 进度**: 4/6 完工 (PR-1 #634 + PR-2 #638 + PR-3 #642 + PR-4 #644) + 剩 PR-5 order_service+delivery_adapter / PR-6 (可选) pg_dump cache
+- **drift-tolerant CI workflow**: 累积五例 (PR #634 + #638 + #642 + #644 + **#647**) → **正式启用 carve-out 第 12 类**（PR #647 RFQ award concurrent 由并发 session ship，自动满足第 5 例阈值）
+
+### 遗留问题
+
+- §17 桌台并发语义对齐 follow-up PR (合并 #549/#557/#559/cashier 6 P1+P2/order 3 P1 = ~11 路径) — 等创始人 3 选择题 (双开台 race / 转桌争抢 / 结算释放桌台中间态)
+- **Issue #643** PR-3 §19 4 P2 + 1 P3 follow-up: T2 distinct-set / T1 真 refund worker 区分 / drain sleep 显式化 / conftest scan SoT / T2 setup payment_id 文档化
+- **Issue #646** PR-4 §19 round-1 4 项 follow-up: Gap-A 跨 dish 预聚合 ABBA 测试覆盖空白 + P2-1 docstring path / P2-2 schema 漂移 unit test / P2-3 workflow gate 精度
+- pre-existing CI 漂移 12+ 项 (python-lint-test / Ruff / frontend-build / Test Changed Services) 与本批无关
+
+### 明日计划
+
+PR-5 order_service + delivery_adapter concurrent (~1day, audit §4.2.x, 6-PR roadmap 第 5/6) — 应用 PR-4 distinct-set 真模板 + drift-tolerant CI 第 5 次实战预期；或 PR-6 pg_dump cache 加速 (audit doc §6.2 第 2 期, workflow ~5min → ~30s)；或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复)；或 Mac mini M4 真机部署 / 等创始人 P0 输入
+
+---
+
 ## 2026-05-15 上午 — "0 + A" 第二轮 ship 收尾 sediment：PR #636 ("0 + A" 第一轮 sediment) + PR #638 (PR-2 cashier_engine concurrent 框架金标准) + 并发 PR #633 (PRD-02 W7-1 扣秤) + PR #637 (PRD-06 W7-2 出料率) 4 PR ship (5/14 单日累计 36 PR)
 
 ### 今日完成
