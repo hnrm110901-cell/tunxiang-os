@@ -295,8 +295,14 @@ async def test_inventory_receive_stock_concurrent_n10_no_lost_update(session_fac
         )
         await s.commit()
 
-    async def _receive(session: AsyncSession) -> str:
-        """单 worker receive_stock + 返回 tx_id (Issue #643 P2-A distinct-set)."""
+    async def _receive(session: AsyncSession) -> tuple[str, float]:
+        """单 worker receive_stock + 返回 (tx_id, new_quantity) tuple.
+
+        §19 PR-4 P1-1 fix: distinct-set tx_id 仅是 uuid4 现场生成，FOR UPDATE 失效
+        也不会触发. 改返回 new_quantity 形成 [10, 20, ..., 100] 严格递增序列断言 —
+        FOR UPDATE 真生效则各 worker quantity_after 互异且累加; lost update 则会出现
+        重复值 (e.g., 多 worker 看到 qty_before=0 都写 10).
+        """
         result = await receive_stock(
             ingredient_id=str(ingredient_id),
             quantity=10.0,
@@ -307,7 +313,7 @@ async def test_inventory_receive_stock_concurrent_n10_no_lost_update(session_fac
             tenant_id=str(tenant_id),
             db=session,
         )
-        return result["transaction_id"]
+        return (result["transaction_id"], result["new_quantity"])
 
     results = await run_concurrent(
         session_factory, tenant_id, n=10,
@@ -366,105 +372,137 @@ async def test_inventory_receive_stock_concurrent_n10_no_lost_update(session_fac
             f"transactions sum quantity actual={total_qty} expected=100.0"
         )
 
-    # 主断言 (Issue #643 P2-A distinct-set): worker 返回的 tx_ids 全部 distinct
-    tx_ids = [r for r in results if isinstance(r, str)]
-    assert len(tx_ids) == 10, (
-        f"worker 返回 tx_id 数 actual={len(tx_ids)} expected=10. "
-        f"non-string results: {[r for r in results if not isinstance(r, str)][:3]}"
+    # 主断言 (Issue #643 P2-A 升级 — §19 PR-4 P1-1 fix):
+    # worker 返回 (tx_id, new_quantity) 严格递增序列. FOR UPDATE 串行化下各 worker
+    # quantity_after 互异 (10, 20, 30, ..., 100); lost update 时序列会重复或缺值.
+    # 这才是真有 BUG-detection signal 的断言 (P2-A 模板正解).
+    pairs = [r for r in results if isinstance(r, tuple)]
+    assert len(pairs) == 10, (
+        f"worker 返回 (tx_id, new_quantity) tuple 数 actual={len(pairs)} expected=10. "
+        f"non-tuple results: {[r for r in results if not isinstance(r, tuple)][:3]}"
     )
-    distinct_tx_ids = set(tx_ids)
-    assert len(distinct_tx_ids) == 10, (
-        f"Issue #643 P2-A distinct-set 失败: distinct tx_ids "
-        f"actual={len(distinct_tx_ids)} expected=10. "
-        f"重复 tx_id (理论上 uuid4 撞概率 ~0, 但若 worker 假绿返回 fixture-shared "
-        f"id 也会落入此分支): {tx_ids}"
+    tx_ids = [p[0] for p in pairs]
+    new_qtys = sorted(p[1] for p in pairs)
+    expected_qtys = [10.0 * (i + 1) for i in range(10)]  # [10, 20, ..., 100]
+    assert new_qtys == expected_qtys, (
+        f"Issue #643 P2-A FOR UPDATE 串行化真生效断言失败: "
+        f"sorted(quantity_after) actual={new_qtys} expected={expected_qtys}. "
+        f"FOR UPDATE 真生效 → 10 worker 各自看到不同 qty_before (0/10/20/.../90), "
+        f"写入 qty_after (10/20/30/.../100). lost update 时多 worker 看到 qty_before=0 "
+        f"都写 qty_after=10, 序列会出现重复值 (e.g., [10,10,...,10] 或 [10,20,20,...])"
     )
+    # 辅助断言: tx_ids 仍 distinct (uuid4 现场生成 ~0 概率撞), 留作 sanity check
+    assert len(set(tx_ids)) == 10, f"tx_ids 重复 (uuid4 撞概率应 ~0): {tx_ids}"
 
 
 # ───────────────────────────────────────────────────────────────────
-# T2: N=10 concurrent deduct_for_order — ADR 0002 跨 dish ABBA 死锁防护真行为
+# T2: N=10 concurrent deduct_for_dish — ADR 0002 within-dish ABBA 死锁防护真行为
 # ───────────────────────────────────────────────────────────────────
-async def test_inventory_deduct_for_order_cross_dish_abba_no_deadlock(session_factory):
-    """T2 — 200 桌晚高峰多单同时完成跨 dish 共享 ingredient ABBA 防护真行为.
+async def test_inventory_deduct_for_dish_within_dish_abba_no_deadlock(
+    session_factory, monkeypatch,
+):
+    """T2 — single dish 多 ingredient BOM 反向序, deduct_for_dish L131 sort 真生效.
+
+    §19 PR-4 P0-1 fix: 原设计调 deduct_for_order 跨 dish 不能真触发 ABBA, 因为:
+      (a) Python set[uuid.UUID] 迭代顺序 hash-deterministic 跨 worker 一致, 即使
+          源 L284 sorted 移除也不会 ABBA;
+      (b) deduct_for_order 用 db.begin_nested() savepoint, L284 预聚合已锁齐所有
+          ingredient, 后续 deduct_for_dish 内部 SELECT FOR UPDATE 是同事务 reentrant
+          不再申请新锁, 即使源 L131 sorted 移除也不会 ABBA.
+
+    新设计: 直接调 deduct_for_dish (绕过 deduct_for_order 预聚合), monkeypatch
+    `_get_bom_for_dish` 返回**显式控制**的 BOM 顺序 (D1=[A,B] / D2=[B,A]),
+    保证 worker 看到的 BOM 顺序差异. 这才能真测试 L131 内部 sort:
 
     setup: 1 store + 2 ingredients (ing_a, ing_b, current_quantity=1000 each, min=10)
-           + 2 dishes (D1, D2)
-           + dish_ingredients 反向序 BOM:
-             D1.bom = [(ing_a, 1.0), (ing_b, 1.0)]   ← A 在前
-             D2.bom = [(ing_b, 1.0), (ing_a, 1.0)]   ← B 在前 (REVERSED — 触发 ABBA)
-    runner: N=10 workers, 5 alternating dish:
-             worker 0,2,4,6,8 → order_items=[{dish_id: D1.id, qty=1}]
-             worker 1,3,5,7,9 → order_items=[{dish_id: D2.id, qty=1}]
+           + 2 dishes (D1, D2) (无 dish_ingredients 行, BOM 由 monkeypatch 提供)
+           + monkeypatch _get_bom_for_dish:
+             - D1 → [{ingredient_id: ing_a, qty: 1.0}, {ingredient_id: ing_b, qty: 1.0}]
+             - D2 → [{ingredient_id: ing_b, qty: 1.0}, {ingredient_id: ing_a, qty: 1.0}]
+    runner: N=10 workers, 偶数 worker → deduct_for_dish(d1) / 奇数 → deduct_for_dish(d2)
     断言（核心 ADR 0002 ABBA 防护真行为, audit §4.3 P0 Issue #549）:
-      - 10 worker 全部成功（无 exception — sorted(key=str) 预聚合保证一致锁顺序,
-        无 PostgresDeadlockDetected）
-      - ing_a.current_quantity = 1000 - 10 = 990 (10 workers × 1.0 each)
-      - ing_b.current_quantity = 990 同
-      - ingredient_transactions count = 20 (每 worker 2 tx = 1 per ingredient)
-      - **distinct-set assertion (Issue #643 P2-A 升级)**: 10 worker 各处理自己 order
-        独立 ingredient_ids, 无重复处理, sum_total_consumed = 20 (10 × 2 ingredients)
+      - 10 worker 全部成功 — L131 `sorted_bom_lines.sort(key=lambda x: str(x[ingredient_id]))`
+        真生效, 所有 worker 都按 str(uuid) 升序锁 ing → 无 ABBA
+      - ing_a.current_quantity = 990 (1000 - 10 workers × 1.0)
+      - ing_b.current_quantity = 990
+      - ingredient_transactions consume count = 20 (10 worker × 2 BOM lines/dish)
+      - **distinct-set assertion**: 10 worker 各独立 worker_idx, sum_deducted = 20
 
-    若 sorted() 未生效（ADR 0002 / PR #567 回归）:
-      - worker A 锁 ing_a 后等 ing_b
-      - worker B 锁 ing_b 后等 ing_a
-      - PG deadlock detector 触发 → 一方 raise DeadlockDetected → worker fail
-      - exceptions count > 0 触发 P0 fail
-      - **客户体验硬约束**: 出餐失败 → 订单 settle 失败级联
+    若 L131 sort 未生效（ADR 0002 / PR #547 PR-B 回归）:
+      - D1 worker (idx 偶): sorted_bom_lines = [A, B] (按 monkeypatch 输入序), 锁 A 后等 B
+      - D2 worker (idx 奇): sorted_bom_lines = [B, A] (按 monkeypatch 输入序), 锁 B 后等 A
+      - PG deadlock detector 触发 → 一方 raise DeadlockDetected
+      - **食安/毛利硬约束**: 200 桌晚高峰跨菜系共享 ingredient (葱姜蒜) 死锁 →
+        出餐失败 → 订单 settle 失败级联
 
     与 T1 互补:
       - T1: 同 ingredient 多 receive_stock → FOR UPDATE 防 lost update (单点锁)
-      - T2: 跨 dish 共享 ingredient → sorted() 防 ABBA (多点锁排序)
+      - T2: 同 dish 多 ingredient 反向序 → L131 sort 防 ABBA (多点锁排序)
     """
-    from services.tx_supply.src.services.auto_deduction import deduct_for_order
+    import services.tx_supply.src.services.auto_deduction as auto_dedup_module
+    from services.tx_supply.src.services.auto_deduction import deduct_for_dish
 
     tenant_id = _new_uuid()
 
-    # setup: 2 ingredients + 2 dishes + 反向序 BOM
+    # setup: 2 ingredients + 2 dishes (BOM 由 monkeypatch 提供, 不存 dish_ingredients)
     async with session_factory() as s:
         store_id = await _seed_store(s, tenant_id)
         ing_a = await _seed_ingredient(
             s, tenant_id, store_id,
-            current_quantity=1000.0, min_quantity=10.0, name="ing-a-cross",
+            current_quantity=1000.0, min_quantity=10.0, name="ing-a-abba",
         )
         ing_b = await _seed_ingredient(
             s, tenant_id, store_id,
-            current_quantity=1000.0, min_quantity=10.0, name="ing-b-cross",
+            current_quantity=1000.0, min_quantity=10.0, name="ing-b-abba",
         )
         d1 = await _seed_dish(s, tenant_id)
         d2 = await _seed_dish(s, tenant_id)
-        # D1.bom = [A, B]   ← ABBA 一边
-        await _seed_dish_ingredient(s, tenant_id, d1, ing_a, quantity=1.0)
-        await _seed_dish_ingredient(s, tenant_id, d1, ing_b, quantity=1.0)
-        # D2.bom = [B, A]   ← REVERSED — 不 sorted 会触发 ABBA
-        await _seed_dish_ingredient(s, tenant_id, d2, ing_b, quantity=1.0)
-        await _seed_dish_ingredient(s, tenant_id, d2, ing_a, quantity=1.0)
         await s.commit()
 
-    # worker 索引 → 决定用 D1 还是 D2; counter 通过 closure 计数, 但 run_concurrent
-    # 不直接传 index, 所以我们用 dict 记账 worker_id → dish_id 后选择
+    # monkeypatch _get_bom_for_dish — D1/D2 BOM 反向序
+    # 源 _get_bom_for_dish 返回 list[dict[str, Any]] with keys {ingredient_id, quantity, unit}
+    # ingredient_id 类型: source 用 row.ingredient_id (String(50)) 直接返回 str.
+    # auto_deduction.deduct_for_dish L122-130 build sorted_bom_lines, L131 sort by str(ing_id).
+    bom_d1 = [
+        {"ingredient_id": str(ing_a), "quantity": 1.0, "unit": "kg"},
+        {"ingredient_id": str(ing_b), "quantity": 1.0, "unit": "kg"},
+    ]
+    bom_d2 = [
+        {"ingredient_id": str(ing_b), "quantity": 1.0, "unit": "kg"},  # REVERSED — 触发 ABBA
+        {"ingredient_id": str(ing_a), "quantity": 1.0, "unit": "kg"},
+    ]
+
+    async def _mock_get_bom(db, dish_uuid, tenant_uuid):  # noqa: ARG001
+        if dish_uuid == d1:
+            return bom_d1
+        if dish_uuid == d2:
+            return bom_d2
+        return []
+
+    monkeypatch.setattr(auto_dedup_module, "_get_bom_for_dish", _mock_get_bom)
+
+    # worker 索引 → 决定用 D1 还是 D2 (alternating)
     workers_count = [0]
     workers_lock = asyncio.Lock()
 
     async def _deduct(session: AsyncSession) -> dict[str, Any]:
-        """单 worker deduct_for_order, 偶数 worker 用 D1, 奇数 worker 用 D2 (alternating)."""
+        """单 worker deduct_for_dish, 偶数 → D1 / 奇数 → D2 (反向序 BOM)."""
         async with workers_lock:
             idx = workers_count[0]
             workers_count[0] += 1
         dish_id = d1 if idx % 2 == 0 else d2
-        order_id_str = str(_new_uuid())
-        result = await deduct_for_order(
-            order_id=order_id_str,
-            order_items=[{"dish_id": str(dish_id), "quantity": 1, "item_name": f"item-{idx}"}],
+        result = await deduct_for_dish(
+            dish_id=str(dish_id),
+            quantity=1,
             store_id=str(store_id),
             tenant_id=str(tenant_id),
             db=session,
         )
         return {
-            "order_id": order_id_str,
-            # Return shape per auto_deduction.py L338-343: deducted_items (plural) /
-            # missing_bom / insufficient_stock — verified by source read 5/15
-            "deducted_count": len(result.get("deducted_items", [])),
-            "missing_bom_count": len(result.get("missing_bom", [])),
+            "worker_idx": idx,
+            "dish_id": str(dish_id),
+            "deducted_count": len(result.get("deducted", [])),
+            "missing_bom": result.get("missing_bom", False),
             "insufficient_count": len(result.get("insufficient_stock", [])),
         }
 
@@ -474,16 +512,17 @@ async def test_inventory_deduct_for_order_cross_dish_abba_no_deadlock(session_fa
         timeout_sec=60.0,  # ABBA deadlock detection 需更长 timeout 兜底
     )
 
-    # 全部成功 — sorted(key=str) 真生效, 无 DeadlockDetected
+    # 主断言 (P0 ABBA 防护核心): 全 worker 成功, 无 DeadlockDetected
     exceptions = [r for r in results if isinstance(r, BaseException)]
     assert not exceptions, (
-        f"P0 ABBA 死锁泄漏: deduct_for_order concurrent unexpected exceptions "
+        f"P0 ABBA 死锁泄漏: deduct_for_dish concurrent unexpected exceptions "
         f"({len(exceptions)}/{len(results)}): {exceptions[:3]!r}. "
-        f"ADR 0002 sorted(key=str) 锁排序未生效, audit §4.3 P0 Issue #549 回归. "
-        f"PostgresDeadlockDetected 表明跨 dish 锁顺序不一致触发 ABBA"
+        f"ADR 0002 / L131 sorted_bom_lines.sort(key=str) 未生效, audit §4.3 P0 "
+        f"Issue #549 回归. PostgresDeadlockDetected 表明 D1 worker (BOM=[A,B]) 锁 A 后等 B "
+        f"+ D2 worker (BOM=[B,A]) 锁 B 后等 A 触发 ABBA"
     )
 
-    # 主断言 (库存正确扣减): ing_a / ing_b 各 -10
+    # 主断言 (库存正确扣减 — sorted() 后 worker 顺序入锁 + 串行 commit): ing_a / ing_b 各 -10
     async with session_factory() as s:
         result = await s.execute(
             text("""
@@ -498,7 +537,7 @@ async def test_inventory_deduct_for_order_cross_dish_abba_no_deadlock(session_fa
         assert abs(qty_map[str(ing_a)] - 990.0) < 1e-6, (
             f"ing_a current_quantity actual={qty_map.get(str(ing_a))} expected=990.0 "
             f"(1000 - 10 workers × 1.0). 若 < 990 表明 worker fail / lost update; "
-            f"若 > 990 表明 worker 未真扣减 (mock 假绿)"
+            f"若 > 990 表明 worker 未真扣减"
         )
         assert abs(qty_map[str(ing_b)] - 990.0) < 1e-6, (
             f"ing_b current_quantity actual={qty_map.get(str(ing_b))} expected=990.0"
@@ -517,34 +556,35 @@ async def test_inventory_deduct_for_order_cross_dish_abba_no_deadlock(session_fa
         count, total_consumed = result.one()
         assert count == 20, (
             f"ingredient_transactions consume count actual={count} expected=20 "
-            f"(10 worker × 2 ingredients per dish). FOR UPDATE / sorted() 防 ABBA 后, "
-            f"每 worker 应完整扣减 dish 的 2 个 BOM lines"
+            f"(10 worker × 2 ingredients per dish)"
         )
         assert abs(total_consumed - 20.0) < 1e-6, (
             f"transactions abs(quantity) sum actual={total_consumed} expected=20.0"
         )
 
-    # 主断言 (Issue #643 P2-A distinct-set 升级到 order 维度):
-    # 10 worker 各 deduct 1 order, 各 deducted=2 ingredients, 全 missing_bom=0
+    # 主断言 (Issue #643 P2-A distinct-set — worker_idx 维度):
+    # 10 worker 各独立 idx, sum deducted = 20 (10 × 2 BOM lines/dish), 无 missing/insufficient
     deducted_results = [r for r in results if isinstance(r, dict)]
     assert len(deducted_results) == 10, (
-        f"deduct_for_order 应返回 dict, actual {len(deducted_results)}/10"
+        f"deduct_for_dish 应返回 dict, actual {len(deducted_results)}/10"
     )
-    distinct_order_ids = {r["order_id"] for r in deducted_results}
-    assert len(distinct_order_ids) == 10, (
-        f"Issue #643 P2-A: distinct order_ids actual={len(distinct_order_ids)} expected=10. "
-        f"重复 order_id 表明 worker 假绿共享 order_id"
+    distinct_indices = {r["worker_idx"] for r in deducted_results}
+    assert len(distinct_indices) == 10, (
+        f"Issue #643 P2-A: distinct worker_idx actual={len(distinct_indices)} expected=10. "
+        f"重复 idx 表明 workers_lock 串行化 fail"
     )
     total_deducted = sum(r["deducted_count"] for r in deducted_results)
     assert total_deducted == 20, (
         f"sum deducted_count actual={total_deducted} expected=20 (10 worker × 2 BOM lines/dish). "
         f"若 < 20 表明 BOM 加载不全; 若 > 20 表明重复扣减"
     )
-    total_missing_bom = sum(r["missing_bom_count"] for r in deducted_results)
-    assert total_missing_bom == 0, (
-        f"missing_bom 应为 0 (D1/D2 均有完整 BOM): actual sum={total_missing_bom}"
+    missing_count = sum(1 for r in deducted_results if r["missing_bom"])
+    assert missing_count == 0, (
+        f"missing_bom 应为 0 (monkeypatch _get_bom_for_dish 总返回非空 BOM): "
+        f"actual {missing_count}/10 missing"
     )
     total_insufficient = sum(r["insufficient_count"] for r in deducted_results)
     assert total_insufficient == 0, (
-        f"insufficient_stock 应为 0 (1000 库存远超 10 单×1.0 消耗): actual sum={total_insufficient}"
+        f"insufficient_stock 应为 0 (1000 库存远超 10 worker × 1.0 消耗): "
+        f"actual sum={total_insufficient}"
     )
