@@ -218,6 +218,8 @@ async def _push_supplier_portal(
         }
 
         # SAVEPOINT 隔离：INSERT 失败只回滚到 savepoint，不污染外层 txn
+        # #613 闭环：ON CONFLICT DO NOTHING 配 v431 partial UNIQUE 索引
+        # uq_supplier_portal_cert_alert 防 _log_alert 失败-after-INSERT 次日 re-scan 重复入 inbox
         async with conn.begin_nested():
             await conn.execute(
                 text(
@@ -227,6 +229,12 @@ async def _push_supplier_portal(
                     VALUES
                         (:tenant_id::uuid, :supplier_id::uuid, :message_type,
                          :subject, :body, CAST(:metadata AS JSONB))
+                    ON CONFLICT (
+                        tenant_id, supplier_id, message_type,
+                        (metadata->>'cert_id'), (metadata->>'threshold')
+                    )
+                    WHERE message_type = 'cert_expiry_alert'
+                    DO NOTHING
                     """
                 ),
                 {
