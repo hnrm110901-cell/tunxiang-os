@@ -17,13 +17,14 @@ from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
+from ..services.cert_service import is_supplier_blocked
 from ..services.receiving_v2_service import (
     complete_receiving,
     create_receiving_order,
@@ -88,6 +89,24 @@ async def create_order(
 
     若传入 procurement_order_id，系统会从采购单预填预期数量。
     """
+    # ── PRD-01 食安合规阻断（Tier 1）────────────────────────────────────────────
+    # 若供应商有任意证件过期（auto_block_on_expire=TRUE），阻断收货入库。
+    # 续证后 expire_date 更新到未来，下次查询自动解除阻断，无需手动操作。
+    if body.supplier_id:
+        if await is_supplier_blocked(
+            db,
+            tenant_id=x_tenant_id,
+            supplier_id=body.supplier_id,
+            today=date.today(),
+        ):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "SUPPLIER_CERT_EXPIRED",
+                    "message": "供应商证件已过期，无法收货",
+                },
+            )
+    # ── 业务逻辑 ─────────────────────────────────────────────────────────────────
     try:
         result = await create_receiving_order(
             tenant_id=x_tenant_id,
