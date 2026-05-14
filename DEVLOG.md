@@ -1,3 +1,64 @@
+## 2026-05-14 末段 — "0 + A" 路径执行 sediment：PR #632 (5/14 夜段 batch sediment) + PR #634 (concurrent_runner PR-1 infra 真 PG 反测基建) 2 PR ship (5/14 累计 32 PR)
+
+### 今日完成
+
+5/14 末段（CST 17:18 + 18:22）ship 2 PR — "0 + A" 路径执行：**先 sediment 后 infra**。任务 0 (#632) 把 5/14 夜段 4 PR batch (#628/#629/#630/#631 + 并发 #625) 的"未落仓库 SoT 部分"批量落盘；任务 A (#634) 把 PR #631 proposal §10 PR-1 (infra) 落地真 PG 并发测试框架基建。**首次实战 drift-tolerant CI workflow 模式**（落 memory `feedback_drift_tolerant_workflow.md`），5/14 单日累计 ship 32 PR（30 prior + #632 + #634）。
+
+**PR #632 — 5/14 夜段 sediment 4 PR batch MERGED** `b9f7a247` (admin squash, **docs-only carve-out 类 2 第 14 例**, 5/14 17:18 CST, +122 行 / 2 files):
+- DEVLOG.md +83 + docs/progress.md +39
+- 内容：5/14 夜段 PR #628 (audit doc §11 §17 决策表) + #629 (ADR 0002 ABBA 文档化) + #630 (#559 XFAIL strict 守护) + #631 (真 PG 并发测试框架 proposal DRAFT) + 并发 session #625 (PR-01C 证件管理 UI Phase 1 W6 9/9 收尾) — 5/14 单日 30 PR ship blitz sediment 收尾
+- 跳 §19 reviewer 完整 run — docs-only blast radius 0，走 explicit-ask 单点 confirm
+
+**PR #634 — concurrent_runner PR-1 infra MERGED** `fe522871` (admin squash, **Tier 1 fund/源/邻接 explicit-ask 第 17 例**, 5/14 18:22 CST, +938 行 / -28 行 / 5 NEW files):
+- `shared/test_utils/concurrent_runner.py` NEW (+165) — `async run_concurrent(sessionmaker, tenant_id, n, operation)` + `assert_final_consistency()` API，各 worker 独立 session/transaction + `SET LOCAL ROLE tunxiang_rls_app` 切非 superuser + `set_tenant_guc` 事务级 GUC + `asyncio.gather(return_exceptions=True)`
+- `tests/concurrent/conftest.py` NEW (+139) — function-scoped engine + session_factory + autouse cleanup (`SET LOCAL session_replication_role = replica` + DELETE)
+- `tests/concurrent/test_runner_smoke_tier1.py` NEW (+230) — 3 用例 smoke verifier (T1 N=10 INSERT 无 race + T2 FOR UPDATE 串行化真验证 + T3 helper paths assert_final_consistency status_set)
+- `.github/workflows/tier1-row-lock-concurrent.yml` NEW (+120) — **drift-tolerant CI 模式首次实战**（`continue-on-error: true` on `alembic upgrade head` + HARD verify step 硬校验 smoke 真前置 stores 表 + RLS 启用）
+- `docs/testing/concurrent-runner-howto.md` NEW (+231) — howto / 模板 / 陷阱 / mock vs concurrent 边界
+- 本地真 PG 反测 **3/3 PASS in 0.52s** — `docker compose -f infra/compose/test-pg.yml up -d` + bootstrap + `pytest tests/concurrent/test_runner_smoke_tier1.py --confcutdir tests/concurrent --override-ini asyncio_mode=auto -v`
+- CI `Tier 1 Row-Lock — 真 PG N 路并发反测` workflow ✅ 加入真门禁列表（首次真 PG 行锁反测 CI gate 加入）
+- §19 reviewer round-1 APPROVE-WITH-FOLLOWUP (0 P0 / 2 P1 / 3 P2 / 2 P3) — P1-A 内 PR 4 fix commit + CI httpx (`feedback_tier1_ci_minimal_deps_trap.md` 模式应用 — 不扩 tier1-gate install 列表，module-local 兜底); 3 P3 deferred 落 **Issue #635**
+
+### 关键决策（跨 session 价值）
+
+- **"0 + A" 路径执行模式实证** — cold-start prompt 明确双任务 (0 sediment / A infra)，本 session 严格按"先 sediment 后 infra"顺序：sediment 走 docs-only 快通道 (~30min) 不阻塞主线 ship，infra 走 §19 reviewer + Tier 1 explicit-ask 全流程 (~3h)。sediment-first 模式避免 "infra ship 后 sediment 漂移" 风险，下次同主题 ship 默认套此模式
+- **drift-tolerant CI workflow 模式标准化**（落 memory `feedback_drift_tolerant_workflow.md`）— `tier1-row-lock-concurrent.yml` 首次实战：`continue-on-error: true` on `alembic upgrade head` + 显式 HARD verify step 硬校验 smoke 真前置 (stores 表 + RLS 启用)。stores 在 v001 创建，drift 在 v301 才发生 — alembic 部分跑过 v200+ 后失败时 stores 早 ready。CI 实测真绿 ✅，而不是"加入即全 fail"（rls-runtime-p0-pg-tests.yml `#508` 加入以来全 PR fail 的反面教训）。**真 drift 修复走独立 issue，不阻塞新 gate ship；drift 修了后 continue-on-error 自然变 no-op**
+- **pytest `--confcutdir` 防 conftest dep 污染**（PR #634 实证）— 跑独立测试目录必带 `--confcutdir tests/concurrent`，否则 root `conftest.py` 命中其他服务 stub 污染。本地真 PG verifier 命令模板入 `docs/testing/concurrent-runner-howto.md`
+- **§19 round-1 PR 内 fix + round-2 跳过模式**（与 PR #227 3-round / PR #609 1-round 区分）— PR #634 round-1 fix 4 commits 后**未跑 round-2** 是因为：P0/P1 全在 PR 内 fix; P2-B/P3-A/P3-B 是 PR-2+ 启动前考虑级别，PR-1 scope 完成度独立。Lesson: §19 多轮流程不是死规则 — round-1 verdict 是 APPROVE-WITH-FOLLOWUP + PR 内已 fix MUST 项 + 剩余项落 issue 时，round-2 可跳过
+- **本地真 PG verifier ROI 高**（`feedback_smoke_test_must_verify_functionality.md` 模式应用）— ~5min 投入跑 docker compose + bootstrap + pytest 3 用例 PASS，避免 CI 反复试错 (~30min/轮)；PR-2+ 必跑
+
+### 数据变化
+
+- 迁移版本：无 (2 PR 都 0 migration)
+- 新增源：1 file (concurrent_runner.py +165 行 — `shared/test_utils/` 真 PG 反测 ADD)
+- 新增测试 infra：2 files (conftest_pg.py +139 + smoke_tier1.py +230 = 369 行)
+- 新增 CI workflow：1 file (tier1-row-lock-concurrent.yml +120 — drift-tolerant 首例)
+- 新增文档：2 files (concurrent-runner-howto.md +231 + DEVLOG/progress sediment +122 = 353 行)
+- 新增 memory：1 file (`feedback_drift_tolerant_workflow.md`)
+- 修改源：0 file
+- 修改 lockfile：0
+
+### 累计 tally 更新 (5/14 末段)
+
+- **Tier 1 fund/源/邻接 explicit-ask** (不在 11 类 carve-out): 累计 **17 例** (#271/#272/#544/#546/#547/#553/#556/#560/#563/#566/#570/#574/#583/#588/#581/#227/#609/#618/#616/#622/#625/#634 — 增 **#634** 1 例)
+- **docs-only carve-out 类 2**: 累计 **14 例** (#624 第 13 例后增 **#632** 第 14 例)
+- **carve-out 矩阵**: 11 类不变（**第 12 类候选 — drift-tolerant CI workflow ADD 首例 #634** 待累积二例后正式纳入，当前归入 Tier 1 explicit-ask）
+- **本 session 累计**: 2 PR ship (#632 + #634) + 1 issue create (#635) + 1 lesson memory create (`feedback_drift_tolerant_workflow.md`) + MEMORY.md update
+- **5/14 单日累计 ship**: **32 PR** = 25 prior (上午-中午 13 PR + 下午段 #621/#622/#623 + 下午段晚 + 等) + 4 (夜段 batch #628-#631) + 1 (并发 #625) + 2 (末段 #632 + #634)
+
+### 遗留问题
+
+- §17 桌台并发语义对齐 follow-up PR (合并 #549/#557/#559/cashier 6 P1+P2/order 3 P1 = ~11 路径) — 等创始人 3 选择题答复 (audit doc §11 已落表 PR #628)
+- Issue #635 — concurrent_runner §19 round-1 deferred (P2-B FK 触发器掩盖拓扑 + P3-A status_set + P3-B 列长度) — PR-2 启动前考虑 P2-B
+- 其他 P0 输入等待 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质 — 创始人级别)
+- pre-existing CI 漂移 12+ 项 (python-lint-test / Ruff / frontend-build / TypeScript Check / Test Changed Services / RLS Runtime — 7 P0 表 / nightly-offline-e2e.yml stale npm-ci) 全 PR 一律 fail — 与本 batch 无关，`project_tunxiang_ci_gates.md` 已登记
+
+### 明日计划
+
+PR-2 cashier_engine concurrent 框架金标准 (~1day) — `tests/concurrent/test_cashier_engine_concurrent_tier1.py` 3 P0 路径 (T1 N=10 add_item / T2 N=10 apply_discount / T3 N=10 settle_order) + 扩 conftest.py `_CONCURRENT_TABLES` 加 payments → order_items → orders → stores FK 拓扑序 + 本地真 PG verifier + §19 reviewer (背 review subagent) + Tier 1 fund/源 explicit-ask 第 18 例 + 应 audit doc §8.3「正面/负面测试模式」"框架金标准"milestone
+
+---
+
 ## 2026-05-14 夜段 — 5/14 ship 收尾 sediment：audit §17 决策表 + ADR 0002 ABBA 文档化 + #559 XFAIL 守护 + 真 PG 并发测试框架 proposal 4 PR batch ship (5/14 累计 30 PR — 含并发 session PR #625)
 
 ### 今日完成

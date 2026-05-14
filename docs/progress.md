@@ -1,3 +1,40 @@
+## 2026-05-14 末段 18:30 · "0 + A" 路径执行 sediment：PR #632 (5/14 夜段 batch sediment) + PR #634 (concurrent_runner PR-1 infra 真 PG 反测基建) 2 PR ship (5/14 累计 32 PR)
+
+### 完成状态
+
+- [x] **PR #632** docs(devlog) 5/14 夜段 4 PR batch sediment MERGED `b9f7a247` (**docs-only carve-out 类 2 第 14 例**, 5/14 17:18 CST, DEVLOG.md +83 + docs/progress.md +39 = +122 行 / 2 files)
+- [x] **PR #634** infra(test) concurrent_runner + workflow PR-1 MERGED `fe522871` (**Tier 1 fund/源/邻接 explicit-ask 第 17 例**, 5/14 18:22 CST, 5 NEW files / +938 行 / -28 含 4 §19 fix commit)
+- [x] **本地真 PG smoke 3/3 PASS in 0.52s** — T1 N=10 INSERT 无 race + T2 FOR UPDATE 串行化真验证 + T3 helper paths assert_final_consistency status_set
+- [x] **§19 reviewer round-1 APPROVE-WITH-FOLLOWUP** (0 P0 / 2 P1 / 3 P2 / 2 P3) — P1-A 内 PR 4 fix commit + CI httpx (`feedback_tier1_ci_minimal_deps_trap.md` 模式应用)；3 P3 deferred 落 **Issue #635**
+- [x] **CI `Tier 1 Row-Lock — 真 PG N 路并发反测` ✅ 加入真门禁列表** — drift-tolerant CI 模式首次实战
+- [x] **Lesson memory 新建** — `feedback_drift_tolerant_workflow.md` 落盘 + MEMORY.md L75 index 引用
+- [x] **5/14 单日累计 ship 32 PR** = 25 prior + 4 夜段 batch (#628/#629/#630/#631) + 1 并发 (#625) + 2 末段 (#632 + #634)
+
+### 关键决策
+
+- **"0 + A" 路径执行模式实证** — cold-start prompt 明确双任务 (0 sediment / A infra)，本 session 严格按"先 sediment 后 infra"顺序：sediment 走 docs-only 快通道 (~30min) 不阻塞主线 ship，infra 走 §19 reviewer + Tier 1 explicit-ask 全流程 (~3h)。sediment-first 模式避免 "infra ship 后 sediment 漂移" 风险
+- **drift-tolerant CI workflow 模式标准化** — `tier1-row-lock-concurrent.yml` 首次实战 `continue-on-error: true` on `alembic upgrade head` + 显式 HARD verify step 硬校验 smoke 真前置 (stores 表 + RLS 启用)。stores 在 v001 创建，drift 在 v301 — alembic 部分跑过 v200+ 后失败时 stores 早 ready。CI 实测真绿，**不污染主路径，不进预存漂移列表**
+- **pytest `--confcutdir` 防 conftest dep 污染** — PR #634 实证：跑独立测试目录必带 `--confcutdir tests/concurrent`，否则 root `conftest.py` 命中其他服务 stub 污染
+- **§19 round-1 PR 内 fix + round-2 跳过模式** — PR #634 round-1 fix 4 commits 后跳 round-2，原因：P0/P1 全在 PR 内 fix + P2-B/P3-A/P3-B 是 PR-2+ 启动前考虑级别 + PR-1 scope 完成度独立。Lesson: §19 多轮流程不死规则
+- **本地真 PG verifier ROI 高** — ~5min 投入避免 CI 反复试错 ~30min/轮
+
+### 下一步
+
+- 优先 PR-2 cashier_engine concurrent 框架金标准 (~1day) — 本 session "0 + A" cold-start prompt 已 user explicit-ask 实施
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复 — audit doc §11 已落表 PR #628)
+- 或 PR-3 payment_saga SKIP LOCKED concurrent / PR-4 inventory_io + auto_deduction (ADR 0002 验证) / PR-5 order + delivery / PR-6 (可选) pg_dump cache
+- 或 Mac mini M4 真机部署 (~3-4h, 物理工程, 需 SSH/现场)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- **PR #634 = T2 infra 测试 ADD，blast radius 中等** — concurrent_runner.py 是新基建非业务源改动，但是 `shared/test_utils/` 命名空间下后续 PR-2+ 都会 import 它；signature breaking change 会 cascade。**Mitigate**: 5 NEW files 加 §19 reviewer round-1 + 本地真 PG smoke 3/3 PASS 双闭环
+- **drift-tolerant CI 模式首次实战** — 模式落 memory 但未广泛验证；若后续 alembic chain 有新 drift 加入超越 v200，stores 表前置可能失败，需重新评估前置 step 选择。**Mitigate**: 走独立 issue 修 alembic chain drift，不阻塞 PR-2+
+- pre-existing CI 漂移 12+ 项 (python-lint-test / Ruff / Test Changed Services / TypeScript Check / RLS Runtime — 7 P0 表 / nightly-offline-e2e.yml stale npm-ci) 全 PR 一律 fail — 与本 batch 无关
+- **5/14 32 PR/单日新历史** 远超 `feedback_proactive_session_split.md` 4+ 阈值 (8x)，但本 session 仅 ship 2 PR + sediment + §19 round-1，上下文消费可控；PR-2 启动前评估是否拆 session
+
+---
+
 ## 2026-05-14 夜段 22:00 · 5/14 ship 收尾 sediment：audit §17 决策表 + ADR 0002 ABBA 文档化 + #559 XFAIL 守护 + 真 PG 并发测试框架 proposal 4 PR batch ship (5/14 累计 30 PR — 含并发 session #625)
 
 ### 完成状态
