@@ -1,3 +1,93 @@
+## 2026-05-14 中午–下午 — PR #227 + PR #609 双 ship · edge sync nonce store 完整闭环 (Tier 1 fund/源 explicit-ask 第 8 + 第 9 例)
+
+### 今日完成
+
+接上 session 5/14 上午-中午 13 PR batch 后，下午段闭环 PR #195 audit 系列 SECURITY/Tier 1 链路最后两 PR：① PR #227 squash merge 23 项 P0 修复主线（5/14 12:07 main HEAD `3a6b230c`）② PR #609 重建 PR #228 unique 内容 ship（5/14 13:19 main HEAD `4d2b4c3c`）= **5/14 单日累计 17 PR ship**（13 上午-中午 batch + #602 cert_expiry_alerter + #603 devlog + #227 + #609）。两 PR 同属 **Tier 1 fund/源 explicit-ask（不在 8 类 carve-out）**，全流程 §19 reviewer + CI 真门禁 + explicit-ask user。
+
+**PR #227 — 23 项 P0/SECURITY/Tier 1 batch MERGED** `3a6b230c` (5/14 12:07, admin squash, **Tier 1 fund/源 explicit-ask 第 8 例**):
+- **5/6 创建 stale 8 天**，base=main rebase 后 249 commits 跨 14 files squash → 2 conflict (cashier_engine + order_service) 都选 HEAD pattern
+- **3 round §19 reviewer (opus B 选项)** 流程奠基（落 `feedback_multi_round_19_reviewer_flow.md`）：round-1 2 P0 + 1 P1 → fix → round-2 0 P0/P1 无回归 → round-3 CI gate fix verify
+- **真 missing 落地 origin/main** 3 NEW 文件：`shared/security/src/internal_jwt.py` mint+verify / `services/tx-trade/src/metrics.py` payment_saga Counter / `docs/security/rls-force-rollout.md` 5 阶段计划。+ gateway proxy mint_internal_jwt 2 处 / banquet V3 RSA-SHA256 验签 3 处 / sync_ingest edge HMAC + Step 1-3 兼容 + soft_delete 白名单
+- **PR #227 row-lock 部分确认已被 5/13 row-lock 6-PR roadmap (#553/#556/#560) 完全覆盖** — cashier_engine + order_service + payment_saga 三 Tier 1 文件 conflict 都选 HEAD（main 用 `lock: bool=False` kwarg pattern 更优，PR #227 强制锁会让 read-only caller 性能回归）
+- **CI 真门禁 22/22 SUCCESS** — Tier 1 门禁判定 + 14 个 `Run Tier 1 services/*/src/tests` + 4 个 `Run Tier 1 services/*/tests` + tests/tier1 + RLS 严格 + 源-test 配对 全绿（12 FAILURE 全是 main 预存漂移：9 个 python-lint-test + Ruff + RLS Runtime + Test Changed Services）
+- §19 round-1 P1/P2 follow-up issue 落盘：**#606** P1 `proxy.py` resp.json() 非 JSON 丢下游 status code (1 行修) / **#607** P2 Prometheus PaymentSuccessRateLow 0/0=NaN 永不触发 (and-gate 修法 1 行)
+- 新教训落 3 个 memory：`feedback_post_rebase_caller_audit.md` (rebase 副作用 silent bug) / `feedback_multi_round_19_reviewer_flow.md` (3 round §19 流程奠基) / `feedback_tier1_ci_minimal_deps_trap.md` (Tier 1 CI 不装 requirements.txt 真依赖陷阱 + module-local fail-open 兜底)
+
+**PR #228 → GitHub auto-close**:
+- PR #228 stacked on #227 (base=`rebase/pr-195-clean`, head=`rebase/pr-201-clean`)，PR #227 squash-merge 时 GitHub 自动删 base branch → PR #228 base ref 失效触发 auto-close (5/14 04:07Z, event=closed, mergedAt=null)
+- closed PR review：unique 内容 = 3 文件（去掉已 merged `b059738a` PR #227 pre-squash）— `edge_sync_nonce_store.py` NEW 210 行 + `test_edge_sync_nonce_store_tier1.py` NEW 216 行 + `sync_ingest_router.py` MODIFY +21/-23
+- **方案 2 重建** — 起独立 worktree `.tunxiang-p0-worktrees/pr-228-reborn/` + 新 branch `tier1/edge-sync-nonce-store-redis` from `origin/main` HEAD `3a6b230c` + cherry-pick `52df07ee` clean + cherry-pick `945fa9fe` **auto-merge 0 conflict**（PR #228 改 nonce 段 vs PR #227 改 ts-skew/Step1-3/soft_delete 段互不冲突）
+
+**PR #609 — EdgeSyncNonceStore abstraction MERGED** `4d2b4c3c` (5/14 13:19, admin squash, **Tier 1 fund/源 explicit-ask 第 9 例**, supersedes #228, 闭 PR #227 P1-1 follow-up):
+- 3 files / +426 NEW + 21+/23- router modify = 0 migration
+- 闭环 PR #227 squash 后 `sync_ingest_router.py` L52-58 自评 WARNING "进程内 dict 多副本失效，HPA ≥ 2 同 nonce 重放 N 次，生产 follow-up 改 Redis 共享存储"
+- `EdgeSyncNonceStore` Protocol + `InProcessNonceStore`（单副本可用）+ `RedisNonceStore` (SETNX EX ttl 真共享，多副本安全) + `get_nonce_store()` 工厂 (按 `EDGE_SYNC_NONCE_REDIS_URL` env 切换 + singleton 缓存)
+- **生产 fail-closed**：`EDGE_SYNC_HMAC_REQUIRED=true` + `TX_ENV=production` 时 InProcess 不允许（除非 `EDGE_SYNC_ALLOW_INPROCESS_NONCE=true` explicit opt-out）
+- **HMAC 前置 / nonce mark 后置**（PR #228 P1-3 修复点）router L162-194: header check → ts skew → HMAC 校验 → tenant 一致性 → nonce mark + Redis 故障 503（不 silent fall through 到 in-process）
+- **PR #227 features 全保留**（cherry-pick auto-merge 验证）：4h 离线 SLA L85-100 / Step 1-3 兼容 L131-141 / soft_delete 白名单 L377+L802
+- 测试 15 用例本机 Python 3.9.6 **15/15 passed in 0.04s** — InProcess GC / 多副本不共享演示 / Redis SETNX 契约 mock / 工厂 env 切换 / 生产 fail-closed 路径
+- **Round-1 §19 reviewer (opus B 选项) APPROVED 0 P0 / 0 P1** — A 安全语义 / B HMAC 顺序 / C PR #227 不退化 / D CI 依赖 / E 测试 robust 全 PASS（无 fix commit，跳 round-2/3，符合 `feedback_multi_round_19_reviewer_flow.md` 流程）
+- **CI 真门禁 22+ SUCCESS** — Tier 1 门禁判定 + 14 服务 tier1 测试（含 `tx-trade/src/tests` + `tx-trade/tests` 双路径 PR #227 不退化）+ 源-test 配对 + frontend-build + edge-mac-station + Analyze Changes & Label 全绿（11 FAILURE 全是预存漂移）
+- §19 round-1 P2 follow-up issue 落盘：**#610** P2 `get_nonce_store()` 懒加载 → 改 fail-fast startup hook 预热 / **#611** P2 `RedisNonceStore.close()` 未注册 lifespan shutdown 钩子（k8s rolling update graceful close）
+
+### TDD Red→Green 证据 (#609)
+
+```
+[Reproduce] k8s HPA ≥ 2 副本部署，同一 X-Edge-Sync-Nonce 打到不同 pod：
+  Pod A: _EDGE_SYNC_RECENT_NONCES (进程内 dict) → key 不存在 → mark + pass
+  Pod B: 同 nonce → 各自进程内 dict → 也不存在 → pass (replay 通过)
+  → 防重放在多副本下失效，攻击者可重放至多 (replica_count) 次
+
+[Red]   原 PR #228 测试 `test_two_inprocess_stores_dont_share` 直接演示并文档化该
+        失效场景 — 两个独立 InProcess 实例不共享 nonce store
+
+[Refactor] EdgeSyncNonceStore Protocol + RedisNonceStore (SETNX EX ttl) 真共享
+           InProcess 保留作单副本兜底 + 工厂 env 切换
+
+[Green]   15/15 用例 passed in 0.04s — SETNX mock 验证 nx=True/ex=ttl 契约
+          + InProcess GC + 工厂 singleton + 生产 fail-closed + 多副本演示
+```
+
+### §19 reviewer 评审记录 (#609)
+
+`code-reviewer` agent (opus, B 选项真 BUG only):
+- **Round-1: APPROVED 0 P0 / 0 P1** — 5 维评审全 PASS
+  - A 安全语义: SETNX 原子 winner/loser 判定 / InProcess GC 无内存泄漏 / singleton 测试隔离 / 生产 fail-closed 路径覆盖
+  - B HMAC 前置 / nonce mark 后置: router L152-167 顺序正确 / Redis 503 vs 401 语义正确
+  - C PR #227 不退化: 4h SLA + Step 1-3 + soft_delete 全保留（cherry-pick auto-merge）
+  - D CI 依赖: `redis.asyncio` import 在 `_ensure_client()` 内 try/except + fail-closed RuntimeError → 503，符合 `feedback_tier1_ci_minimal_deps_trap.md` module-local pattern
+  - E 测试 robust: 15 用例验证安全语义不是 mock 蒙混 / 多副本演示等价 Red→Green / autouse fixture 双重 reset / Python 3.9/3.11 双兼容
+- P2 follow-up: #610 (startup warmup) + #611 (close shutdown hook) 落盘
+- **CodeRabbit**: 触发，无 P0/P1 异议
+
+### 数据变化
+
+- 迁移版本：无（PR #227 + PR #609 均不带 migration）
+- 新增 API 模块：PR #227 = 3 NEW 文件（internal_jwt.py / metrics.py / rls-force-rollout.md）+ 9 modify；PR #609 = 1 NEW module (edge_sync_nonce_store.py) + 1 NEW test + 1 router modify
+- 新增测试：PR #227 = `test_pr227_security_fixes_tier1.py` 6 用例；PR #609 = `test_edge_sync_nonce_store_tier1.py` 15 用例
+
+### 累计 tally 更新 (5/14 下午段)
+
+- **Tier 1 fund/源 explicit-ask** (不在 8 carve-out): 累计 9 例 (#271/#272/#544/#547/#553/#556/#560/#563 row-lock 6-PR roadmap = 8 + **#227 + #609** = 10 ；纠正：roadmap = 6 PR + #271/#272 fund-path 早期 = 8 例 + PR #227 第 8 例 + PR #609 第 9 例)
+- **本 session 累计**: 2 PR ship (#227 上 session + #609 本 session) + 2 P2 issue create (#610 + #611) + 1 PR close (#228 supersede comment)
+- **5/14 单日累计 ship**: **17 PR**（13 上午-中午 batch + #602 cert_expiry_alerter + #603 devlog + #227 + #609）— 远超 `feedback_proactive_session_split.md` 4+ 阈值，建议下次 session 转新启动
+
+### 遗留问题
+
+- **§17 桌台并发语义对齐 PR**: 合并 #549/#557/#559 + cashier 6 P1/P2 + order 3 P1 = ~11 路径，前提创始人 3 选择题答复（双开台 race / 转桌争抢 / 结算释放桌台中间态）
+- **PR #240 D2-D5 真机 smoke**: head `2f270c5d` CONFLICTING 200+ commits behind，硬件已就位（商米 T2 ×2 + Mac mini M4 ×1 总部办公室同局域网），下 session 优先级
+- **Issue #601 e2e workspace 修法**: i 加入 pnpm-workspace 推荐 / ii workflow 局部 install 替代 — 修后 PR #240 `web-pos offline cashier` 转绿 + main nightly 转绿
+- **本批 P2 follow-up**: #606 (proxy.py JSON guard) / #607 (Prometheus NaN guard) / #610 (startup warmup) / #611 (close shutdown hook) — 可合并 1-2 个 PR ship
+- pre-existing CI 漂移 11 项（python-lint-test / Ruff / Test Changed Services）与本批 PR 无关
+
+### 明日计划
+
+- 优先 PR #240 D2-D5 真机 smoke（rebase 到 main `4d2b4c3c` + 解 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini + Core ML 模型部署）
+- 或并行轻量 P2 follow-up batch ship (#606 + #607 + #610 + #611) 清 issue queue
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+---
+
 ## 2026-05-14 上午–中午 — 13 PR ship batch (PR-03 doc_number 完整链路 + PR-01 supplier_certs 双 sub-PR + structlog 跨服务 4-PR + §19 follow-up 3-PR + deps 2-PR)
 
 ### 今日完成
