@@ -60,6 +60,9 @@ from services.tx_supply.src.workers.cert_expiry_alerter import (
     _classify_threshold,
     _already_alerted,
     _log_alert,
+    _push_supplier_portal,
+    _push_wecom_purchaser,
+    _push_wecom_safety_director,
     _scan_one_tenant,
     CHANNEL_WECOM_SAFETY,
     CHANNEL_WECOM_PURCHASER,
@@ -496,3 +499,304 @@ class TestNoWebhookSkippedLogged:
 
         # 无异常，returned dict 结构正确
         assert "evaluated" in result and "sent" in result
+
+
+# ─── 10. sub-PR C — 推送通道接线契约 ────────────────────────────────────────
+#
+# tx_org IMNotificationService 注册：从 tx-supply 测试树运行时，根 conftest
+# 只注册顶级 `services` namespace + 各服务 src/services/；tx_supply/conftest
+# 仅注册 services.tx_supply.*。需要手动注册 services.tx_org.* 命名空间
+# 才能 patch tx-supply worker 内对 services.tx_org.src.services.im_notification_service
+# 的懒 import。
+import importlib.util as _importlib_util
+import types as _types
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+_TX_ORG_SVC_DIR = os.path.join(_REPO_ROOT, "services", "tx-org")
+_TX_ORG_SRC_DIR = os.path.join(_TX_ORG_SVC_DIR, "src")
+
+
+def _register_tx_org_im_namespace() -> None:
+    """注册 services.tx_org.src.services.im_notification_service 命名空间链。"""
+    if "services.tx_org.src.services.im_notification_service" in sys.modules:
+        return
+    for name, path in [
+        ("services.tx_org", _TX_ORG_SVC_DIR),
+        ("services.tx_org.src", _TX_ORG_SRC_DIR),
+        ("services.tx_org.src.services", os.path.join(_TX_ORG_SRC_DIR, "services")),
+    ]:
+        if name not in sys.modules:
+            mod = _types.ModuleType(name)
+            mod.__path__ = [path]
+            mod.__package__ = name
+            sys.modules[name] = mod
+    spec = _importlib_util.spec_from_file_location(
+        "services.tx_org.src.services.im_notification_service",
+        os.path.join(_TX_ORG_SRC_DIR, "services", "im_notification_service.py"),
+    )
+    if spec and spec.loader:
+        _mod = _importlib_util.module_from_spec(spec)
+        sys.modules["services.tx_org.src.services.im_notification_service"] = _mod
+        spec.loader.exec_module(_mod)
+
+
+_register_tx_org_im_namespace()
+
+
+def _sample_cert(*, days: int = 30, expire: date = date(2026, 6, 13)) -> dict:
+    """sub-PR C 推送测试用 cert dict（含 supplier_name，匹配 cert_service round-2 fix）。"""
+    return {
+        "cert_id": _CERT_A,
+        "supplier_id": _SUPPLIER_A,
+        "supplier_name": "徐记海鲜供应商A",
+        "cert_type": "食品经营许可证",
+        "cert_number": "XJ-2024-001",
+        "expire_date": expire,
+        "days_until_expiry": days,
+    }
+
+
+class TestPushChannelWiringTier1:
+    """sub-PR C 推送通道接线 Tier 1 契约测试。
+
+    覆盖：
+      1. 食安总监 wecom 推送：调 IMNotificationService.send_wecom_bot 且消息含证件信息
+      2. send_wecom_bot 返回 False → stub 返回 (False, 'wecom_send_failed')
+      3. 采购员推送 message 含'采购员'角色（区别于食安总监）
+      4. supplier_portal 推送：执行 INSERT INTO supplier_portal_messages（subject/body/metadata）
+      5. supplier_portal SQLAlchemyError → 返回 (False, 'portal_insert_failed: <ClassName>')，不 raise
+      6. 任何 channel 的 success/failure log 都不能含 webhook_url 字符串值（防泄漏）
+    """
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_calls_im_service_with_correct_args(self):
+        """食安总监 wecom 推送：调 IMNotificationService.send_wecom_bot，message 含证件信息。"""
+        cert = _sample_cert(days=30)
+        webhook = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=SECRET-XYZ"
+
+        mock_inst = MagicMock()
+        rendered_message = (
+            "### 供应商证件临期预警\n"
+            "**供应商**：徐记海鲜供应商A\n"
+            "**证件类型**：食品经营许可证\n"
+            "**证件编号**：XJ-2024-001\n"
+            "**到期日**：2026-06-13\n"
+            "**距过期**：30 天（阈值 D-30）\n"
+            "**收件角色**：食安总监\n\n请通知供应商提前准备续证材料，避免临期断档。"
+        )
+        mock_inst.notify_cert_expiry = AsyncMock(return_value=rendered_message)
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-30", webhook
+            )
+
+        assert success is True
+        assert error_msg is None
+
+        # send_wecom_bot 调 webhook + rendered message
+        assert mock_inst.send_wecom_bot.call_count == 1
+        sent_args, sent_kwargs = mock_inst.send_wecom_bot.call_args
+        sent_url = sent_args[0] if sent_args else sent_kwargs.get("webhook_url")
+        sent_msg = sent_args[1] if len(sent_args) > 1 else sent_kwargs.get("message")
+        assert sent_url == webhook
+        assert "徐记海鲜供应商A" in sent_msg
+        assert "食品经营许可证" in sent_msg
+        assert "XJ-2024-001" in sent_msg
+        assert "2026-06-13" in sent_msg
+
+        # notify_cert_expiry 用了食安总监 recipient_role
+        assert mock_inst.notify_cert_expiry.call_count == 1
+        _, kw = mock_inst.notify_cert_expiry.call_args
+        assert kw["recipient_role"] == "食安总监"
+        assert kw["threshold"] == "D-30"
+        assert kw["supplier_name"] == "徐记海鲜供应商A"
+        assert kw["cert_type"] == "食品经营许可证"
+        assert kw["cert_number"] == "XJ-2024-001"
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_returns_false_on_send_failure(self):
+        """send_wecom_bot 返回 False（5xx/timeout）→ stub 返回 (False, 'wecom_send_failed')。"""
+        cert = _sample_cert(days=7)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=False)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-7", "https://qyapi.weixin.qq.com/mock"
+            )
+
+        assert success is False
+        assert error_msg == "wecom_send_failed"
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_purchaser_uses_purchaser_recipient_role(self):
+        """采购员推送 message 用'采购员'角色文案（区别于食安总监模板）。"""
+        cert = _sample_cert(days=15)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="### 供应商证件临期预警\n采购员")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_purchaser(
+                _TENANT_XUJI, cert, "D-15", "https://qyapi.weixin.qq.com/purchaser"
+            )
+
+        assert success is True
+        assert error_msg is None
+
+        # recipient_role='采购员' 与 safety director 模板区分
+        _, kw = mock_inst.notify_cert_expiry.call_args
+        assert kw["recipient_role"] == "采购员"
+        assert kw["threshold"] == "D-15"
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_inserts_with_correct_payload(self):
+        """supplier_portal 推送：执行 INSERT INTO supplier_portal_messages，含 message_type/subject/body/metadata。"""
+        cert = _sample_cert(days=0, expire=date(2026, 5, 14))
+
+        captured: dict = {}
+
+        async def execute_capture(query, params=None):
+            captured["sql"] = str(query)
+            captured["params"] = params or {}
+            return MagicMock()
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_capture)
+
+        success, error_msg = await _push_supplier_portal(
+            conn, _TENANT_XUJI, cert, "D+0"
+        )
+
+        assert success is True
+        assert error_msg is None
+        assert "INSERT INTO supplier_portal_messages" in captured["sql"]
+        assert captured["params"]["tenant_id"] == _TENANT_XUJI
+        assert captured["params"]["supplier_id"] == _SUPPLIER_A
+        assert captured["params"]["message_type"] == "cert_expiry_alert"
+        # subject 体现 D+0 已过期分支
+        assert "已过期" in captured["params"]["subject"]
+        assert "食品经营许可证" in captured["params"]["subject"]
+        # body 含证件编号 + 过期日
+        assert "XJ-2024-001" in captured["params"]["body"]
+        # metadata 是 JSON 字符串（CAST AS JSONB），含 cert_id / threshold
+        import json as _json
+
+        meta = _json.loads(captured["params"]["metadata"])
+        assert meta["cert_id"] == _CERT_A
+        assert meta["threshold"] == "D+0"
+        assert meta["cert_type"] == "食品经营许可证"
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_inserts_临期_subject_for_negative_threshold(self):
+        """临期阈值（D-7/D-15/D-30）→ subject 走"临期"分支，不是"已过期"。"""
+        cert = _sample_cert(days=7)
+
+        captured: dict = {}
+
+        async def execute_capture(query, params=None):
+            captured["params"] = params or {}
+            return MagicMock()
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_capture)
+
+        await _push_supplier_portal(conn, _TENANT_XUJI, cert, "D-7")
+        assert "临期" in captured["params"]["subject"]
+        assert "D-7" in captured["params"]["subject"]
+        assert "已过期" not in captured["params"]["subject"]
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_returns_false_on_db_error(self):
+        """conn.execute raises SQLAlchemyError → 返回 (False, 'portal_insert_failed: <ClassName>')，不 raise。"""
+        cert = _sample_cert(days=0)
+
+        from sqlalchemy.exc import IntegrityError
+
+        async def execute_raises(query, params=None):
+            raise IntegrityError("INSERT", {}, Exception("duplicate key"))
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_raises)
+
+        success, error_msg = await _push_supplier_portal(
+            conn, _TENANT_XUJI, cert, "D+1"
+        )
+
+        assert success is False
+        assert error_msg is not None
+        assert error_msg.startswith("portal_insert_failed:")
+        assert "IntegrityError" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_push_does_not_log_webhook_url_content(self):
+        """监管：success log 不能含 webhook_url 字符串值（防 token 泄漏）。"""
+        secret_token = "SECRET-TOKEN-DO-NOT-LEAK-XYZ"
+        webhook = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={secret_token}"
+        cert = _sample_cert(days=30)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter.logger"
+        ) as mock_logger:
+            await _push_wecom_safety_director(_TENANT_XUJI, cert, "D-30", webhook)
+
+        # 收集所有 logger.info / logger.warning 调用的 args + kwargs 字符串化
+        all_log_text = ""
+        for log_call in (
+            list(mock_logger.info.call_args_list)
+            + list(mock_logger.warning.call_args_list)
+        ):
+            all_log_text += str(log_call)
+
+        assert secret_token not in all_log_text, (
+            f"webhook 内 token 泄漏到 log: {all_log_text}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_failure_log_does_not_leak_webhook_url(self):
+        """监管：failure log 也不能含 webhook_url 字符串值。"""
+        secret_token = "FAILURE-PATH-SECRET-TOKEN"
+        webhook = f"https://qyapi.weixin.qq.com/mock?key={secret_token}"
+        cert = _sample_cert(days=15)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=False)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter.logger"
+        ) as mock_logger:
+            await _push_wecom_purchaser(_TENANT_XUJI, cert, "D-15", webhook)
+
+        all_log_text = ""
+        for log_call in (
+            list(mock_logger.info.call_args_list)
+            + list(mock_logger.warning.call_args_list)
+        ):
+            all_log_text += str(log_call)
+
+        assert secret_token not in all_log_text
