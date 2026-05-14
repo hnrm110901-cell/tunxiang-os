@@ -320,3 +320,165 @@ CLAUDE.md §17 Tier 1 红线全 16 服务：
 - **审计范围**：16 个候选文件全文读取 + main 版本核对（避开当前 worktree 在 `refactor/w2a-remove-regional-phase2` 分支与 #271/#272 base 差异）
 
 **审计完成。无文件修改（read-only 遵守）。**
+
+---
+
+## 11. §17 桌台并发语义对齐决策跟踪（待创始人答复）
+
+> 本节为 PR-D / PR-E 6+3 P1 路径的语义决策追踪表。创始人答复 3 选择题后，按填空表格落地 §17 对齐 PR（cashier_engine 6 P1/P2 + order_service 3 P1 = 9 路径，合并 #549/#557/#559 follow-up issue = 11 路径范围）。
+>
+> 本节为决策记录，**不含实现指引**。创始人答复后，由 architect agent 出具具体修法 + 修复 PR 拆分方案。
+>
+> **2026-05-14 14:46 落盘** — DEVLOG 5/13 末段已记录"等创始人 3 选择题答复"，本节文档化以避免每次重新分析。
+
+### 11.1 影响路径全景（11 路径，按 P 级别）
+
+#### cashier_engine.py（6 路径，P1/P2）
+
+| 路径 | 行号 | 级别 | 现状 | 涉及决策 |
+|---|---|---|---|---|
+| `open_table` | L125-160 | P1 | SELECT Table 无锁 → UPDATE 直接赋值 | **选择题 1（双开台 race）** |
+| `change_table_status` | L284-322 | P2 | 状态校验后并发覆盖，非法转换绕过 | **选择题 1（衍生 — 状态机一致性）** |
+| `update_item` | L462-497 | P1 | OrderItem 无锁，并发改 quantity 金额错 | 与 §17 无关 — 通用 OrderItem lock 议题（#557 落 issue） |
+| `remove_item` | L520-547 | P1 | OrderItem 无锁 + phantom 风险 | 同上（OrderItem lock 议题） |
+| `cancel_order` | L929-948 | P1 | 无 Order 锁，并发结算+取消 → 已 paid 订单被 cancel | 与 §17 关联 — **订单终态保护** |
+| `transfer_table` | L1338-1389 | P1 | SELECT-then-校验-then-UPDATE 校验窗口竞争 — 两路转到同一空桌都通过 | **选择题 2（转桌争抢）** |
+
+#### order_service.py（3 路径，P1）
+
+| 路径 | 行号 | 级别 | 现状 | 涉及决策 |
+|---|---|---|---|---|
+| `update_item_quantity` | L279-296 | P1 | OrderItem 无锁 | 通用 OrderItem lock |
+| `remove_item` | L302-318 | P1 | OrderItem 无锁 + phantom | 同上 |
+| `cancel_order` | L464-476 | P1 | 无 Order 锁，并发结算+取消 | 与 §17 关联 — 订单终态保护 |
+
+#### Follow-up issues（合并范围内的架构/补 test 议题）
+
+| Issue | 类别 | 内容 | 与 §17 关系 |
+|---|---|---|---|
+| [#549](https://github.com/hnrm110901-cell/tunxiang-os/issues/549) | architect | `auto_deduction.deduct_for_order` 跨 dish ABBA 死锁防护 | 独立 — architect 评估，可合并到 §17 PR 同步 ship |
+| [#557](https://github.com/hnrm110901-cell/tunxiang-os/issues/557) | 文档+test | `apply_discount _calc_order_cost` OrderItem 隐式不变量 | 与 OrderItem lock 议题关联（cashier update_item / remove_item） |
+| [#559](https://github.com/hnrm110901-cell/tunxiang-os/issues/559) | 校验缺失 | `order_service.apply_discount` 未校验 order.status | 与终态保护关联 |
+
+### 11.2 三个选择题
+
+#### 选择题 1 — 双开台 race（`open_table` P1）
+
+**场景**：两个服务员同时打开同一空桌（前台 + POS / 双 POS / 不同员工手机）。
+
+**当前现状**：
+- `cashier_engine.py:L125-160`: SELECT Table (status='free') → UPDATE Table.status='occupied' + current_order_id=order_id（直接赋值，无 FOR UPDATE）
+- 两路并发都通过 SELECT 校验 → 各自 UPDATE → 后写者覆盖前写者的 order_id → 桌台被第二个订单"占"了，**第一个订单失去桌台引用**
+
+**候选方案**：
+
+| # | 方案 | 实现 | 优点 | 缺点 |
+|---|------|------|------|------|
+| 1A | 强一致（FOR UPDATE + rowcount check） | SELECT 加 `.with_for_update()`，第二路看到 status='occupied' 抛 `TableOccupiedError` | 业务语义清晰，错误前端可弹窗"桌台已被开台，请刷新" | 服务员看到错误需手动 retry，P99 延迟 +5-10ms |
+| 1B | LWW（最后写入胜出，订单端兜底） | UPDATE Table 不加锁，允许后写者覆盖；订单状态机以 Order 表为准 | 性能最优，无阻塞 | 桌台-订单引用不一致，下次结算找桌台时数据漂移 — **不推荐** |
+| 1C | 混合（开台锁桌，状态转换 LWW） | open_table 加 FOR UPDATE；后续 change_table_status 仍 LWW | 关键入口强一致，其他操作高性能 | 决策边界复杂 — 哪些操作算"关键入口"？需另立规则 |
+
+**关联路径**: 选 1A 后 `change_table_status` (P2) 也建议一并加锁（强一致一致性）。
+
+**测试需求**：
+- `test_double_open_table_race_tier1.py`: asyncio.gather 2 路并发 open_table，断言只 1 路成功 + 1 路抛 `TableOccupiedError`（方案 1A）
+
+---
+
+#### 选择题 2 — 转桌争抢（`transfer_table` P1）
+
+**场景**：两路并发转桌都指向同一空桌（典型：500 元桌 + 200 元桌都想升 1000 元 VIP 桌）。
+
+**当前现状**：
+- `cashier_engine.py:L1338-1389`: SELECT Order (无锁) → SELECT target Table (无锁) → 校验 target.status='free' → UPDATE 释放原桌 + 锁新桌
+- **校验后竞争窗口**：两路同时见 free → 各自 UPDATE → 后写者覆盖，第一个 Order 失去桌台 + 源桌可能错误释放
+
+**候选方案**：
+
+| # | 方案 | 实现 | 优点 | 缺点 |
+|---|------|------|------|------|
+| 2A | 双锁（源桌+目标桌按 ID 排序） | SELECT 源桌 + 目标桌 `.with_for_update()`，按 `table_id` 升序锁防 ABBA | 强一致，无死锁 | 锁两桌持有时间长 (~10ms)，高峰转桌频繁可能 contention |
+| 2B | 原子 UPDATE rowcount check | `UPDATE target SET status='occupied', current_order_id=:new_order_id WHERE status='free'` → rowcount=0 抛 `TableOccupiedError` | 单语句原子，无需 FOR UPDATE，性能最优 | 源桌释放需配套幂等 — 若中途 fail 源桌可能"丢失" |
+| 2C | saga 模式（事件驱动） | `TableTransferRequested` 事件 → projector 串行处理 → 失败发送 `TableTransferFailed` 事件 | 完全异步，无锁 | 实现复杂度高，事件总线已 v147 接入但 transfer 未注册事件类型 |
+
+**关联路径**: 与选择题 1 方案选择关联（如选 1A 强一致，则 2 推荐 2A 双锁；若选 1B/1C，则 2 可走 2B 原子 update）。
+
+**测试需求**：
+- `test_transfer_table_race_tier1.py`: 两路并发 transfer 到同一目标桌，断言只 1 路成功 + 桌台终态一致（无双占用 + 无源桌"丢失"）
+
+---
+
+#### 选择题 3 — 结算释放桌台中间态（`settle_order` P0 → `_release_table`）
+
+**场景**：两路并发结算同一订单（典型：服务员 POS + 顾客自助 / 双 POS 同时点结算按钮）。
+
+**当前现状**（PR #556/#560 后已部分修复）：
+- `cashier_engine.py:L744-820`: SELECT Order **FOR UPDATE** → transition_order(completed) → `_release_table()` UPDATE 桌台释放（**故意无锁**, audit §4.1.2 备注 + DEVLOG 5/13 晚段晚 备忘）
+- 设计意图：Order FOR UPDATE 串行化两路 settle，输者抛"订单已结算"分支，`_release_table` 只执行一次。**但桌台完整语义留 §17 创始人对齐**。
+
+**候选方案**：
+
+| # | 方案 | 实现 | 优点 | 缺点 |
+|---|------|------|------|------|
+| 3A | fail-fast（保留当前隐式） | 维持现状：Order FOR UPDATE + `_release_table` 不加锁，依赖串行化让 release 只跑一次 | 实现最简，已在 main | 隐式依赖事务边界 — 若 settle 完成后桌台未及时刷新（前端缓存）会显示"已释放"假状态 |
+| 3B | 幂等释放（WHERE 子句过滤） | `_release_table` UPDATE WHERE `current_order_id=:order_id AND status='occupied'`，允许多次调用无害 | 显式幂等，便于 retry / replay / saga 补偿 | 多一次 WHERE 校验，性能微降；需 audit 既存 caller 是否依赖"释放必发生" |
+| 3C | saga 补偿（显式 rollback） | settle fail 时 emit `OrderSettleFailed` → projector 触发 `_release_table` 补偿 | 完全异步，可观测性最好 | 实现复杂度高，需新增 event_type + projector |
+
+**关联路径**: 与 `cancel_order` (cashier L929 + order_service L464) 终态保护关联 — 取消已结算订单也需 fail-fast。
+
+**测试需求**：
+- `test_concurrent_settle_release_tier1.py`: 双路并发 settle 同订单，断言 1 路成功 + 1 路抛"订单已结算" + 桌台 release 只执行 1 次（或幂等多次结果一致，方案 3B）
+- `test_settle_fail_release_rollback_tier1.py`: settle 路径中途 fail（payment_saga compensate），断言桌台 status 回到 occupied（方案 3C）或保持 occupied（方案 3A 默认事务回滚）
+
+### 11.3 决策追踪表
+
+> 创始人答复后填本表。每题选 1 个候选方案，并标注答复时间 + 备注。
+
+| 选择题 | 候选 | 创始人选择 | 答复时间 | 备注 |
+|---|---|---|---|---|
+| 1 — 双开台 race (`open_table` P1) | 1A / 1B / 1C | ⏳ pending | — | — |
+| 2 — 转桌争抢 (`transfer_table` P1) | 2A / 2B / 2C | ⏳ pending | — | — |
+| 3 — 结算释放桌台中间态 (`settle_order` P0 / `_release_table`) | 3A / 3B / 3C | ⏳ pending | — | — |
+
+### 11.4 后续 PR 拆分预案（创始人答复后启动）
+
+按 §8.1 拆分原则，§17 对齐 PR 候选拆分：
+
+| # | PR | 范围 | 大小 | 依赖决策 |
+|---|----|------|------|---------|
+| §17-A | tx-trade cashier_engine 桌台路径 | open_table + change_table_status + transfer_table | 中 (~80 行) | 选择题 1 + 2 |
+| §17-B | tx-trade settle 终态保护 | cashier.settle_order + cashier.cancel_order + order_service.cancel_order + _release_table | 中 (~100 行) | 选择题 3 |
+| §17-C | OrderItem lock 议题 (与 §17 并行) | cashier.update_item + cashier.remove_item + order_service.update_item_quantity + order_service.remove_item | 中 (~120 行) | 不依赖 §17 — 可独立 ship |
+| §17-D | follow-up 合并 | #549 ABBA architect + #557 OrderItem 不变量文档+test + #559 apply_discount status 校验 | 小-中 (~60 行) | 不依赖 §17 |
+
+**ship 流程**: 每 PR 仍按 §8.2 — explicit-ask user / §19 reviewer / Tier 1 row-lock 并发 regression 测试。
+
+### 11.5 阻塞依赖图
+
+```
+创始人答复 3 选择题
+    ├─ 选择题 1 → 解锁 §17-A (cashier 桌台 3 路径)
+    ├─ 选择题 2 → 解锁 §17-A (同 PR)
+    └─ 选择题 3 → 解锁 §17-B (settle 4 路径)
+                              ↓
+                  §17-C / §17-D 可并行 ship（不依赖创始人答复）
+```
+
+### 11.6 决策点缘起
+
+- **§17 命名缘起**: CLAUDE.md §17 "Tier 1：零容忍" 红线表 — 订单状态机 + 桌台拓扑相关均属 Tier 1
+- **三选择题来源**: 本 audit doc §7 Verifier #2（"业务上是否要求强一致？last-writer-wins 桌台状态是否可接受？"）+ DEVLOG 5/13 晚段晚 PR #556/#560 ship 备忘（"桌台 release 故意不加锁 — 留 §17 创始人对齐"）
+- **触发 PR**: PR #556 (`fca685e8`) cashier 3 P0 / PR #560 (`ebb758ce`) order_service 2 P0 — 5/14 凌晨 ship，明确 6+3 P1/P2 路径"待 §17 桌台对齐"
+- **当前阻塞**: 11 路径 unable to ship until 创始人答复，DEVLOG 已 4+ session 记录该阻塞
+
+### 11.7 推荐解读（不强制）
+
+> 本节为审计层 architect 视角的初步偏好，**不替代创始人决策**，仅为减少决策成本提供 default 起点。
+
+- **选择题 1**: 偏好 **1A 强一致** — 桌台是物理资源（一桌不能两团客人），LWW 数据漂移不可接受；服务员见错误重试是合理 UX
+- **选择题 2**: 偏好 **2A 双锁排序** — 与 1A 一致性匹配；与 `tx-member/stored_value_service.py` 11 处"2 卡同锁排序"模式一致（5/13 row-lock audit baseline ✅ 12 正例之一）
+- **选择题 3**: 偏好 **3B 幂等释放** — 显式幂等比隐式事务边界更鲁棒；为未来 saga 补偿 / 灰度 retry / 离线 replay 留余地，性能开销 minor (~1ms)
+
+如创始人无特别意见，本表建议作 default 选项（1A / 2A / 3B）。
+
+---
