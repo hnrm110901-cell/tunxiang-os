@@ -1,3 +1,47 @@
+## 2026-05-14 下午段晚 14:46 · P0 nightly 修复 + tx-supply 可观测性收口 + §19 P2 测试补遗 3 PR batch ship (5/14 累计 25 PR)
+
+### 完成状态
+
+- [x] **PR #621** pnpm-lock.yaml resync after PR #619 e2e/ workspace add MERGED `9fc1d844` (**frontend lockfile resync 候选第 10 类 carve-out 首例**, 与 #619 第 9 类配对, Closes #601 真正修复路径, 1 file +29/-0 lockfile-only)
+- [x] **PR #622** tx-supply doc_number fallback Prometheus counter + admin UI MERGED `78d96d9a` (**Tier 1 邻接 explicit-ask 第 13 例**, PR-03D / Closes #592, 11 files +906/-0, 4-part atomic commits)
+- [x] **PR #623** gateway+tx-trade §19 round-1 E 项 P2 follow-up unit tests MERGED `a33d8771` (**双 carve-out 同 PR 历史首例 类 4 + 类 8 / 候选第 11 类首例**, Closes #606 / 闭 #610 + #611, 2 NEW test files +319/-0 blast radius 0)
+- [x] **§19 reviewer round-1 + round-2 (PR #622)** — round-1 1 P0 (X-Role gate bypass) + 1 P1 (`_name` 私属性) + 2 P2 → round-2 全修 APPROVE 0 P0/0 P1
+- [x] **PR #621 跳 §19** — lockfile-only blast radius 0 走 explicit-ask 直接 admin-merge；workflow_dispatch on PR head 验证 `Offline E2E (Sprint A2 P0-2)` step 5+6 双 success
+- [x] **PR #623 user 授权跳 §19 完整 run** — 双 carve-out 类 4 + 类 8 / 0 source / blast radius 0 + AST/mock 守护已自验，partial reviewer agent 已确认 mock 路径达 resp.json()
+- [x] **CI 真门禁全绿** (3 PR：PR #622 tier1-gate paths 命中 17 service matrix 全绿 / PR #623 tier1-gate paths 命中 *tier1* 后缀触发全 17 service matrix / PR #621 frontend-build + edge-mac-station + Analyze Changes & Label SUCCESS)
+- [x] **3 new lesson memory 落盘**: `feedback_workspace_lockfile_sync.md` / `project_tunxiang_offline_e2e_workflows.md` / `feedback_gh_pr_merge_worktree_cosmetic_fail.md`
+- [x] **5/14 累计 25 PR ship** (22 prior session + 本 batch 3 = 25 PR)
+
+### 关键决策
+
+- **新 carve-out 矩阵扩展 9 → 11 类候选** — 第 10 类候选 frontend lockfile resync (PR #621 首例, 与 #619 第 9 类配对) + 第 11 类候选双 carve-out 同 PR test-only blast radius 0 (PR #623 首例 类 4 + 类 8). `feedback_carveout_admin_merge_pattern.md` 待 sediment session 正式收录两新类 + 给每类首例 PR 编号 + 判定条件统一
+- **3 lesson memory 三件套落盘** — `feedback_workspace_lockfile_sync.md` (PR #621 7h 修复链断教训) + `project_tunxiang_offline_e2e_workflows.md` (PR #621 dispatch 错 workflow 实证) + `feedback_gh_pr_merge_worktree_cosmetic_fail.md` (PR #621 + #623 实证 2 次 cosmetic fail 不要 panic). 事故驱动 memory 增长模式：每个 cosmetic/silent fail 提取 → 下 session cold-start 直接避坑
+- **§19 reviewer 分级矩阵补完三级** — ① 实质 logic 改动 (PR #622 +906 / 11 files / Tier 1 邻接) 走完整 §19 + 多 round (1 P0 + 1 P1 + 2 P2 round-1 → round-2 全修 APPROVE) / ② T2 infra/邻接 config 走 §19 + group explicit-ask / ③ blast radius 0 test-only / lockfile / docs-only (PR #621 + #623) 跳 §19 + explicit-ask 单点 confirm. 三级标准统一适用
+- **PR #622 graceful degradation 监控四件套首次完整落地** — `feedback_graceful_degradation_pattern.md` 契约 (辅助标识 infra 失败 fail-open 静默 fallback NULL + structlog warn + Prometheus counter + 监控告警) 完整闭环：Counter (`doc_number_fallback_total{service, doc_type}` cardinality 封闭 ≤ 6 组合) + 6 catch site 接线 + Ant Design 仪表板 + on-call runbook + 2 告警规则草稿 (Burst 5min>10 critical / Slow 15min>0 warning). 为后续 SKU 编码 / 单据可读编号类 graceful degradation 模式建立完整范本
+- **PR #622 X-Role → X-Internal-Role gate (§19 round-1 P0)** — X-Role 不在 gateway `_STRIP` 列表客户端可伪造直达 tx-supply:8006 → 改 X-Internal-Role (proxy.py L130 `_STRIP` + L142 gateway 注入 trusted role) 不可伪造. 教训：内部受信 header 必须在 gateway `_STRIP` 列表 + gateway 单点注入，与"客户端可设置 header"边界严格分离
+- **PR #622 collect() 私属性 → 公开 API (§19 round-1 P1/P2)** — 后端 endpoint + 测试都用 `metric_family.samples` 公开 API 遍历，不读 `_name` / `_value` 私属性. 防 prometheus_client 主版本升级断裂. 教训：第三方库私属性 (单下划线) 即使能跑也不用，公开 API 一定有等价语义
+- **PR #623 AST 守护选型而非 runtime mock** — lifespan 端到端需 init_db (real PG) + schedulers + payment consumer 多重 fixture，P2 priority ROI 不划算；跟 `test_lifespan_payment_consumer_tier1.py` T4-T6 PR #128 silent failure 守护同模式. AST 守护防回归同等有效，跟 runtime mock 二选一时优先 AST
+- **issue tracking lifecycle 三段式实证** — PR #623 同时 Closes #606 + 闭 #610 + #611：3 issues 在 5/14 上午 PR #616/#618 已实质性 fix（生产代码已修），#623 补的是 source-protection AST 测试守护，不是 fix 本身. "fix-in-prod → guard-in-test → tracking-close" 三段式，避免 fix PR 与 guard PR 强耦合 + 加快 fix 路径 ship 速度
+
+### 下一步
+
+- 优先 PR #240 D2-D5 真机 smoke (rebase 到 main `a33d8771` + 27 files 200+ commits behind 冲突 + Tailscale 接入 Mac mini M4 + Core ML 模型部署 + #619/#621 ship 后 web-pos offline cashier check 应转绿)
+- 或 §17 桌台并发语义对齐 PR (前提创始人 3 选择题答复 — 双开台 race / 转桌争抢 / 结算释放桌台中间态)
+- 或 PR-01C 供应链证件管理 UI 收尾 Phase 1 W6 9/9 (PR #622 收口后剩 1)
+- 或等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质)
+
+### 已知风险
+
+- 本 batch 3 PR 总 +1254 / -0 跨 6 模块 (tx-supply / gateway / tx-trade / web-admin / docs / lockfile)，**PR #622 11 files 触碰 Tier 1 邻接 (库存 io / 收货 / 盘点 / 采购单)** — 但仅 1 行 catch site 加 `record_doc_number_fallback(...)`，fail-open 契约保证 counter 错误不传播业务路径，blast radius 边界清晰
+- **PR #622 Tier 1 邻接 explicit-ask 第 13 例** — 不在 10 类 carve-out 内，跟 #271/#272/#544/#547/#553/#556/#560/#563/#227/#609/#618/#616 同模式，每 PR 必须 §19 reviewer + explicit-ask user（已完成）
+- **PR #621 lockfile resync 候选新 carve-out 第 10 类** — 与 #619 frontend workspace config 第 9 类配对，blast radius 0 lockfile-only 改动，`feedback_workspace_lockfile_sync.md` 已记录判定条件，待 `feedback_carveout_admin_merge_pattern.md` 正式收录
+- **PR #623 双 carve-out 候选新第 11 类** — 单 PR 同时命中类 4 (*tier1* 后缀) + 类 8 (test-only Tier 1 邻接 non-*tier1*)，blast radius 0 接受跳完整 §19. 是 §19 reviewer scope 分级在 test-only PR 上的极简边界，需 sediment session 给判定条件成文
+- **25 PR/单日** 远超 `feedback_proactive_session_split.md` 4+ 阈值 (6.25 倍)，但本 session 仅 ship 3 PR + 3 memory + 1 devlog PR (本 PR)，上下文消费可控
+- pre-existing CI 漂移 11+ 项 (python-lint-test / Ruff / Test Changed Services / TypeScript Check / RLS Runtime — 7 P0 表 / nightly-offline-e2e.yml stale npm-ci) 全 PR 一律 fail — 与本批无关，`project_tunxiang_ci_gates.md` 已登记 + 本 batch 新增 `project_tunxiang_offline_e2e_workflows.md` 双 workflow 文件陷阱
+- `nightly-offline-e2e.yml` (stale npm-ci) 应某天独立 PR 删除或迁 pnpm@10，low-priority follow-up，归 `project_tunxiang_ci_gates.md` 预存漂移列表
+
+---
+
 ## 2026-05-14 下午段 13:44 · 轻量 P0/P1/P2 follow-up 4 PR batch ship (B/C 路径完整闭环, 5 issues 全 CLOSED)
 
 ### 完成状态
