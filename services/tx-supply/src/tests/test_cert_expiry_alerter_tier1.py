@@ -60,6 +60,9 @@ from services.tx_supply.src.workers.cert_expiry_alerter import (
     _classify_threshold,
     _already_alerted,
     _log_alert,
+    _push_supplier_portal,
+    _push_wecom_purchaser,
+    _push_wecom_safety_director,
     _scan_one_tenant,
     CHANNEL_WECOM_SAFETY,
     CHANNEL_WECOM_PURCHASER,
@@ -80,13 +83,26 @@ _TODAY = date(2026, 5, 14)
 # ─── helper: mock DB ─────────────────────────────────────────────────────────
 
 
+def _mk_savepoint_cm() -> MagicMock:
+    """构造 conn.begin_nested() / conn.begin() 返回的 async context manager 替身。
+
+    PR #608 round-2 P0 SAVEPOINT 修复后，`_push_supplier_portal` / `_log_alert`
+    内部用 `async with conn.begin_nested()` 隔离 INSERT 失败；mock 必须返回
+    支持 __aenter__/__aexit__ 的对象，否则触发 RuntimeWarning(coroutine never awaited)。
+    """
+    ctx = MagicMock()
+    ctx.__aenter__ = AsyncMock(return_value=None)
+    ctx.__aexit__ = AsyncMock(return_value=False)  # 不吞异常
+    return ctx
+
+
 def _mk_db(
     *,
     already_alerted: bool = False,
     alertable_rows: Optional[list] = None,
     tenant_webhooks: Optional[dict] = None,
 ) -> AsyncMock:
-    """通用 mock DB，支持三类查询路径。"""
+    """通用 mock DB，支持三类查询路径 + SAVEPOINT 上下文管理器。"""
     db = AsyncMock()
 
     _webhooks = tenant_webhooks or {
@@ -124,6 +140,9 @@ def _mk_db(
 
     db.execute = AsyncMock(side_effect=execute_side_effect)
     db.flush = AsyncMock()
+    # SAVEPOINT / 外层 begin() 上下文管理器
+    db.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+    db.begin = MagicMock(side_effect=lambda: _mk_savepoint_cm())
     return db
 
 
@@ -404,6 +423,7 @@ class TestAlertLogIdempotentOnCeleryRetry:
 
         db = AsyncMock()
         db.execute = AsyncMock(side_effect=already_alerted_side_effect)
+        db.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         # 第一次 _already_alerted（push 失败前）→ False
         result1 = await _already_alerted(db, _CERT_A, "D-30", CHANNEL_WECOM_SAFETY)
@@ -447,6 +467,9 @@ class TestNoWebhookSkippedLogged:
         mock_conn = AsyncMock()
         mock_conn.execute = AsyncMock(return_value=MagicMock())
         mock_conn.commit = AsyncMock()
+        # SAVEPOINT / 外层 begin() 上下文管理器（PR #608 round-2 P0）
+        mock_conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+        mock_conn.begin = MagicMock(side_effect=lambda: _mk_savepoint_cm())
 
         mock_cm = MagicMock()
         mock_cm.__aenter__ = AsyncMock(return_value=mock_conn)
@@ -496,3 +519,422 @@ class TestNoWebhookSkippedLogged:
 
         # 无异常，returned dict 结构正确
         assert "evaluated" in result and "sent" in result
+
+
+# ─── 10. sub-PR C — 推送通道接线契约 ────────────────────────────────────────
+#
+# tx_org IMNotificationService 注册：从 tx-supply 测试树运行时，根 conftest
+# 只注册顶级 `services` namespace + 各服务 src/services/；tx_supply/conftest
+# 仅注册 services.tx_supply.*。需要手动注册 services.tx_org.* 命名空间
+# 才能 patch tx-supply worker 内对 services.tx_org.src.services.im_notification_service
+# 的懒 import。
+import importlib.util as _importlib_util
+import types as _types
+
+_REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.."))
+_TX_ORG_SVC_DIR = os.path.join(_REPO_ROOT, "services", "tx-org")
+_TX_ORG_SRC_DIR = os.path.join(_TX_ORG_SVC_DIR, "src")
+
+
+def _register_tx_org_im_namespace() -> None:
+    """注册 services.tx_org.src.services.im_notification_service 命名空间链。"""
+    if "services.tx_org.src.services.im_notification_service" in sys.modules:
+        return
+    for name, path in [
+        ("services.tx_org", _TX_ORG_SVC_DIR),
+        ("services.tx_org.src", _TX_ORG_SRC_DIR),
+        ("services.tx_org.src.services", os.path.join(_TX_ORG_SRC_DIR, "services")),
+    ]:
+        if name not in sys.modules:
+            mod = _types.ModuleType(name)
+            mod.__path__ = [path]
+            mod.__package__ = name
+            sys.modules[name] = mod
+    spec = _importlib_util.spec_from_file_location(
+        "services.tx_org.src.services.im_notification_service",
+        os.path.join(_TX_ORG_SRC_DIR, "services", "im_notification_service.py"),
+    )
+    if spec and spec.loader:
+        _mod = _importlib_util.module_from_spec(spec)
+        sys.modules["services.tx_org.src.services.im_notification_service"] = _mod
+        spec.loader.exec_module(_mod)
+
+
+_register_tx_org_im_namespace()
+
+
+def _sample_cert(*, days: int = 30, expire: date = date(2026, 6, 13)) -> dict:
+    """sub-PR C 推送测试用 cert dict（含 supplier_name，匹配 cert_service round-2 fix）。"""
+    return {
+        "cert_id": _CERT_A,
+        "supplier_id": _SUPPLIER_A,
+        "supplier_name": "徐记海鲜供应商A",
+        "cert_type": "食品经营许可证",
+        "cert_number": "XJ-2024-001",
+        "expire_date": expire,
+        "days_until_expiry": days,
+    }
+
+
+class TestPushChannelWiringTier1:
+    """sub-PR C 推送通道接线 Tier 1 契约测试。
+
+    覆盖：
+      1. 食安总监 wecom 推送：调 IMNotificationService.send_wecom_bot 且消息含证件信息
+      2. send_wecom_bot 返回 False → stub 返回 (False, 'wecom_send_failed')
+      3. 采购员推送 message 含'采购员'角色（区别于食安总监）
+      4. supplier_portal 推送：执行 INSERT INTO supplier_portal_messages（subject/body/metadata）
+      5. supplier_portal SQLAlchemyError → 返回 (False, 'portal_insert_failed: <ClassName>')，不 raise
+      6. 任何 channel 的 success/failure log 都不能含 webhook_url 字符串值（防泄漏）
+    """
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_calls_im_service_with_correct_args(self):
+        """食安总监 wecom 推送：调 IMNotificationService.send_wecom_bot，message 含证件信息。"""
+        cert = _sample_cert(days=30)
+        webhook = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=SECRET-XYZ"
+
+        mock_inst = MagicMock()
+        rendered_message = (
+            "### 供应商证件临期预警\n"
+            "**供应商**：徐记海鲜供应商A\n"
+            "**证件类型**：食品经营许可证\n"
+            "**证件编号**：XJ-2024-001\n"
+            "**到期日**：2026-06-13\n"
+            "**距过期**：30 天（阈值 D-30）\n"
+            "**收件角色**：食安总监\n\n请通知供应商提前准备续证材料，避免临期断档。"
+        )
+        mock_inst.notify_cert_expiry = AsyncMock(return_value=rendered_message)
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-30", webhook
+            )
+
+        assert success is True
+        assert error_msg is None
+
+        # send_wecom_bot 调 webhook + rendered message
+        assert mock_inst.send_wecom_bot.call_count == 1
+        sent_args, sent_kwargs = mock_inst.send_wecom_bot.call_args
+        sent_url = sent_args[0] if sent_args else sent_kwargs.get("webhook_url")
+        sent_msg = sent_args[1] if len(sent_args) > 1 else sent_kwargs.get("message")
+        assert sent_url == webhook
+        assert "徐记海鲜供应商A" in sent_msg
+        assert "食品经营许可证" in sent_msg
+        assert "XJ-2024-001" in sent_msg
+        assert "2026-06-13" in sent_msg
+
+        # notify_cert_expiry 用了食安总监 recipient_role
+        assert mock_inst.notify_cert_expiry.call_count == 1
+        _, kw = mock_inst.notify_cert_expiry.call_args
+        assert kw["recipient_role"] == "食安总监"
+        assert kw["threshold"] == "D-30"
+        assert kw["supplier_name"] == "徐记海鲜供应商A"
+        assert kw["cert_type"] == "食品经营许可证"
+        assert kw["cert_number"] == "XJ-2024-001"
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_returns_false_on_send_failure(self):
+        """send_wecom_bot 返回 False（5xx/timeout）→ stub 返回 (False, 'wecom_send_failed')。"""
+        cert = _sample_cert(days=7)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=False)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-7", "https://qyapi.weixin.qq.com/mock"
+            )
+
+        assert success is False
+        assert error_msg == "wecom_send_failed"
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_purchaser_uses_purchaser_recipient_role(self):
+        """采购员推送 message 用'采购员'角色文案（区别于食安总监模板）。"""
+        cert = _sample_cert(days=15)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="### 供应商证件临期预警\n采购员")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ):
+            success, error_msg = await _push_wecom_purchaser(
+                _TENANT_XUJI, cert, "D-15", "https://qyapi.weixin.qq.com/purchaser"
+            )
+
+        assert success is True
+        assert error_msg is None
+
+        # recipient_role='采购员' 与 safety director 模板区分
+        _, kw = mock_inst.notify_cert_expiry.call_args
+        assert kw["recipient_role"] == "采购员"
+        assert kw["threshold"] == "D-15"
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_inserts_with_correct_payload(self):
+        """supplier_portal 推送：执行 INSERT INTO supplier_portal_messages，含 message_type/subject/body/metadata。"""
+        cert = _sample_cert(days=0, expire=date(2026, 5, 14))
+
+        captured: dict = {}
+
+        async def execute_capture(query, params=None):
+            captured["sql"] = str(query)
+            captured["params"] = params or {}
+            return MagicMock()
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_capture)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+
+        success, error_msg = await _push_supplier_portal(
+            conn, _TENANT_XUJI, cert, "D+0"
+        )
+
+        assert success is True
+        assert error_msg is None
+        assert "INSERT INTO supplier_portal_messages" in captured["sql"]
+        assert captured["params"]["tenant_id"] == _TENANT_XUJI
+        assert captured["params"]["supplier_id"] == _SUPPLIER_A
+        assert captured["params"]["message_type"] == "cert_expiry_alert"
+        # subject 体现 D+0 已过期分支
+        assert "已过期" in captured["params"]["subject"]
+        assert "食品经营许可证" in captured["params"]["subject"]
+        # body 含证件编号 + 过期日
+        assert "XJ-2024-001" in captured["params"]["body"]
+        # metadata 是 JSON 字符串（CAST AS JSONB），含 cert_id / threshold
+        import json as _json
+
+        meta = _json.loads(captured["params"]["metadata"])
+        assert meta["cert_id"] == _CERT_A
+        assert meta["threshold"] == "D+0"
+        assert meta["cert_type"] == "食品经营许可证"
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_inserts_临期_subject_for_negative_threshold(self):
+        """临期阈值（D-7/D-15/D-30）→ subject 走"临期"分支，不是"已过期"。"""
+        cert = _sample_cert(days=7)
+
+        captured: dict = {}
+
+        async def execute_capture(query, params=None):
+            captured["params"] = params or {}
+            return MagicMock()
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_capture)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+
+        await _push_supplier_portal(conn, _TENANT_XUJI, cert, "D-7")
+        assert "临期" in captured["params"]["subject"]
+        assert "D-7" in captured["params"]["subject"]
+        assert "已过期" not in captured["params"]["subject"]
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_returns_false_on_db_error(self):
+        """conn.execute raises SQLAlchemyError → 返回 (False, 'portal_insert_failed: <ClassName>')，不 raise。"""
+        cert = _sample_cert(days=0)
+
+        from sqlalchemy.exc import IntegrityError
+
+        async def execute_raises(query, params=None):
+            raise IntegrityError("INSERT", {}, Exception("duplicate key"))
+
+        conn = AsyncMock()
+        conn.execute = AsyncMock(side_effect=execute_raises)
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+
+        success, error_msg = await _push_supplier_portal(
+            conn, _TENANT_XUJI, cert, "D+1"
+        )
+
+        assert success is False
+        assert error_msg is not None
+        assert error_msg.startswith("portal_insert_failed:")
+        assert "IntegrityError" in error_msg
+
+    @pytest.mark.asyncio
+    async def test_push_does_not_log_webhook_url_content(self):
+        """监管：success log 不能含 webhook_url 字符串值（防 token 泄漏）。"""
+        secret_token = "SECRET-TOKEN-DO-NOT-LEAK-XYZ"
+        webhook = f"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={secret_token}"
+        cert = _sample_cert(days=30)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=True)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter.logger"
+        ) as mock_logger:
+            await _push_wecom_safety_director(_TENANT_XUJI, cert, "D-30", webhook)
+
+        # 收集所有 logger.info / logger.warning 调用的 args + kwargs 字符串化
+        all_log_text = ""
+        for log_call in (
+            list(mock_logger.info.call_args_list)
+            + list(mock_logger.warning.call_args_list)
+        ):
+            all_log_text += str(log_call)
+
+        assert secret_token not in all_log_text, (
+            f"webhook 内 token 泄漏到 log: {all_log_text}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_failure_log_does_not_leak_webhook_url(self):
+        """监管：failure log 也不能含 webhook_url 字符串值。"""
+        secret_token = "FAILURE-PATH-SECRET-TOKEN"
+        webhook = f"https://qyapi.weixin.qq.com/mock?key={secret_token}"
+        cert = _sample_cert(days=15)
+
+        mock_inst = MagicMock()
+        mock_inst.notify_cert_expiry = AsyncMock(return_value="rendered")
+        mock_inst.send_wecom_bot = AsyncMock(return_value=False)
+
+        with patch(
+            "services.tx_org.src.services.im_notification_service.IMNotificationService",
+            return_value=mock_inst,
+        ), patch(
+            "services.tx_supply.src.workers.cert_expiry_alerter.logger"
+        ) as mock_logger:
+            await _push_wecom_purchaser(_TENANT_XUJI, cert, "D-15", webhook)
+
+        all_log_text = ""
+        for log_call in (
+            list(mock_logger.info.call_args_list)
+            + list(mock_logger.warning.call_args_list)
+        ):
+            all_log_text += str(log_call)
+
+        assert secret_token not in all_log_text
+
+    # ─── PR #608 round-2 §19 reviewer P0 + P1 回归 ──────────────────────────
+
+    @pytest.mark.asyncio
+    async def test_supplier_portal_insert_failure_does_not_poison_subsequent_log_alert(self):
+        """P0 回归（round-1 §19）：SAVEPOINT 隔离 INSERT 失败 →
+        同 conn 后续 _log_alert 仍能成功，外层 txn 不被污染。
+
+        Setup: mock conn 让 supplier_portal INSERT 抛 IntegrityError；
+        SAVEPOINT 机制只回滚 savepoint。后续 _log_alert（也用 SAVEPOINT）
+        在同一 conn 上必须正常完成，不抛 InFailedSqlTransaction。
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        conn = AsyncMock()
+
+        savepoint_calls = {"count": 0}
+
+        def make_savepoint():
+            savepoint_calls["count"] += 1
+            return _mk_savepoint_cm()
+
+        conn.begin_nested = MagicMock(side_effect=make_savepoint)
+
+        executed_sql: list[str] = []
+
+        async def fake_execute(query, params=None):
+            sql = str(query)
+            executed_sql.append(sql)
+            if "supplier_portal_messages" in sql and "INSERT" in sql.upper():
+                # 模拟 RLS WITH CHECK 违规 / NOT NULL 失败
+                raise IntegrityError(
+                    "INSERT INTO supplier_portal_messages",
+                    {},
+                    Exception("RLS WITH CHECK violation"),
+                )
+            # cert_alert_log INSERT/UPSERT 正常成功
+            return MagicMock()
+
+        conn.execute = AsyncMock(side_effect=fake_execute)
+
+        cert = _sample_cert(days=0, expire=date(2026, 5, 14))
+
+        # Step 1: _push_supplier_portal 必须 fail-open 不抛
+        success, err = await _push_supplier_portal(conn, _TENANT_XUJI, cert, "D+0")
+        assert success is False
+        assert err is not None
+        assert err.startswith("portal_insert_failed:")
+
+        # Step 2: 同 conn 上 _log_alert 必须仍能成功
+        # 关键断言：如果外层 txn 被污染，asyncpg/SA 会抛 InFailedSqlTransaction
+        # 这里 mock 不模拟 PG 真行为，但 SAVEPOINT 路径走通 + cert_alert_log
+        # INSERT 被 fake_execute 接受 → 等同于 PG 真实场景外层未污染
+        await _log_alert(
+            conn, _TENANT_XUJI, _CERT_A, "D+0",
+            CHANNEL_SUPPLIER_PORTAL, False, err,
+        )
+
+        # 验证两次 SAVEPOINT 都被使用：一次给 portal INSERT，一次给 log_alert
+        assert savepoint_calls["count"] == 2, (
+            f"expected 2 SAVEPOINTs (portal + log_alert), got {savepoint_calls['count']}"
+        )
+
+        # 验证两个 INSERT 都被执行
+        assert any("supplier_portal_messages" in s for s in executed_sql)
+        assert any("cert_alert_log" in s for s in executed_sql)
+
+    @pytest.mark.asyncio
+    async def test_push_wecom_safety_director_handles_lazy_import_failure(self):
+        """P1-2 回归：ImportError on lazy import 被捕获，返回 (False, error_msg) — fail-open 契约。"""
+        cert = _sample_cert(days=30)
+
+        # 强制触发 ImportError：阻塞 services.tx_org.src.services.im_notification_service 重新加载
+        saved_mod = sys.modules.pop(
+            "services.tx_org.src.services.im_notification_service", None
+        )
+        # 用 None 标记阻止重新 import（Python import system 见到 None 抛 ImportError）
+        sys.modules["services.tx_org.src.services.im_notification_service"] = None  # type: ignore[assignment]
+
+        try:
+            success, err = await _push_wecom_safety_director(
+                _TENANT_XUJI, cert, "D-30",
+                "https://qyapi.test/x",
+            )
+            assert success is False, "ImportError 应触发 fail-open 返回 False"
+            assert err is not None
+            assert err.startswith("wecom_send_exception:"), f"got {err!r}"
+        finally:
+            sys.modules.pop(
+                "services.tx_org.src.services.im_notification_service", None
+            )
+            if saved_mod is not None:
+                sys.modules[
+                    "services.tx_org.src.services.im_notification_service"
+                ] = saved_mod
+            else:
+                # 重新触发命名空间注册让其他测试可继续 patch
+                _register_tx_org_im_namespace()
+
+    @pytest.mark.asyncio
+    async def test_push_supplier_portal_handles_missing_cert_key(self):
+        """P1-1 回归：cert dict 缺键触发 KeyError → 被 fail-open 捕获，返回 (False, error_msg)。"""
+        conn = AsyncMock()
+        conn.begin_nested = MagicMock(side_effect=lambda: _mk_savepoint_cm())
+        conn.execute = AsyncMock(return_value=MagicMock())
+
+        # 缺 supplier_id / cert_type / 等关键键
+        bad_cert = {"cert_id": _CERT_A}
+
+        success, err = await _push_supplier_portal(
+            conn, _TENANT_XUJI, bad_cert, "D-30"
+        )
+        assert success is False
+        assert err is not None
+        assert err.startswith("portal_payload_invalid:"), f"got {err!r}"

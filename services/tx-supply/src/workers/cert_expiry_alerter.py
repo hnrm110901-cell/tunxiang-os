@@ -9,6 +9,7 @@
 """
 from __future__ import annotations
 
+import json
 import os
 from datetime import date, datetime, timezone
 from typing import Optional, Tuple
@@ -42,7 +43,13 @@ def _get_engine() -> AsyncEngine:
     return _engine
 
 
-# ─── 推送通道 stub（sub-PR C 替换为真实现）──────────────────────────────────
+# ─── 推送通道实现（sub-PR C 真接线）──────────────────────────────────────────
+#
+# fail-open 契约：任何异常都不向上抛，统一返回 (False, error_msg)。
+# 调用方 _scan_one_tenant 拿到 (success, error_msg) 后落 cert_alert_log，下
+# 一日 daily scan 失败记录会重试（_already_alerted 仅以 success=TRUE 行为准）。
+#
+# 安全：webhook_url 内容不入 log（避免泄漏 webhook token）。
 
 
 async def _push_wecom_safety_director(
@@ -51,14 +58,59 @@ async def _push_wecom_safety_director(
     threshold: str,
     webhook_url: str,
 ) -> Tuple[bool, Optional[str]]:
-    """食安总监企微 webhook 推送 stub（sub-PR C 替换为真 HTTP 调用）。"""
-    logger.info(
-        "cert_alert_stub_wecom_safety_director",
+    """食安总监企微 webhook 推送：调 IMNotificationService 渲染模板 + send_wecom_bot。
+
+    fail-open 契约：dict 读取 / 懒 import / IMNotificationService 调用全部包
+    在 try 内，避免 KeyError/TypeError/ImportError 漏出 escaping fail-open。
+    """
+    try:
+        # 懒 import 在 try 内：未来 tx-org 包不可用时不直接抛 ImportError 给调用方
+        from services.tx_org.src.services.im_notification_service import IMNotificationService
+
+        supplier_name = cert.get("supplier_name") or "(未知供应商)"
+        cert_id_val = cert["cert_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = str(cert["expire_date"])
+        days_until_expiry = int(cert["days_until_expiry"])
+
+        svc = IMNotificationService()
+        message = await svc.notify_cert_expiry(
+            supplier_name=supplier_name,
+            cert_type=cert_type,
+            cert_number=cert_number,
+            expire_date=expire_date,
+            days_until_expiry=days_until_expiry,
+            threshold=threshold,
+            recipient_role="食安总监",
+        )
+        sent = await svc.send_wecom_bot(webhook_url, message)
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, ImportError) as exc:
+        logger.warning(
+            "cert_alert_wecom_safety_director_exception",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert.get("cert_id", "")),
+            threshold=threshold,
+            error=str(exc),
+            exc_info=True,
+        )
+        return (False, f"wecom_send_exception: {exc.__class__.__name__}")
+
+    if sent:
+        logger.info(
+            "cert_alert_wecom_safety_director_sent",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert_id_val),
+            threshold=threshold,
+        )
+        return (True, None)
+    logger.warning(
+        "cert_alert_wecom_safety_director_failed",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
+        cert_id=str(cert_id_val),
         threshold=threshold,
     )
-    return (True, None)
+    return (False, "wecom_send_failed")
 
 
 async def _push_wecom_purchaser(
@@ -67,14 +119,58 @@ async def _push_wecom_purchaser(
     threshold: str,
     webhook_url: str,
 ) -> Tuple[bool, Optional[str]]:
-    """采购员企微 webhook 推送 stub（sub-PR C 替换为真 HTTP 调用）。"""
-    logger.info(
-        "cert_alert_stub_wecom_purchaser",
+    """采购员企微 webhook 推送：模板 recipient_role='采购员'，复用 send_wecom_bot 通道。
+
+    fail-open 契约：dict 读取 / 懒 import / IMNotificationService 调用全部包
+    在 try 内（与 _push_wecom_safety_director 同模式）。
+    """
+    try:
+        from services.tx_org.src.services.im_notification_service import IMNotificationService
+
+        supplier_name = cert.get("supplier_name") or "(未知供应商)"
+        cert_id_val = cert["cert_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = str(cert["expire_date"])
+        days_until_expiry = int(cert["days_until_expiry"])
+
+        svc = IMNotificationService()
+        message = await svc.notify_cert_expiry(
+            supplier_name=supplier_name,
+            cert_type=cert_type,
+            cert_number=cert_number,
+            expire_date=expire_date,
+            days_until_expiry=days_until_expiry,
+            threshold=threshold,
+            recipient_role="采购员",
+        )
+        sent = await svc.send_wecom_bot(webhook_url, message)
+    except (OSError, ValueError, RuntimeError, KeyError, TypeError, AttributeError, ImportError) as exc:
+        logger.warning(
+            "cert_alert_wecom_purchaser_exception",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert.get("cert_id", "")),
+            threshold=threshold,
+            error=str(exc),
+            exc_info=True,
+        )
+        return (False, f"wecom_send_exception: {exc.__class__.__name__}")
+
+    if sent:
+        logger.info(
+            "cert_alert_wecom_purchaser_sent",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert_id_val),
+            threshold=threshold,
+        )
+        return (True, None)
+    logger.warning(
+        "cert_alert_wecom_purchaser_failed",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
+        cert_id=str(cert_id_val),
         threshold=threshold,
     )
-    return (True, None)
+    return (False, "wecom_send_failed")
 
 
 async def _push_supplier_portal(
@@ -83,11 +179,89 @@ async def _push_supplier_portal(
     cert: dict,
     threshold: str,
 ) -> Tuple[bool, Optional[str]]:
-    """写入 supplier_portal_messages inbox 表 stub（sub-PR C 真实现 INSERT）。"""
+    """写入 supplier_portal_messages inbox 表（v424 schema：subject/body/metadata JSONB）。
+
+    RLS：调用方 _scan_one_tenant 已 set_config('app.tenant_id') 生效，本函数不重复设置。
+
+    P0 防御（PR #608 round-2）：INSERT 包在 conn.begin_nested() SAVEPOINT 中，
+    单 cert 失败（如 RLS WITH CHECK / IntegrityError）只回滚 savepoint，
+    外层 _scan_one_tenant 事务保持干净，后续 _already_alerted / _log_alert
+    不会被 InFailedSqlTransaction 污染。
+
+    fail-open 契约：dict 读取也在 try 内，避免 KeyError 漏出。
+    """
+    try:
+        cert_id_val = cert["cert_id"]
+        supplier_id_val = cert["supplier_id"]
+        cert_type = cert["cert_type"]
+        cert_number = cert["cert_number"]
+        expire_date = cert["expire_date"]
+        days_until_expiry = int(cert["days_until_expiry"])
+
+        if threshold.startswith("D+"):
+            subject = f"【已过期】{cert_type} 请立即续证"
+        else:
+            subject = f"【临期 {threshold}】{cert_type} 即将过期"
+
+        body = (
+            f"您的{cert_type}（编号 {cert_number}）"
+            f"将于 {expire_date} 过期，距今 {days_until_expiry} 天。"
+            f"请尽快上传续证文件至供应商门户。"
+        )
+        metadata = {
+            "cert_id": str(cert_id_val),
+            "cert_type": cert_type,
+            "cert_number": cert_number,
+            "expire_date": str(expire_date),
+            "days_until_expiry": days_until_expiry,
+            "threshold": threshold,
+        }
+
+        # SAVEPOINT 隔离：INSERT 失败只回滚到 savepoint，不污染外层 txn
+        async with conn.begin_nested():
+            await conn.execute(
+                text(
+                    """
+                    INSERT INTO supplier_portal_messages
+                        (tenant_id, supplier_id, message_type, subject, body, metadata)
+                    VALUES
+                        (:tenant_id::uuid, :supplier_id::uuid, :message_type,
+                         :subject, :body, CAST(:metadata AS JSONB))
+                    """
+                ),
+                {
+                    "tenant_id": str(tenant_id),
+                    "supplier_id": str(supplier_id_val),
+                    "message_type": "cert_expiry_alert",
+                    "subject": subject,
+                    "body": body,
+                    "metadata": json.dumps(metadata, ensure_ascii=False),
+                },
+            )
+    except SQLAlchemyError as exc:
+        logger.warning(
+            "cert_alert_supplier_portal_insert_failed",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert.get("cert_id", "")),
+            error=str(exc),
+            exc_info=True,
+        )
+        return (False, f"portal_insert_failed: {exc.__class__.__name__}")
+    except (KeyError, TypeError, ValueError, AttributeError) as exc:
+        logger.warning(
+            "cert_alert_supplier_portal_payload_invalid",
+            tenant_id=str(tenant_id),
+            cert_id=str(cert.get("cert_id", "")),
+            error=str(exc),
+            exc_info=True,
+        )
+        return (False, f"portal_payload_invalid: {exc.__class__.__name__}")
+
     logger.info(
-        "cert_alert_stub_supplier_portal",
+        "cert_alert_supplier_portal_inserted",
         tenant_id=str(tenant_id),
-        cert_id=str(cert["cert_id"]),
+        cert_id=str(cert_id_val),
+        supplier_id=str(supplier_id_val),
         threshold=threshold,
     )
     return (True, None)
@@ -206,30 +380,35 @@ async def _log_alert(
     UNIQUE (cert_id, alert_threshold, channel)：冲突时 UPDATE success + error_msg + sent_at，
     允许"成功覆盖失败"和"再次失败覆盖前次失败"，确保幂等查询 _already_alerted(success=TRUE)
     在推送成功后能正确命中。
+
+    P0 防御（PR #608 round-2）：INSERT 包在 conn.begin_nested() SAVEPOINT 中，
+    单条 INSERT 失败（NOT NULL / RLS WITH CHECK）只回滚 savepoint，外层
+    _scan_one_tenant txn 保持干净；调用方仍以 SQLAlchemyError 捕获并跳过本 cert。
     """
-    await conn.execute(
-        text(
-            """
-            INSERT INTO cert_alert_log
-                (tenant_id, cert_id, alert_threshold, channel, success, error_msg)
-            VALUES
-                (:tenant_id::uuid, :cert_id::uuid, :threshold, :channel, :success, :error_msg)
-            ON CONFLICT (cert_id, alert_threshold, channel)
-            DO UPDATE SET
-                success   = EXCLUDED.success,
-                error_msg = EXCLUDED.error_msg,
-                sent_at   = NOW()
-            """
-        ),
-        {
-            "tenant_id": str(tenant_id),
-            "cert_id": str(cert_id),
-            "threshold": threshold,
-            "channel": channel,
-            "success": success,
-            "error_msg": error_msg,
-        },
-    )
+    async with conn.begin_nested():
+        await conn.execute(
+            text(
+                """
+                INSERT INTO cert_alert_log
+                    (tenant_id, cert_id, alert_threshold, channel, success, error_msg)
+                VALUES
+                    (:tenant_id::uuid, :cert_id::uuid, :threshold, :channel, :success, :error_msg)
+                ON CONFLICT (cert_id, alert_threshold, channel)
+                DO UPDATE SET
+                    success   = EXCLUDED.success,
+                    error_msg = EXCLUDED.error_msg,
+                    sent_at   = NOW()
+                """
+            ),
+            {
+                "tenant_id": str(tenant_id),
+                "cert_id": str(cert_id),
+                "threshold": threshold,
+                "channel": channel,
+                "success": success,
+                "error_msg": error_msg,
+            },
+        )
 
 
 # ─── 单 tenant 扫描 ───────────────────────────────────────────────────────────
@@ -250,13 +429,19 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
     sent = 0
 
     async with engine.connect() as conn:
-        # 设置 RLS 租户上下文
+      # 显式外层事务：set_config('app.tenant_id', true) 是 transaction-local，
+      # 必须在同一显式 txn 内完成所有 RLS-bound 操作；SAVEPOINT 由
+      # _push_supplier_portal / _log_alert 内部 conn.begin_nested() 提供
+      # 单 cert 隔离，避免 IntegrityError 污染外层 txn → 后续 cert 的
+      # _already_alerted / _log_alert 全部失败 → 下次 daily scan 重复推送。
+      async with conn.begin():
+        # 设置 RLS 租户上下文（true=transaction-local，依赖外层 begin()）
         await conn.execute(
             text("SELECT set_config('app.tenant_id', :tid, true)"),
             {"tid": str(tenant_id)},
         )
 
-        # 读 webhook URLs
+        # 读 webhook URLs（在显式 txn 内，set_config 生效）
         webhook_urls = await _get_tenant_webhook_urls(conn, tenant_id)
 
         # 查询临期 + 过期证件（list_alertable 接受 AsyncConnection — text() 层接口兼容）
@@ -329,7 +514,14 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                         success, error_msg = await _push_supplier_portal(
                             conn, tenant_id, cert, threshold
                         )
-                except (OSError, ValueError, RuntimeError) as exc:
+                except (
+                    OSError,
+                    ValueError,
+                    RuntimeError,
+                    KeyError,
+                    TypeError,
+                    AttributeError,
+                ) as exc:
                     success = False
                     error_msg = str(exc)
                     logger.warning(
@@ -343,6 +535,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                     )
 
                 # 落 cert_alert_log（无论成功/失败都记录）
+                # _log_alert 内部用 SAVEPOINT 隔离 INSERT 失败，外层 txn 不被污染
                 try:
                     await _log_alert(conn, tenant_id, cert_id, threshold, channel, success, error_msg)
                 except SQLAlchemyError as exc:
@@ -357,7 +550,7 @@ async def _scan_one_tenant(tenant_id: str, today: date) -> dict:
                 if success:
                     sent += 1
 
-        await conn.commit()
+      # async with conn.begin() 自动 commit；不再需要显式 conn.commit()
 
     return {"evaluated": evaluated, "sent": sent}
 
