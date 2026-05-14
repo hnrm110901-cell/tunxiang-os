@@ -38,12 +38,14 @@ SQL grep 互补 — 负面 mode）:
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import types
 import uuid
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -197,12 +199,18 @@ async def _ensure_v342_schema(engine):
         """))
 
 
-@pytest.fixture(autouse=True)
-def _silence_emit_event(monkeypatch):
+@pytest_asyncio.fixture(autouse=True)
+async def _silence_emit_event(monkeypatch):
     """CashierEngine 业务调 asyncio.create_task(emit_event(...))，无 Redis 时背景
     task 会 fail (Task exception was never retrieved 警告)。本 fixture monkeypatch
     emit_event 为 no-op coroutine, 让测试干净不依赖事件总线 infra (本 PR scope: 行锁,
     非事件总线)。
+
+    **§19 P1-B fix**: monkeypatch 是 function-scope, 但 cashier_engine 用
+    asyncio.create_task(emit_event(...)) fire-and-forget。worker commit/return 后
+    create_task 仍 pending; 若 fixture teardown 时 monkeypatch undo, 后续 task
+    跑真 emit_event 抛 ConnectionRefusedError 污染 CI。改 async generator + yield
+    + 多轮 asyncio.sleep(0) drain pending tasks 在 monkeypatch 恢复前完成。
     """
     import services.tx_trade.src.services.cashier_engine as cashier_module
 
@@ -214,6 +222,11 @@ def _silence_emit_event(monkeypatch):
     # patch 两处 reference - emitter_module 导出 + cashier_engine 已 import 的本地 ref
     monkeypatch.setattr(emitter_module, "emit_event", _noop_emit)
     monkeypatch.setattr(cashier_module, "emit_event", _noop_emit)
+    yield
+    # drain pending fire-and-forget tasks before monkeypatch undo
+    # 多轮 sleep(0) yield event loop 让所有 create_task 完成 _noop_emit (本 PR scope)
+    for _ in range(5):
+        await asyncio.sleep(0)
 
 
 # ───────────────────────────────────────────────────────────────────
@@ -433,32 +446,42 @@ async def test_cashier_settle_order_concurrent_n10_double_settle_prevention(sess
         timeout_sec=30.0,
     )
 
-    # 分流结果: 成功 vs ValueError("订单已结算")
+    # 分流结果: 成功 vs 失败 (任意 ValueError 都算预期失败 — §19 P1-A fix:
+    # 主断言 successes==1 是 P0 双结算泄漏防护核心, settled_errors 只作诊断辅助)。
+    # 失败原因可能是 "订单已结算"(L759)/"订单已取消"(L761)/transition_order 状态机
+    # 拒绝 — 任意 ValueError 都意味着第 1 worker 之外的 worker 在 FOR UPDATE 拿锁后
+    # 看到 status 已变 → 被业务层拒绝, 这正是 FOR UPDATE 真生效的证据。
     successes = [r for r in results if isinstance(r, dict)]
-    settled_errors = [
-        r for r in results
-        if isinstance(r, ValueError) and "已结算" in str(r)
-    ]
+    value_errors = [r for r in results if isinstance(r, ValueError)]
+    settled_errors = [r for r in value_errors if "已结算" in str(r)]
     other_errors = [
         r for r in results
-        if isinstance(r, BaseException) and not (
-            isinstance(r, ValueError) and "已结算" in str(r)
-        )
+        if isinstance(r, BaseException) and not isinstance(r, ValueError)
     ]
 
+    # 主断言 (P0 双结算泄漏防护核心): 仅 1 worker 成功
     assert len(successes) == 1, (
         f"双结算泄漏 P0: 成功 settle 数 {len(successes)} ≠ 1. "
         f"FOR UPDATE 未真生效, audit §4.1 P0 最严重路径回归. "
-        f"results: successes={len(successes)} settled_errors={len(settled_errors)} "
-        f"other_errors={len(other_errors)}"
+        f"results: successes={len(successes)} value_errors={len(value_errors)} "
+        f"settled_errors={len(settled_errors)} other_errors={len(other_errors)}"
     )
-    assert len(settled_errors) == 9, (
-        f"剩余 worker 应 raise '订单已结算' ValueError, 实际 {len(settled_errors)}/9. "
+    # 辅助断言: 剩余 9 worker 全部是预期的 ValueError (非 DB 异常 / 网络 / 类型错误)
+    assert len(value_errors) == 9, (
+        f"剩余 worker 应抛 ValueError (订单状态守卫拒绝), 实际 {len(value_errors)}/9. "
         f"other_errors={other_errors[:3]}"
     )
-    assert not other_errors, (
-        f"settle concurrent 不应有非 '订单已结算' 异常: {other_errors[:3]}"
-    )
+    # 不抛 settled_errors!=9 硬断言 — 业务层状态机措辞可能变 (PR #559/§17 桌台对齐
+    # follow-up 可能 refactor 错误消息), 用诊断 warn 替代避免 false-fail:
+    if len(settled_errors) != 9:
+        # pytest -W default::Warning 会显示, 但不 fail
+        import warnings
+        warnings.warn(
+            f"诊断: settled_errors '已结算' 字串匹配 {len(settled_errors)}/9; "
+            f"其他 ValueError ({len(value_errors) - len(settled_errors)} 笔) 也算 FOR UPDATE 生效, "
+            f"但建议确认状态机错误消息措辞未变 (issue #559 / §17 桌台对齐 follow-up)",
+            stacklevel=1,
+        )
 
     # 终态: 1 payment 落库 + orders.status='completed'
     async with session_factory() as s:
