@@ -73,6 +73,7 @@ def upgrade() -> None:
         )
 
         op.execute("ALTER TABLE ingredient_weight_standards ENABLE ROW LEVEL SECURITY")
+        op.execute("ALTER TABLE ingredient_weight_standards FORCE ROW LEVEL SECURITY")
 
         op.execute(
             """
@@ -123,6 +124,7 @@ def upgrade() -> None:
         )
 
         op.execute("ALTER TABLE receiving_weight_deductions ENABLE ROW LEVEL SECURITY")
+        op.execute("ALTER TABLE receiving_weight_deductions FORCE ROW LEVEL SECURITY")
 
         op.execute(
             """
