@@ -500,7 +500,7 @@ async def _run_calendar_trigger_check() -> None:
         # 生成Agent建议（不直接执行旅程，走审核流）
         logger.info(
             "calendar_trigger_suggestion",
-            event=trigger["event_name"],
+            trigger_event=trigger["event_name"],
             action=trigger.get("action"),
             description=trigger.get("description"),
         )
