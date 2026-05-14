@@ -1185,7 +1185,26 @@ class CashierEngine:
         )
 
     async def _calc_order_cost(self, order_id: uuid.UUID) -> Optional[int]:
-        """计算订单BOM总成本，用于毛利校验"""
+        """计算订单 BOM 总成本，用于毛利底线校验.
+
+        **隐式锁不变量（Tier 1 三条硬约束#1 毛利底线依赖）**：
+        调用方**必须**在调用前持有 Order 行锁（`_get_order(lock=True)` 或
+        等价 FOR UPDATE on Order），否则 OrderItem 集合可能因并发 add_item /
+        remove_item / update_item 不稳定，导致毛利底线绕过.
+
+        当前路径全部覆盖（audit doc `docs/security/tier1-row-lock-audit-2026-05.md` §4.1）:
+          - apply_discount: L587 `_get_order(order_uuid, lock=True)` 后 L614 调本函数 ✅
+          - 任何未来新增 caller 必须先获 Order FOR UPDATE.
+
+        本函数自身**不**加 OrderItem FOR UPDATE — 依赖 Order 锁串行化 OrderItem
+        mutation（add_item P0 已锁 Order；remove_item/update_item 通过 raw UPDATE
+        Order 被 caller 路径 FOR UPDATE 阻塞）.
+
+        **Audit**: `test_cashier_engine_row_lock_tier1.py::TestCalcOrderCostLockInvariantAudit`
+        静态扫描所有 caller 路径，未持锁会 fail.
+
+        关联: issue #557 / PR #556 §19 P1#1 follow-up.
+        """
         result = await self.db.execute(select(OrderItem).where(OrderItem.order_id == order_id))
         items = result.scalars().all()
 
