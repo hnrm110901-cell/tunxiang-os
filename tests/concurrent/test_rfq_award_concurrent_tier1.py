@@ -26,6 +26,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.test_utils.concurrent_runner import (
@@ -184,9 +185,10 @@ async def test_rfq_award_for_update_unique_serializes_n10(session_factory):
                     "by": str(created_by),
                 },
             )
-        except Exception as exc:
-            # UNIQUE 冲突会被 PG 抛 IntegrityError，但 FOR UPDATE 已串行化通常不应到此
-            raise ValueError(f"award INSERT failed: {exc.__class__.__name__}") from exc
+        except IntegrityError as exc:
+            # §19 round-1 P1-B: 具体异常类型 (CLAUDE.md §13 禁 broad except)
+            # UNIQUE(tenant_id, rfq_id) 冲突 PG 抛 IntegrityError，但 FOR UPDATE 已串行化通常不应到此
+            raise ValueError(f"award INSERT failed: UNIQUE 冲突 {exc.__class__.__name__}") from exc
 
         # 3. UPDATE rfqs.status = 'awarded'
         await s.execute(

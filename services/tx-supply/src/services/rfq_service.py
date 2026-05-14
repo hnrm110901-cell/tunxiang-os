@@ -229,33 +229,38 @@ async def get_rfq(
     """
     await _set_tenant(db, tenant_id)
 
-    lock_clause = " FOR UPDATE" if lock else ""
+    # §19 round-1 P0：禁止 f-string 拼接进 SQL（feedback_19_review_misses_ci_gates / L011）。
+    # 两个预构造 SQL 常量按布尔选 — 消除 f-string，与 PR-A/B/C/D/E lock pattern 对齐。
     result = await db.execute(
-        text(
-            f"""
-            SELECT
-                id::text                   AS id,
-                tenant_id::text            AS tenant_id,
-                rfq_number,
-                initiator_id::text         AS initiator_id,
-                deadline,
-                status,
-                notes,
-                created_by::text           AS created_by,
-                created_at,
-                updated_at,
-                is_deleted
-            FROM rfqs
-            WHERE id        = :rfq_id
-              AND tenant_id = :tenant_id
-              AND is_deleted = FALSE
-            LIMIT 1{lock_clause}
-            """
-        ),
+        text(_RFQ_SELECT_FOR_UPDATE_SQL if lock else _RFQ_SELECT_SQL),
         {"rfq_id": rfq_id, "tenant_id": _uuid_str(tenant_id)},
     )
     row = result.mappings().first()
     return dict(row) if row is not None else None
+
+
+_RFQ_SELECT_BASE_SQL = """
+    SELECT
+        id::text                   AS id,
+        tenant_id::text            AS tenant_id,
+        rfq_number,
+        initiator_id::text         AS initiator_id,
+        deadline,
+        status,
+        notes,
+        created_by::text           AS created_by,
+        created_at,
+        updated_at,
+        is_deleted
+    FROM rfqs
+    WHERE id        = :rfq_id
+      AND tenant_id = :tenant_id
+      AND is_deleted = FALSE
+    LIMIT 1
+"""
+
+_RFQ_SELECT_SQL = _RFQ_SELECT_BASE_SQL
+_RFQ_SELECT_FOR_UPDATE_SQL = _RFQ_SELECT_BASE_SQL.rstrip() + " FOR UPDATE\n"
 
 
 # ─── Tier 1 award 路径 ────────────────────────────────────────────────────────
@@ -269,27 +274,27 @@ async def award_rfq(
     selected_quote_id: str,
     reason: str,
     approver_id: str,
-    created_by: str,
     ai_recommendation_followed: Optional[bool] = None,
 ) -> dict:
     """Tier 1 中标 — row-lock 行锁串行化 + 二级审批 + RLHF 信号写入。
 
     硬约束（全部强制）:
       1. RFQ 必须存在 + status != 'awarded' + status != 'cancelled' + is_deleted=FALSE
-      2. approver_id != rfq.created_by (二级审批 — 防 self-approve)
+      2. approver_id != rfq.created_by (二级审批 — 防 self-approve, DB 层 SoT)
       3. selected_quote_id 必须属于本 rfq (跨 rfq 中标拒绝)
       4. UNIQUE(tenant_id, rfq_id) on rfq_awards 防重复 award (DB-level)
       5. FOR UPDATE on rfqs 串行化并发 award 请求 (200 桌并发 #579)
 
     Tier 1 资金路径前置 — 此函数 commit 后 rfq.status = 'awarded' 不可回退（不可逆操作）。
     后续采购单生成 + 应付账款挂账走 sub-B 集成或后续 PR.
+
+    §19 round-1 P1-A 教训：路由层无法可靠得知 rfq.created_by（只知调用者 X-User-ID），
+    参数层 self-approve 检查若 caller 误传相同值会永远 raise。删除参数 created_by +
+    参数层检查，DB 层 (rfq.created_by != approver_id) 是唯一 SoT。
+    INSERT rfq_awards.created_by 直接用 approver_id（操作人即审批人，符合业务语义）。
     """
     if not reason or not reason.strip():
         raise ValueError("award reason 必填 — 合规审计")
-    if str(approver_id) == str(created_by):
-        raise ValueError(
-            f"approver_id={approver_id} 不能与 created_by 相同（二级审批必须独立签字）"
-        )
 
     await _set_tenant(db, tenant_id)
 
@@ -379,7 +384,8 @@ async def award_rfq(
             "reason": reason.strip(),
             "ai_followed": ai_recommendation_followed,
             "approver_id": _uuid_str(approver_id),
-            "created_by": _uuid_str(created_by),
+            # §19 round-1 P1-A: created_by = approver_id (操作人即审批人, 业务语义对齐)
+            "created_by": _uuid_str(approver_id),
             "now": now,
         },
     )

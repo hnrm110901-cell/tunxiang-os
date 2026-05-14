@@ -111,6 +111,8 @@ async def award_supply_rfq(
     成功后 rfqs.status='awarded' + rfq_awards 入表（不可回退）。
     """
     try:
+        # §19 round-1 P1-A: 删 created_by 参数 — DB 层 rfq.created_by != approver_id
+        # 是唯一 SoT。路由层 X-User-ID 仅作为 approver_id（操作人即审批人）。
         item = await award_rfq(
             db=db,
             tenant_id=x_tenant_id,
@@ -118,7 +120,6 @@ async def award_supply_rfq(
             selected_quote_id=str(body.selected_quote_id),
             reason=body.reason,
             approver_id=x_user_id,
-            created_by=x_user_id,
             ai_recommendation_followed=body.ai_recommendation_followed,
         )
     except ValueError as e:

@@ -147,10 +147,7 @@ _TIER1_TEXT_FSTRING_BASELINES: dict[str, int] = {
     # text(f"... WHERE {where_sql}") 触发两条 baseline（FSTRING + SQLVAR），where_sql 由
     # only_active / supplier_id / store_id 等硬编码字面量条件 + 参数占位 :tenant_id/:supplier_id/
     # :store_id 组成，无用户输入注入面。
-    # PR-PRD-04 sub-B (rfq_service.get_rfq) 加 1 仅 FSTRING — text(f"... LIMIT 1{lock_clause}")
-    # lock_clause 是布尔派生的字面量 " FOR UPDATE" 或 ""，无用户输入注入面，与
-    # yield/weight/delivery_window service get 路径同 row-lock pattern
-    "services/tx-supply/src": 83,  # PK.3 / PK.2-fix + PR-01C + PR #633 weight + PRD-06 yield + PRD-05 delivery_window + PRD-04 sub-B rfq
+    "services/tx-supply/src": 82,  # PK.3 / PK.2-fix + PR-01C + PR #633 weight + PRD-06 yield + PRD-05 delivery_window
 }
 
 

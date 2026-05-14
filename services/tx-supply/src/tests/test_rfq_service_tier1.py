@@ -298,21 +298,6 @@ class TestGetRFQLockPattern:
 
 class TestAwardRFQTier1:
     @pytest.mark.asyncio
-    async def test_award_self_approve_rejected_param_level(self):
-        """approver_id == created_by 参数层即拒绝（防 self-approve）。"""
-        db = _mk_db_award(rfq=None, quote=None, award_result=None)
-        with pytest.raises(ValueError, match="不能与 created_by 相同"):
-            await award_rfq(
-                db,
-                _TENANT_XUJI,
-                _RFQ_ID,
-                selected_quote_id=_QUOTE_ID,
-                reason="lowest price",
-                approver_id=_USER_BUYER,
-                created_by=_USER_BUYER,
-            )
-
-    @pytest.mark.asyncio
     async def test_award_reason_required(self):
         """reason 必填 — 合规审计（选 A 不选 B 的理由）。"""
         db = _mk_db_award(rfq=None, quote=None, award_result=None)
@@ -324,7 +309,6 @@ class TestAwardRFQTier1:
                 selected_quote_id=_QUOTE_ID,
                 reason="   ",  # whitespace only
                 approver_id=_USER_DIRECTOR,
-                created_by=_USER_BUYER,
             )
 
     @pytest.mark.asyncio
@@ -339,7 +323,6 @@ class TestAwardRFQTier1:
                 selected_quote_id=_QUOTE_ID,
                 reason="lowest",
                 approver_id=_USER_DIRECTOR,
-                created_by=_USER_BUYER,
             )
 
     @pytest.mark.asyncio
@@ -358,7 +341,6 @@ class TestAwardRFQTier1:
                 selected_quote_id=_QUOTE_ID,
                 reason="lowest",
                 approver_id=_USER_DIRECTOR,
-                created_by=_USER_BUYER,
             )
 
     @pytest.mark.asyncio
@@ -377,17 +359,17 @@ class TestAwardRFQTier1:
                 selected_quote_id=_QUOTE_ID,
                 reason="lowest",
                 approver_id=_USER_DIRECTOR,
-                created_by=_USER_BUYER,
             )
 
     @pytest.mark.asyncio
     async def test_award_db_level_self_approve_rejected(self):
-        """rfq.created_by != param.created_by 时仍需 approver != rfq.created_by 校验。
+        """approver_id == rfq.created_by → DB 层校验拒绝（防 self-approve）。
 
-        模拟：参数 created_by=用户A，但 DB 中 rfq.created_by=用户B；approver=用户B → 拒绝。
+        §19 round-1 P1-A 教训：路由层无法可靠得知 rfq.created_by，参数层 self-approve
+        检查已删除，DB 层 (rfq.created_by != approver_id) 是唯一 SoT。
         """
         db = _mk_db_award(
-            rfq=_rfq_row(created_by=_USER_DIRECTOR),  # rfq 由 director 创建
+            rfq=_rfq_row(created_by=_USER_BUYER),  # rfq 由采购员创建
             quote=None,
             award_result=None,
         )
@@ -398,8 +380,7 @@ class TestAwardRFQTier1:
                 _RFQ_ID,
                 selected_quote_id=_QUOTE_ID,
                 reason="lowest",
-                approver_id=_USER_DIRECTOR,  # approver 与 rfq.created_by 同
-                created_by=_USER_BUYER,  # 不同的 created_by 通过参数层
+                approver_id=_USER_BUYER,  # approver 与 rfq.created_by 同 → DB 层拒绝
             )
 
     @pytest.mark.asyncio
@@ -418,7 +399,6 @@ class TestAwardRFQTier1:
                 selected_quote_id=_QUOTE_ID_OTHER_RFQ,
                 reason="lowest",
                 approver_id=_USER_DIRECTOR,
-                created_by=_USER_BUYER,
             )
 
     @pytest.mark.asyncio
@@ -448,7 +428,6 @@ class TestAwardRFQTier1:
             selected_quote_id=_QUOTE_ID,
             reason="lowest",
             approver_id=_USER_DIRECTOR,
-            created_by=_USER_BUYER,
             ai_recommendation_followed=True,
         )
         sqls = [str(call.args[0]) for call in db.execute.call_args_list]
@@ -482,7 +461,6 @@ class TestAwardRFQTier1:
             selected_quote_id=_QUOTE_ID,
             reason="AI recommend",
             approver_id=_USER_DIRECTOR,
-            created_by=_USER_BUYER,
             ai_recommendation_followed=True,
         )
         assert result["ai_recommendation_followed"] is True
@@ -514,7 +492,6 @@ class TestAwardRFQTier1:
             selected_quote_id=_QUOTE_ID,
             reason="went lower",
             approver_id=_USER_DIRECTOR,
-            created_by=_USER_BUYER,
             ai_recommendation_followed=False,
         )
         assert result["ai_recommendation_followed"] is False
@@ -546,7 +523,6 @@ class TestAwardRFQTier1:
             selected_quote_id=_QUOTE_ID,
             reason="lowest",
             approver_id=_USER_DIRECTOR,
-            created_by=_USER_BUYER,
         )
         sqls = [str(call.args[0]) for call in db.execute.call_args_list]
         update_sql = next((s for s in sqls if "UPDATE rfqs" in s and "awarded" in s), "")

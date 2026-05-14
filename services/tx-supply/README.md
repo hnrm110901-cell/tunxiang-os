@@ -532,7 +532,7 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **测试**：
   - `test_rfq_service_tier1.py` 16 用例（CRUD 4 + lock pattern 2 + award Tier 1 10）
   - `tests/concurrent/test_rfq_award_concurrent_tier1.py` 1 用例（#579 200 桌并发反测）
-- **baseline drift**：services/tx-supply/src text(f) 82→83 (+1)（rfq_service.get_rfq lock_clause f-string 同 yield/weight/delivery_window 模式）
+- **baseline 不变**：services/tx-supply/src text(f) 82（§19 round-1 P0 修复后 get_rfq 用 2 个预构造 SQL 常量按布尔选，消除 f-string 拼接 / L011 严格符合）
 - **不在 sub-B 范围**：publish / submit_quote / close / cancel state transitions / supplier_portal /rfq/{id}/quote endpoint / 前端比价表 UI（sub-C 落）
 - **预计 5 commits**（service + routes + tier1 tests + #579 concurrent + README/baseline）
 
