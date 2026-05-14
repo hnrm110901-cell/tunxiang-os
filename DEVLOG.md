@@ -1,3 +1,54 @@
+## 2026-05-14 深夜 — PRD-04 sub-C 询价单 state transitions + supplier-portal scope + 全栈 UI (Phase 2 W9-W10 / T2 carve-out type 7)
+
+### 今日完成
+
+继 sub-A v431 RFQ schema (#645) 与 sub-B Tier 1 award + #579 200 桌并发 (#647) ship 后，本 PR 落 sub-C 全栈一把 ship：4 state transitions（publish/close/cancel + submit_quote 副作用跃迁）+ supplier-portal scope endpoint + admin/supplier 双前端页 + AI 推荐 v1（最低价 heuristic）+ 40 新 mock 用例。**Tier 级别 T2 normal**（rfq_service.py 不在 Tier 1 source patterns）→ carve-out type 7 auto admin-merge，不 explicit-ask。
+
+- **rfq_service.py +6 函数**：
+  - `publish_rfq` — draft → published，FOR UPDATE 锁；非 draft 拒绝
+  - `close_rfq` — quoting → comparing，FOR UPDATE 锁
+  - `cancel_rfq` — 非终态 → cancelled，reason 必填合规审计（拼接到 notes），awarded/cancelled 拒绝
+  - `submit_quote` — supplier-side：rfq.status in (published, quoting) + 邀请校验 + SKU 校验 + ON CONFLICT UPSERT + 首报 published→quoting 跃迁 + invitees.responded_at 更新（200 桌并发 FOR UPDATE 锁串行化）
+  - `get_rfq_comparison` — 按 SKU 聚合所有报价 + AI 推荐 quote_id（最低价 v1）
+  - `list_rfqs` — deadline 倒序 + status 过滤（两预构造 SQL 常量按布尔选，避 f-string）
+
+- **rfq_routes.py +6 admin endpoints + 1 supplier-portal subrouter**：
+  - POST /api/v1/supply/rfqs/{id}/publish | /close | /cancel
+  - GET /api/v1/supply/rfqs (list with `?status=&limit=&offset=`) | /{id}/comparison
+  - POST /api/v1/supply/supplier-portal/rfqs/{id}/quote（X-Supplier-ID header）
+  - 错误模型映射 helper `_state_machine_http`（404 / 409 状态机冲突 / 422 校验失败）
+
+- **rfq_models.py +2 Pydantic schemas**：`RFQCancelRequest`（reason min_length=1）+ `RFQSupplierQuoteSubmit`（path rfq_id, body ingredient_id + unit_price_fen + qty_offered + valid_until + notes）
+
+- **main.py**：注册 `rfq_supplier_portal_router`（独立 prefix 与 supplier_portal_v2_routes 共存 — 新 RFQ schema 走 `/rfqs/{id}/quote`，legacy `supplier_rfq_requests` 仍走 `/rfq/{id}/quote` 单数路径）
+
+- **apps/web-admin 前端 +2 pages**：
+  - `RFQManagementPage` (/supply/rfqs)：列表 + status 过滤 + 创建 modal（动态 items + invitees）+ 详情 drawer（state buttons + 比价表 + AI 推荐高亮 + Award 二级审批 inline 表单含 RLHF radio）
+  - `RFQSupplierQuotePage` (/supplier-portal/rfqs/:rfqId/quote?supplier_id=<uuid>)：供应商门户报价提交，per-SKU Form 行 + 覆盖检测 + canQuote 状态机闸（仅 published/quoting 可提交）
+  - 拆 `QuoteItemRow` 子组件避 React hooks-in-loop
+
+- **测试 40 用例 + 0 回归**：`test_rfq_state_transitions_tier1.py` AsyncMock + SQL 匹配 pattern：publish 7（含 5 个非 draft parametrize）/ close 7（5 个非 quoting parametrize）/ cancel 6 / submit_quote 10（含 status/邀请/SKU/价格/qty/ON CONFLICT 校验）/ comparison 3 / list 4。`test_rfq_service_tier1.py` (16) + `test_rfq_schema.py` (10) 全绿无回归 + `test_no_sql_fstring_regression_tier1.py` baseline 守门 10 用例全绿。
+
+- **baseline 不变**：`services/tx-supply/src` text(f) **82**（与 sub-B 同 — 所有新增 SQL 用 :param + 预构造常量 `_LIST_RFQS_*_SQL`，零 f-string 拼接）
+
+### 数据变化
+
+- 迁移版本：v431 复用，无新增（sub-C 纯业务逻辑 + UI）
+- 新增 API 模块：tx-supply +6 admin endpoints + 1 supplier-portal endpoint
+- 新增前端：web-admin +2 pages（RFQManagement + SupplierQuote）
+- 新增测试：1 file / 40 用例
+- 修改源：rfq_service.py / rfq_routes.py / rfq_models.py / main.py / App.tsx
+
+### 遗留问题
+
+- supplier-portal JWT 鉴权 sub-D follow-up（当前 X-Supplier-ID header 透传 — 适合 buyer 预览 + e2e 联调；生产由 supplier_portal_v2 `/auth/login` 接 RFQ scope）
+- AI 推荐 v2：引入 PRD-05 配送时间窗扣分 + supplier_score 综合排序（独立 PR / sub-D）
+- 邮件/IM 推送邀请通知 follow-up（依赖通用 supplier_portal_messages 入箱 — 与 #485 合并）
+- pre-existing CI 漂移（python-lint-test / Ruff / frontend-build / Test Changed Services / RLS Runtime — schema drift）与本 PR 无关
+
+### 明日计划
+
+§17 桌台对齐 PR 4 段（C 选项 — D2 已锁定 1A/2A/3B）或 W10 PRD-07 申购模板（B 选项）— 按创始人选择推进
 ## 2026-05-15 下午 — "0 + A" 第三-第四轮 ship 收尾 sediment：PR #642 (PR-3 payment_saga concurrent SKIP LOCKED 真行为) + PR #644 (PR-4 inventory + auto_deduction concurrent ABBA 真行为) + 并发 PR #641 (W8 PRD-05 时间窗 [Tier1]) + PR #645 (W9 PRD-04 sub-A RFQ [T2]) + 并发 PR #647 (W9 PRD-04 sub-B RFQ award [Tier1]) 5 PR ship (5/14 单日累计 42 PR)
 
 ### 今日完成
