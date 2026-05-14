@@ -123,7 +123,13 @@ def _snapshot_for(metrics_module, service: str, doc_type: str) -> float:
 
 
 def test_record_fallback_increments_counter() -> None:
-    """record_doc_number_fallback 写入 Counter 后 collect() 公开 API 可见 +1."""
+    """record_doc_number_fallback 写入 Counter 后 collect() 公开 API 可见 +1.
+
+    Tier 1 CI minimal deps (无 prometheus_client) 走 no-op stub，本测试跳过；
+    生产路径 prometheus_client 真接入由 prometheus-fastapi-instrumentator
+    transitive 装。
+    """
+    pytest.importorskip("prometheus_client")
     from services.tx_supply.src import metrics
 
     before = _snapshot_for(metrics, "test_svc_unique_1", "test_type_unique_1")
@@ -172,7 +178,12 @@ def client():
 
 
 def test_fallback_stats_returns_structure(client) -> None:
-    """endpoint 返回 ok=True + by_service/by_doc_type/by_combo + total."""
+    """endpoint 返回 ok=True + by_service/by_doc_type/by_combo + total.
+
+    需 prometheus_client 真 Counter 才能 inc → collect → 非空 sample;
+    Tier 1 CI minimal-deps 路径跳过（stub 返回空 list, total=0 不满足 ≥1）。
+    """
+    pytest.importorskip("prometheus_client")
     from services.tx_supply.src import metrics
 
     # 先 inc 一次以保证至少 1 个 sample（用本测试独有 label 避免污染）

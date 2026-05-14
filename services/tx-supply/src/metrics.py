@@ -18,9 +18,44 @@ issue #592（PR #586 §19 round-2 follow-up）:
 
 from __future__ import annotations
 
-from typing import Final
+from typing import Any, Final
 
-from prometheus_client import Counter
+# Tier 1 CI minimal deps trap (feedback_tier1_ci_minimal_deps_trap.md):
+# tier1-gate workflow 只装 ~10 包，prometheus_client 不在内。生产 / staging
+# 通过 prometheus-fastapi-instrumentator transitive 装；Tier 1 CI 走 fail-open
+# stub 而非扩 workflow（与 PR #227 round-3 metrics.py 同模式）。
+try:
+    from prometheus_client import Counter  # type: ignore[import-not-found]
+
+    _PROMETHEUS_AVAILABLE = True
+except ImportError:  # pragma: no cover — CI Tier 1 minimal deps 路径
+    _PROMETHEUS_AVAILABLE = False
+
+    class _NoOpChild:
+        """Counter().labels(...) 返回的 child 的 no-op 替身.
+
+        生产路径 prometheus_client 真接 in；只有 Tier 1 minimal-deps CI 走此分支。
+        """
+
+        def inc(self, amount: float = 1.0) -> None:  # noqa: D401
+            return None
+
+    class _NoOpCounter:
+        """prometheus_client.Counter 的 no-op 替身（fail-open）.
+
+        保留 API 表面 (.labels / .collect) 让 metrics 调用方代码无需 branch。
+        """
+
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            return None
+
+        def labels(self, **_kwargs: Any) -> _NoOpChild:
+            return _NoOpChild()
+
+        def collect(self) -> list[Any]:
+            return []
+
+    Counter = _NoOpCounter  # type: ignore[assignment, misc]
 
 # 6 catch 现场命中（PR #586 §19 round-2 / issue #592）:
 #   inventory_io.receive_stock          (service=inventory_io, doc_type=inventory_io)
