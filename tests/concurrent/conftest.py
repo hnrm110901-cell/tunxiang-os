@@ -81,6 +81,13 @@ _CONCURRENT_TABLES: tuple[str, ...] = (
     "order_items",    # 子 (FK → orders)
     "orders",         # 中间 (FK → stores)
     "stores",         # 父
+    # PRD-04 sub-B W9 v431 RFQ 5 表 — Tier 1 award 资金路径 + #579 200 桌并发
+    # FK 子→父序: rfq_awards → rfq_quotes → rfq_invitees → rfq_items → rfqs
+    "rfq_awards",     # 子 (FK → rfqs CASCADE, → rfq_quotes RESTRICT)
+    "rfq_quotes",     # 子 (FK → rfqs CASCADE)
+    "rfq_invitees",   # 子 (FK → rfqs CASCADE)
+    "rfq_items",      # 子 (FK → rfqs CASCADE)
+    "rfqs",           # 父
 )
 
 

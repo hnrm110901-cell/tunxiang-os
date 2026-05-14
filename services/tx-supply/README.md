@@ -511,11 +511,34 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **v428 PRD-02 ingredient_weight_standards + receiving_weight_deductions（W7-1 PR #633 ✅ ship）**
 - **v429 PRD-06 ingredient_yield_standards（W7-2 PR #637 ✅ ship）**
 - **v430 PRD-05 supplier_delivery_windows + supplier_delivery_violations（W8 PR #641 ✅ ship）**
-- **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 本 PR）**
+- **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 PR #645 ✅ ship）**
+- **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 本 PR，复用 v431 schema 无新 migration）**
 - v432 PRD-13 sub-A MarketSurvey schema（W11-W12）
 - v433+ PRD-07 RequisitionTemplate + WarehouseRequisitionTemplateBinding + #589 purchase_orders 建表（W10）
 
-#### W9 PR 立项参数（PRD-04 sub-A RFQ schema + #613 supplier_portal_messages UNIQUE）
+#### W9 sub-B PR 立项参数（PRD-04 RFQ award 路径 + 二级审批 + #579 200 桌并发）
+
+**Tier 级别**：Tier 1 资金路径前置（award → 采购单 → 应付账款）／**Tier 1 explicit-ask**：第 21 例 reconciled（不在 8 类 carve-out）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only 多 round
+
+- **范围**：rfq_service.py (create_rfq + get_rfq lock pattern + award_rfq Tier 1) / 3 admin-side REST endpoint (POST /rfqs, GET /rfqs/{id}, POST /rfqs/{id}/award) / main.py 注册 rfq_router
+- **Tier 1 award 硬约束**：
+  - FOR UPDATE on rfqs (PR-A/B/C/D/E pattern 串行化 — 200 桌并发 #579 反测)
+  - UNIQUE(tenant_id, rfq_id) on rfq_awards (DB-level 双保险防重复 award)
+  - 二级审批 approver_id != rfq.created_by (param 层 + DB 层双重)
+  - quote 归属校验 (selected_quote_id 必须属于本 rfq — 合规审计)
+  - 状态机校验 (awarded/cancelled 拒绝重复 award)
+  - ai_recommendation_followed BOOLEAN ⭐ RLHF 训练信号
+- **#579 闭环**：tests/concurrent/test_rfq_award_concurrent_tier1.py 1 用例 N=10 并发 award 同 rfq → 仅 1 成功 + 9 raise "已 award"；conftest._CONCURRENT_TABLES 加 RFQ 5 表 (FK 子→父序)；workflow paths 加 rfq_service.py + v431
+- **测试**：
+  - `test_rfq_service_tier1.py` 16 用例（CRUD 4 + lock pattern 2 + award Tier 1 10）
+  - `tests/concurrent/test_rfq_award_concurrent_tier1.py` 1 用例（#579 200 桌并发反测）
+- **baseline 不变**：services/tx-supply/src text(f) 82（§19 round-1 P0 修复后 get_rfq 用 2 个预构造 SQL 常量按布尔选，消除 f-string 拼接 / L011 严格符合）
+- **不在 sub-B 范围**：publish / submit_quote / close / cancel state transitions / supplier_portal /rfq/{id}/quote endpoint / 前端比价表 UI（sub-C 落）
+- **预计 5 commits**（service + routes + tier1 tests + #579 concurrent + README/baseline）
+
+Closes #579
+
+#### W9 sub-A PR #645 立项参数（PRD-04 RFQ schema + #613 supplier_portal_messages UNIQUE）— ✅ ship
 
 **Tier 级别**：T2 infra ADD（schema-only，sub-B/C 落业务）／**explicit-ask**：不需要（T2 carve-out type 7 auto admin-merge）／**§19 reviewer**：opus B 选项 P0/P1 真 BUG only
 

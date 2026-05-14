@@ -33,6 +33,9 @@ on:
       - 'shared/db-migrations/versions/v428_ingredient_weight_standards.py'
       - 'shared/db-migrations/versions/v429_ingredient_yield_standards.py'
       - 'shared/db-migrations/versions/v430_supplier_delivery_windows.py'
+      # W9 PRD-04 sub-B RFQ award (Tier 1 资金路径前置, #579 200 桌并发反测)
+      - 'services/tx-supply/src/services/rfq_service.py'
+      - 'shared/db-migrations/versions/v431_rfq_schema.py'
       # RLS 基建 + alembic chain 基础 (foundation 改动可能影响 RLS policy / 表结构)
       - 'infra/docker/init-rls.sql'
       - 'shared/db-migrations/versions/v001_rls_foundation_and_core_entities.py'
