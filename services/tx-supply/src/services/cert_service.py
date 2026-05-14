@@ -165,6 +165,53 @@ async def list_expiring(
     return [dict(r) for r in rows]
 
 
+async def list_alertable(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    today: date,
+    lookahead_days: int = 30,
+) -> List[dict]:
+    """临期 + 过期组合查询（PR-01B sub-PR B / PRD-01）。
+
+    返回 supplier_certificates 中：
+    - expire_date BETWEEN today AND today + lookahead_days  （临期窗口）
+    - 或 expire_date < today                                （已过期）
+
+    每行返回 dict 含：cert_id, supplier_id, cert_type, cert_number,
+    expire_date, days_until_expiry（signed int — 负数表示已过期 N 天）。
+    """
+    await _set_tenant(db, tenant_id)
+
+    result = await db.execute(
+        text(
+            """
+            SELECT
+                id::text           AS cert_id,
+                supplier_id::text  AS supplier_id,
+                cert_type,
+                cert_number,
+                expire_date,
+                (expire_date - :today)::int AS days_until_expiry
+            FROM supplier_certificates
+            WHERE tenant_id   = :tenant_id
+              AND is_deleted  = FALSE
+              AND (
+                (expire_date BETWEEN :today AND :today + (:lookahead_days || ' days')::interval)
+                OR expire_date < :today
+              )
+            ORDER BY expire_date ASC
+            """
+        ),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "today": today,
+            "lookahead_days": lookahead_days,
+        },
+    )
+    return [dict(r) for r in result.mappings()]
+
+
 async def renew_cert(
     db: AsyncSession,
     tenant_id: str,
