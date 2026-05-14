@@ -55,11 +55,19 @@ _RLS_TEST_ROLE = "tunxiang_rls_app"
 # （trigger 已绕过）。**未来 PR-2+ 修法**: 切 TRUNCATE...CASCADE 或 CI lint 守顺序。
 # 当前注释标明子→父序，按 issue #635 短期方案 A 处理。
 _CONCURRENT_TABLES: tuple[str, ...] = (
-    "payment_sagas",  # 子 (逻辑 FK → orders + payments，v091 未声明 constraint)
+    # PR #642 (payment_saga, 逻辑 FK → orders + payments，v091 未声明 constraint)
+    "payment_sagas",
+    # PR #638 (cashier_engine, FK 子→父序): payments → order_items → orders → stores
     "payments",       # 子 (FK → orders)
     "order_items",    # 子 (FK → orders)
     "orders",         # 中间 (FK → stores)
     "stores",         # 父
+    # PR #641 W7-W8 Tier 1 供应链标准库（v428/v429/v430）— 反测 row-lock + UNIQUE 幂等
+    # 无 DB-level FK 约束，但 violations 应用层依赖 windows（先清子）
+    "supplier_delivery_violations",
+    "supplier_delivery_windows",
+    "ingredient_yield_standards",
+    "ingredient_weight_standards",
 )
 
 
