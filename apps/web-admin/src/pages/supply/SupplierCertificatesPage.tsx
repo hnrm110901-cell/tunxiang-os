@@ -87,6 +87,7 @@ interface Certificate {
 
 interface CertListData {
   items: Certificate[];
+  total?: number;
   page: number;
   size: number;
 }
@@ -373,8 +374,10 @@ function RenewCertModal({ cert, open, onClose, onSuccess }: RenewModalProps) {
             { required: true, message: '请选择新到期日' },
             {
               validator: (_, value: dayjs.Dayjs) => {
-                if (!value || value.isAfter(dayjs())) return Promise.resolve();
-                return Promise.reject(new Error('续证日期必须晚于今天'));
+                if (!value || !value.isBefore(dayjs().startOf('day'))) {
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error('续证日期不能早于今天'));
               },
             },
           ]}
@@ -424,6 +427,7 @@ export function SupplierCertificatesPage() {
   const loadSuppliers = useCallback(async () => {
     setSupplierLoading(true);
     try {
+      // size=100 是 endpoint 当前上限；服务端 search 待 follow-up（500+ 供应商客户必须）
       const data = await txFetchData<{ items: Supplier[]; total: number }>(
         '/api/v1/supply/supplier-portal/suppliers?page=1&size=100',
       );
@@ -463,7 +467,7 @@ export function SupplierCertificatesPage() {
         `/api/v1/supply/suppliers/${supplierId}/certificates?${params.toString()}`,
       );
       setCerts(data.items ?? []);
-      setTotal((data.items ?? []).length);
+      setTotal(typeof data.total === 'number' ? data.total : (data.items ?? []).length);
     } catch (err) {
       const errObj = err as { code?: string; message?: string };
       const msg = errObj.message ?? String(err);
