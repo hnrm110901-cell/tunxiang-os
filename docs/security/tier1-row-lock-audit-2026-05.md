@@ -298,6 +298,23 @@ CLAUDE.md §17 Tier 1 红线全 16 服务：
 
 **负面测试模式**：在修复前先写一个会失败的并发测（XFAIL），证明 race 真实存在；修复后翻为 PASS。
 
+### 8.4 修复进度（sediment 2026-05-15）
+
+| # | 服务 | merge commit | ship 日期 | 状态 |
+|---|---|---|---|---|
+| PR-A | tx-finance | `5cfd9756` (#544) | 5/13 晚 | ✅ MERGED |
+| PR-B | tx-supply | `6564b915` (#547) | 5/13 晚晚 | ✅ MERGED |
+| PR-C | tx-trade payment_saga | `3ee7c9b3` (#553) | 5/13 深夜 | ✅ MERGED |
+| PR-D | tx-trade cashier_engine | — | 待 G10 解禁 | ⏳ 撞 G10 并发线 |
+| PR-E | tx-trade order_service | — | 待 G10 解禁 | ⏳ 撞 G10 并发线 |
+| PR-F | tx-trade delivery_adapter | `d98a23e0` (#563) + `29e42f30` (#566) + #650 测试 | 5/13 晚 | ✅ MERGED |
+
+**真实剩余**: PR-D + PR-E = 2 PR (撞 G10), audit doc §8 6-PR roadmap 完成 **4/6**.
+
+**架构层 follow-up**（未起）:
+- [#535](https://github.com/hnrm110901-cell/tunxiang-os/issues/535) wine_storage 双轨 SoT（待创始人决策，W21 守门会 §1.1 议程）
+- [#537](https://github.com/hnrm110901-cell/tunxiang-os/issues/537) PaymentSaga S1→S3 跨步骤占位锁（待 architect 评估，W21 守门会 §1.2 议程）
+
 ---
 
 ## 9. 关联
