@@ -1,3 +1,54 @@
+## 2026-05-15 上午 — §17-A 桌台对齐 1A + 2A ship (D2 锁定首发 / Tier 1 fund/源 explicit-ask 第 22 例)
+
+### 今日完成
+
+继 PRD-07 #651 ship 后，启动 §17 桌台并发语义对齐 4 段 PR 系列首发：§17-A cashier_engine.py 桌台入口 3 路径 (open_table / change_table_status / transfer_table) 加 FOR UPDATE 行锁，落地 audit doc §11.3 创始人 D2 锁定方案 1A + 2A。
+
+- **§17-A 范围 (3 路径)**：
+  - `open_table` (L113) **1A 强一致** — SELECT Table 加 `.with_for_update()` + 抛 typed `TableOccupiedError(ValueError)`
+  - `change_table_status` (L276) **1A 衍生** — SELECT Table 加 `.with_for_update()`
+  - `transfer_table` (L1352) **2A 双锁排序** — 单条 SELECT WHERE table_no IN (old, target) ORDER BY tables.id ASC WITH FOR UPDATE — PG 在 ORDER BY 评估后施锁，锁顺序 deterministic 防 ABBA 死锁；目标桌非 free 抛 TableOccupiedError
+
+- **新 typed exception**：`TableOccupiedError(ValueError)` — 上层路由 / WebSocket 弹窗可 typed catch 区分 "桌台已被并发占用" vs 通用业务校验失败；继承 ValueError 保兼容现有 except ValueError caller 不破坏
+
+- **测试 9 用例**：
+  - **正面 mode** `services/tx-trade/tests/test_cashier_table_row_lock_tier1.py` (mock-driven SQL grep) 6 用例:
+    - open_table FOR UPDATE 校验 / occupied raise typed error / TableOccupiedError 继承 ValueError
+    - change_table_status FOR UPDATE 校验
+    - transfer_table 双锁 IN+ORDER BY id+FOR UPDATE 校验 / target occupied raise typed
+  - **负面 mode** `tests/concurrent/test_cashier_table_concurrent_tier1.py` (真 PG asyncio.gather 反测) 3 用例:
+    - T1 N=10 open_table 同桌 → 1 success + 9 TableOccupiedError + 终态 1 occupied / 1 order
+    - T2 N=10 transfer 同 target VIP → 1 success + 9 fail + VIP 终态合理
+    - T3 swap (A→B + B→A) → 双锁排序无死锁 + 终态合理 (≥1 success)
+  - 兼容 cashier row_lock + concurrent test 全绿无回归
+
+- **conftest.py**：tests/concurrent/_CONCURRENT_TABLES 加 "tables" (FK 子→stores)
+
+- **audit doc §11.3 决策追踪表**：3 行填表完成 (1 ✅ 1A / 2 ✅ 2A / 3 ✅ 3B)，备注标记 §17-A ship 落地路径
+
+- **Tier 1 explicit-ask 第 22 例 reconciled** — cashier_engine.py 在 TIER1_SOURCE_PATTERNS，必须 explicit-ask + §19 reviewer + 200 桌并发 regression; 不在 8 类 carve-out
+
+### 数据变化
+
+- 迁移版本：无 (纯业务逻辑 lock 加固)
+- 新增 API 模块：0 (TableOccupiedError typed exception 加在 cashier_engine.py)
+- 新增前端：0 (§17-A 是后端 lock 加固; 前端弹窗通过现有 ValueError → 422 路径生效)
+- 新增测试：2 file / 9 用例 (mock 6 + 真 PG 3)
+- 修改源：services/tx-trade/src/services/cashier_engine.py (3 处 SELECT 加 .with_for_update() + transfer_table 改双锁 + TableOccupiedError typed exception)
+
+### 遗留问题
+
+- §17-B settle 终态保护 (3B 幂等释放) — 下一步 ship
+- §17-C OrderItem lock 4 路径 — 不依赖 §17 决策，可并行
+- §17-D #549 ABBA architect + #557 OrderItem 不变量 + #559 apply_discount status 校验 — follow-up bundle
+- pre-existing CI 漂移 (python-lint-test / Ruff / Test Changed Services / TypeScript Check 非 web-pos / ESLint *) 与本 PR 无关
+
+### 明日计划
+
+§17-B settle 终态保护 ship (3B 幂等释放) → §17-C OrderItem lock → §17-D follow-up bundle，按 D3 explicit-ask 第 22-25 例顺序
+
+---
+
 ## 2026-05-15 凌晨 — PRD-07 申购模板 + #589 purchase_orders 闭环 全栈 ship (Phase 2 W10 / T2 carve-out type 7)
 
 ### 今日完成

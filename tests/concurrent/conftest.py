@@ -88,6 +88,8 @@ _CONCURRENT_TABLES: tuple[str, ...] = (
     "rfq_invitees",   # 子 (FK → rfqs CASCADE)
     "rfq_items",      # 子 (FK → rfqs CASCADE)
     "rfqs",           # 父
+    # §17-A cashier 桌台 1A/2A — 真 PG open_table / transfer_table 行锁反测
+    "tables",         # 子 (FK → stores)
 )
 
 

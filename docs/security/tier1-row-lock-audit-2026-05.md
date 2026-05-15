@@ -436,9 +436,9 @@ CLAUDE.md §17 Tier 1 红线全 16 服务：
 
 | 选择题 | 候选 | 创始人选择 | 答复时间 | 备注 |
 |---|---|---|---|---|
-| 1 — 双开台 race (`open_table` P1) | 1A / 1B / 1C | ⏳ pending | — | — |
-| 2 — 转桌争抢 (`transfer_table` P1) | 2A / 2B / 2C | ⏳ pending | — | — |
-| 3 — 结算释放桌台中间态 (`settle_order` P0 / `_release_table`) | 3A / 3B / 3C | ⏳ pending | — | — |
+| 1 — 双开台 race (`open_table` P1) | 1A / 1B / 1C | **1A** ✅ | 2026-05-14 deep-interview | 强一致 FOR UPDATE + TableOccupiedError; 与 stored_value_service 11 处锁同 pattern. **§17-A PR ship 落地** (open_table + change_table_status 1A 衍生) |
+| 2 — 转桌争抢 (`transfer_table` P1) | 2A / 2B / 2C | **2A** ✅ | 2026-05-14 deep-interview | 双锁排序 (table_no IN (old, target) ORDER BY tables.id ASC FOR UPDATE) 防 ABBA 死锁. **§17-A PR ship 落地** |
+| 3 — 结算释放桌台中间态 (`settle_order` P0 / `_release_table`) | 3A / 3B / 3C | **3B** ✅ | 2026-05-14 deep-interview | 显式幂等 (WHERE current_order_id=:id AND status='occupied'); 留 §17-B PR 落地 |
 
 ### 11.4 后续 PR 拆分预案（创始人答复后启动）
 

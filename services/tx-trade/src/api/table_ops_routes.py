@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from shared.ontology.src.database import get_db
 from shared.security.src.error_handler import safe_http_exception
 
-from ..services.cashier_engine import CashierEngine
+from ..services.cashier_engine import CashierEngine, TableOccupiedError
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/api/v1", tags=["table-ops"])
@@ -64,5 +64,8 @@ async def transfer_table(
         )
         await db.commit()
         return _ok(result)
+    except TableOccupiedError as exc:
+        # §17-A 2A: 目标桌并发占用 — 409 Conflict 让前端区分"刷新桌台地图"vs 通用 400
+        raise safe_http_exception(409, "桌台已被占用，请刷新桌台地图", exc) from exc
     except ValueError as exc:
         raise safe_http_exception(400, "请求参数无效", exc) from exc
