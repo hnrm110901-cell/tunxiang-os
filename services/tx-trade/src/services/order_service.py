@@ -354,14 +354,27 @@ class OrderService:
         return {"removed_item_id": item_id, "deducted_fen": item.subtotal_fen}
 
     async def apply_discount(self, order_id: str, discount_fen: int, reason: str = "") -> dict:
+        """应用折扣
+
+        §17-D2 (issue #559): 终态订单 (completed/cancelled) 不应被改 discount.
+        main 既存 bug — apply_discount 无 status guard, completed 订单仍可改折扣
+        + final_amount_fen → 已结订单金额漂移. fix 加 status guard 拒绝终态.
+
+        Tier 1 资金路径：折扣需读最新 total_amount_fen 后写回 discount/final，
+        必须 FOR UPDATE 串行化加菜 / 折扣两路并发（audit doc §4.1 P0）。
+        **比 cashier_engine.apply_discount 更危险** — 连 margin 校验都没有，
+        串行化 + §17-D2 status guard 共同守门。
+        """
         await self._set_tenant()
-        # Tier 1 资金路径：折扣需读最新 total_amount_fen 后写回 discount/final，
-        # 必须 FOR UPDATE 串行化加菜 / 折扣两路并发（audit doc §4.1 P0）。
-        # **比 cashier_engine.apply_discount 更危险** — 连 margin 校验都没有，
-        # 串行化是唯一防线。
         order = await self._get_order(uuid.UUID(order_id), lock=True)
         if not order:
             raise ValueError(f"Order not found: {order_id}")
+        # §17-D2 (issue #559): 终态订单拒折扣 — 防 completed/cancelled 订单
+        # discount + final 漂移. 与 cashier_engine.cancel_order 同模式 status guard.
+        if order.status == OrderStatus.completed.value:
+            raise ValueError("已结算订单无法应用折扣，请走退款流程")
+        if order.status == OrderStatus.cancelled.value:
+            raise ValueError("订单已取消，无法应用折扣")
         new_final = order.total_amount_fen - discount_fen
         if new_final < 0:
             raise ValueError("Discount exceeds order total")
