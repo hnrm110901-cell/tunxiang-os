@@ -349,10 +349,17 @@ class WarehouseRequisitionTemplateBinding(Base):
 
 ## 四、P1 PRD 清单（10 项，徐记替换必备）
 
-### PRD-08 部门用料范围白名单
+### PRD-08 部门用料范围白名单 ✅ ship (Phase 2 W11 / v433)
 - **价值**: 防止后厨员工领料"串货"（早餐档领高档食材 → 毛利漏）
-- **模型**: `DepartmentIngredientWhitelist(dept_id, ingredient_id, max_qty_per_day)`
-- **工时**: 4 人日
+- **模型**: `DepartmentIngredientWhitelist(dept_id, ingredient_id, max_qty_per_day, is_active)`
+- **工时**: 4 人日（实际跨服务）
+- **集成路径**:
+  - `dept_issue.create_issue_order` — 领料路径硬阻塞 (D2 锁定) + 路由层映射 403 Forbidden
+  - `auto_deduction.deduct_for_dish/order` — BOM 扣料 dept_id opt-in 校验 (Tier 1 邻接, caller 激活为 follow-up)
+- **语义决策**: max_qty_per_day NULL = 不限量（D1 锁定，向后兼容）; is_active=FALSE 视为软禁用
+- **新增 API 8 endpoint**: 5 CRUD + bulk-authorize + validate + soft delete
+- **Tier 1 邻接 explicit-ask 第 27 例** ← 触 TIER1_SOURCE_PATTERNS 邻接 (auto_deduction 食安+毛利底线)
+- **未来扩展**: max_qty_per_day 跨日累计 (P1) / dish→dept 自动 mapping (P1) / 早餐档异常领料行为画像 (Phase 4 AI)
 
 ### PRD-09 分解型 BOM UI（整件拆零）
 - **价值**: 1 箱啤酒 = 24 瓶，库存按箱采、按瓶销售，**没有拆分关系核算就错**
@@ -514,8 +521,9 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **v431 PRD-04 sub-A RFQ 5 表 (rfqs/items/invitees/quotes/awards) + supplier_portal_messages partial UNIQUE 索引 (#613 闭环)（W9 PR #645 ✅ ship）**
 - **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 PR #647 ✅ ship，复用 v431 schema 无新 migration）**
 - **PRD-04 sub-C state transitions + supplier-portal scope + 前端 RFQManagementPage/QuotePage + AI 推荐 UI（W9-W10 本 PR，复用 v431 schema 无新 migration）**
-- **v432 PRD-07 RequisitionTemplate 3 表 + #589 purchase_orders 3 表 建表（W10 本 PR ship）**
-- v433+ PRD-13 sub-A MarketSurvey schema（W11-W12）
+- **v432 PRD-07 RequisitionTemplate 3 表 + #589 purchase_orders 3 表 建表（W10 PR #651 ✅ ship）**
+- **v433 PRD-08 department_ingredient_whitelists 1 表 + RLS 四联（W11 本 PR ship，第 27 例 explicit-ask）**
+- v434+ PRD-13 sub-A MarketSurvey schema（W11-W12）
 
 #### W9 sub-B PR 立项参数（PRD-04 RFQ award 路径 + 二级审批 + #579 200 桌并发）
 
