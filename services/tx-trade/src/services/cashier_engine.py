@@ -846,9 +846,9 @@ class CashierEngine:
         transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
 
-        # 释放桌台
+        # 释放桌台 — §17-B 3B 幂等: 传 order.id, UPDATE WHERE current_order_id 守门
         if order.table_number:
-            await self._release_table(str(order.store_id), order.table_number)
+            await self._release_table(str(order.store_id), order.table_number, order.id)
 
         await self.db.flush()
 
@@ -958,9 +958,15 @@ class CashierEngine:
         order_id: str,
         reason: str = "",
     ) -> dict:
-        """取消订单 — 释放桌台"""
+        """取消订单 — 释放桌台
+
+        §17-B 终态保护: SELECT Order FOR UPDATE 防 settle/cancel race.
+        若两路同时进 (一路 settle + 一路 cancel), FOR UPDATE 串行化让输者
+        读到 status=completed/cancelled 抛 ValueError, 而非两路都过校验后
+        commit 时 overwrite.
+        """
         order_uuid = uuid.UUID(order_id)
-        order = await self._get_order(order_uuid)
+        order = await self._get_order(order_uuid, lock=True)
 
         if order.status == OrderStatus.completed.value:
             raise ValueError("已结算订单无法取消，请走退款流程")
@@ -975,9 +981,9 @@ class CashierEngine:
             "cancelled_at": datetime.now(timezone.utc).isoformat(),
         }
 
-        # 释放桌台
+        # 释放桌台 — §17-B 3B 幂等: 传 order.id, UPDATE WHERE current_order_id 守门
         if order.table_number:
-            await self._release_table(str(order.store_id), order.table_number)
+            await self._release_table(str(order.store_id), order.table_number, order.id)
 
         await self.db.flush()
         logger.info("order_cancelled", order_no=order.order_no, reason=reason)
@@ -1240,15 +1246,22 @@ class CashierEngine:
 
         return total_cost if has_cost else None
 
-    async def _release_table(self, store_id: str, table_no: str) -> None:
-        # §19 round-1 P0-1: tenant_id 过滤防 internal session 跨租户 UPDATE
+    async def _release_table(
+        self, store_id: str, table_no: str, order_id: uuid.UUID
+    ) -> None:
+        # §17-A P0-1: tenant_id 过滤防 internal session 跨租户 UPDATE
         # (RLS 在 internal superuser session 被绕过, 显式 WHERE tenant_id 双保险)
+        # §17-B 3B 幂等: WHERE 加 current_order_id=:order_id + status='occupied' 守门.
+        # 多次调用同 (table, order_id) 仅首次 UPDATE 影响 1 行, 后续 0 行无害.
+        # 若 table 已被新 order 重 occupy, 旧 order_id 不匹配 → UPDATE 0 行, 不污染.
         await self.db.execute(
             update(Table)
             .where(
                 Table.store_id == uuid.UUID(store_id),
                 Table.table_no == table_no,
                 Table.tenant_id == self.tenant_id,
+                Table.current_order_id == order_id,
+                Table.status == TableStatus.occupied.value,
             )
             .values(status=TableStatus.free.value, current_order_id=None)
         )
@@ -1443,7 +1456,8 @@ class CashierEngine:
             )
 
         # 释放原桌 (锁已持有, _release_table UPDATE 在事务内安全)
-        await self._release_table(str(store_uuid), old_table_no)
+        # §17-B 3B 幂等: 传 order.id 让 WHERE current_order_id 守门
+        await self._release_table(str(store_uuid), old_table_no, order_uuid)
 
         # 锁定目标桌 (ORM 修改在 with_for_update 持锁的事务内)
         target_table.status = TableStatus.occupied.value

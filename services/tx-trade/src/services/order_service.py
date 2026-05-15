@@ -406,7 +406,8 @@ class OrderService:
         transition_order(order, OrderStatus.completed)
         order.completed_at = datetime.now(timezone.utc)
         if order.table_number:
-            await self._release_table(str(order.store_id), order.table_number)
+            # §17-B 3B 幂等: 传 order.id, UPDATE WHERE current_order_id 守门
+            await self._release_table(str(order.store_id), order.table_number, order.id)
         await self.db.flush()
 
         logger.info(
@@ -453,18 +454,22 @@ class OrderService:
     # ─── 取消 ───
 
     async def cancel_order(self, order_id: str, reason: str = "") -> dict:
+        """取消订单 — 释放桌台
+
+        §17-B 终态保护: SELECT Order FOR UPDATE 防 settle/cancel race.
+        FOR UPDATE 串行化让输者读到 status=completed/cancelled, 状态机
+        transition_order 抛 ValueError, 而非两路都过校验后 commit overwrite.
+        """
         await self._set_tenant()
-        result = await self.db.execute(
-            select(Order).where(Order.id == uuid.UUID(order_id)).where(Order.tenant_id == self.tenant_id)
-        )
-        order = result.scalar_one_or_none()
+        order = await self._get_order(uuid.UUID(order_id), lock=True)
         if not order:
             raise ValueError(f"Order not found: {order_id}")
         # P0-3: 走状态机守卫，已结账订单不能再取消（必须走退款路径）
         transition_order(order, OrderStatus.cancelled)
         order.order_metadata = {**(order.order_metadata or {}), "cancel_reason": reason}
         if order.table_number:
-            await self._release_table(str(order.store_id), order.table_number)
+            # §17-B 3B 幂等: 传 order.id, UPDATE WHERE current_order_id 守门
+            await self._release_table(str(order.store_id), order.table_number, order.id)
         await self.db.flush()
 
         # CLAUDE.md §15 事件总线：旁路写入 ORDER.CANCELLED
@@ -550,11 +555,18 @@ class OrderService:
             .values(status=TableStatus.occupied.value, current_order_id=order_id)
         )
 
-    async def _release_table(self, store_id: str, table_no: str) -> None:
+    async def _release_table(
+        self, store_id: str, table_no: str, order_id: uuid.UUID
+    ) -> None:
+        # §17-B 3B 幂等: WHERE 加 current_order_id=:order_id + status='occupied' 守门.
+        # 多次调用同 (table, order_id) 仅首次 UPDATE 影响 1 行, 后续 0 行无害.
+        # 若 table 已被新 order 重 occupy, 旧 order_id 不匹配 → UPDATE 0 行, 不污染.
         await self.db.execute(
             update(Table)
             .where(Table.tenant_id == self.tenant_id)
             .where(Table.store_id == uuid.UUID(store_id))
             .where(Table.table_no == table_no)
+            .where(Table.current_order_id == order_id)
+            .where(Table.status == TableStatus.occupied.value)
             .values(status=TableStatus.free.value, current_order_id=None)
         )
