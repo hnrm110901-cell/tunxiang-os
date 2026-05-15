@@ -217,12 +217,29 @@ class TestCreateWhitelist:
 
     @pytest.mark.asyncio
     async def test_duplicate_raises_value_error(self):
-        """UNIQUE (tenant, dept, ingredient) violation → ValueError("已存在")，路由层 409。"""
+        """UNIQUE (tenant, dept, ingredient) violation → ValueError("已存在")，路由层 409。
+        IntegrityError 后还要查 (dept,ingredient) 是否有 is_active 行 (P0-2 修复后)
+        — 若 row 是 active 则返回 "已存在" 错误.
+        """
         from sqlalchemy.exc import IntegrityError
 
-        db, _ = _mk_db_create(
-            fail_with=IntegrityError("duplicate whitelist", None, None)
-        )
+        # mock: INSERT 抛 IntegrityError, 后续 GET_BY_PAIR 返回 active row
+        db = AsyncMock()
+
+        async def execute_side_effect(query, params=None):
+            sql = str(query)
+            result = MagicMock()
+            if "set_config" in sql:
+                return MagicMock()
+            if "INSERT INTO department_ingredient_whitelists" in sql:
+                raise IntegrityError("duplicate whitelist", None, None)
+            if "FROM department_ingredient_whitelists" in sql:
+                # active row 已存在
+                result.mappings.return_value.first.return_value = _wl_row(is_active=True)
+                return result
+            return MagicMock()
+
+        db.execute = AsyncMock(side_effect=execute_side_effect)
         with pytest.raises(ValueError, match="已存在"):
             await create_whitelist(
                 db,
@@ -231,6 +248,46 @@ class TestCreateWhitelist:
                 ingredient_id=_INGREDIENT_LOBSTER,
                 created_by=_USER_FOOD_SAFETY,
             )
+
+    @pytest.mark.asyncio
+    async def test_duplicate_when_soft_disabled_returns_useful_error_p0_2(self):
+        """§19 round-1 P0-2 守门: 当 (dept,ingredient) 已有 is_active=FALSE 的软禁用 row,
+        create 抛 IntegrityError 后查到 → ValueError("已存在但被禁用") + 给出 PATCH 引导.
+        UI default only_active=true 隐藏禁用记录, 用户找不到该 row → 直接新建 → 死锁;
+        修复后给明确 id 让 UI 引导用户去激活.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        db = AsyncMock()
+
+        async def execute_side_effect(query, params=None):
+            sql = str(query)
+            result = MagicMock()
+            if "set_config" in sql:
+                return MagicMock()
+            if "INSERT INTO department_ingredient_whitelists" in sql:
+                raise IntegrityError("duplicate whitelist", None, None)
+            if "FROM department_ingredient_whitelists" in sql:
+                # is_active=FALSE 软禁用 row
+                result.mappings.return_value.first.return_value = _wl_row(is_active=False)
+                return result
+            return MagicMock()
+
+        db.execute = AsyncMock(side_effect=execute_side_effect)
+        with pytest.raises(ValueError) as exc_info:
+            await create_whitelist(
+                db,
+                _TENANT_XUJI,
+                dept_id=_DEPT_SEAFOOD,
+                ingredient_id=_INGREDIENT_LOBSTER,
+                created_by=_USER_FOOD_SAFETY,
+            )
+        msg = str(exc_info.value)
+        # 错误消息必须给出 PATCH 引导 + 现有 whitelist_id
+        assert "已存在但被禁用" in msg
+        assert _WHITELIST_ID in msg
+        assert "PATCH" in msg
+        assert "is_active" in msg
 
 
 # ─── 2. get_whitelist ────────────────────────────────────────────────────────
@@ -308,23 +365,77 @@ class TestUpdateWhitelist:
     async def test_update_max_qty(self):
         db, sql_log = _mk_db_update(get_row=_wl_row(max_qty_per_day=Decimal("100")))
         result = await update_whitelist(
-            db, _TENANT_XUJI, _WHITELIST_ID, max_qty_per_day=Decimal("100")
+            db,
+            _TENANT_XUJI,
+            _WHITELIST_ID,
+            updates={"max_qty_per_day": Decimal("100")},
         )
         assert result["max_qty_per_day"] == Decimal("100")
-        assert any("UPDATE department_ingredient_whitelists" in s for s in sql_log)
+        update_sqls = [s for s in sql_log if "UPDATE department_ingredient_whitelists" in s]
+        assert update_sqls
+        # §19 round-1 P0-1 守门: 仅 SET max_qty_per_day, 不动 is_active / notes
+        assert "max_qty_per_day = :max_qty_per_day" in update_sqls[0]
+        assert "is_active = :is_active" not in update_sqls[0]
+        assert "notes = :notes" not in update_sqls[0]
 
     @pytest.mark.asyncio
     async def test_no_fields_rejected(self):
         db, _ = _mk_db_update(get_row=_wl_row())
         with pytest.raises(ValueError, match="至少"):
-            await update_whitelist(db, _TENANT_XUJI, _WHITELIST_ID)
+            await update_whitelist(db, _TENANT_XUJI, _WHITELIST_ID, updates={})
 
     @pytest.mark.asyncio
     async def test_not_found_rejected(self):
         db, _ = _mk_db_update(get_row=None)
         with pytest.raises(ValueError, match="不存在"):
             await update_whitelist(
-                db, _TENANT_XUJI, _WHITELIST_ID, is_active=False
+                db, _TENANT_XUJI, _WHITELIST_ID, updates={"is_active": False}
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_max_qty_to_null_unlimited_p0_1_regression(self):
+        """§19 round-1 P0-1 守门: PATCH max_qty_per_day=None → SQL 写 NULL,
+        而非 COALESCE 保留原值. 食安总监能调回不限量.
+        """
+        db, sql_log = _mk_db_update(get_row=_wl_row(max_qty_per_day=None))
+        result = await update_whitelist(
+            db,
+            _TENANT_XUJI,
+            _WHITELIST_ID,
+            updates={"max_qty_per_day": None},
+        )
+        assert result["max_qty_per_day"] is None
+        update_sqls = [s for s in sql_log if "UPDATE department_ingredient_whitelists" in s]
+        # SQL 必须含 SET max_qty_per_day = :max_qty_per_day (绑定 NULL 写入)
+        assert update_sqls and "max_qty_per_day = :max_qty_per_day" in update_sqls[0]
+        # 关键: 不能含 COALESCE — 旧实现的 BUG signature
+        assert "COALESCE" not in update_sqls[0]
+
+    @pytest.mark.asyncio
+    async def test_update_is_active_false_explicit_disable(self):
+        """§19 round-1 P0-1 守门: PATCH is_active=False 软禁用 — 必须落地."""
+        db, sql_log = _mk_db_update(get_row=_wl_row(is_active=False))
+        result = await update_whitelist(
+            db,
+            _TENANT_XUJI,
+            _WHITELIST_ID,
+            updates={"is_active": False},
+        )
+        assert result["is_active"] is False
+        update_sqls = [s for s in sql_log if "UPDATE department_ingredient_whitelists" in s]
+        assert update_sqls and "is_active = :is_active" in update_sqls[0]
+        assert "COALESCE" not in update_sqls[0]
+
+    @pytest.mark.asyncio
+    async def test_max_qty_zero_rejected_in_updates(self):
+        """max_qty_per_day=0 仍然被拒 (Decimal 0 非 None, 必须 > 0 或显式 None)."""
+        db, _ = _mk_db_update(get_row=_wl_row())
+        with pytest.raises(ValueError, match="max_qty_per_day"):
+            await update_whitelist(
+                db,
+                _TENANT_XUJI,
+                _WHITELIST_ID,
+                updates={"max_qty_per_day": Decimal("0")},
             )
 
 
@@ -365,33 +476,49 @@ class TestDeleteWhitelist:
 class TestBulkAuthorize:
     @pytest.mark.asyncio
     async def test_mixed_create_and_update(self):
-        """前两条 (dept, ingredient) 已存在 → UPDATE；后一条不存在 → INSERT。"""
+        """前两条 (dept, ingredient) 已存在 → UPDATE；后一条不存在 → INSERT。
+
+        Mock pattern: 用 helper 工厂构造每个 result, 避 MagicMock 链式 attribute
+        auto-generation 干扰 (P1-1 fix 后 SQL 多 CASE WHEN, mock first 设 None
+        必须用独立 result 对象).
+        """
         update_call_count = {"n": 0}
         db = AsyncMock()
 
+        def _result_with_row(row: dict | None) -> MagicMock:
+            r = MagicMock()
+            r.mappings.return_value.first.return_value = row
+            return r
+
         async def execute_side_effect(query, params=None):
             sql = str(query)
-            result = MagicMock()
             if "set_config" in sql:
                 return MagicMock()
             if "UPDATE department_ingredient_whitelists" in sql and "is_deleted = FALSE" in sql:
-                # UPSERT BY PAIR — 前两次命中（返回 row），第三次不命中
                 update_call_count["n"] += 1
                 if update_call_count["n"] <= 2:
-                    result.mappings.return_value.first.return_value = _wl_row(
-                        ingredient_id=str(params.get("ingredient_id")) if params else _INGREDIENT_LOBSTER,
-                        max_qty_per_day=params.get("max_qty_per_day") if params else None,
+                    return _result_with_row(
+                        _wl_row(
+                            ingredient_id=str(params.get("ingredient_id"))
+                            if params
+                            else _INGREDIENT_LOBSTER,
+                            max_qty_per_day=params.get("max_qty_per_day")
+                            if params
+                            else None,
+                        )
                     )
-                else:
-                    result.mappings.return_value.first.return_value = None
-                return result
+                return _result_with_row(None)
             if "INSERT INTO department_ingredient_whitelists" in sql:
-                # 第三条新建
-                result.mappings.return_value.first.return_value = _wl_row(
-                    ingredient_id=str(params.get("ingredient_id")) if params else "new-ing",
-                    max_qty_per_day=params.get("max_qty_per_day") if params else None,
+                return _result_with_row(
+                    _wl_row(
+                        ingredient_id=str(params.get("ingredient_id"))
+                        if params
+                        else "new-ing",
+                        max_qty_per_day=params.get("max_qty_per_day")
+                        if params
+                        else None,
+                    )
                 )
-                return result
             return MagicMock()
 
         db.execute = AsyncMock(side_effect=execute_side_effect)
@@ -433,6 +560,81 @@ class TestBulkAuthorize:
                 items=[{"ingredient_id": f"ing-{i}"} for i in range(201)],
                 created_by=_USER_FOOD_SAFETY,
             )
+
+    @pytest.mark.asyncio
+    async def test_preserves_existing_max_qty_when_field_absent_p1_1(self):
+        """§19 round-1 P1-1 守门: caller item 不含 max_qty_per_day key 时, UPSERT
+        SQL 必须用 CASE WHEN :preserve_max_qty THEN ... 保留原值, 而非 SET = NULL.
+        矩阵编辑器二次授权场景: 食安总监原已设 龙虾=50kg/天, 后来加新食材不动龙虾,
+        旧的 50kg 限额不能被静默清零 (毛利风险).
+        """
+        captured_params: list[dict] = []
+        db = AsyncMock()
+
+        async def execute_side_effect(query, params=None):
+            sql = str(query)
+            result = MagicMock()
+            if "set_config" in sql:
+                return MagicMock()
+            if "UPDATE department_ingredient_whitelists" in sql:
+                if params:
+                    captured_params.append(params)
+                # SQL 必须含 CASE WHEN :preserve_max_qty (P1-1 修复 signature)
+                assert "preserve_max_qty" in sql, (
+                    f"§19 P1-1 修复回归: UPSERT SQL 必须含 CASE WHEN :preserve_max_qty, 实际: {sql}"
+                )
+                result.mappings.return_value.first.return_value = _wl_row()
+                return result
+            return MagicMock()
+
+        db.execute = AsyncMock(side_effect=execute_side_effect)
+
+        # case A: caller 不传 max_qty_per_day → preserve=True
+        await bulk_authorize(
+            db,
+            _TENANT_XUJI,
+            dept_id=_DEPT_SEAFOOD,
+            items=[{"ingredient_id": _INGREDIENT_LOBSTER}],  # 不含 max_qty_per_day key
+            created_by=_USER_FOOD_SAFETY,
+        )
+        assert captured_params, "UPDATE 未触发"
+        assert captured_params[-1].get("preserve_max_qty") is True
+        assert captured_params[-1].get("preserve_notes") is True
+
+    @pytest.mark.asyncio
+    async def test_explicit_none_max_qty_overrides_existing_p1_1(self):
+        """§19 round-1 P1-1 配套: caller 显式传 max_qty_per_day=None →
+        preserve_max_qty=False → SQL CASE 走 ELSE 分支 SET NULL (清零原限额到不限量).
+        """
+        captured_params: list[dict] = []
+        db = AsyncMock()
+
+        async def execute_side_effect(query, params=None):
+            sql = str(query)
+            result = MagicMock()
+            if "set_config" in sql:
+                return MagicMock()
+            if "UPDATE department_ingredient_whitelists" in sql:
+                if params:
+                    captured_params.append(params)
+                result.mappings.return_value.first.return_value = _wl_row()
+                return result
+            return MagicMock()
+
+        db.execute = AsyncMock(side_effect=execute_side_effect)
+
+        await bulk_authorize(
+            db,
+            _TENANT_XUJI,
+            dept_id=_DEPT_SEAFOOD,
+            items=[
+                {"ingredient_id": _INGREDIENT_LOBSTER, "max_qty_per_day": None}  # 显式 None
+            ],
+            created_by=_USER_FOOD_SAFETY,
+        )
+        assert captured_params
+        assert captured_params[-1].get("preserve_max_qty") is False
+        assert captured_params[-1].get("max_qty_per_day") is None
 
 
 # ─── 7. validate_ingredient_allowed ──────────────────────────────────────────

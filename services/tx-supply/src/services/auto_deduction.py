@@ -128,6 +128,12 @@ async def deduct_for_dish(
 
     # PRD-08 白名单硬阻塞 — dept_id 提供时, BOM 每行 ingredient 经白名单校验
     # 违反 raise IngredientNotAllowedError, 调用方事务 rollback 整单
+    #
+    # §19 round-1 P1-2 follow-up (caller 激活前必修):
+    # 当前逐行串行 await validate_ingredient_allowed — 200 桌 × 5 dish × 5 ingredient
+    # = 5000 次 service 调用. Tier 1 P99 < 200ms 门槛会破. tx-trade 激活 dept_id 透传
+    # 前必须先改为 batch SELECT `WHERE (dept_id, ingredient_id) IN (...)`
+    # + in-memory 校验, 或 request-scoped 缓存. 见 PRD-08 follow-up issue.
     if dept_id is not None:
         from .dept_whitelist_service import validate_ingredient_allowed
 

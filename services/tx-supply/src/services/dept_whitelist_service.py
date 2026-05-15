@@ -163,16 +163,22 @@ def _select_list_whitelists_sql(
     return _LIST_WHITELIST_ALL_SQL
 
 
-_UPDATE_WHITELIST_SQL = """
-    UPDATE department_ingredient_whitelists
-    SET max_qty_per_day = COALESCE(:max_qty_per_day, max_qty_per_day),
-        is_active       = COALESCE(:is_active, is_active),
-        notes           = COALESCE(:notes, notes),
-        updated_at      = :now
-    WHERE id        = :whitelist_id
-      AND tenant_id = :tenant_id
-      AND is_deleted = FALSE
-"""
+# §19 round-1 P0-1 fix: 动态字段拼接 — 仅 SET 用户实际提供的字段, 让 NULL 也能写入
+# 之前 COALESCE 模式致 max_qty_per_day 一旦设了非 NULL 永远改不回 NULL (不限量)
+# — 食安总监无法调回不限量, 毛利策略调整死锁.
+_UPDATE_WHITELIST_PREFIX_SQL = (
+    "UPDATE department_ingredient_whitelists SET updated_at = :now"
+)
+_UPDATE_WHITELIST_SUFFIX_SQL = (
+    " WHERE id = :whitelist_id"
+    " AND tenant_id = :tenant_id"
+    " AND is_deleted = FALSE"
+)
+_UPDATE_FIELD_FRAGMENTS: dict[str, str] = {
+    "max_qty_per_day": ", max_qty_per_day = :max_qty_per_day",
+    "is_active": ", is_active = :is_active",
+    "notes": ", notes = :notes",
+}
 
 _DELETE_WHITELIST_SQL = """
     UPDATE department_ingredient_whitelists
@@ -184,13 +190,23 @@ _DELETE_WHITELIST_SQL = """
       AND is_deleted = FALSE
 """
 
-# Upsert by (dept_id, ingredient_id) — 已 soft-deleted 的也恢复
+# §19 round-1 P1-1 fix: Upsert by (dept_id, ingredient_id) — 已 soft-deleted 的也恢复
+# preserve_max_qty/preserve_notes 区分"未提供"vs"显式 None":
+#   - caller 不传 max_qty_per_day key → preserve=TRUE → 保留原值
+#   - caller 显式 max_qty_per_day=None → preserve=FALSE → SET NULL (不限量)
+# 之前 SET max_qty_per_day = :max_qty_per_day 静默清零原限额 (毛利风险)
 _UPSERT_WHITELIST_BY_PAIR_SQL = """
     UPDATE department_ingredient_whitelists
-    SET max_qty_per_day = :max_qty_per_day,
+    SET max_qty_per_day = CASE
+                            WHEN :preserve_max_qty THEN max_qty_per_day
+                            ELSE :max_qty_per_day
+                          END,
         is_active       = TRUE,
         is_deleted      = FALSE,
-        notes           = :notes,
+        notes           = CASE
+                            WHEN :preserve_notes THEN notes
+                            ELSE :notes
+                          END,
         updated_at      = :now
     WHERE dept_id       = :dept_id
       AND ingredient_id = :ingredient_id
@@ -252,6 +268,24 @@ async def create_whitelist(
             },
         )
     except IntegrityError as exc:
+        # §19 round-1 P0-2 fix: 软禁用 row 给出明确激活路径而非冷拒 409
+        # UI 默认 only_active=true 隐藏禁用记录, 用户找不到那条行 → 直接新建 → 409
+        # 死锁. 这里检测 (dept,ingredient) 是否已有 is_active=FALSE row, 给出 id 引导.
+        existing_result = await db.execute(
+            text(_GET_WHITELIST_BY_PAIR_SQL),
+            {
+                "dept_id": _uuid_str(dept_id),
+                "ingredient_id": _uuid_str(ingredient_id),
+                "tenant_id": _uuid_str(tenant_id),
+            },
+        )
+        existing_row = existing_result.mappings().first()
+        if existing_row is not None and not existing_row.get("is_active"):
+            raise ValueError(
+                f"白名单已存在但被禁用 (whitelist_id={existing_row['id']}); "
+                f"请用 PATCH /api/v1/supply/dept-whitelists/{existing_row['id']} "
+                f'body {{"is_active": true}} 重新激活, 而非新建'
+            ) from exc
         raise ValueError(
             f"白名单已存在：dept_id={dept_id}, ingredient_id={ingredient_id}"
         ) from exc
@@ -326,22 +360,33 @@ async def update_whitelist(
     tenant_id: str,
     whitelist_id: str,
     *,
-    max_qty_per_day: Optional[Decimal] = None,
-    is_active: Optional[bool] = None,
-    notes: Optional[str] = None,
+    updates: dict,
 ) -> dict:
-    """更新白名单。任一字段为 None 时 COALESCE 保留原值。"""
-    fields = {
-        "max_qty_per_day": max_qty_per_day,
-        "is_active": is_active,
-        "notes": notes,
-    }
-    set_fields = {k: v for k, v in fields.items() if v is not None}
-    if not set_fields:
+    """更新白名单。
+
+    §19 round-1 P0-1 fix: 改为 explicit `updates: dict` 参数 + 动态 SQL 拼接 —
+    让"显式传 None" (清空回 NULL) 与"字段未提供" (保留原值) 区分:
+      - updates 包含 key → SET col = :col (允许写 NULL)
+      - updates 不含 key → 不动 (不写入 SQL SET 子句)
+
+    允许字段: max_qty_per_day / is_active / notes (其他 key 静默忽略)
+
+    路由层调用模式:
+        updates = body.model_dump(exclude_unset=True)
+        await update_whitelist(db, tenant_id, whitelist_id, updates=updates)
+    """
+    allowed = set(_UPDATE_FIELD_FRAGMENTS.keys())
+    set_keys = sorted(set(updates.keys()) & allowed)  # sorted 让 SQL 拼接 deterministic
+    if not set_keys:
         raise ValueError("至少提供一个更新字段")
 
-    if max_qty_per_day is not None and max_qty_per_day <= 0:
-        raise ValueError("max_qty_per_day 必须 > 0 或不传（保留原值）")
+    # 校验 max_qty_per_day (非 NULL 时必须 > 0)
+    mqd = updates.get("max_qty_per_day")
+    if "max_qty_per_day" in updates and mqd is not None:
+        if Decimal(str(mqd)) <= 0:
+            raise ValueError(
+                "max_qty_per_day 必须 > 0 或显式传 None (NULL = 不限量)"
+            )
 
     await _set_tenant(db, tenant_id)
 
@@ -349,24 +394,26 @@ async def update_whitelist(
     if existing is None:
         raise ValueError(f"whitelist_id={whitelist_id} 不存在或已删除")
 
-    now = datetime.now(timezone.utc)
-    await db.execute(
-        text(_UPDATE_WHITELIST_SQL),
-        {
-            "whitelist_id": whitelist_id,
-            "tenant_id": _uuid_str(tenant_id),
-            "max_qty_per_day": max_qty_per_day,
-            "is_active": is_active,
-            "notes": notes,
-            "now": now,
-        },
-    )
+    # 动态拼接 SQL — 仅 SET 用户实际提供的字段, 让 NULL 也能写入
+    sql_parts = [_UPDATE_WHITELIST_PREFIX_SQL]
+    params: dict[str, object] = {
+        "whitelist_id": whitelist_id,
+        "tenant_id": _uuid_str(tenant_id),
+        "now": datetime.now(timezone.utc),
+    }
+    for key in set_keys:
+        sql_parts.append(_UPDATE_FIELD_FRAGMENTS[key])
+        params[key] = updates[key]
+    sql_parts.append(_UPDATE_WHITELIST_SUFFIX_SQL)
+    prepared_text = "".join(sql_parts)
+
+    await db.execute(text(prepared_text), params)
 
     logger.info(
         "dept_whitelist_updated",
         whitelist_id=whitelist_id,
         tenant_id=str(tenant_id),
-        fields=list(set_fields.keys()),
+        fields=set_keys,
     )
     return (await get_whitelist(db, tenant_id, whitelist_id)) or {}
 
@@ -435,12 +482,17 @@ async def bulk_authorize(
 
     for it in items:
         ingredient_id = str(it["ingredient_id"])
+        # §19 round-1 P1-1 fix: 区分 "未提供" vs "显式 None"
+        # caller 不在 dict 里放 max_qty_per_day key → preserve_max_qty=True 保留原值
+        # caller 显式 it["max_qty_per_day"]=None → preserve=False, 写入 NULL (不限量)
+        has_max_qty_key = "max_qty_per_day" in it
+        has_notes_key = "notes" in it
         max_qty_per_day = (
             Decimal(str(it["max_qty_per_day"]))
-            if it.get("max_qty_per_day") is not None
+            if has_max_qty_key and it["max_qty_per_day"] is not None
             else None
         )
-        notes = it.get("notes")
+        notes = it.get("notes") if has_notes_key else None
 
         # 1. 尝试 upsert by (dept_id, ingredient_id)
         upd_result = await db.execute(
@@ -449,6 +501,8 @@ async def bulk_authorize(
                 "dept_id": _uuid_str(dept_id),
                 "ingredient_id": ingredient_id,
                 "tenant_id": _uuid_str(tenant_id),
+                "preserve_max_qty": not has_max_qty_key,
+                "preserve_notes": not has_notes_key,
                 "max_qty_per_day": max_qty_per_day,
                 "notes": notes,
                 "now": now,

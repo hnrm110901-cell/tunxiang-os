@@ -147,6 +147,12 @@ class TestDeductForDishWhitelistGuard:
 
 
 class TestDeductForOrderWhitelistPassthrough:
+    """deduct_for_order dept_id 透传到 deduct_for_dish.
+
+    测试同时 patch _get_bom_for_dish (避免 BOM SELECT 通过 MagicMock 走完 .scalars().all()
+    chain 导致 coroutine.attribute 异常) + deduct_for_dish (拦截真实 BOM 锁路径).
+    """
+
     @pytest.mark.asyncio
     async def test_dept_id_passed_to_deduct_for_dish(self):
         """deduct_for_order dept_id 必须透传到每次 deduct_for_dish 调用。"""
@@ -156,7 +162,7 @@ class TestDeductForOrderWhitelistPassthrough:
             {"dish_id": _DISH_LOBSTER_ROLL, "quantity": 1, "item_name": "龙虾卷"},
         ]
 
-        with patch.object(
+        with patch.object(ad, "_get_bom_for_dish", AsyncMock(return_value=[])), patch.object(
             ad,
             "deduct_for_dish",
             AsyncMock(
@@ -198,7 +204,7 @@ class TestDeductForOrderWhitelistPassthrough:
             {"dish_id": _DISH_LOBSTER_ROLL, "quantity": 1, "item_name": "龙虾卷"},
         ]
 
-        with patch.object(
+        with patch.object(ad, "_get_bom_for_dish", AsyncMock(return_value=[])), patch.object(
             ad,
             "deduct_for_dish",
             AsyncMock(

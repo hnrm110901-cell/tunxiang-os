@@ -145,15 +145,20 @@ async def update_supply_dept_whitelist(
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
     db: AsyncSession = Depends(_get_db),
 ) -> dict:
-    """更新白名单。max_qty_per_day / is_active / notes 任一字段。"""
+    """更新白名单。max_qty_per_day / is_active / notes 任一字段。
+
+    §19 round-1 P0-1 fix: body.model_dump(exclude_unset=True) 区分"未提供"
+    vs "显式 None" — 让 max_qty_per_day 能被 PATCH 回 NULL (不限量),
+    is_active=FALSE 也能被显式禁用. JSON body 中字段不出现 → 不动;
+    出现 (含 null) → 写入.
+    """
+    updates = body.model_dump(exclude_unset=True)
     try:
         item = await update_whitelist(
             db=db,
             tenant_id=x_tenant_id,
             whitelist_id=whitelist_id,
-            max_qty_per_day=body.max_qty_per_day,
-            is_active=body.is_active,
-            notes=body.notes,
+            updates=updates,
         )
     except ValueError as e:
         msg = str(e)
@@ -204,19 +209,23 @@ async def bulk_authorize_supply_dept_whitelist(
     种允许食材（含限额）→ 一键提交。已存在的 (dept_id, ingredient_id)
     upsert（恢复 is_active + 更新 max_qty_per_day）；不存在的 INSERT 新行。
     """
+    # §19 round-1 P1-1 fix: per-item model_dump(exclude_unset=True) 区分"未提供"
+    # vs "显式 None" — caller 未在 JSON body 里写 max_qty_per_day 字段时不擦原限额.
+    items_dump: list[dict] = []
+    for it in body.items:
+        item_dict: dict = {"ingredient_id": str(it.ingredient_id)}
+        provided = it.model_dump(exclude_unset=True)
+        if "max_qty_per_day" in provided:
+            item_dict["max_qty_per_day"] = it.max_qty_per_day
+        if "notes" in provided:
+            item_dict["notes"] = it.notes
+        items_dump.append(item_dict)
     try:
         result = await bulk_authorize(
             db=db,
             tenant_id=x_tenant_id,
             dept_id=str(body.dept_id),
-            items=[
-                {
-                    "ingredient_id": str(it.ingredient_id),
-                    "max_qty_per_day": it.max_qty_per_day,
-                    "notes": it.notes,
-                }
-                for it in body.items
-            ],
+            items=items_dump,
             created_by=x_user_id,
         )
     except ValueError as e:
