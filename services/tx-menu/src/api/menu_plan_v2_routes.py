@@ -501,7 +501,7 @@ async def get_effective_menu(
                 try:
                     price_fen = int(r[5])
                 except (TypeError, ValueError):
-                    pass
+                    log.warning("menu_plan_v2.price_override_parse_failed", raw_value=str(r[5]), exc_info=True)
             elif r[4] == "availability":
                 is_available = r[5].lower() == "true" if r[5] else is_available
 

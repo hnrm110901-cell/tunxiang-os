@@ -458,7 +458,7 @@ async def get_effective_menu(
                 if not (from_minutes <= current_minutes <= until_minutes):
                     is_available = False
             except (ValueError, AttributeError):
-                pass
+                log.warning("channel_menu_override.time_window_parse_failed", available_from=str(available_from), available_until=str(available_until), exc_info=True)
 
         menu_items.append(
             {
