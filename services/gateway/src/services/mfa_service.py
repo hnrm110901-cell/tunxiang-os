@@ -187,4 +187,5 @@ class MFAService:
         try:
             return hashed_codes.index(hashed_input)
         except ValueError:
+            logger.warning("mfa.backup_code_no_match", exc_info=True)
             return None

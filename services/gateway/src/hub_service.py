@@ -1183,7 +1183,7 @@ async def hub_customer_health(db: AsyncSession, customer_id: str) -> Optional[di
         if sla_row and sla_row[0] is not None:
             sla_score = round(float(sla_row[0]), 1)
     except (SQLAlchemyError, OperationalError):
-        pass
+        log.warning("hub_service.sla_score_db_failed", merchant_name=merchant.get("name", ""), exc_info=True)
 
     # 从 hub_adapter_connections 聚合 adapter 健康度
     adapter_score = 85.0
@@ -1201,7 +1201,7 @@ async def hub_customer_health(db: AsyncSession, customer_id: str) -> Optional[di
         if adapter_row and adapter_row[0] is not None:
             adapter_score = round(float(adapter_row[0]), 1)
     except (SQLAlchemyError, OperationalError):
-        pass
+        log.warning("hub_service.adapter_score_db_failed", merchant_name=merchant.get("name", ""), exc_info=True)
 
     # 从 hub_tickets 统计工单数量
     ticket_score = 80.0
@@ -1222,7 +1222,7 @@ async def hub_customer_health(db: AsyncSession, customer_id: str) -> Optional[di
             # 工单越少得分越高
             ticket_score = max(40.0, 100.0 - cnt * 5.0)
     except (SQLAlchemyError, OperationalError):
-        pass
+        log.warning("hub_service.ticket_score_db_failed", customer_id=customer_id, exc_info=True)
 
     dimensions = {
         "sla_hit_rate": {
@@ -2677,7 +2677,7 @@ async def hub_get_migration(db: AsyncSession, migration_id: str) -> Optional[dic
                 try:
                     extra = json.loads(resolution)
                 except (json.JSONDecodeError, ValueError):
-                    pass
+                    log.warning("hub_service.migration_resolution_parse_failed", migration_id=migration_id, exc_info=True)
             return {
                 "id": d["id"],
                 "name": d["name"],
@@ -3276,7 +3276,7 @@ async def hub_playbook_runs(db: AsyncSession, playbook_id: str) -> Optional[list
                 try:
                     extra = json.loads(resolution)
                 except (json.JSONDecodeError, ValueError):
-                    pass
+                    log.warning("hub_service.playbook_run_resolution_parse_failed", playbook_id=playbook_id, exc_info=True)
             items.append(
                 {
                     "run_id": d["run_id"],

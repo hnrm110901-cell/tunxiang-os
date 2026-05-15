@@ -61,6 +61,7 @@ def _extract_user_id(request: Request) -> Optional[str]:
         data = json.loads(base64.urlsafe_b64decode(payload))
         return data.get("user_id") or data.get("sub")
     except (IndexError, ValueError, KeyError):
+        logger.warning("personalization.jwt_payload_decode_failed", exc_info=True)
         return None
 
 

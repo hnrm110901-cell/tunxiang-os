@@ -155,7 +155,7 @@ async def _proxy(request: Request, target_url: str) -> JSONResponse:
                     headers["X-Internal-JWT"] = internal_jwt
             except ImportError:
                 # helper 尚未部署到环境时降级 — 不阻塞 proxy
-                pass
+                logger.warning("proxy.internal_jwt_helper_missing", exc_info=True)
         body = await request.body()
 
         resp = await _http_pool.request(
