@@ -1,3 +1,56 @@
+## 2026-05-15 早段 · 6-PR concurrent_runner roadmap 收官 PR #650 PR-5 + §17 系列首发 PR #652 §17-A + 并发 ship PR #653 §17-B + PRD-07 W10 PR #651 4 PR ship 收尾 sediment (Tier 1 fund/源/邻接 explicit-ask 第 27 例 reconciled)
+
+### 完成状态
+
+- [x] **PR #650** infra(test) order_service + delivery_adapter concurrent Tier 1 测试 PR-5 MERGED `7a37c918` (**Tier 1 fund/源/邻接 explicit-ask 第 26 例 reconciled**, 5/15 06:26 UTC / 14:26 CST, 5 files / +1126 / -18, audit §4.1.4 + §4.1.5 真行为) — 4 测试 (T1 apply_discount + Issue #643 P2-A distinct-set / T2 settle_order 1 success+9 ValueError / T3 receive_order IntegrityError catch / T4 confirm_order state machine) + drift-tolerant CI 第 6 次实战 + §19 round-1 1 P1+3 P2 → in-PR fix `ee08a9a1` → CI sync DSN bug → round-2 APPROVE 0/0 + P2 cosmetic fix `9160517d` (与 PR #553 PR-C / PR #642 PR-3 同金标准水位)
+- [x] **PR #653** (并发 session ship, ack-only) fix(tx-trade) §17-B settle 终态保护 + 3B 幂等释放 MERGED `a80cff3c` (**Tier 1 fund/源 explicit-ask 第 27 例 reconciled**, 5/15 06:38 UTC / 14:38 CST, §17-B / D2 锁定第二发, 5 files / +1073 / -23) — `_release_table` 加 `order_id` 必传参数 + UPDATE WHERE `current_order_id=:order_id AND status='occupied'` 守门 (3B 幂等); cashier `cancel_order` + order_service `cancel_order` 改用 `_get_order(lock=True)` 终态保护; 13 mock + 3 真 PG settle race (T1 N=10 settle / T2 release-then-reoccupy / T3 settle+cancel race). 详细 entry 留并发 session sediment, 本 sediment 仅 ack
+- [x] **PR #652** fix(tx-trade) cashier 桌台 1A FOR UPDATE + 2A 双锁排序 + 双模式 9 测试 MERGED `002ae15d` (**Tier 1 fund/源 explicit-ask 第 25 例 reconciled**, 5/15 05:57 UTC, §17-A / D2 锁定首发) — open_table + change_table_status (1A 强一致) + transfer_table (2A 双锁 IN+ORDER BY id+FOR UPDATE 防 ABBA) + 新 typed `TableOccupiedError(ValueError)` + mock 6 + 真 PG 3 并发反测 / §19 round-1 1 P0 (transfer source 桌静默放过 + `_release_table` 缺 tenant_id) + 2 P1 (路由 409 + T3 swap 断言) 全修 + round-2 APPROVE
+- [x] **PR #651** feat(tx-supply,web-admin) RequisitionTemplate + #589 purchase_orders 闭环 + 全栈 UI MERGED `7c88b9fd` ([T2] T2 carve-out type 7 auto admin-merge, 5/14 23:33 UTC, PRD-07 Phase 2 W10) — v432 6 表 (PRD-07 3 + #589 闭环 3) + 9 函数 service + 8 endpoints + 全栈 UI + AI 推荐 fail-open + 30 测试用例 / §19 round-1 1 P0 (fail-open 缺 SQLAlchemyError) + 2 P1 (IntegrityError / mock 类型) 全修 + round-2 APPROVE / closes #589
+- [x] **6-PR concurrent_runner roadmap 5/6 完工** — PR-1 #634 + PR-2 #638 + PR-3 #642 + PR-4 #644 + **PR-5 #650**; 剩 PR-6 (可选) pg_dump cache 加速
+- [x] **drift-tolerant CI workflow 第 6 次实战** — PR #650 HARD verify 9 → 10 表 (+ `delivery_orders`); carve-out 类 12 已正式启用 (5/14 末段)
+- [x] **§17 桌台并发语义对齐 4 段系列首发 + 第二发** — PR #652 落地 audit doc §11.3 creator D2 锁定方案 1A + 2A (5/15 05:57) + **PR #653 §17-B (3B 幂等释放 + 终态保护, 5/15 06:38, 并发 session)**; 剩 §17-C OrderItem lock (4 路径, 不依赖决策可并行) + §17-D #549/#557/#559 follow-up bundle (前提创始人答复 §17 选择题 2 转桌争抢)
+- [x] **新 lesson `feedback_ci_sync_dsn_module_top_rewrite.md` 落盘** — PR-5 round-2 实战首例: CI workflow 设 `DATABASE_URL=postgresql://` (sync) → 业务源顶层 import `database.py` 触发 module-level `create_async_engine` fail; 业务源不可改 scope 下在测试模块顶端 rewrite `os.environ['DATABASE_URL']` → asyncpg, 模块加载顺序保证 first import wins
+
+### 关键决策
+
+- **Tier 1 explicit-ask tally 第三次重校准 (关键)** — cold-start prompt 标 "累计 25 例" **漏算 PR #652** (5/15 05:57 UTC §17-A)。PR #650 自己 PR body 标 "第 25 例" 也是 stale (push 5/14 22:05 时 #652 还未 ship)。按 merge timestamp ASC 严格重排:
+  - 16 prior (5/13 末段累积)
+  - 17 = #634 (5/14 18:22, PR-1 concurrent_runner)
+  - 18 = #633 (5/14 18:30, PRD-02 W7-1, concurrent)
+  - 19 = #637 (5/14 20:00, PRD-06 W7-2, concurrent)
+  - 20 = #638 (5/14 20:19, PR-2 cashier_engine)
+  - 21 = #642 (5/14 21:04, PR-3 payment_saga)
+  - 22 = #641 (5/14 21:13, W8 PRD-05, concurrent)
+  - 23 = #644 (5/14 22:08, PR-4 inventory+auto_deduction)
+  - 24 = #647 (5/14 22:31, W9 PRD-04 sub-B RFQ award, concurrent)
+  - **25 = #652** (5/15 05:57, §17-A, concurrent w.r.t. PR-5 push)
+  - **26 = #650** (5/15 06:26, PR-5)
+  - **27 = #653** (5/15 06:38, §17-B, **本 sediment 进行中并发 ship**)
+  - **5/15 早段累计 27 例**。**精确法**: [Tier1] tag + merge timestamp ASC + explicit-ask 模式, [T2] 不入。**Lesson 累计第三次** (5/14 末段 + 5/15 上午 + 5/15 早段 sediment 三次重校准): cold-start prompt tally 是 stale snapshot (今次漏算 #652 §17-A); PR body 自报 tally 也 stale (PR #650 body "第 25 例" / PR #653 body "第 23 例" 均不含彼此); **必须按 timestamp ASC + 包含并发 session [Tier1] PR + sediment 进行中 fetch 监控并发 ship**。`feedback_19_review_misses_ci_gates.md` + `feedback_concurrent_pr_race.md` 同类警告
+- **§19 多轮 fix verify 模式 PR-5 实证** (与 PR #227 / PR #644 同模式) — Initial → round-1 REQUEST-CHANGES (1 P1 falsifiability + 3 P2) → in-PR fix `ee08a9a1` → CI sync DSN bug 暴露 → round-2 APPROVE 0/0 + P2 cosmetic fix `9160517d`。**质量水位**: 0/0 round-2 + in-PR cosmetic, 与 PR #553 PR-C / PR #642 PR-3 同金标准
+- **T1 falsifiability redesign 关键决策** (P1-1 fix) — 原 T1 同行原子 UPDATE → 即便去掉 FOR UPDATE invariant 仍成立 (**假绿**); 新 T1 mixed 5 apply + 5 modify_order 显式 raw FOR UPDATE UPDATE total/final → 失效则 apply 用 stale total 破坏 invariant。**Falsifiability 实测**: 临时改 source 为 `lock=False`, 5 次重复 → 3 fail / 2 pass (60% 本地, CI 5x 累计 ≈ 99%, 生产 200 桌必失败)。honest 限制声明落 docstring + follow-up issue 候选 (deterministic 100% 需 monkeypatch sleep, 实测触 PG row lock 死锁, 不在本 PR scope)
+- **CI sync DSN bypass 模式** (P0 fix) — 业务源不可改 scope 下测试模块顶端 (any business import 之前) rewrite `os.environ['DATABASE_URL']` `postgresql://` → `postgresql+asyncpg://`, 模块加载顺序保证 first import wins。新 lesson `feedback_ci_sync_dsn_module_top_rewrite.md`
+- **6-PR concurrent_runner roadmap 收官质量节奏** — PR-1 #634 多轮 / PR-2 #638 round-1 fix / PR-3 #642 一发即过 / PR-4 #644 round-1 → round-2 / **PR-5 #650 round-1 → round-2 + in-PR cosmetic**。5 PR 全部 0/0 收尾, 0 main 回归。PR-6 pg_dump cache 加速可选
+
+### 下一步
+
+- 优先 **PR-6 pg_dump cache 加速** (可选, audit doc §6.2 第 2 期) — concurrent workflow ~5min → ~30s, `key=hashFiles('shared/db-migrations/versions/**')`
+- 或 **§17-B settle 终态保护** (3B 幂等释放) — Tier 1 explicit-ask 第 27 例候选 (前提创始人答复 §17 选择题 3 结算桌台中间态)
+- 或 **§17-C OrderItem lock 4 路径** — 不依赖 §17 决策可并行
+- 或 **§17-D follow-up bundle** (#549 ABBA architect + #557 OrderItem 不变量 + #559 apply_discount status 校验) — 与 cashier 6 P1+P2 / order 3 P1 合并
+- 或 **Mac mini M4 真机部署** / 等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 ontology / channel-aggregation 资质 / §17 选择题 2+3)
+
+### 已知风险
+
+- **T1 deterministic 100% falsifiability gap** — 当前 60% 本地 / ~99% CI 5x / 200 桌生产必失败; 100% 需 monkeypatch `_get_order` 注入 sleep 实测触 PG row lock 死锁, 不在本 PR scope. follow-up issue 候选
+- **§17 选择题 2+3 等待** — 转桌争抢 / 结算桌台中间态 创始人对齐未完, 阻塞 §17-B/§17-D
+- **drift-tolerant CI 6 例累积** — PR #634 + #638 + #642 + #644 + #647 + **#650** 已稳定, carve-out 第 12 类 5/14 末段正式启用
+- **Tier 1 explicit-ask tally 第三次重校准** — cold-start prompt 漏算 #652, 下次 sediment 必须按 timestamp ASC 重排 + 包含并发 session [Tier1] PR
+- pre-existing CI 漂移 12+ 项 与本批无关, `project_tunxiang_ci_gates.md` 已登记
+- **本 sediment session 仅写 docs/devlog 不动业务** — 上下文消费极低; 下次 PR-6 / §17 后续 PR 启动前评估是否拆 session
+
+---
+
 ## 2026-05-15 下午 · "0 + A" 第三-第四轮 ship 收尾 sediment：PR #642 (PR-3 payment_saga SKIP LOCKED) + PR #644 (PR-4 inventory + auto_deduction ABBA) + 并发 PR #641 (W8 PRD-05 [Tier1]) + PR #645 (W9 PRD-04 sub-A [T2]) + 并发 PR #647 (W9 PRD-04 sub-B RFQ award [Tier1]) 5 PR ship (5/14 单日累计 42 PR)
 
 ### 完成状态

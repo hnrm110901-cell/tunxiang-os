@@ -1,3 +1,88 @@
+## 2026-05-15 早段 — 6-PR concurrent_runner roadmap 收官 PR-5 #650 order_service + delivery_adapter 真行为 ship (Tier 1 fund/源/邻接 explicit-ask 第 26 例 reconciled)
+
+### 今日完成
+
+继 §17-A #652 ship 后 ~30min (5/15 05:57 → 06:26 UTC), 紧接 ship 6-PR concurrent_runner roadmap **5/6 收官** — PR-5 验证 audit doc §4.1.4 `order_service` 2 P0 + §4.1.5 `delivery_adapter` 1 P1 + 1 P2 路径 FOR UPDATE / IntegrityError catch **真行为**, 与 PR #560 PR-E + PR #563 PR-F 的 mock-driven SQL grep 互补.
+
+- **PR #650 ship `7a37c918`** (5/15 06:26 UTC / 14:26 CST, **Tier 1 fund/源/邻接 explicit-ask 第 26 例 reconciled**, 5 files / +1126 / -18):
+  - `.github/workflows/tier1-row-lock-concurrent.yml` HARD verify 9 → 10 表 (+ `delivery_orders`) — **drift-tolerant CI 第 6 次实战** (carve-out 类 12 已正式启用 5/14 末段)
+  - `docs/testing/concurrent-runner-howto.md` +58: §3.5 distinct-set 升级模板 (Issue #643 P2-A SoT) + §3.6 schema drift 检查清单 (Issue #643 P2-D SoT)
+  - `tests/concurrent/conftest.py` `_CONCURRENT_TABLES` + `delivery_orders`
+  - `tests/concurrent/test_order_service_concurrent_tier1.py` +566 / T1-T2
+  - `tests/concurrent/test_delivery_adapter_concurrent_tier1.py` +469 / T3-T4
+
+- **4 测试用例**:
+  - **T1** N=10 mixed (5 `apply_discount` + 5 `modify_order` 显式 raw FOR UPDATE UPDATE total/final) — invariant `final + discount == total` falsifiable signal (round-1 P1-1 重设计后): FOR UPDATE 失效 → apply 用 stale total 算 final → invariant 在终态破坏 [P0 资金路径 — `apply_discount` 比 cashier_engine 简化版更危险, 无 margin 校验]
+  - **T2** N=10 `settle_order` 同 order → 1 success + 9 `ValueError "Order already settled"` (Saga S3 链路依赖 — `payment_saga._complete_order` L502 同事务 FOR UPDATE 重入安全) [P0 支付路径]
+  - **T3** N=10 `receive_order` 同 platform_order_id → `IntegrityError` catch 真行为: 1 worker 真创建 + 9 `duplicate=True` (走 L161 existing 或 L256-277 race-recovered) + `delivery_orders` count==1 + distinct order_ids==1 [P1 INSERT race]
+  - **T4** N=10 `confirm_order` → 1 success (status=preparing) + 9 ValueError 业务守卫 (state machine FOR UPDATE 串行化) [P2 state machine]
+
+### §19 reviewer 多轮 fix verify (3 commits)
+
+`code-reviewer` agent (opus, B 选项真 BUG only):
+
+- **Initial push `500dfb92`** (5/14 22:05 UTC) — 4 用例首发
+- **Round-1 verdict REQUEST-CHANGES** (1 P1 + 3 P2/P3) → in-PR fix `ee08a9a1` (5/15 06:13 UTC):
+  - **P1-1 fix** T1 redesign with competing total writer (真 falsifiable signal) — 原 T1 同行原子 UPDATE → 即便去掉 FOR UPDATE invariant 仍成立 = **假绿**; 新 T1 mixed 5 apply + 5 modify_order 显式 raw FOR UPDATE UPDATE total/final → 失效则 apply 用 stale total 破坏 invariant. **Falsifiability 实测**: 临时改 source 为 `lock=False`, 5 次重复跑 → 3 fail / 2 pass (60% 本地, CI 5+ 累计 ≈ 99%, 生产 200 桌多 pod 必失败)
+  - **P2-1 fix** T3 remove `workers_lock` — `uuid4` 现场生成 `worker_id` 替代 idx counter, 最大化 IntegrityError catch path 触发概率
+  - **P2-2 fix** `_silence_log` dead fixture (yield-only YAGNI) 删除
+  - **P2-3 fix** `_silence_notify_platform` defensive monkeypatch — 当前 source L706-716 是 `logger.info` stub 无网络风险, 加 no-op coroutine 防未来真 HTTP client 引入
+- **CI fail in T3+T4** (sync DSN module-top BUG, **新 lesson**)
+- **Round-2 verdict APPROVE 0 P0 / 0 P1** + 1 P2 cosmetic → fix `9160517d` (5/15 06:21 UTC):
+  - **P0 fix** CI sync `DATABASE_URL` 致 `delivery_adapter` import fail — workflow 设 `DATABASE_URL=postgresql://...` (sync) 触发 `database.py` L14 module-level `create_async_engine(DATABASE_URL,...)` → `InvalidRequestError: asyncio extension requires async driver`. 业务源不可改 (cold-start scope), 测试模块顶端 (any business import 之前) `os.environ['DATABASE_URL']` rewrite `postgresql://` → `postgresql+asyncpg://`. 模块加载顺序保证 first import wins. **新 lesson `feedback_ci_sync_dsn_module_top_rewrite.md` 落盘** (cold-start prompt 已 ref)
+  - **P2 cosmetic** drop vacuous `distinct_worker_ids` assertion — uuid4 撞概率 ≈ 10^-37 恒真无 signal; 改为 distinct count 注释 + 保留真信号断言 (`len(dict_results)==10` + `duplicate_count==9` + `distinct_order_ids==1`)
+
+**质量水位**: 0/0 round-2 APPROVE + in-PR P2 cosmetic — 与 PR #553 PR-C / PR #642 PR-3 同金标准 (PR-1 #634 / PR-2 #638 / PR-4 #644 均为多轮 fix verify 收尾)
+
+### TDD Red→Green 证据
+
+```
+[Reproduce] Falsifiability locally (临时改 source lock=False):
+  T1 mixed 5 apply + 5 modify_order race → 5 次重复 → 3 fail / 2 pass (60%)
+  invariant `final + discount == total` 在终态破坏
+
+[Round-1 Red]   T1 redesign 通过 ee08a9a1, 但 CI sync DSN bug 致 T3+T4 fail
+[Round-2 Refactor] 9160517d 测试模块顶端 rewrite DSN bypass + drop vacuous assertion
+[Green]         本地真 PG 4/4 PASS in 1.16s (新) + 全 concurrent suite 14 passed + 4 skipped
+                in 3.45s (0 回归); CI "Tier 1 Row-Lock — 真 PG N 路并发反测" ✅
+```
+
+### CI 真门禁 vs 预存漂移
+
+- **Tier 1 真门禁全绿** (✅): "Tier 1 Row-Lock — 真 PG N 路并发反测" (drift-tolerant CI 第 6 次实战) / "Tier 1 门禁判定" / "源改动必须配对测试改动" / "发现 Tier 1 测试文件" / 14 Run Tier 1 services/* / frontend-build / edge-mac-station
+- **预存漂移 (与本 PR 无关)**: 8 `python-lint-test (gateway/tx-trade/...)` + `Test Changed Services` FAILURE — `project_tunxiang_ci_gates.md` 已登记
+
+### 6-PR concurrent_runner roadmap 5/6 收官状态
+
+| PR | 内容 | 水位 |
+|---|---|---|
+| PR-1 #634 | concurrent_runner + workflow + conftest 基建 | round-1 P0+P1 in-PR fix |
+| PR-2 #638 | cashier_engine 框架金标准 (§4.1.1 / §8.3) | round-1 2 P1 PR 内 fix + 2 P2 → #639 |
+| PR-3 #642 | payment_saga SKIP LOCKED (§4.1.3) | **0/0 一发即过** (金标准) |
+| PR-4 #644 | inventory + auto_deduction ABBA (§4.3) | round-1 1 P0+1 P1 → round-2 APPROVE 0/0 |
+| **PR-5 #650** | **order_service + delivery_adapter (§4.1.4 + §4.1.5)** | **round-1 1 P1+3 P2 → round-2 APPROVE 0/0 + in-PR P2 cosmetic** |
+| PR-6 (可选) | pg_dump cache 加速 (~5min → ~30s, §6.2 第 2 期) | 未启动 |
+
+### 数据变化
+
+- 迁移版本: 无 (test infra + workflow + docs only)
+- 新增 API 模块: 0
+- 新增测试: 2 file / 4 用例 (T1-T2 + T3-T4)
+- 修改源: 0 (业务源不动 per cold-start scope; conftest `_CONCURRENT_TABLES` 加 `delivery_orders` / workflow HARD verify 9→10 表 / howto +58)
+
+### 遗留问题
+
+- **PR-6 pg_dump cache 加速** (可选, audit §6.2 第 2 期) — concurrent workflow ~5min → ~30s, `key=hashFiles('shared/db-migrations/versions/**')`
+- **§17 桌台并发语义对齐 进度** — PR #652 §17-A (1A/2A 5/15 05:57 UTC) ✅ + 并发 session ship **PR #653 §17-B `a80cff3c`** (3B 幂等释放 + 终态保护, 5/15 06:38 UTC, **Tier 1 explicit-ask 第 27 例 reconciled**, `_release_table(store_id, table_no, order_id)` 加 order_id 守门 + cashier `cancel_order` 用 `_get_order(lock=True)` 终态保护 + order_service 同步, 13 mock + 3 真 PG settle race / 详细 entry 留并发 session sediment) ✅; 剩 §17-C OrderItem lock (4 路径, 不依赖创始人决策可并行) + §17-D #549/#557/#559 follow-up bundle
+- **T1 deterministic 100% falsifiability** — 当前 60% 本地 / ~99% CI 5x / 200 桌生产必失败; 100% 需 monkeypatch `_get_order` 注入 sleep 实测会触发 PG row lock 死锁, 不在本 PR scope. follow-up issue 候选
+- pre-existing CI 漂移 12+ 项 与本 PR 无关
+
+### 明日计划
+
+或 PR-6 pg_dump cache 加速 / §17-B/C/D follow-up (前提创始人选择题 2+3 答复) / Mac mini M4 真机部署 / 等创始人 P0 输入 (B dev-plan-60d / C DailySummary §18 / channel-aggregation 资质)
+
+---
+
 ## 2026-05-15 上午 — §17-A 桌台对齐 1A + 2A ship (D2 锁定首发 / Tier 1 fund/源 explicit-ask 第 22 例)
 
 ### 今日完成
