@@ -236,8 +236,9 @@ async def test_settle_order_concurrent_n10_only_one_succeeds(session_factory):
 
     async with session_factory() as s:
         store_id = await _seed_store(s, tenant_id)
+        # state_machine: pending → completed 非法 (须经 confirmed); seed 用 confirmed
         order_id = await _seed_order(
-            s, tenant_id, store_id, table_no="A01", status="pending", final_amount_fen=final_fen
+            s, tenant_id, store_id, table_no="A01", status="confirmed", final_amount_fen=final_fen
         )
         await _seed_table(
             s, tenant_id, store_id, table_no="A01",
@@ -429,9 +430,11 @@ async def test_settle_cancel_race_terminal_protection(session_factory):
 
     async with session_factory() as s:
         store_id = await _seed_store(s, tenant_id)
+        # state_machine: pending → completed 非法; cancel 路径 pending → cancelled OK
+        # 用 confirmed 让 settle 合法 + cancel 也合法 (confirmed → cancelled)
         order_id = await _seed_order(
             s, tenant_id, store_id, table_no="A01",
-            status="pending", final_amount_fen=final_fen,
+            status="confirmed", final_amount_fen=final_fen,
         )
         await _seed_table(
             s, tenant_id, store_id, table_no="A01",
