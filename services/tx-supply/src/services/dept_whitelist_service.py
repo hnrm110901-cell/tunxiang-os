@@ -271,6 +271,13 @@ async def create_whitelist(
         # §19 round-1 P0-2 fix: 软禁用 row 给出明确激活路径而非冷拒 409
         # UI 默认 only_active=true 隐藏禁用记录, 用户找不到那条行 → 直接新建 → 409
         # 死锁. 这里检测 (dept,ingredient) 是否已有 is_active=FALSE row, 给出 id 引导.
+        #
+        # §19 round-2 P0-3 fix: asyncpg IntegrityError 后底层连接 transaction
+        # 处于 ABORTED 状态 — 任何后续 execute() 触发 InFailedSqlTransactionError
+        # → 路由 500 (P0-2 修复失效). 修法: db.rollback() 清失败状态 + 重置 RLS
+        # set_config (transaction-local, rollback 后丢失).
+        await db.rollback()
+        await _set_tenant(db, tenant_id)
         existing_result = await db.execute(
             text(_GET_WHITELIST_BY_PAIR_SQL),
             {

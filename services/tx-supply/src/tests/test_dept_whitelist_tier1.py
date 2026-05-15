@@ -251,29 +251,46 @@ class TestCreateWhitelist:
 
     @pytest.mark.asyncio
     async def test_duplicate_when_soft_disabled_returns_useful_error_p0_2(self):
-        """§19 round-1 P0-2 守门: 当 (dept,ingredient) 已有 is_active=FALSE 的软禁用 row,
-        create 抛 IntegrityError 后查到 → ValueError("已存在但被禁用") + 给出 PATCH 引导.
-        UI default only_active=true 隐藏禁用记录, 用户找不到该 row → 直接新建 → 死锁;
-        修复后给明确 id 让 UI 引导用户去激活.
+        """§19 round-1 P0-2 + round-2 P0-3 守门: IntegrityError → rollback +
+        重置 RLS → SELECT 软禁用 row → ValueError("已存在但被禁用").
+
+        P0-3 (round-2): 真实 asyncpg IntegrityError 后底层连接 ABORTED, 必须先
+        db.rollback() 才能再 execute(). 此 regression test 明确 assert rollback +
+        _set_tenant (set_config) 被调用.
         """
         from sqlalchemy.exc import IntegrityError
 
         db = AsyncMock()
+        db.rollback = AsyncMock()
+        set_config_calls_after_rollback: list[bool] = []
+        rollback_called: dict[str, bool] = {"v": False}
 
         async def execute_side_effect(query, params=None):
             sql = str(query)
             result = MagicMock()
             if "set_config" in sql:
+                # P0-3 守门: rollback 后必须重新设 RLS — 记录调用是否在 rollback 之后
+                set_config_calls_after_rollback.append(rollback_called["v"])
                 return MagicMock()
             if "INSERT INTO department_ingredient_whitelists" in sql:
                 raise IntegrityError("duplicate whitelist", None, None)
             if "FROM department_ingredient_whitelists" in sql:
+                # P0-3 守门: SELECT 必须在 rollback 后才能执行 (asyncpg state machine)
+                assert rollback_called["v"], (
+                    "§19 round-2 P0-3: SELECT 必须在 db.rollback() 之后 — "
+                    "否则真实 asyncpg 触发 InFailedSqlTransactionError → 500"
+                )
                 # is_active=FALSE 软禁用 row
                 result.mappings.return_value.first.return_value = _wl_row(is_active=False)
                 return result
             return MagicMock()
 
+        async def rollback_side_effect():
+            rollback_called["v"] = True
+
         db.execute = AsyncMock(side_effect=execute_side_effect)
+        db.rollback = AsyncMock(side_effect=rollback_side_effect)
+
         with pytest.raises(ValueError) as exc_info:
             await create_whitelist(
                 db,
@@ -288,6 +305,13 @@ class TestCreateWhitelist:
         assert _WHITELIST_ID in msg
         assert "PATCH" in msg
         assert "is_active" in msg
+        # P0-3 守门 (round-2): rollback 必须被调用
+        db.rollback.assert_awaited_once()
+        # P0-3 守门: rollback 之后还要有一次 set_config (RLS 重置)
+        assert any(set_config_calls_after_rollback), (
+            "§19 round-2 P0-3: rollback 后必须重设 set_config (RLS context "
+            "在 transaction-local rollback 后丢失)"
+        )
 
 
 # ─── 2. get_whitelist ────────────────────────────────────────────────────────
@@ -478,26 +502,34 @@ class TestBulkAuthorize:
     async def test_mixed_create_and_update(self):
         """前两条 (dept, ingredient) 已存在 → UPDATE；后一条不存在 → INSERT。
 
-        Mock pattern: 用 helper 工厂构造每个 result, 避 MagicMock 链式 attribute
-        auto-generation 干扰 (P1-1 fix 后 SQL 多 CASE WHEN, mock first 设 None
-        必须用独立 result 对象).
+        Mock pattern: 用 plain class `_FakeResult` 替代 MagicMock 链 — first.return_value
+        在 Python 3.11 行为 with chain-of-attrs 不稳, real-class is deterministic.
         """
+
+        class _FakeResult:
+            def __init__(self, row):
+                self._row = row
+
+            def mappings(self):
+                return self
+
+            def first(self):
+                return self._row
+
+            def all(self):
+                return [self._row] if self._row else []
+
         update_call_count = {"n": 0}
         db = AsyncMock()
-
-        def _result_with_row(row: dict | None) -> MagicMock:
-            r = MagicMock()
-            r.mappings.return_value.first.return_value = row
-            return r
 
         async def execute_side_effect(query, params=None):
             sql = str(query)
             if "set_config" in sql:
-                return MagicMock()
+                return _FakeResult(None)
             if "UPDATE department_ingredient_whitelists" in sql and "is_deleted = FALSE" in sql:
                 update_call_count["n"] += 1
                 if update_call_count["n"] <= 2:
-                    return _result_with_row(
+                    return _FakeResult(
                         _wl_row(
                             ingredient_id=str(params.get("ingredient_id"))
                             if params
@@ -507,9 +539,9 @@ class TestBulkAuthorize:
                             else None,
                         )
                     )
-                return _result_with_row(None)
+                return _FakeResult(None)
             if "INSERT INTO department_ingredient_whitelists" in sql:
-                return _result_with_row(
+                return _FakeResult(
                     _wl_row(
                         ingredient_id=str(params.get("ingredient_id"))
                         if params
@@ -519,7 +551,7 @@ class TestBulkAuthorize:
                         else None,
                     )
                 )
-            return MagicMock()
+            return _FakeResult(None)
 
         db.execute = AsyncMock(side_effect=execute_side_effect)
 
