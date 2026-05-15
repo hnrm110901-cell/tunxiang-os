@@ -496,11 +496,15 @@ class CashierEngine:
 
         # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen 算 diff 错乱
         # (audit §4.1 P1). Order 已在 L495 lock=True, OrderItem 锁是显式 + 防御性.
+        # §17-D1: 显式 tenant_id 过滤 (cashier 类不调 _set_tenant, RLS app.tenant_id 未设
+        # 时跨租户 OrderItem 可命中; 通过 Order.tenant_id 已校验间接绑定, 此处显式过滤
+        # 是 defense-in-depth).
         result = await self.db.execute(
             select(OrderItem)
             .where(
                 OrderItem.id == item_uuid,
                 OrderItem.order_id == order_uuid,
+                OrderItem.tenant_id == self.tenant_id,
             )
             .with_for_update()
         )
@@ -560,11 +564,13 @@ class CashierEngine:
         # 再 SELECT OrderItem FOR UPDATE 防 stale subtotal.
         order = await self._get_order(order_uuid, lock=True)
 
+        # §17-D1: 显式 tenant_id 过滤 defense-in-depth (cashier 类不调 _set_tenant)
         result = await self.db.execute(
             select(OrderItem)
             .where(
                 OrderItem.id == item_uuid,
                 OrderItem.order_id == order_uuid,
+                OrderItem.tenant_id == self.tenant_id,
             )
             .with_for_update()
         )

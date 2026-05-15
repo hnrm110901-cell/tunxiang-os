@@ -264,12 +264,21 @@ class OrderService:
         await self.db.flush()
         return {"item_id": str(item.id), "subtotal_fen": subtotal_fen}
 
-    async def update_item_quantity(self, item_id: str, new_quantity: int) -> dict:
+    async def update_item_quantity(
+        self,
+        item_id: str,
+        new_quantity: int,
+        order_id: Optional[str] = None,
+    ) -> dict:
         """改菜数量
 
         §17-C: SELECT OrderItem FOR UPDATE 防 200 桌并发改同 item 用 stale
         subtotal_fen 算 diff 错乱 (audit §4.1 P1). Order UPDATE 用 raw
         arithmetic `Order.total_amount_fen + diff` 是 PG 原子, 不需 Order FOR UPDATE.
+
+        §17-D1 (P2-2): order_id 可选参数 — caller (路由层) 传入时校验
+        `item.order_id == order_id`, 防 caller 误传不属于该 order 的 item_id 仍能命中
+        + 改数量 + 更新 item.order_id 指向的 Order. 旧 caller 不传保兼容.
         """
         await self._set_tenant()
         # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen
@@ -282,6 +291,11 @@ class OrderService:
         item = result.scalar_one_or_none()
         if not item:
             raise ValueError(f"OrderItem not found: {item_id}")
+        # §17-D1: order_id 归属校验 (provided 时)
+        if order_id is not None and item.order_id != uuid.UUID(order_id):
+            raise ValueError(
+                f"OrderItem {item_id} 不属于 Order {order_id}"
+            )
         diff = item.unit_price_fen * new_quantity - item.subtotal_fen
         item.quantity = new_quantity
         item.subtotal_fen = item.unit_price_fen * new_quantity
@@ -297,12 +311,18 @@ class OrderService:
         await self.db.flush()
         return {"item_id": item_id, "new_quantity": new_quantity, "diff_fen": diff}
 
-    async def remove_item(self, item_id: str) -> dict:
+    async def remove_item(
+        self,
+        item_id: str,
+        order_id: Optional[str] = None,
+    ) -> dict:
         """删菜
 
         §17-C: SELECT OrderItem FOR UPDATE 防 200 桌并发删/改同 item 用 stale
         subtotal_fen 算 deducted 错乱 (audit §4.1 P1). Order UPDATE 用 raw
         arithmetic `Order.total_amount_fen - item.subtotal_fen` 是 PG 原子.
+
+        §17-D1 (P2-2): order_id 可选参数 — caller 传入时校验 item.order_id 归属.
         """
         await self._set_tenant()
         # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen
@@ -315,6 +335,11 @@ class OrderService:
         item = result.scalar_one_or_none()
         if not item:
             raise ValueError(f"OrderItem not found: {item_id}")
+        # §17-D1: order_id 归属校验 (provided 时)
+        if order_id is not None and item.order_id != uuid.UUID(order_id):
+            raise ValueError(
+                f"OrderItem {item_id} 不属于 Order {order_id}"
+            )
         await self.db.execute(
             update(Order)
             .where(Order.id == item.order_id)

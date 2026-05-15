@@ -193,14 +193,18 @@ async def update_item(
     order_id: str, item_id: str, req: UpdateItemQtyReq, request: Request, db: AsyncSession = Depends(get_db)
 ):
     svc = OrderService(db, _get_tenant_id(request))
-    result = await svc.update_item_quantity(item_id=item_id, new_quantity=req.new_quantity)
+    # §17-D1: 传 order_id 让 service 校验 item.order_id 归属 (防 caller 误传)
+    result = await svc.update_item_quantity(
+        item_id=item_id, new_quantity=req.new_quantity, order_id=order_id
+    )
     return {"ok": True, "data": result, "error": None}
 
 
 @router.delete("/orders/{order_id}/items/{item_id}")
 async def remove_item(order_id: str, item_id: str, request: Request, db: AsyncSession = Depends(get_db)):
     svc = OrderService(db, _get_tenant_id(request))
-    result = await svc.remove_item(item_id=item_id)
+    # §17-D1: 传 order_id 让 service 校验 item.order_id 归属
+    result = await svc.remove_item(item_id=item_id, order_id=order_id)
     return {"ok": True, "data": result, "error": None}
 
 
