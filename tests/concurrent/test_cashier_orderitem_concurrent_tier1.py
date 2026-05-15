@@ -7,11 +7,15 @@ PR-Tier1 §17-C of 2026-05-13 audit doc §4.1 P1 — OrderItem 漏锁 4 路径�
 验证 audit doc §4.1 OrderItem 漏锁**真行为** (与 mock SQL grep 互补):
 
   - T1: N=10 concurrent update_item_quantity 同 item → 最终 item.subtotal_fen 与
-        Order.total_amount_fen 自洽 (FOR UPDATE 串行化 + raw arithmetic 累积安全)
-  - T2: N=5 concurrent update_item_quantity 不同 item 同 order → Order.total 累积正确
-        (cross-item Order arithmetic 不需 Order FOR UPDATE 也 PG 原子)
-  - T3: cashier_engine.update_item N=10 concurrent → Python recalc 路径 FOR UPDATE
-        串行化让 Order.total 累积正确 (Python-side new_total 不是 PG 原子, 必须 lock)
+        Order.total_amount_fen 自洽 (FOR UPDATE 串行化 + raw arithmetic 累积安全) —
+        **§17-C 价值证明** (无 OrderItem 锁会 fail: stale subtotal 算 diff 错乱)
+  - T2: cashier_engine.update_item N=10 同 item → 终态自洽 — **regression guard 非价值证明**:
+        cashier 端 Order 已在 PR #227 lock=True, Order 串行化 + READ COMMITTED 重读已独立
+        防 stale; T2 是 audit §7 verifier #1 防御性锁的回归门禁
+  - T3: order_service.update_item_quantity N=5 不同 item 同 order → Order.total 累积正确
+        (cross-item raw arithmetic Order row lock 自动串行化, 不需 Order FOR UPDATE)
+  - T4: cashier_engine.update_item ↔ remove_item 同 (order, item) N=10 并发 ABBA 反测 —
+        §19 round-1 P0-1 守门: 验证锁顺序 Order-first-then-OrderItem 双路径同序, 0 死锁
 
 业务场景 (audit doc §4.1 P1):
   - 服务员 PWA 加菜后改数量重试网络抖动 → 双改同 item
@@ -482,4 +486,138 @@ async def test_update_item_concurrent_distinct_items_same_order(session_factory)
     )
     assert items_total.sum == expected, (
         f"sum(items.subtotal) ({items_total.sum}) != expected {expected}"
+    )
+
+
+# ───────────────────────────────────────────────────────────────────
+# T4: cashier_engine update_item ↔ remove_item ABBA 反测 — §19 round-1 P0-1
+# ───────────────────────────────────────────────────────────────────
+async def test_cashier_update_remove_no_abba_deadlock(session_factory):
+    """T4 — cashier_engine.update_item 与 remove_item 同 (order, item) 并发, 锁顺序统一防 ABBA.
+
+    §19 round-1 P0-1 守门: update_item 内部 Order-first-then-OrderItem (Order @ L495 →
+    OrderItem @ L499); remove_item 修前 OrderItem-first-then-Order, 修后改为同序.
+    若顺序未对齐, 200 桌徐记海鲜峰值一桌多服务员同时改/退同一道菜会真实命中
+    PG `deadlock_timeout` (默认 1s) 抛 DeadlockDetected → Tier 1 P99 < 200ms 门槛失守.
+
+    setup: 1 store + 1 order (total=10000) + N items 各 (qty=2 / unit=500 / subtotal=1000)
+    runner: N/2 workers 跑 update_item (改某 item qty) + N/2 workers 跑 remove_item (删另一 item)
+            但同时也安排部分 worker 操作同一 item — 制造 cross-function 锁顺序竞争
+    断言:
+      - 无 PG OperationalError "deadlock detected"
+      - 所有 worker 成功 (修 quantity / remove 各自完成) 或抛业务 ValueError "菜品明细不存在"
+        (第二路 remove 因第一路已 DELETE 找不到 item, 是合理终态)
+      - Order.total 与 sum(remaining item subtotal) 自洽
+    """
+    from sqlalchemy.exc import OperationalError
+
+    from services.tx_trade.src.services.cashier_engine import CashierEngine
+
+    tenant_id = _new_uuid()
+    n = 10  # 5 update + 5 remove, 操作 5 items (每 item 2 worker — 1 update + 1 remove)
+
+    async with session_factory() as s:
+        store_id = await _seed_store(s, tenant_id)
+        order_id = await _seed_order(s, tenant_id, store_id, total_fen=n // 2 * 1000)
+        item_ids: list[uuid.UUID] = []
+        for i in range(n // 2):
+            iid = await _seed_orderitem(
+                s, tenant_id, order_id,
+                item_name=f"item_{i}",
+                quantity=2,
+                unit_price_fen=500,  # subtotal = 1000
+            )
+            item_ids.append(iid)
+        await s.commit()
+
+    async def _update_factory(item_id: uuid.UUID, new_qty: int):
+        async def _do(session: AsyncSession) -> dict:
+            eng = CashierEngine(db=session, tenant_id=str(tenant_id))
+            return await eng.update_item(
+                order_id=str(order_id),
+                item_id=str(item_id),
+                quantity=new_qty,
+            )
+        return _do
+
+    async def _remove_factory(item_id: uuid.UUID):
+        async def _do(session: AsyncSession) -> dict:
+            eng = CashierEngine(db=session, tenant_id=str(tenant_id))
+            return await eng.remove_item(
+                order_id=str(order_id),
+                item_id=str(item_id),
+                reason="ABBA 反测",
+            )
+        return _do
+
+    async def _run_one(op):
+        async with session_factory() as sess:
+            await sess.execute(
+                text("SELECT set_config('app.tenant_id', :tid, true)"),
+                {"tid": str(tenant_id)},
+            )
+            try:
+                result = await op(sess)
+                await sess.commit()
+                return result
+            except BaseException as e:
+                await sess.rollback()
+                return e
+
+    # 每个 item 配 1 update + 1 remove 同时跑 — 触发 cross-function 锁顺序竞争
+    ops = []
+    for iid in item_ids:
+        ops.append(await _update_factory(iid, 5))   # 改 qty 2→5
+        ops.append(await _remove_factory(iid))      # 删同 item
+
+    results = await asyncio.wait_for(
+        asyncio.gather(*[_run_one(op) for op in ops], return_exceptions=True),
+        timeout=30.0,
+    )
+
+    # 关键断言 1: 无 PG deadlock (锁顺序统一证明)
+    deadlock_errors = [
+        r for r in results
+        if isinstance(r, OperationalError) and "deadlock" in str(r).lower()
+    ]
+    assert len(deadlock_errors) == 0, (
+        f"ABBA 死锁触发! cashier_engine.update_item ↔ remove_item 锁顺序未统一: "
+        f"{[str(e)[:120] for e in deadlock_errors]}"
+    )
+
+    # 关键断言 2: 所有 worker 或成功或抛业务 ValueError (item not found 因为另一路已 delete)
+    succeeded = [r for r in results if not isinstance(r, BaseException)]
+    failed = [r for r in results if isinstance(r, BaseException)]
+    item_not_found_errors = [
+        e for e in failed
+        if isinstance(e, ValueError) and "菜品明细不存在" in str(e)
+    ]
+    assert len(failed) == len(item_not_found_errors), (
+        f"非预期错误: {[(type(e).__name__, str(e)[:80]) for e in failed if e not in item_not_found_errors]}"
+    )
+
+    # 终态: Order.total = sum(remaining 未 delete 的 items.subtotal)
+    # remove_item 真 DELETE, update_item 改 quantity → subtotal. 若 update 先 commit
+    # 后 remove 删了, 该 item 不在终态 sum. 若 remove 先 commit, update 抛 NotFound
+    # 不影响 item 也不影响 Order. 所以终态 Order.total 应该等于 remaining items 的
+    # subtotal 之和.
+    async with session_factory() as s:
+        await s.execute(
+            text("SELECT set_config('app.tenant_id', :tid, true)"), {"tid": str(tenant_id)}
+        )
+        order_row = (await s.execute(
+            text("SELECT total_amount_fen FROM orders WHERE id=CAST(:oid AS uuid)"),
+            {"oid": str(order_id)},
+        )).first()
+        items_sum = (await s.execute(
+            text(
+                "SELECT COALESCE(SUM(subtotal_fen), 0) AS sum FROM order_items "
+                "WHERE order_id=CAST(:oid AS uuid)"
+            ),
+            {"oid": str(order_id)},
+        )).first()
+
+    assert order_row.total_amount_fen == items_sum.sum, (
+        f"Order.total ({order_row.total_amount_fen}) != sum(remaining items.subtotal) "
+        f"({items_sum.sum}) — 锁顺序问题导致 race 累积错乱"
     )

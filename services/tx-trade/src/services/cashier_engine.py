@@ -549,11 +549,17 @@ class CashierEngine:
         §17-C: OrderItem FOR UPDATE 防 stale subtotal 算 deducted 错乱 +
         Order FOR UPDATE 防 Python-side `new_total = total - deducted` UPDATE
         literal value 的 SELECT-then-UPDATE race (audit §4.1 P1).
+
+        §19 round-1 P0-1: 锁顺序必须 Order-first-then-OrderItem (与 update_item
+        L495→L499 同序), 防 update_item↔remove_item 同 (order, item) ABBA 死锁.
         """
         item_uuid = uuid.UUID(item_id)
         order_uuid = uuid.UUID(order_id)
 
-        # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal
+        # §17-C: 先 _get_order(lock=True) Order 锁 (与 update_item 同序防 ABBA),
+        # 再 SELECT OrderItem FOR UPDATE 防 stale subtotal.
+        order = await self._get_order(order_uuid, lock=True)
+
         result = await self.db.execute(
             select(OrderItem)
             .where(
@@ -572,8 +578,6 @@ class CashierEngine:
         item.return_flag = True
         item.return_reason = reason
 
-        # §17-C: _get_order(lock=True) 防 Python-side recalc race
-        order = await self._get_order(order_uuid, lock=True)
         new_total = order.total_amount_fen - deducted
         new_final = new_total - order.discount_amount_fen
 
