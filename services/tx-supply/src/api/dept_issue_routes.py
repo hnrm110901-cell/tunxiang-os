@@ -1,16 +1,23 @@
 """部门领用 API 路由 -- 7 个端点
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
+
+PRD-08（2026-05-15）：create_issue_order 路由注入 AsyncSession + 透传 enforce_whitelist=True，
+触 dept_whitelist_service 校验；违反 IngredientNotAllowedError → 403 Forbidden。
 """
 
 from __future__ import annotations
 
 from typing import List
 
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
+
+from ..models.dept_whitelist_models import IngredientNotAllowedError
 
 router = APIRouter(prefix="/api/v1/supply", tags=["dept-issue"])
 
@@ -81,8 +88,14 @@ class SalesToInventoryRequest(BaseModel):
 async def create_issue_order(
     body: CreateIssueRequest,
     x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
 ):
-    """创建部门领用单"""
+    """创建部门领用单
+
+    PRD-08：领料前校验 dept_whitelist_service.validate_ingredient_allowed —
+    违反 raise IngredientNotAllowedError → 403 Forbidden（合规/权限层面）。
+    其他 ValueError → 400（参数错误层面）。
+    """
     from ..services.dept_issue import create_issue_order as svc
 
     try:
@@ -92,9 +105,13 @@ async def create_issue_order(
             [i.model_dump() for i in body.items],
             body.operator_id,
             x_tenant_id,
-            db=None,
+            db=db,
+            enforce_whitelist=True,
         )
         return {"ok": True, "data": result}
+    except IngredientNotAllowedError as e:
+        # PRD-08 食安/合规硬阻塞 — 403 Forbidden 让前端区分"无权限"vs"参数错误"
+        raise safe_http_exception(403, "部门未授权用料 — 违反白名单", e) from e
     except ValueError as e:
         raise safe_http_exception(400, "请求参数无效", e) from e
 

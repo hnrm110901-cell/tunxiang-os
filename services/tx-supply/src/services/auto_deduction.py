@@ -7,12 +7,18 @@
 4. 库存不足时记录告警但不阻塞（允许负库存）
 
 金额单位：分(fen)
+
+PRD-08（2026-05-15）：deduct_for_dish / deduct_for_order 增加 dept_id 可选参数 —
+当 dept_id 提供时，扣料前 BOM 每行 ingredient 经 dept_whitelist_service 校验；
+违反 raise IngredientNotAllowedError，savepoint 回滚整单。
+caller (tx-trade) 当前未传 dept_id（保 backward compat），激活为 follow-up。
 """
 
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from decimal import Decimal
+from typing import Any, Optional
 
 import structlog
 from sqlalchemy import select, text
@@ -87,6 +93,8 @@ async def deduct_for_dish(
     store_id: str,
     tenant_id: str,
     db: AsyncSession,
+    *,
+    dept_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """对单道菜执行 BOM 扣料
 
@@ -96,9 +104,16 @@ async def deduct_for_dish(
         store_id: 门店 UUID
         tenant_id: 租户 UUID
         db: 数据库会话（调用方管理事务）
+        dept_id: PRD-08 —当上层 caller 提供制作菜品的档口 ID 时，扣料前
+                 经 dept_whitelist_service 校验 BOM 每行 ingredient；违反
+                 raise IngredientNotAllowedError（毛利底线硬约束）。当前
+                 caller (tx-trade) 未传，None 默认跳过校验保 backward compat。
 
     Returns:
         {deducted: [...], missing_bom: bool, insufficient_stock: [...]}
+
+    Raises:
+        IngredientNotAllowedError: 当 dept_id 提供且该档口未授权某 BOM ingredient 时
     """
     tenant_uuid = uuid.UUID(tenant_id)
     dish_uuid = uuid.UUID(dish_id)
@@ -110,6 +125,34 @@ async def deduct_for_dish(
     if not bom_lines:
         log.warning("bom_not_found", dish_id=dish_id)
         return {"deducted": [], "missing_bom": True, "insufficient_stock": []}
+
+    # PRD-08 白名单硬阻塞 — dept_id 提供时, BOM 每行 ingredient 经白名单校验
+    # 违反 raise IngredientNotAllowedError, 调用方事务 rollback 整单
+    if dept_id is not None:
+        from .dept_whitelist_service import validate_ingredient_allowed
+
+        for line in bom_lines:
+            line_ing_id = line.get("ingredient_id")
+            if not line_ing_id:
+                continue
+            try:
+                uuid.UUID(line_ing_id)
+            except (ValueError, TypeError):
+                continue  # broken row 跳过 (与 L131 内部一致)
+            line_qty = line.get("quantity") or 0
+            line_total = (
+                Decimal(str(line_qty)) * Decimal(str(quantity))
+                if line_qty
+                else None
+            )
+            await validate_ingredient_allowed(
+                db,
+                tenant_id,
+                dept_id=str(dept_id),
+                ingredient_id=str(line_ing_id),
+                qty=line_total,
+                raise_on_violation=True,
+            )
 
     deducted: list[dict[str, Any]] = []
     insufficient_stock: list[dict[str, Any]] = []
@@ -220,6 +263,8 @@ async def deduct_for_order(
     store_id: str,
     tenant_id: str,
     db: AsyncSession,
+    *,
+    dept_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """订单完成时的批量扣料
 
@@ -232,12 +277,18 @@ async def deduct_for_order(
         store_id: 门店 UUID
         tenant_id: 租户 UUID
         db: 数据库会话
+        dept_id: PRD-08 — 透传给 deduct_for_dish 用于 BOM 行白名单校验；
+                 None 默认跳过校验（caller (tx-trade) 当前未传，激活为 follow-up）
 
     Returns:
         {
             order_id, deducted_items: [...],
             missing_bom: [...], insufficient_stock: [...]
         }
+
+    Raises:
+        IngredientNotAllowedError: 当 dept_id 提供且任一 dish 的 BOM 行未授权时；
+                                  begin_nested savepoint 回滚整单（无半状态）
     """
     log.info("deduct_for_order.start", order_id=order_id, item_count=len(order_items))
 
@@ -306,6 +357,7 @@ async def deduct_for_order(
                 store_id=store_id,
                 tenant_id=tenant_id,
                 db=db,
+                dept_id=dept_id,
             )
 
             if result["missing_bom"]:
