@@ -526,10 +526,10 @@ class TestBulkAuthorize:
             sql = str(query)
             if "set_config" in sql:
                 return _FakeResult(None)
-            # UPSERT marker: P1-1 fix 引入的 CASE WHEN :preserve_max_qty 是 UPSERT 独有
-            # 不能用 "is_deleted = FALSE" 因为 SQL 多空格对齐 ("is_deleted      = FALSE")
-            # 单空格 substring 不匹配
-            if "CASE WHEN :preserve_max_qty" in sql:
+            # UPSERT marker: 用 P1-1 fix 引入的 preserve_max_qty 参数名 (UPSERT 独有,
+            # 与 P1-1 regression tests 同款 marker). 不能用 "is_deleted = FALSE" 因为
+            # SQL 多空格对齐 ("is_deleted      = FALSE") 单空格 substring 不匹配.
+            if "preserve_max_qty" in sql:
                 update_call_count["n"] += 1
                 if update_call_count["n"] <= 2:
                     return _FakeResult(
