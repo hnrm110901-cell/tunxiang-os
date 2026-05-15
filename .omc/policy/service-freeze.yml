@@ -1,0 +1,78 @@
+# 屯象OS 服务冻结令 (Service Freeze Policy)
+# 战略源 SoT: 屯象OS 架构与代码升级优化战略开发计划 2026-05-12 §1 第一性原理 #1
+#   "复杂度守恒 — 新服务 = 新故障源；新抽象 = 新维护成本"
+# 战略 §6 治理四件套自动化 hook 之一: ".omc/policy/service-freeze.yml — 拦截新服务文件"
+#
+# 生效期: 2026-05-12 → 2026-08-04 (12 周战略路线图)
+# 生效机制: scripts/check-service-freeze.py (手动调用 / 集成 git pre-commit / CI)
+#
+# 目标: 阻止新建 services/tx-* 服务, 强制服务收敛 24→17 终态.
+
+version: 1
+effective_from: 2026-05-12
+review_date: 2026-08-04   # 战略 W12 验收节点
+
+policy:
+  # 现有 19 个 services + gateway = 20 (5/15 实测), 战略目标 W12 收敛到 17
+  # 任何新加 services/tx-* 必须走架构守门会 (每两周一次) 例外申请
+  forbid_new_service_dir: true
+
+  # 已存在服务白名单 (policy 仅拦截白名单外的新加)
+  allowed_services:
+    # 核心 7 (战略 §6 服务收敛 W12 终态不可再砍)
+    - gateway
+    - tx-trade
+    - tx-pay
+    - tx-finance
+    - tx-agent
+    - edge   # edge/ 目录 (mac-station/coreml-bridge/sync-engine), 非 services/
+
+    # 扩展 10 (W12 仍存在, 含 7 个待收敛)
+    - tx-menu
+    - tx-member
+    - tx-supply
+    - tx-ops
+    - tx-org
+    - tx-growth
+    - tx-analytics
+    - tx-expense
+    - mcp-server
+
+    # 待收敛 (W9-W11 计划合并/降级)
+    - tx-forge        # W9 Phase 2 → 合并 tx-devforge
+    - tx-devforge     # W9 Phase 2 → 合并入 tx-forge
+    - tx-predict      # W9 Phase 2 → 合并入 tx-brain
+    - tx-brain        # W9 Phase 2 → 接收 tx-predict
+    - tx-intel        # W10 Phase 3 → 合并入 tx-analytics
+    - tx-civic        # W11 Phase 4 → 改回路由模块 (不再独立服务)
+
+    # W10 计划新增 (战略 §4 举措 4 Phase C)
+    - tx-ontology     # W10 Phase C 抽出独立服务 (端口 W10 抽时另议, 8019 已被 tx-predict 占)
+
+  # 触发拦截的路径模式 (任一新文件路径匹配即阻止)
+  forbidden_patterns:
+    - "services/tx-*/main.py"
+    - "services/tx-*/src/main.py"
+    - "services/tx-*/Dockerfile"
+    - "services/tx-*/pyproject.toml"
+    - "services/tx-*/requirements.txt"
+
+  # 例外申请流程 (战略 §6 治理四件套之一: 每两周一次架构守门会)
+  exception_process:
+    forum: 架构守门会 (Architecture Gatekeeping Meeting)
+    frequency: 每两周一次, 周五 30 min
+    record_path: docs/governance/decisions/
+    required_approvers:
+      - 创始人 (战略 §9 决策点 #2 服务数变更必须创始人确认)
+      - Tech Lead
+
+# 5/15 实测 services/ 目录 (20 个, 与 allowed_services 对齐前置校验):
+# gateway / mcp-server / tx-agent / tx-analytics / tx-brain / tx-civic /
+# tx-devforge / tx-expense / tx-finance / tx-forge / tx-growth / tx-intel /
+# tx-member / tx-menu / tx-ops / tx-org / tx-pay / tx-predict / tx-supply /
+# tx-trade
+
+# 备注:
+# - 删除现有服务也需走架构守门会 (W2 Phase 1 已删 tx-indonesia/malaysia/vietnam)
+# - 重命名服务 = 删 + 加, 同样走例外申请
+# - tx-ontology 是 W10 计划新增, 一旦 W10 抽服务 PR 通过, 加入 allowed_services
