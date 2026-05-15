@@ -354,6 +354,34 @@ class TestGetListUpdateDelete:
             )
 
     @pytest.mark.asyncio
+    async def test_update_rejects_null_default_method_p1_1_regression(self):
+        """§19 round-1 P1-1 守门: default_method=None (schema NOT NULL) 必须 422
+        而非 500. asyncpg IntegrityError 抛出会被 FastAPI 转 500, 失控指标 SLI."""
+        db, _ = _mk_db_update(get_row=_rule_row())
+        with pytest.raises(ValueError, match="default_method"):
+            await update_rule(
+                db, _TENANT_XUJI, _RULE_ID, updates={"default_method": None}
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_rejects_null_allow_share_p1_1_regression(self):
+        """§19 round-1 P1-1 守门 同模式: allow_share=None (schema NOT NULL)."""
+        db, _ = _mk_db_update(get_row=_rule_row())
+        with pytest.raises(ValueError, match="allow_share"):
+            await update_rule(
+                db, _TENANT_XUJI, _RULE_ID, updates={"allow_share": None}
+            )
+
+    @pytest.mark.asyncio
+    async def test_update_rejects_null_is_active_p1_1_regression(self):
+        """§19 round-1 P1-1 守门 同模式: is_active=None (schema NOT NULL)."""
+        db, _ = _mk_db_update(get_row=_rule_row())
+        with pytest.raises(ValueError, match="is_active"):
+            await update_rule(
+                db, _TENANT_XUJI, _RULE_ID, updates={"is_active": None}
+            )
+
+    @pytest.mark.asyncio
     async def test_delete_rule_success(self):
         db = AsyncMock()
         db.execute = AsyncMock(return_value=_FakeResult(_rule_row()))

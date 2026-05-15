@@ -286,12 +286,24 @@ async def deduct_for_dish(
     # BOM 物理扣料**不变** (loop 已完成), 只是 cost attribution 切分到多 share
     if share_split is not None:
         try:
+            from pydantic import ValidationError as _PydanticValidationError
+
             from .share_split_service import apply_split
             from ..models.share_split_models import ShareSplitSpec
             from shared.events.src.emitter import emit_event
             from shared.events.src.event_types import InventoryEventType
 
-            spec = ShareSplitSpec(**share_split)
+            # §19 round-1 P1-2 fix: pydantic v2 ValidationError 不是 ValueError 子类,
+            # 须显式转 ValueError 让 caller (sub-B cashier_engine) route 层 422
+            # 映射. 不放进 (ImportError, RuntimeError) fail-open 列表 — caller 显式
+            # 传了 split_spec 期望生效, 配置错应 fail-loud 拒绝整次下单 (徐记 200 桌
+            # 峰值场景每分钟数百次调用 — 4xx 而非 5xx 才能保下单成功率 SLI).
+            try:
+                spec = ShareSplitSpec(**share_split)
+            except _PydanticValidationError as ve:
+                raise ValueError(
+                    f"share_split 参数无效: {ve.errors()}"
+                ) from ve
             total_bom_cost_fen = sum(
                 d.get("total_cost_fen") or 0 for d in deducted
             )

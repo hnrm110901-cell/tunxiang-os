@@ -167,6 +167,57 @@ class TestDeductForDishShareSplit:
                     )
 
     @pytest.mark.asyncio
+    async def test_invalid_share_split_dict_raises_value_error_p1_2_regression(self):
+        """§19 round-1 P1-2 守门: caller 传无效 share_split dict (e.g. count<2,
+        缺 method, 缺 weights) → pydantic.ValidationError 转 ValueError 让 caller
+        route 层 422 映射, 而非 500 (徐记 200 桌峰值 SLI 保护).
+        """
+        from services.tx_supply.src.services import auto_deduction as ad
+
+        bom_lines = [
+            {"ingredient_id": "99999999-0001-0001-0001-999999999999", "quantity": 0.5, "unit": "kg"}
+        ]
+        with patch.object(ad, "_get_bom_for_dish", AsyncMock(return_value=bom_lines)):
+            db = AsyncMock()
+            db_result = MagicMock()
+            db_result.scalar_one_or_none.return_value = None
+            db.execute = AsyncMock(return_value=db_result)
+            db.flush = AsyncMock()
+
+            # case 1: count < 2 (Pydantic Field ge=2 拒)
+            with pytest.raises(ValueError, match="share_split 参数无效"):
+                await ad.deduct_for_dish(
+                    dish_id=_DISH_SUANCAIYU,
+                    quantity=1,
+                    store_id=_STORE,
+                    tenant_id=_TENANT_XUJI,
+                    db=db,
+                    share_split={"method": "even", "count": 1},
+                )
+
+            # case 2: 缺 method
+            with pytest.raises(ValueError, match="share_split 参数无效"):
+                await ad.deduct_for_dish(
+                    dish_id=_DISH_SUANCAIYU,
+                    quantity=1,
+                    store_id=_STORE,
+                    tenant_id=_TENANT_XUJI,
+                    db=db,
+                    share_split={"count": 2},
+                )
+
+            # case 3: method=weighted 但缺 weights (model_validator 拦)
+            with pytest.raises(ValueError, match="share_split 参数无效"):
+                await ad.deduct_for_dish(
+                    dish_id=_DISH_SUANCAIYU,
+                    quantity=1,
+                    store_id=_STORE,
+                    tenant_id=_TENANT_XUJI,
+                    db=db,
+                    share_split={"method": "weighted", "count": 2},
+                )
+
+    @pytest.mark.asyncio
     async def test_share_split_event_emit_failure_fail_open(self):
         """emit_event 抛 RuntimeError → fail-open warning, BOM 扣料结果仍正常返回."""
         from services.tx_supply.src.services import auto_deduction as ad

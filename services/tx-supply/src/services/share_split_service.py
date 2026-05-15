@@ -337,13 +337,23 @@ async def update_rule(
     if not set_keys:
         raise ValueError("至少提供一个更新字段")
 
-    # 校验 default_method
+    # §19 round-1 P1-1 fix: default_method=None 必须拦截 (schema NOT NULL, 否则
+    # asyncpg IntegrityError → 路由 500 而非 422)
     if "default_method" in updates:
         m = updates["default_method"]
-        if m is not None and m not in ("even", "weighted", "manual"):
+        if m is None:
+            raise ValueError(
+                "default_method 不能为 NULL — 允许值: even/weighted/manual"
+            )
+        if m not in ("even", "weighted", "manual"):
             raise ValueError(
                 f"default_method 必须是 even/weighted/manual, 实际 {m}"
             )
+    # §19 round-1 P1-1 fix 同模式: allow_share=None (schema NOT NULL) → ValueError
+    if "allow_share" in updates and updates["allow_share"] is None:
+        raise ValueError("allow_share 不能为 NULL — 允许值: true/false")
+    if "is_active" in updates and updates["is_active"] is None:
+        raise ValueError("is_active 不能为 NULL — 允许值: true/false")
     # 校验 max_share_count
     if "max_share_count" in updates:
         msc = updates["max_share_count"]
