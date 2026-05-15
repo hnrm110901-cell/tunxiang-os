@@ -1,0 +1,91 @@
+# 屯象OS 服务冻结令 — 12 周升级战略 W1-T4
+# ================================================================
+# 单一权威源 (SoT)：本文件是服务冻结的唯一定义
+# 拦截脚本：scripts/check_service_freeze.sh
+# pre-commit 集成：.pre-commit-config.yaml local hook `service-freeze`
+# baseline：docs/service-health/2026-W20.md
+# ================================================================
+
+policy:
+  name: service-freeze
+  effective_from: "2026-05-12"
+  effective_until: "2026-06-11"   # 30 天，到期自动失效
+  reason: |
+    12 周升级战略 W1-T4：当前 23 个微服务 + 11 个红色健康度。
+    AI 协同开发速度超过治理能力，禁止新建服务直到 W4 架构守门会评审。
+    详见 docs/service-health/2026-W20.md + 战略路线图。
+
+  # 冻结规则：禁止新建 services/tx-*/src/main.py
+  # 修改既有服务不受影响（diff-filter=A 只针对新增）
+  rules:
+    - id: no-new-service-main
+      pattern: "^services/tx-[^/]+/src/main\\.py$"
+      filter: added
+      severity: blocking
+
+# 现有服务清单（W1-T5 baseline，23 个）— 修改不受冻结影响
+existing_services:
+  - gateway
+  - tx-trade
+  - tx-menu
+  - tx-member
+  - tx-growth
+  - tx-ops
+  - tx-supply
+  - tx-finance
+  - tx-agent
+  - tx-analytics
+  - tx-brain
+  - tx-intel
+  - tx-org
+  - tx-civic       # W11 计划回路由模块
+  - tx-forge
+  - tx-expense
+  - tx-pay
+  - tx-devforge
+  - tx-predict
+  - tx-indonesia   # W2 计划删除
+  - tx-malaysia    # W2 计划删除
+  - tx-vietnam     # W2 计划删除
+  - mcp-server
+
+# W2 计划删除清单（W1-T4 同步建立）
+planned_deletions:
+  - service: tx-indonesia
+    reason: 国际化过早抽象，无业务
+    target_week: W2
+  - service: tx-malaysia
+    reason: 国际化过早抽象，无业务
+    target_week: W2
+  - service: tx-vietnam
+    reason: 国际化过早抽象，无业务
+    target_week: W2
+
+# W9-W11 计划合并/回路由清单
+planned_consolidations:
+  - target_week: W9
+    merge:
+      - [tx-forge, tx-devforge]
+      - [tx-predict, tx-brain]
+  - target_week: W10
+    merge:
+      - [tx-intel, tx-analytics]
+  - target_week: W11
+    demote:
+      - service: tx-civic
+        to: 路由模块
+
+# 例外机制
+exceptions:
+  # 一次性绕过（必须有充分理由）
+  env_bypass: TX_ALLOW_NEW_SERVICE
+  bypass_log: .omc/state/freeze-bypass-log.txt
+  bypass_review: 每两周架构守门会逐条评审
+
+  # 长期例外（白名单，本次留空）
+  whitelist: []
+
+# 12 周战略目标
+targets:
+  W12_service_count: 17
+  baseline_W20_service_count: 23
