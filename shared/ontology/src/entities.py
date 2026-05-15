@@ -445,6 +445,15 @@ class OrderItem(TenantBase):
     barcode_scanned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), comment="条码扫描确认时间")
     scanned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), comment="扫码确认人ID")
 
+    # 多人合点 (PRD-11 sub-B / v436 / Tier 1 第 29 例)
+    # 语义: 该 OrderItem 被 N 人共享分摊 (1=单人独享, N>1=N 人合点)
+    # settle_order 时 share_count>1 自动构造 share_split={method:'EVEN', count:N}
+    # emit OrderEventType.ITEMS_SETTLED, tx-supply projector (sub-B.2/sub-C 范围) 异步消费
+    share_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1, server_default="1",
+        comment="多人合点拆分人数 (1=独享, N=N 人共享)"
+    )
+
     order: Mapped["Order"] = relationship("Order", back_populates="items")
 
 

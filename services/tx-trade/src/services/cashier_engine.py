@@ -14,6 +14,7 @@ from typing import Optional
 import httpx
 import structlog
 from sqlalchemy import Date, and_, cast, func, select, text, update
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events.src.emitter import emit_event
@@ -367,8 +368,19 @@ class CashierEngine:
         customizations: Optional[dict] = None,
         pricing_mode: str = "fixed",
         weight_value: Optional[float] = None,
+        *,
+        share_count: int = 1,
     ) -> dict:
-        """加菜 — 支持固定价/称重/时价三种定价模式"""
+        """加菜 — 支持固定价/称重/时价三种定价模式
+
+        PRD-11 sub-B (v436 / Tier 1 第 29 例):
+            share_count: 多人合点拆分人数 (kwonly, 默认 1 = 单人独享). N>1 表示该 OrderItem
+                被 N 人共享分摊, settle_order 时 share_count>1 自动构造 share_split={method:'EVEN',
+                count:N} 并 emit OrderEventType.ITEMS_SETTLED. 与 v436 CHECK (share_count >= 1)
+                对齐, <1 立即 ValueError 不让 INSERT 触发 IntegrityError 5xx.
+        """
+        if share_count < 1:
+            raise ValueError(f"share_count 必须 >= 1, 收到 {share_count}")
         order_uuid = uuid.UUID(order_id)
         dish_uuid = uuid.UUID(dish_id) if dish_id else None
 
@@ -428,6 +440,7 @@ class CashierEngine:
             customizations=customizations or {},
             pricing_mode=pricing_mode,
             weight_value=weight_value,
+            share_count=share_count,
         )
         self.db.add(item)
 
@@ -465,6 +478,9 @@ class CashierEngine:
                     "subtotal_fen": subtotal_fen,
                     "pricing_mode": pricing_mode,
                     "order_total_fen": new_total,
+                    # PRD-11 sub-B: 加菜阶段 share_count 进 event payload, 与 settle 时
+                    # OrderEventType.ITEMS_SETTLED 双源校验 (sub-B.2 projector 可对账)
+                    "share_count": share_count,
                 },
                 source_service="tx-trade",
             )
@@ -483,8 +499,18 @@ class CashierEngine:
         item_id: str,
         quantity: Optional[int] = None,
         notes: Optional[str] = None,
+        *,
+        share_count: Optional[int] = None,
     ) -> dict:
-        """改菜 — 修改数量或备注"""
+        """改菜 — 修改数量或备注
+
+        PRD-11 sub-B (v436 / Tier 1 第 29 例):
+            share_count: 修改多人合点拆分人数 (kwonly, None=不动). 创始人 D4 决策:
+                settle 前可改 / settle 后冻结. order.status==completed/cancelled 时
+                share_count 改动直接 ValueError ("订单已结算, 拆单人数冻结"). 与 §17-A/B
+                终态保护对齐 — 已 emit ITEMS_SETTLED 后 share_count 重写会让 projector
+                attribution 与 event payload 不一致.
+        """
         # 独立 review P1-2：函数头一次性锁定订单 (lock=True)，避免原本两次
         # _get_order（L482 / L497）的双锁顺序歧义；同事务内第二次锁是 no-op，
         # 但跨请求竞争同 item 时存在 200 桌高峰下的死锁风险。
@@ -493,6 +519,20 @@ class CashierEngine:
         order_uuid = uuid.UUID(order_id)
         item_uuid = uuid.UUID(item_id)
         order = await self._get_order(order_uuid, lock=True)
+
+        # PRD-11 sub-B 终态保护 — share_count 改动需 settle 前 (D4 决策)
+        # 仅当 caller 显式传 share_count 且 order 终态时 raise. 其他字段 (quantity/notes)
+        # 维持 pre-existing 行为 (settle 后改 notes 历史允许, §17 后续 PR 范围, 本 PR 不扩).
+        if share_count is not None:
+            if share_count < 1:
+                raise ValueError(f"share_count 必须 >= 1, 收到 {share_count}")
+            if order.status in (
+                OrderStatus.completed.value,
+                OrderStatus.cancelled.value,
+            ):
+                raise ValueError(
+                    f"订单状态 {order.status}, 拆单人数 share_count 冻结无法修改"
+                )
 
         # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen 算 diff 错乱
         # (audit §4.1 P1). Order 已在 L495 lock=True, OrderItem 锁是显式 + 防御性.
@@ -531,12 +571,16 @@ class CashierEngine:
         if notes is not None:
             item.notes = notes
 
+        if share_count is not None:
+            item.share_count = share_count
+
         await self.db.flush()
 
         return {
             "item_id": item_id,
             "new_quantity": item.quantity,
             "new_subtotal_fen": item.subtotal_fen,
+            "new_share_count": item.share_count,
             "diff_fen": diff,
             "order_total_fen": order.total_amount_fen,
             "order_final_fen": order.final_amount_fen,
@@ -931,6 +975,62 @@ class CashierEngine:
                 source_service="tx-trade",
             )
         )
+
+        # ─── PRD-11 sub-B 平行事件写入：结算后逐 OrderItem 携 share_count 旁路 ───
+        # 给 tx-supply projector (sub-B.2 / sub-C 范围) 异步消费, 决定是否构造
+        # share_split={method:'EVEN', count:N} 调 auto_deduction.deduct_for_order
+        # (share_count==1 时 projector 跳过 share_split, 走 backward compat).
+        # 失败 fail-open: settle 已完成, item 列表读失败不阻塞 settle return.
+        # 排除 return_flag=True 的退菜 item (BOM 不应扣).
+        items_payload: list[dict] = []
+        try:
+            items_result = await self.db.execute(
+                select(OrderItem)
+                .where(
+                    OrderItem.order_id == order_uuid,
+                    OrderItem.tenant_id == self.tenant_id,
+                    OrderItem.return_flag.is_(False),
+                )
+            )
+            for oi in items_result.scalars().all():
+                items_payload.append(
+                    {
+                        "order_item_id": str(oi.id),
+                        "dish_id": str(oi.dish_id) if oi.dish_id else None,
+                        "qty": oi.quantity,
+                        "share_count": oi.share_count,
+                        "subtotal_fen": oi.subtotal_fen,
+                    }
+                )
+        except (SQLAlchemyError, AttributeError) as exc:
+            # fail-open: settle 已完成 (transition_order completed + emit PAID),
+            # ITEMS_SETTLED 是事件总线旁路, 读失败 log warn 不阻塞 settle return.
+            # 与 inventory.split_attributed event emit 失败 fail-open 一致.
+            logger.warning(
+                "items_settled_query_failed",
+                order_id=order_id,
+                error=str(exc),
+                exc_info=True,
+            )
+
+        if items_payload:
+            asyncio.create_task(
+                emit_event(
+                    event_type=OrderEventType.ITEMS_SETTLED,
+                    tenant_id=self.tenant_id,
+                    stream_id=order_id,
+                    payload={
+                        "order_no": order.order_no,
+                        "store_id": str(order.store_id) if order.store_id else None,
+                        "items": items_payload,
+                    },
+                    store_id=str(order.store_id) if order.store_id else None,
+                    source_service="tx-trade",
+                    metadata={
+                        "settled_at": order.completed_at.isoformat() if order.completed_at else None,
+                    },
+                )
+            )
 
         # ─── 营销归因（火花旁路，不阻塞结算）───
         effective_customer_id = customer_id or (str(order.customer_id) if order.customer_id else None)

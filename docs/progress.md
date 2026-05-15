@@ -1,3 +1,40 @@
+## 2026-05-15 W11 第五发 (in-flight) · PRD-11 sub-B OrderItem.share_count Tier 1 第 29 例 (Phase 2 W11, 待 ship)
+
+### 完成状态
+
+- [x] **范围澄清完成** — settle 后异步 emit_event (选项 1 推荐) 锁定, 不新增跨服务 import
+- [x] **5 files 改动** (5 file / +~450 / -10 / 13 用例 tier1):
+  - `shared/db-migrations/versions/v436_order_item_share_count.py` (新, 80 行) — ALTER order_items ADD COLUMN share_count + CHECK >= 1
+  - `shared/ontology/src/entities.py:447` — OrderItem 加 share_count Mapped[int] NOT NULL server_default=1
+  - `shared/events/src/event_types.py:38` — OrderEventType.ITEMS_SETTLED 注册
+  - `services/tx-trade/src/services/cashier_engine.py` — add_item / update_item kwonly share_count + settle_order 末尾 emit ITEMS_SETTLED + SQLAlchemyError fail-open
+  - `services/tx-trade/tests/test_orderitem_share_count_tier1.py` (新, ~470 行 / 13 tier1 用例)
+- [x] **syntax check 4 files OK** + Python 3.9 自身 skip guard 与 sub-A 一致
+- [ ] **待: push + create PR + §19 reviewer round-N + explicit-ask admin-merge**
+
+### 关键决策
+
+- **D1 (Ontology 边界)**: 改 entities.py — 正统 Ontology 改动, 创始人 OK 触 §18 冻结令豁免. **Why**: SoT 单源避 ORM/DB 漂移, 后续 sub-C tx-analytics ORM 查询不缺字段
+- **D2 (NOT NULL DEFAULT 1)**: PG 14+ ALTER ADD COLUMN ... DEFAULT 是 O(1) catalog 操作不锁表, 历史 OrderItem 自动回填 1. **Why**: 简单一致, 与 quantity NOT NULL 同模式
+- **D3 (share_count>1 默认 EVEN)**: settle 时自动构造 share_split={method:'EVEN', count:N}, POS 收银员零额外操作. **Why**: 与 W11 sub-A 3-way enum 默认行为对齐
+- **D4 (settle 前可改 / settle 后冻结)**: update_item share_count + status==completed/cancelled → ValueError 拒绝. **Why**: 与 §17-A/B 终态保护一致, ITEMS_SETTLED emit 后改 share_count 让 projector attribution 与 event payload 不一致
+- **范围 (settle 后异步 emit_event vs settle 内同进程 import deduct)**: 选 settle 后 emit, 留 tx-supply projector 异步消费. **Why**: 与 Phase 1 事件总线架构一致, **不**新增跨服务 import (Tier 1 边界不裂); 200 桌并发 settle 不直接同步等 BOM SELECT FOR UPDATE; 工时 ~4 人日合理
+
+### 下一步
+
+- push → create PR — Tier 1 fund/源 explicit-ask 第 29 例
+- §19 reviewer round-N (业务/数据安全/Tier 1 邻接独立眼光)
+- CI 真门禁全绿: Tier 1 Gate + Tier 1 测试 (Python 3.11) + alembic chain integrity + RLS gate
+- explicit-ask 创始人 admin-merge
+
+### 已知风险
+
+- **跨服务 emit 但无 projector 消费**: 本 PR emit ITEMS_SETTLED 后无下游消费者. sub-B.2 follow-up PR 必须接 projector 才让 deduct 链路真正闭环. 若不接, **生产中 INVENTORY.split_attributed 不会被 emit**, sub-A 落地仍为零
+- **fail-open 查询失败掩盖**: SQLAlchemyError 路径只 log warn 不抛, 若长期 DB 异常会让 ITEMS_SETTLED 永久缺失. 需要 Prometheus counter `items_settled_query_failed_total` 监控 (本 PR 范围外, 见 feedback_graceful_degradation_pattern)
+- **D4 仅守门 share_count**: notes/quantity settle 后改动 pre-existing 行为不动. §17 后续 PR 范围扩到全字段冻结后, 此处 D4 守门需 align 到更强约束
+
+---
+
 ## 2026-05-15 早段 (postscript) · §17-C 补遗 sediment: PR #655 OrderItem FOR UPDATE 4 路径 ship + 前 sediment PR #654 漏抓校正 (Tier 1 fund/源 explicit-ask 第 28 例 reconciled — 最终 tally)
 
 ### 完成状态

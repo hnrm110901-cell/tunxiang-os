@@ -34,6 +34,7 @@ class OrderEventType(str, Enum):
     PARTIAL_REFUNDED = "order.partial_refunded"  # 部分退款
     CLOSED = "order.closed"  # 结账关闭
     BILLING_RULE_APPLIED = "order.billing_rule_applied"  # 账单规则（最低消费/服务费）应用
+    ITEMS_SETTLED = "order.items_settled"  # PRD-11 sub-B 结算后逐 OrderItem 携 share_count emit, 留 tx-supply projector 异步消费触发 deduct_for_order(share_split)
 
 
 class DiscountEventType(str, Enum):
