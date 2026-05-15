@@ -41,6 +41,13 @@ def _gen_order_no() -> str:
     return f"TX{now.strftime('%Y%m%d%H%M%S')}{uuid.uuid4().hex[:4].upper()}"
 
 
+# §17-A: 桌台并发抢占冲突 — typed exception 让上层 (路由 / 重试 / WebSocket 弹窗) 区分
+# "桌台已被开台" vs 通用业务校验失败. 继承 ValueError 保兼容现有 except ValueError caller.
+class TableOccupiedError(ValueError):
+    """桌台已被并发占用 (open_table FOR UPDATE / transfer_table 双锁后)
+    — 1A 强一致 + 2A 双锁排序触发, 上层应弹窗提示用户刷新桌台地图."""
+
+
 # ─── 桌台状态到模型枚举的映射 ───
 _STATE_MACHINE_TO_TABLE_STATUS = {
     "empty": TableStatus.free.value,
@@ -119,24 +126,33 @@ class CashierEngine:
         order_type: str = "dine_in",
         customer_id: Optional[str] = None,
     ) -> dict:
-        """开台 — 创建订单 + 锁定桌台 + 自动加茶位费"""
+        """开台 — 创建订单 + 锁定桌台 + 自动加茶位费
+
+        §17-A 1A 强一致: SELECT Table 加 FOR UPDATE 行锁串行化双开台 race —
+        第二路并发开台见到 status='occupied' 抛 TableOccupiedError.
+        典型场景: 双 POS / 前台+POS 同时开同一桌 (audit doc §11.2 选择题 1).
+        """
         store_uuid = uuid.UUID(store_id)
 
-        # 查桌台
+        # 查桌台 — §17-A 1A: FOR UPDATE 行锁防双开台 race (audit §11.2 选择题 1 锁定方案 1A)
         result = await self.db.execute(
-            select(Table).where(
+            select(Table)
+            .where(
                 Table.store_id == store_uuid,
                 Table.table_no == table_no,
                 Table.tenant_id == self.tenant_id,
                 Table.is_active == True,  # noqa: E712
             )
+            .with_for_update()
         )
         table = result.scalar_one_or_none()
         if not table:
             raise ValueError(f"桌台不存在: {table_no}")
 
         if table.status != TableStatus.free.value:
-            raise ValueError(f"桌台 {table_no} 当前状态 {table.status}，无法开台")
+            raise TableOccupiedError(
+                f"桌台 {table_no} 当前状态 {table.status}，无法开台 — 桌台已被并发占用，请刷新"
+            )
 
         # 创建订单
         order_no = _gen_order_no()
@@ -280,14 +296,21 @@ class CashierEngine:
         target_status: str,
         reason: Optional[str] = None,
     ) -> dict:
-        """变更桌台状态 — 通过 state_machine 校验合法性"""
+        """变更桌台状态 — 通过 state_machine 校验合法性
+
+        §17-A 1A 衍生: SELECT 加 FOR UPDATE 行锁让状态校验后到 UPDATE 之间无并发覆盖窗口.
+        与 open_table 同 1A 强一致 pattern (audit §11.2 选择题 1 锁定方案 1A 关联路径).
+        """
         store_uuid = uuid.UUID(store_id)
+        # §17-A 1A 衍生: FOR UPDATE 行锁防 state_machine 校验后并发覆盖
         result = await self.db.execute(
-            select(Table).where(
+            select(Table)
+            .where(
                 Table.store_id == store_uuid,
                 Table.table_no == table_no,
                 Table.tenant_id == self.tenant_id,
             )
+            .with_for_update()
         )
         table = result.scalar_one_or_none()
         if not table:
@@ -1218,11 +1241,14 @@ class CashierEngine:
         return total_cost if has_cost else None
 
     async def _release_table(self, store_id: str, table_no: str) -> None:
+        # §19 round-1 P0-1: tenant_id 过滤防 internal session 跨租户 UPDATE
+        # (RLS 在 internal superuser session 被绕过, 显式 WHERE tenant_id 双保险)
         await self.db.execute(
             update(Table)
             .where(
                 Table.store_id == uuid.UUID(store_id),
                 Table.table_no == table_no,
+                Table.tenant_id == self.tenant_id,
             )
             .values(status=TableStatus.free.value, current_order_id=None)
         )
@@ -1361,6 +1387,11 @@ class CashierEngine:
         1. 订单必须处于 pending/confirmed 状态
         2. 目标桌必须为 free 状态
         3. 原桌号记录到 order.table_transfer_from 以供追溯
+
+        §17-A 2A 双锁排序: 源桌 + 目标桌按 table.id ASC FOR UPDATE 锁定 — 防止
+        两路 swap 转桌 (A→B + B→A) 形成 ABBA 死锁. 单条 SELECT WHERE table_no
+        IN (old, target) ORDER BY id WITH FOR UPDATE 由 PG 在 ORDER BY 后施锁,
+        保证锁顺序 deterministic. (audit §11.2 选择题 2 锁定方案 2A)
         """
         order_uuid = uuid.UUID(order_id)
         order = await self._get_order(order_uuid)
@@ -1378,26 +1409,43 @@ class CashierEngine:
 
         store_uuid = order.store_id
 
-        # 查询目标桌台
-        target_result = await self.db.execute(
-            select(Table).where(
+        # §17-A 2A: 源 + 目标双桌按 id ASC FOR UPDATE 锁定 — 防 swap ABBA 死锁
+        # PostgreSQL 在 ORDER BY 评估后再施锁, 锁顺序 deterministic 安全
+        both_result = await self.db.execute(
+            select(Table)
+            .where(
                 Table.store_id == store_uuid,
-                Table.table_no == target_table_no,
+                Table.table_no.in_([old_table_no, target_table_no]),
                 Table.tenant_id == self.tenant_id,
                 Table.is_active == True,  # noqa: E712
             )
+            .order_by(Table.id)
+            .with_for_update()
         )
-        target_table = target_result.scalar_one_or_none()
+        tables_by_no = {t.table_no: t for t in both_result.scalars()}
+        target_table = tables_by_no.get(target_table_no)
         if not target_table:
             raise ValueError(f"目标桌台不存在: {target_table_no}")
 
-        if target_table.status != TableStatus.free.value:
-            raise ValueError(f"目标桌台 {target_table_no} 当前状态 {target_table.status}，不是空闲状态，无法转入")
+        # §19 round-1 P0-1: 显式校验源桌存在 — 若 order.table_number 指向已软删
+        # / 物理删 / is_active=False 的桌, IN clause 不返回, 之前静默放过会
+        # 导致 _release_table UPDATE 旧桌 0 行 + order 转新桌但旧桌引用残留.
+        source_table = tables_by_no.get(old_table_no)
+        if not source_table:
+            raise ValueError(
+                f"源桌台不存在或已停用: {old_table_no} — 无法转台"
+            )
 
-        # 释放原桌
+        if target_table.status != TableStatus.free.value:
+            raise TableOccupiedError(
+                f"目标桌台 {target_table_no} 当前状态 {target_table.status}，"
+                "不是空闲状态，无法转入 — 桌台已被并发占用，请刷新"
+            )
+
+        # 释放原桌 (锁已持有, _release_table UPDATE 在事务内安全)
         await self._release_table(str(store_uuid), old_table_no)
 
-        # 锁定目标桌
+        # 锁定目标桌 (ORM 修改在 with_for_update 持锁的事务内)
         target_table.status = TableStatus.occupied.value
         target_table.current_order_id = order_uuid
 

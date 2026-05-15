@@ -24,7 +24,7 @@ from shared.ontology.src.database import get_db
 
 logger = structlog.get_logger(__name__)
 
-from ..services.cashier_engine import CashierEngine
+from ..services.cashier_engine import CashierEngine, TableOccupiedError
 from ..services.daily_settlement import DailySettlementService
 from ..services.payment_gateway import PaymentGateway
 from ..services.payment_saga_service import PaymentSagaService
@@ -193,6 +193,9 @@ async def open_table(
             customer_id=req.customer_id,
         )
         return _ok(result)
+    except TableOccupiedError as e:
+        # §17-A 1A: 桌台并发占用 — 409 Conflict 让前端区分"刷新桌台地图"vs 通用 400
+        _err(str(e), code=409)
     except ValueError as e:
         _err(str(e))
 
