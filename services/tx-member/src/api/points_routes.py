@@ -97,7 +97,9 @@ def _emit_points_changed(
         from shared.events.src.emitter import emit_event  # noqa: PLC0415
         from shared.events.src.event_types import MemberEventType  # noqa: PLC0415
     except ImportError:
-        return  # 事件总线未就绪 → 静默跳过（不阻塞业务）
+        # 事件总线未就绪 → 静默跳过（不阻塞业务）
+        logger.warning("points.event_emitter_unavailable", exc_info=True)
+        return
 
     try:
         asyncio.create_task(

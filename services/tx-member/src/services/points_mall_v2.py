@@ -1711,8 +1711,8 @@ async def seed_default_achievements(
             )
             seeded_count += 1
         except IntegrityError:
-            # 已存在，跳过
-            pass
+            # 已存在，跳过 (idempotent seed)
+            logger.warning("points_mall.achievement_seed_skipped_duplicate", code=defn["code"], exc_info=True)
 
     await db.flush()
 

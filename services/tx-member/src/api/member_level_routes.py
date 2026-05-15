@@ -405,7 +405,8 @@ async def check_upgrade(
                     {"new_level": eligible_level, "mid": member_id, "tid": x_tenant_id},
                 )
             except SQLAlchemyError:
-                pass  # customers 表字段可能不存在，容错处理
+                # customers 表字段可能不存在，容错处理
+                logger.warning("member_level.customers_level_update_failed", member_id=str(member_id), exc_info=True)
 
             # 写升降级历史
             await db.execute(
