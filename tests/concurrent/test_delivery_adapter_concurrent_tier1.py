@@ -192,14 +192,21 @@ async def _seed_delivery_order(
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def _silence_log(monkeypatch):
-    """delivery_adapter 业务调 logger.info 多处. 测试不验 log, 但确保 structlog
-    `event=` 保留字段冲突 (PR #566 / #570 修过) 不在本 PR 复活. _notify_platform
-    L706 已 rename `notify_event=`, 真测试时让 log 安静即可.
+async def _silence_notify_platform(monkeypatch):
+    """**§19 round-1 P2-3 fix (defensive)**: monkeypatch DeliveryPlatformAdapter
+    `_notify_platform` 为 no-op coroutine. 当前 source L706-716 仅是 logger.info stub
+    (TODO: 注入 MeituanClient 实现真实通知), 无 HTTP 调用 → 测试不会 fail on network.
 
-    本 fixture 仅 yield, 不 monkeypatch (logger 配置已是 JSON 输出, 测试 capsys
-    可见但不影响断言). 留 fixture 作 future 扩展 hook.
+    但本 fixture 防御性 patch 防未来 source 引入真 HTTP client (e.g., MeituanClient
+    .post)致 CI test fail on network unreachable. 与 _silence_emit_event /
+    _silence_attribution 同模式.
     """
+    from services.tx_trade.src.services.delivery_adapter import DeliveryPlatformAdapter
+
+    async def _noop_notify(self, platform, event, data):
+        return None
+
+    monkeypatch.setattr(DeliveryPlatformAdapter, "_notify_platform", _noop_notify)
     yield
 
 
@@ -213,6 +220,10 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
 
     setup: 1 store + delivery_orders 表空 (本测试不预 seed delivery_order)
     runner: N=10 workers 各 receive_order(platform="meituan", platform_order_id=同一值)
+            **§19 round-1 P2-1 fix**: 不用 workers_lock 串行 idx 分配 — 改用
+            uuid.uuid4() 现场生成 distinct identifier, 让 10 worker 真并发 SELECT
+            existing 最大化 IntegrityError catch path 触发概率 (workers_lock 串行
+            会让多 worker 走 L161 existing 早返回路径而非 L256-277 race-recovered).
     断言（核心 P1 + Issue #643 P2-A distinct-set 升级版）:
       - 10 worker 全部成功（无 exception — IntegrityError 被 L246 catch 兜底）
       - 1 worker 见 duplicate=False (or absent) — 真创建那一笔
@@ -221,7 +232,7 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
       - delivery_orders 表内 platform_order_id 仅 1 行 (UNIQUE constraint 真生效)
       - **distinct-set assertion**: 9 worker 返回的 order_id 与 1 真创建 worker
         相同 (即所有 worker 看到同一 existing 的 id)
-      - 9 duplicate worker_idx ∪ 1 success worker_idx == 10 distinct workers
+      - 10 worker 各自 distinct uuid worker_id
 
     若 IntegrityError catch 未生效 (audit §4.1.5 P1 — PR #563 PR-F fix 回归):
       - 10 worker 并发 SELECT existing → None (空表)
@@ -244,14 +255,14 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
     # 所有 worker 用同一 platform_order_id 触发 UNIQUE constraint race
     shared_platform_order_id = f"MT-RACE-{uuid.uuid4().hex[:16]}"
 
-    workers_count = [0]
-    workers_lock = asyncio.Lock()
-
     async def _receive(session: AsyncSession) -> dict:
-        """单 worker receive_order, 返回 (worker_idx, was_duplicate, order_id)."""
-        async with workers_lock:
-            idx = workers_count[0]
-            workers_count[0] += 1
+        """单 worker receive_order, 返回 (worker_id, was_duplicate, order_id).
+
+        **§19 P2-1 fix**: 不用 workers_lock 串行 idx 分配 — 用 uuid 现场生成,
+        让 10 worker 真并发 SELECT existing → 最大化 IntegrityError catch path
+        (L256-277) 触发概率.
+        """
+        worker_id = str(uuid.uuid4())[:8]
         # 注入 worker 自己的 session (DeliveryPlatformAdapter._get_session 优先用
         # 注入的 session 不创建新; _close_session 注入的不关; receive_order 内部
         # session.commit() 触发 UNIQUE → run_concurrent 外层 commit 是 no-op)
@@ -271,7 +282,7 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
             delivery_address="测试地址",
         )
         return {
-            "worker_idx": idx,
+            "worker_id": worker_id,
             "was_duplicate": result.get("duplicate", False),
             "order_id": result["order_id"],
         }
@@ -305,10 +316,12 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
         f"worker 应返回 dict, actual {len(dict_results)}/10. "
         f"non-dict: {[r for r in results if not isinstance(r, dict)][:3]}"
     )
-    distinct_indices = {r["worker_idx"] for r in dict_results}
-    assert len(distinct_indices) == 10, (
-        f"Issue #643 P2-A: distinct worker_idx actual={len(distinct_indices)} expected=10. "
-        f"workers_lock 串行化 fail"
+    # **§19 P2-1 fix**: 用 distinct uuid worker_id 替代 workers_lock idx (后者
+    # 串行化会削弱 IntegrityError catch path 触发概率)
+    distinct_worker_ids = {r["worker_id"] for r in dict_results}
+    assert len(distinct_worker_ids) == 10, (
+        f"Issue #643 P2-A: distinct worker_id actual={len(distinct_worker_ids)} "
+        f"expected=10. uuid4 现场生成应天然 distinct (撞概率 ≈ 0)"
     )
     duplicate_count = sum(1 for r in dict_results if r["was_duplicate"])
     assert duplicate_count == 9, (
