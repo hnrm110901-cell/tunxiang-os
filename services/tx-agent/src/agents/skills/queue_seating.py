@@ -297,7 +297,8 @@ class QueueSeatingAgent(SkillAgent):
                 )
                 if resp:
                     suggestions.append(f"AI建议: {resp}")
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("queue_seating_ai_router_failed", error=str(exc), exc_info=True)
                 pass
 
         return AgentResult(

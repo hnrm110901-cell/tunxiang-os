@@ -84,6 +84,7 @@ class DomainEventConsumer:
             try:
                 await redis.xgroup_create(stream_key, group_name, id="$", mkstream=True)
             except Exception:  # noqa: BLE001 — BUSYGROUP 表示已存在，忽略
+                logger.debug("domain_event_consumer_group_already_exists", stream_key=stream_key, group_name=group_name)
                 pass
 
     async def _convert_to_agent_event(self, stream_key: str, fields: dict) -> Optional[AgentEvent]:

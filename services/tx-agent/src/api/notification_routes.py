@@ -145,6 +145,7 @@ async def _sse_generator(tenant_id: str, operator_id: str) -> AsyncGenerator[str
             await pubsub.unsubscribe(channel)
             await redis.aclose()
         except Exception:  # noqa: BLE001 — 清理阶段兜底，不应再抛出
+            logger.debug("notification_sse_cleanup_failed", tenant_id=tenant_id)
             pass
 
 

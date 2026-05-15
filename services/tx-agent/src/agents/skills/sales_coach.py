@@ -742,7 +742,8 @@ def _coerce_uuid(raw: Any) -> Optional[UUID]:
         return raw
     try:
         return UUID(str(raw))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        logger.debug("sales_coach_coerce_uuid_failed", error=str(exc))
         return None
 
 
@@ -754,7 +755,8 @@ def _coerce_date(raw: Any) -> date:
     if isinstance(raw, str):
         try:
             return date.fromisoformat(raw[:10])
-        except ValueError:
+        except ValueError as exc:
+            logger.debug("sales_coach_coerce_date_failed", error=str(exc))
             pass
     return date.today()
 

@@ -161,7 +161,8 @@ async def _load_revenue_by_slot(
         rows = {str(r["slot"]): int(r["revenue_fen"]) for r in result.mappings()}
         if rows:
             return rows
-    except (OperationalError, ProgrammingError):
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning("workforce_planner_db_query_failed", error=str(exc), exc_info=True)
         pass
     # 降级：返回空字典
     return {}

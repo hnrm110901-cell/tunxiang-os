@@ -187,12 +187,14 @@ async def lifespan(app: FastAPI):
         try:
             await consumer_task
         except asyncio.CancelledError:
+            logger.debug("consumer_task_cancelled_on_shutdown")
             pass
         await skill_consumer.stop()
         skill_consumer_task.cancel()
         try:
             await skill_consumer_task
         except asyncio.CancelledError:
+            logger.debug("skill_consumer_task_cancelled_on_shutdown")
             pass
         # 停止所有投影器
         await runner.stop()

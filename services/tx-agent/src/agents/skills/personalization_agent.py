@@ -70,7 +70,8 @@ class PersonalizationAgent(SkillAgent):
                 resp = await self._router.complete(prompt=prompt, max_tokens=30, task_type="quick_classification")
                 if resp:
                     ai_reason = resp.strip().strip('"').strip("'")
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("personalization_dish_reason_ai_failed", error=str(exc), exc_info=True)
                 pass
 
         # 降级：规则生成
@@ -123,7 +124,8 @@ class PersonalizationAgent(SkillAgent):
                                 name = parts[0].strip()
                                 reason = parts[1].strip().strip('"').strip("'")
                                 reasons[name] = reason
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("personalization_batch_reasons_ai_failed", error=str(exc), exc_info=True)
                 pass
 
         # 补充未生成的用规则
@@ -164,7 +166,8 @@ class PersonalizationAgent(SkillAgent):
                         confidence=0.9,
                         inference_layer="cloud",
                     )
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("personalization_greeting_ai_failed", error=str(exc), exc_info=True)
                 pass
 
         # 降级
@@ -225,7 +228,8 @@ class PersonalizationAgent(SkillAgent):
                         confidence=0.85,
                         inference_layer="cloud",
                     )
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("personalization_reorder_prompt_ai_failed", error=str(exc), exc_info=True)
                 pass
 
         # 降级

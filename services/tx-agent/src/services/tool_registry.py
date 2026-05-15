@@ -103,7 +103,8 @@ class ToolRegistry:
             try:
                 config = agent.get_action_config(action)
                 risk_level = config.risk_level
-            except (AttributeError, TypeError):
+            except (AttributeError, TypeError) as exc:
+                logger.debug("tool_registry_action_config_lookup_failed", agent_id=agent_id, action=action, error=str(exc))
                 pass
 
             # 尝试从 MCP agent_registry 获取更详细的 schema
