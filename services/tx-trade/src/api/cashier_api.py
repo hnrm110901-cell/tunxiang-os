@@ -76,11 +76,17 @@ class AddItemReq(BaseModel):
     customizations: Optional[dict] = None
     pricing_mode: str = "fixed"
     weight_value: Optional[float] = None
+    # PRD-11 sub-B (v436 / Tier 1 第 29 例 / §19 round-2 P1-3 fix):
+    # 多人合点拆分人数 (1=独享, N>1 触发 share_split_rules 校验 + ITEMS_SETTLED emit).
+    # 默认 1 = backward compat (旧 POS 客户端不传时 = 独享行为).
+    share_count: int = Field(default=1, ge=1, description="多人合点拆分人数 (1=独享, N=N 人共享, 触发 share_split_rules 校验)")
 
 
 class UpdateItemReq(BaseModel):
     quantity: Optional[int] = Field(default=None, ge=1)
     notes: Optional[str] = None
+    # PRD-11 sub-B: None=不动 share_count; 显式 N 改拆分人数, settle 前可改 (D4 终态冻结).
+    share_count: Optional[int] = Field(default=None, ge=1, description="改多人合点拆分人数 (None=不动; settle 后冻结)")
 
 
 class RemoveItemReq(BaseModel):
@@ -223,6 +229,7 @@ async def add_item(
             customizations=req.customizations,
             pricing_mode=req.pricing_mode,
             weight_value=req.weight_value,
+            share_count=req.share_count,
         )
         return _ok(result)
     except ValueError as e:
@@ -248,6 +255,7 @@ async def update_item(
             item_id=item_id,
             quantity=req.quantity,
             notes=req.notes,
+            share_count=req.share_count,
         )
         return _ok(result)
     except ValueError as e:

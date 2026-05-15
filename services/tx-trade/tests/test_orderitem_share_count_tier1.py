@@ -716,7 +716,52 @@ class TestSettleOrderEmitsItemsSettled:
         )
 
 
-# ─── 4. event_type ITEMS_SETTLED 注册 ────────────────────────────────────────
+# ─── 4. HTTP 路由层 share_count 透传 (§19 round-2 P1-3 fix) ──────────────────
+
+
+class TestCashierApiShareCountWiring:
+    """§19 round-2 P1-3 fix: cashier_api.py AddItemReq/UpdateItemReq 加 share_count
+    + 路由调 engine 时透传, 让 sub-B 数据面 HTTP 边界端到端可用 (否则 share_count
+    永远=1, sub-A apply_split 零数据)."""
+
+    def test_add_item_req_schema_has_share_count(self):
+        """AddItemReq pydantic model 含 share_count 字段, 默认 1, ge=1."""
+        from services.tx_trade.src.api.cashier_api import AddItemReq
+
+        # 默认值 = 1 (backward compat)
+        req = AddItemReq(dish_id="x", dish_name="y", qty=1, unit_price_fen=100)
+        assert req.share_count == 1, "AddItemReq 默认 share_count=1"
+
+        # 显式传 N
+        req2 = AddItemReq(
+            dish_id="x", dish_name="y", qty=1, unit_price_fen=100, share_count=4
+        )
+        assert req2.share_count == 4
+
+        # ge=1 校验
+        with pytest.raises((ValueError, Exception)):  # pydantic ValidationError
+            AddItemReq(
+                dish_id="x", dish_name="y", qty=1, unit_price_fen=100, share_count=0
+            )
+
+    def test_update_item_req_schema_has_share_count(self):
+        """UpdateItemReq pydantic model 含 share_count 字段, 默认 None (不动), ge=1."""
+        from services.tx_trade.src.api.cashier_api import UpdateItemReq
+
+        # 默认 None = 不动
+        req = UpdateItemReq()
+        assert req.share_count is None
+
+        # 显式 N
+        req2 = UpdateItemReq(share_count=3)
+        assert req2.share_count == 3
+
+        # ge=1 校验 (None 跳过)
+        with pytest.raises((ValueError, Exception)):
+            UpdateItemReq(share_count=0)
+
+
+# ─── 5. event_type ITEMS_SETTLED 注册 ────────────────────────────────────────
 
 
 class TestEventTypeRegistered:

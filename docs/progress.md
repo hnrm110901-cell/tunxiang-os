@@ -13,7 +13,13 @@
   - `metrics.py` 加 `cashier_items_settled_query_failed_total` Counter (graceful prometheus stub fallback 模式与 payment_saga_total 一致)
   - `cashier_engine.settle_order` except SQLAlchemyError block 加 `.labels(error_class=type(exc).__name__).inc()`
   - 测试 +5 用例 (rule=None / allow_share=False / 超 max_share_count / is_active=False / share_count=1 跳过 rule check)
-- [ ] **待: push round-2 fix + §19 round-2 verify + CI 真门禁全绿 + explicit-ask admin-merge**
+- [x] **push round-2 fix** (`e65d3b08`) + CI 关键 gate 全绿 (Run Tier 1 tx-trade 22s ✅ / Fresh PG 34s ✅ / Tier 1 supply ✅ / Verify Migration Chain ✅ / frontend-build ✅ / edge-mac-station ✅ / CodeRabbit ✅ / Tier 1 brain/member ✅) + 预存漂移忽略 (python-lint-test (*) / Ruff / RLS Runtime / Test Changed Services / Tier 1 Row-Lock 自加入起所有 PR fail 按 carve-out 处理)
+- [x] **§19 critic round-2 verify**: P1-1 + P1-2 修法 PASS, 0 回归. **但新发现 P1-3** (cashier_api.py 路由层 AddItemReq/UpdateItemReq 未含 share_count → sub-B 数据面在 HTTP 边界永远 share_count=1, engine 层 dead code)
+- [x] **§19 round-3 fix** (选项 A: 本 PR 补 HTTP wiring):
+  - `cashier_api.py` AddItemReq 加 `share_count: int = Field(default=1, ge=1)` + UpdateItemReq 加 `share_count: Optional[int] = Field(default=None, ge=1)`
+  - 路由 add_item / update_item engine 调用透传 `share_count=req.share_count`
+  - 测试 +2 用例 `TestCashierApiShareCountWiring` (AddItemReq schema 默认 1 + ge=1 / UpdateItemReq 默认 None + 显式 N + ge=1)
+- [ ] **待: push round-3 fix + §19 round-3 verify + explicit-ask admin-merge**
 
 ### 关键决策
 
