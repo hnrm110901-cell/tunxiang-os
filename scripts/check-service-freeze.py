@@ -58,22 +58,24 @@ def _load_policy(policy_path: Path) -> dict:
 def _git_changed_files(mode: str, base_ref: str | None) -> list[str]:
     """获取待检查文件列表.
 
-    mode 'staged': git diff --cached --name-only --diff-filter=A (新增)
-    mode 'all':    git status --porcelain (含 untracked + staged)
-    mode 'diff':   git diff --name-only --diff-filter=A {base_ref}..HEAD
+    mode 'staged': git diff --cached --name-only --diff-filter=AR (新增 + 重命名)
+    mode 'all':    git status --porcelain (含 untracked / A / R 状态)
+    mode 'diff':   git diff --name-only --diff-filter=AR {base_ref}...HEAD
+                   三点 (merge-base..HEAD) 防 base_ref 已超过 PR base 时反向 diff 漏
     """
     if mode == "staged":
         cmd = [
             "git", "diff", "--cached",
-            "--name-only", "--diff-filter=A",
+            "--name-only", "--diff-filter=AR",
         ]
     elif mode == "diff":
         if not base_ref:
             print("ERROR: --diff 需要 base_ref 参数", file=sys.stderr)
             sys.exit(2)
+        # 三点 a...b = git_merge_base(a,b)..b, 防 a 已超过 PR base 时漏抓 PR 内 commit 的新文件
         cmd = [
-            "git", "diff", f"{base_ref}..HEAD",
-            "--name-only", "--diff-filter=A",
+            "git", "diff", f"{base_ref}...HEAD",
+            "--name-only", "--diff-filter=AR",
         ]
     else:  # all
         cmd = ["git", "status", "--porcelain"]
@@ -87,15 +89,22 @@ def _git_changed_files(mode: str, base_ref: str | None) -> list[str]:
         sys.exit(2)
 
     if mode == "all":
-        # parse `git status --porcelain` 取 ?? (untracked) + A (added staged)
+        # parse `git status --porcelain`:
+        # status 码白名单: ?? (untracked) / A (added) / R (renamed)
+        # 含 modified 形式 'AM' (staged add + unstaged modify) / 'RM' / 'AD'
         files: list[str] = []
+        capture_codes = {"A", "R"}  # M (modify) 不算"新文件", policy 只拦新增
         for line in result.stdout.splitlines():
             if not line.strip():
                 continue
             status = line[:2]
-            path = line[3:].strip().strip('"')
-            if status.startswith("??") or "A" in status:
-                files.append(path)
+            path_field = line[3:].strip().strip('"')
+            # rename 格式: 'R  old_path -> new_path', 取 new_path
+            if " -> " in path_field:
+                path_field = path_field.split(" -> ", 1)[1].strip().strip('"')
+            # 'XY' 任一字符在白名单, 或整段 == '??'
+            if status == "??" or set(status) & capture_codes:
+                files.append(path_field)
         return files
 
     return [ln.strip() for ln in result.stdout.splitlines() if ln.strip()]

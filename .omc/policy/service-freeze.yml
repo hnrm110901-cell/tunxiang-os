@@ -47,7 +47,7 @@ policy:
     - tx-civic        # W11 Phase 4 → 改回路由模块 (不再独立服务)
 
     # W10 计划新增 (战略 §4 举措 4 Phase C)
-    - tx-ontology     # W10 Phase C 抽出独立服务 (端口 8019)
+    - tx-ontology     # W10 Phase C 抽出独立服务 (端口 W10 抽时另议, 8019 已被 tx-predict 占)
 
   # 触发拦截的路径模式 (任一新文件路径匹配即阻止)
   forbidden_patterns:

@@ -124,7 +124,7 @@ tunxiang-os/
     tx-devforge/       :8017    # DevForge 内部研发平台 — W9 计划合并入 tx-forge
     mcp-server/        :8018    # MCP Protocol Server（对接 Claude Code）
     tx-predict/        :8019    # 预测引擎 V2（traffic_predictor / demand_predictor / staff_schedule_predictor）— W9 计划合并入 tx-brain
-    # ⚠️ tunxiang-api 已 decom（2026-05 之前）；战略 W12 终态新增 tx-ontology:8019 抽 Ontology Layer 服务
+    # ⚠️ tunxiang-api 已 decom（2026-05 之前）；战略 W12 终态新增 tx-ontology 抽 Ontology Layer 服务（端口 W10 决议时另选, 8019 已被 tx-predict 占）
   edge/                         # Mac mini M4 边缘智能后台
     mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本
                                 # 含: print_queue.py（打印重试队列）+ order_offline_buffer.py（订单离线缓冲）+ offline_buffer.py（通用 skill 缓冲）
