@@ -1053,7 +1053,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_jpeg_basic_round_trip(self):
         """采购总监 iPad 拍照上传鲈鱼价签 — 完整流程."""
-        db, sql_log = _mk_db_add_photo(parent_survey=_survey_row())
+        db, sql_log, _ = _mk_db_add_photo(parent_survey=_survey_row())
         result = await upload_photo_for_survey(
             db,
             _TENANT_XUJI,
@@ -1069,7 +1069,7 @@ class TestUploadPhotoForSurvey:
 
     @pytest.mark.asyncio
     async def test_upload_png_allowed(self):
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         result = await upload_photo_for_survey(
             db,
             _TENANT_XUJI,
@@ -1082,7 +1082,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_webp_allowed(self):
         """webp 是 iOS 17+ 默认共享格式, 必须支持."""
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         result = await upload_photo_for_survey(
             db,
             _TENANT_XUJI,
@@ -1095,7 +1095,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_heic_allowed(self):
         """heic 是 iOS 默认相机格式, 必须支持避免转码."""
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         result = await upload_photo_for_survey(
             db,
             _TENANT_XUJI,
@@ -1108,7 +1108,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_unsupported_mime_raises(self):
         """text/plain 等非图片类型必须拦截 (415 unsupported_media_type)."""
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         with pytest.raises(ValueError, match="不支持的 mime_type"):
             await upload_photo_for_survey(
                 db,
@@ -1121,7 +1121,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_pdf_unsupported(self):
         """application/pdf 也必须拦 (恶意伪装上传)."""
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         with pytest.raises(ValueError, match="不支持的 mime_type"):
             await upload_photo_for_survey(
                 db,
@@ -1134,7 +1134,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_empty_file_raises(self):
         """0 字节文件 (前端误传) → ValueError."""
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         with pytest.raises(ValueError, match="为空"):
             await upload_photo_for_survey(
                 db,
@@ -1148,7 +1148,7 @@ class TestUploadPhotoForSurvey:
     async def test_upload_oversize_raises(self):
         """超 5MB 拦截 (413 payload_too_large) — 防 OOM + 防恶意."""
         oversize = b"\xff\xd8" + b"\x00" * (5 * 1024 * 1024 + 1)
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         with pytest.raises(ValueError, match="超过单张上限"):
             await upload_photo_for_survey(
                 db,
@@ -1161,7 +1161,7 @@ class TestUploadPhotoForSurvey:
     @pytest.mark.asyncio
     async def test_upload_with_item_id_passes_to_add_photo(self):
         """item-level 上传 (鲈鱼价签近景) — item_id 必须透传到 add_photo 业务校验."""
-        db, sql_log = _mk_db_add_photo(
+        db, sql_log, _ = _mk_db_add_photo(
             parent_survey=_survey_row(),
             parent_item=_item_row(survey_id=_SURVEY_ID),
         )

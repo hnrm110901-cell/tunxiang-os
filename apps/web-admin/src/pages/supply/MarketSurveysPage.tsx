@@ -26,7 +26,7 @@
  *   DELETE /api/v1/supply/market-surveys/photos/{id}              软删照片
  *   GET    /api/v1/supply/ingredients/search?q=&limit=20          ingredient autocomplete (sub-B)
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Button,
@@ -56,7 +56,7 @@ import {
   SendOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import { API_BASE, getTenantId, getToken, txFetchData } from '../../api/client';
+import { API_BASE, clearAuth, getTenantId, getToken, txFetchData } from '../../api/client';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -169,26 +169,43 @@ function IngredientAutocomplete({
 }: IngredientAutocompleteProps) {
   const [options, setOptions] = useState<IngredientCandidate[]>([]);
   const [fetching, setFetching] = useState(false);
+  // §19 round-1 P1-2 fix: 300ms debounce — 200 桌峰值时 10 员工同时录入 = 40-80
+  // 并发 search 打 server, 加 ILIKE seq scan 拖垮 DB 连接池, 让 Tier 1 写操作 P99 破线
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleSearch = useCallback(async (q: string) => {
+  const handleSearch = useCallback((q: string) => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
     if (!q || !q.trim()) {
       setOptions([]);
       return;
     }
-    setFetching(true);
-    try {
-      const params = new URLSearchParams({ q: q.trim(), limit: '20' });
-      const data = await txFetchData<IngredientCandidate[]>(
-        `/api/v1/supply/ingredients/search?${params.toString()}`,
-      );
-      setOptions(data ?? []);
-    } catch (e) {
-      // 静默 — autocomplete 失败不阻塞业务, 用户可继续键入自由文本
-      console.warn('ingredient autocomplete failed:', e);
-      setOptions([]);
-    } finally {
-      setFetching(false);
-    }
+    debounceRef.current = setTimeout(async () => {
+      setFetching(true);
+      try {
+        const params = new URLSearchParams({ q: q.trim(), limit: '20' });
+        const data = await txFetchData<IngredientCandidate[]>(
+          `/api/v1/supply/ingredients/search?${params.toString()}`,
+        );
+        setOptions(data ?? []);
+      } catch (e) {
+        // 静默 — autocomplete 失败不阻塞业务, 用户可继续键入自由文本
+        console.warn('ingredient autocomplete failed:', e);
+        setOptions([]);
+      } finally {
+        setFetching(false);
+      }
+    }, 300);
+  }, []);
+
+  // 卸载时清掉未执行的定时器, 防 memory leak + setState-after-unmount warning
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, []);
 
   return (
@@ -404,6 +421,13 @@ export function MarketSurveysPage() {
             },
           },
         );
+        // §19 round-1 P1-3 fix: 与 txFetch 一致的 401 处理 — token 过期清 auth 跳登录,
+        // 而非"上传失败：Not authenticated"误导用户反复重试.
+        if (resp.status === 401) {
+          clearAuth();
+          window.location.reload();
+          return false;
+        }
         const json = await resp.json();
         if (!resp.ok || !json.ok) {
           throw new Error(json?.error?.message || json?.detail?.message || '上传失败');

@@ -455,6 +455,21 @@ async def upload_market_survey_photo(
       - 422 invalid_payload — exif_meta_json 不可解析 / 父 survey 缺失 / 跨 survey item
       - 404 survey/item not found
     """
+    # §19 round-1 P1-1 fix: 先按 Content-Length (file.size) 短路, 防大文件全读进内存 OOM.
+    # Starlette 从 Content-Length header 填 file.size. 若客户端不发, file.size 为 None,
+    # 兜底走 service 层的 len(raw_bytes) 判断 (5MB 边界), 不会绕过.
+    _MAX_UPLOAD_BYTES = 5 * 1024 * 1024  # 与 service _MAX_PHOTO_SIZE_BYTES 一致
+    if file.size is not None and file.size > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": "PAYLOAD_TOO_LARGE",
+                "message": (
+                    f"上传文件 {file.size} 字节超过单张上限 {_MAX_UPLOAD_BYTES} "
+                    f"字节 (5 MB) — 已在读入前拒绝"
+                ),
+            },
+        )
     raw_bytes = await file.read()
     mime_type = file.content_type or ""
 
