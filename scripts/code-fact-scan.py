@@ -14,13 +14,14 @@ code-fact-scan.py — 代码事实扫描脚本 (屯象OS 治理四件套之一)
     main_loc             main.py / server.py 行数 (找不到为 -1)
     router_count         app.include_router( 命中数 (main.py)
     commits_30d          最近 30 天该服务目录 commit 数
-    try_except_count     src/ 下 try: 块数
-    silent_failure_count src/ 下 except.*: pass 或 except.*: return None 模式数
+    try_except_count     src/ 下 ast.Try 节点数 (AST 精确)
+    silent_failure_count src/ 下 except handler body 仅含 Pass 或 Return None 的数量 (AST 精确)
 """
 
 from __future__ import annotations
 
 import argparse
+import ast
 import datetime
 import json
 import re
@@ -28,6 +29,9 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import TypedDict
+
+# --week-override 必须匹配 ISO 周号格式，防 path traversal (如 ../../etc/passwd)
+_WEEK_OVERRIDE_PATTERN = re.compile(r"^\d{4}-W\d{2}$")
 
 
 class ServiceStats(TypedDict):
@@ -92,19 +96,35 @@ def _count_git_commits_30d(repo_root: Path, service_path: Path) -> int:
         return -1
 
 
+def _is_silent_handler_body(body: list[ast.stmt]) -> bool:
+    """A handler body is "silent" iff it is exactly one of:
+       - [Pass]
+       - [Return]                (bare `return`)
+       - [Return(value=Constant(None))]  (`return None`)
+    Multi-statement bodies, logging, re-raise, etc. are NOT silent.
+    """
+    if len(body) != 1:
+        return False
+    stmt = body[0]
+    if isinstance(stmt, ast.Pass):
+        return True
+    if isinstance(stmt, ast.Return):
+        if stmt.value is None:
+            return True
+        if isinstance(stmt.value, ast.Constant) and stmt.value.value is None:
+            return True
+    return False
+
+
 def _count_try_except(src_dir: Path) -> tuple[int, int]:
-    r"""
-    Walk src_dir for Python files and count:
-        try_count          -- lines matching r'^\s*try:\s*$'
-        silent_fail_count  -- lines matching silent patterns
+    """
+    Walk src_dir for Python files and count via AST (covers multi-line except):
+        try_count          -- ast.Try node count
+        silent_fail_count  -- handler whose body is exactly Pass or Return None
+
+    AST-based to fix regex single-line limitation (audit follow-up: PR #659 P1-1).
     Returns (try_count, silent_fail_count).
     """
-    try_pat = re.compile(r"^\s*try:\s*$")
-    # silent: `except ...: pass` on same line OR `except ...: return None` on same line
-    silent_pat = re.compile(
-        r"^\s*except\b[^:]*:\s*(pass|return\s+None)\s*(?:#.*)?$"
-    )
-
     try_count = 0
     silent_count = 0
 
@@ -116,13 +136,20 @@ def _count_try_except(src_dir: Path) -> tuple[int, int]:
         if "__pycache__" in py_file.parts:
             continue
         try:
-            for line in py_file.read_text(encoding="utf-8", errors="replace").splitlines():
-                if try_pat.match(line):
-                    try_count += 1
-                if silent_pat.match(line):
-                    silent_count += 1
+            source = py_file.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
+        try:
+            tree = ast.parse(source, filename=str(py_file))
+        except SyntaxError:
+            # 跳过语法错误文件 (例如临时草稿 / 非 Python 3.11 语法)
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Try):
+                try_count += 1
+                for handler in node.handlers:
+                    if _is_silent_handler_body(handler.body):
+                        silent_count += 1
 
     return try_count, silent_count
 
@@ -261,6 +288,12 @@ def main(argv: list[str] | None = None) -> None:
         help="仓库根目录 (默认: 脚本所在目录的父目录)",
     )
     args = parser.parse_args(argv)
+
+    # Validate --week-override 格式 (防 path traversal: 写文件名为 ../../etc/passwd)
+    if args.week_override and not _WEEK_OVERRIDE_PATTERN.fullmatch(args.week_override):
+        parser.error(
+            "--week-override must match YYYY-WXX (e.g. 2026-W20)"
+        )
 
     # Resolve repo root
     script_dir = Path(__file__).resolve().parent

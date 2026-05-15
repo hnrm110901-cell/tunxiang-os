@@ -21,6 +21,7 @@ assert _spec and _spec.loader
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)  # type: ignore[union-attr]
 scan_service = _mod.scan_service
+main = _mod.main
 
 
 def _make_service(tmp_path: Path, name: str, main_content: str) -> Path:
@@ -59,6 +60,55 @@ class TestScanService:
         assert stats["silent_failure_count"] == 2
         # main_loc: 12 lines
         assert stats["main_loc"] == 12
+
+    def test_silent_failure_multiline_excepts(self, tmp_path: Path) -> None:
+        """AST 必须抓到多行写法 (regression guard for PR #659 round-1 P1-1).
+
+        Mainstream Python style is multi-line `except Foo:\\n    pass`. Old
+        regex impl only matched same-line `except Foo: pass` and missed the
+        multi-line form, causing W20.md to falsely report 0 silent failures
+        across all 20 services. This test is the regression line — if anyone
+        reverts to regex, this fails.
+        """
+        content = (
+            "def f():\n"
+            "    try: a()\n"             # try #1
+            "    except OSError:\n"      # multi-line `pass` — silent #1
+            "        pass\n"
+            "    try: b()\n"             # try #2
+            "    except (TypeError, ValueError):\n"  # multi-line `return None` — silent #2
+            "        return None\n"
+            "    try: c()\n"             # try #3
+            "    except KeyError:\n"     # multi-line bare `return` — silent #3
+            "        return\n"
+            "    try: d()\n"             # try #4
+            "    except RuntimeError:\n"  # NOT silent — has logging
+            "        logger.warning('caught', exc_info=True)\n"
+            "    try: e()\n"             # try #5
+            "    except IOError:\n"      # NOT silent — re-raise
+            "        raise\n"
+        )
+        svc_dir = _make_service(tmp_path, "svc-multi", content)
+        stats = scan_service(svc_dir, tmp_path)
+
+        assert stats["try_except_count"] == 5, "应抓 5 个 try 块"
+        assert stats["silent_failure_count"] == 3, (
+            "应抓 3 个多行 silent (pass / return None / 裸 return), "
+            "regex 旧实现会返回 0 — 这是 PR #659 round-1 P1-1 修复的回归门"
+        )
+
+    def test_week_override_format_validation(self, tmp_path: Path, capsys, monkeypatch) -> None:
+        """--week-override 必须校验 YYYY-WXX 格式, 防 path traversal."""
+        # 让 main 跑在 tmp_path 仓库根, 不写到真实仓库
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "services").mkdir()  # 防 scan_all 抛 FileNotFoundError
+
+        with pytest.raises(SystemExit) as exc_info:
+            main(["--week-override", "../../etc/passwd", "--repo-root", str(tmp_path)])
+        # argparse error() exits with code 2
+        assert exc_info.value.code == 2
+        captured = capsys.readouterr()
+        assert "YYYY-WXX" in captured.err
 
     def test_no_main_py_falls_back_to_server_py(self, tmp_path: Path) -> None:
         """When main.py absent, server.py is used for loc/router counts."""
