@@ -228,11 +228,12 @@ class TestGetOrderHelperContract:
         )
 
     @pytest.mark.asyncio
-    async def test_cancel_order_unchanged_no_lock(self):
-        """cancel_order 是 P1，本 PR 方案 1 边界外不加锁 — 回归保护.
+    async def test_cancel_order_uses_for_update_lock_s17b(self):
+        """§17-B 终态保护: cancel_order 必须加 FOR UPDATE 防 settle/cancel race.
 
-        防 PR-E 误改 cancel_order 引入不必要锁导致其他测试 / 性能回归.
-        cancel_order 的 P1 处理留 follow-up PR（与 §17 桌台并发对齐合并）.
+        历史: PR-E 方案 1 (#560) 边界外不加锁; §17-B (audit §11.2 选择题 3)
+        创始人锁定 3B 显式幂等 release + 终态保护, cancel_order SELECT Order
+        改用 _get_order(lock=True). 本测试由 §17-B 翻转预期, 锁定新契约.
         """
         order = _make_order()
         db, captured = _build_db_capture(order)
@@ -240,10 +241,9 @@ class TestGetOrderHelperContract:
 
         await svc.cancel_order(order_id=str(ORDER_ID), reason="测试")
 
-        # cancel_order 是 P1，本 PR 方案 1 范围外，应保持 no-lock
         locked = [s for s in captured if _select_has_for_update(s)]
-        assert not locked, (
-            f"cancel_order 是 P1，方案 1 边界外不应加 FOR UPDATE。"
+        assert locked, (
+            f"§17-B: cancel_order SELECT Order 必须含 FOR UPDATE 终态保护。"
             f"captured: {captured}"
         )
 
