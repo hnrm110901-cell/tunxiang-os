@@ -47,71 +47,35 @@ from .api.voice_routes import router as voice_router
 from .routers.diagnosis_router import router as diagnosis_router
 from .routers.pilot_router import router as pilot_router
 
-# P0 新路由 — 部分可能尚未创建，用 try/except 避免阻止服务启动
-try:
-    from .api.agent_registry_routes import router as agent_registry_router
-except ImportError:
-    agent_registry_router = None
+# P0 新路由 — 显式静态 import，任一模块缺失立即 ModuleNotFoundError（fail-loud）
+from .api.agent_memory_routes import router as agent_memory_router
+from .api.agent_message_routes import router as agent_message_router
+from .api.agent_registry_routes import router as agent_registry_router
+from .api.budget_forecast_routes import router as budget_forecast_router
+from .api.coaching_routes import router as coaching_router
+from .api.customer_journey_routes import router as customer_journey_router
+from .api.event_binding_routes import router as event_binding_router
+from .api.feedback_routes import router as feedback_router
+from .api.im_sop_routes import router as im_sop_router
+from .api.memory_evolution_routes import router as memory_evolution_router
+from .api.session_routes import router as session_router
+from .api.sop_routes import router as sop_router
 
-try:
-    from .api.session_routes import router as session_router
-except ImportError:
-    session_router = None
-
-try:
-    from .api.event_binding_routes import router as event_binding_router
-except ImportError:
-    event_binding_router = None
-
-try:
-    from .api.checkpoint_routes import router as checkpoint_router
-except ImportError:
-    checkpoint_router = None
-
-try:
-    from .api.agent_memory_routes import router as agent_memory_router
-except ImportError:
-    agent_memory_router = None
-
-try:
-    from .api.agent_message_routes import router as agent_message_router
-except ImportError:
-    agent_message_router = None
-
-try:
-    from .api.memory_evolution_routes import router as memory_evolution_router
-except ImportError:
-    memory_evolution_router = None
-
-try:
-    from .api.sop_routes import router as sop_router
-except ImportError:
-    sop_router = None
-
-try:
-    from .api.im_sop_routes import router as im_sop_router
-except ImportError:
-    im_sop_router = None
-
-try:
-    from .api.coaching_routes import router as coaching_router
-except ImportError:
-    coaching_router = None
-
-try:
-    from .api.feedback_routes import router as feedback_router
-except ImportError:
-    feedback_router = None
-
-try:
-    from .api.budget_forecast_routes import router as budget_forecast_router
-except ImportError:
-    budget_forecast_router = None
-
-try:
-    from .api.customer_journey_routes import router as customer_journey_router
-except ImportError:
-    customer_journey_router = None
+# 显式注册表：所有已挂载的 P0 router 名字（按字母序，供 /health 和启动日志使用）
+_P0_ROUTER_NAMES: list[str] = [
+    "agent_memory",
+    "agent_message",
+    "agent_registry",
+    "budget_forecast",
+    "coaching",
+    "customer_journey",
+    "event_binding",
+    "feedback",
+    "im_sop",
+    "memory_evolution",
+    "session",
+    "sop",
+]
 
 
 async def get_db_with_tenant_factory(
@@ -149,6 +113,13 @@ async def lifespan(app: FastAPI):
         agent_tools=_total_tools,
         mcp_imported=_mcp_count,
         total=tool_registry.tool_count,
+    )
+
+    # 启动时打印已加载的 P0 router 清单（fail-loud 保证清单始终为全量）
+    structlog.get_logger(__name__).info(
+        "loaded_routers",
+        routers=_P0_ROUTER_NAMES,
+        router_count=len(_P0_ROUTER_NAMES),
     )
 
     # 用真实 handler 创建 EventBus（替代占位 handler）
@@ -276,38 +247,32 @@ app.include_router(knowledge_router)  # /api/v1/knowledge/* — 知识库管理
 app.include_router(tool_router)  # /api/v1/tools/* — Tool Bus 统一工具注册与调用（P1-4）
 app.include_router(edge_router)  # /api/v1/edge/* — 边缘推理状态/代理（P1-5）
 
-# P0 新路由（条件注册）
-if agent_registry_router is not None:
-    app.include_router(agent_registry_router)
-if session_router is not None:
-    app.include_router(session_router)
-if event_binding_router is not None:
-    app.include_router(event_binding_router)
-if checkpoint_router is not None:
-    app.include_router(checkpoint_router)
-if agent_memory_router is not None:
-    app.include_router(agent_memory_router)
-if agent_message_router is not None:
-    app.include_router(agent_message_router)
-if memory_evolution_router is not None:
-    app.include_router(memory_evolution_router)
-if sop_router is not None:
-    app.include_router(sop_router)
-if im_sop_router is not None:
-    app.include_router(im_sop_router)
-if coaching_router is not None:
-    app.include_router(coaching_router)
-if feedback_router is not None:
-    app.include_router(feedback_router)
-if customer_journey_router is not None:
-    app.include_router(customer_journey_router)  # /api/v1/agent/customer-journey/* — 客户触达SOP旅程
-if budget_forecast_router is not None:
-    app.include_router(budget_forecast_router)  # /api/v1/agent/budget/* — D4c AI预算预测
+# P0 新路由（显式注册，静态 import 保证全量）
+app.include_router(agent_registry_router)
+app.include_router(session_router)
+app.include_router(event_binding_router)
+app.include_router(agent_memory_router)
+app.include_router(agent_message_router)
+app.include_router(memory_evolution_router)
+app.include_router(sop_router)
+app.include_router(im_sop_router)
+app.include_router(coaching_router)
+app.include_router(feedback_router)
+app.include_router(customer_journey_router)  # /api/v1/agent/customer-journey/* — 客户触达SOP旅程
+app.include_router(budget_forecast_router)  # /api/v1/agent/budget/* — D4c AI预算预测
 
 
 @app.get("/health")
 async def health():
-    return {"ok": True, "data": {"service": "tx-agent", "version": "3.0.0"}}
+    return {
+        "ok": True,
+        "data": {
+            "service": "tx-agent",
+            "version": "3.0.0",
+            "loaded_routers": _P0_ROUTER_NAMES,
+            "router_count": len(_P0_ROUTER_NAMES),
+        },
+    }
 
 
 @app.get("/api/v1/agent/agents")
