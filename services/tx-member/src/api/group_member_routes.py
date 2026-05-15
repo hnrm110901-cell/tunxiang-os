@@ -98,6 +98,7 @@ def _optional_operator_id(
     try:
         return UUID(x_operator_id)
     except ValueError:
+        logger.warning("group_member.operator_id_parse_failed", operator_id=x_operator_id, exc_info=True)
         return None
 
 

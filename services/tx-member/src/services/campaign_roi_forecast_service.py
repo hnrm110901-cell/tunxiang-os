@@ -367,7 +367,7 @@ class CampaignROIForecastService:
                     )
                     continue
                 except ValueError:
-                    pass
+                    logger.warning("campaign_roi.action_line_parse_failed", exc_info=True)
             analysis_lines.append(line)
         analysis_text = "\n".join(analysis_lines).strip() or response.strip()
         return analysis_text, actions

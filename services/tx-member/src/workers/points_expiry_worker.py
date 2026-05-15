@@ -146,6 +146,7 @@ class PointsExpiryWorker:
             from shared.events.src.emitter import emit_event  # noqa: PLC0415
             from shared.events.src.event_types import MemberEventType  # noqa: PLC0415
         except ImportError:
+            logger.warning("points_expiry.event_emitter_unavailable", exc_info=True)
             return
 
         for detail in details:
