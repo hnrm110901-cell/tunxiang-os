@@ -268,6 +268,7 @@ def _get_dish_info(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[dic
         row = result.mappings().first()
         return dict(row) if row else None
     except (ImportError, AttributeError):
+        log.warning("dish_margin.get_dish_info_failed", dish_id=str(dish_id), exc_info=True)
         return None
 
 
@@ -343,6 +344,7 @@ def _get_dish_cost(dish_id: uuid.UUID, tenant_id: uuid.UUID, db) -> Optional[int
         )
         return cost_result.scalar_one_or_none() or 0
     except (ImportError, AttributeError):
+        log.warning("dish_margin.get_dish_cost_failed", dish_id=str(dish_id), exc_info=True)
         return None
 
 

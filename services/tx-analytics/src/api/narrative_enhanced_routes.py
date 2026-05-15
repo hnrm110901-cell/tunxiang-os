@@ -103,7 +103,7 @@ async def _query_today_metrics(
         if total_seats > 0:
             turn_rate = round(guest_count / total_seats, 2)
     except SQLAlchemyError:
-        pass
+        logger.warning("narrative_enhanced.turn_rate_calc_failed", exc_info=True)
 
     # ── 人力成本率：当月薪资汇总 / 当月收入（近似） ──────────────────
     labor_cost_rate = 0.0
@@ -137,7 +137,7 @@ async def _query_today_metrics(
         if monthly_rev_est > 0:
             labor_cost_rate = round(labor_fen / monthly_rev_est, 4)
     except SQLAlchemyError:
-        pass
+        logger.warning("narrative_enhanced.labor_cost_rate_calc_failed", exc_info=True)
 
     return {
         "revenue_fen": revenue_fen,

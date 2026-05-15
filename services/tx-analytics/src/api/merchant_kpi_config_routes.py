@@ -151,7 +151,7 @@ async def get_merchant_kpi_configs(
             }
     except SQLAlchemyError:
         # 表不存在时降级到内置配置
-        pass
+        logger.warning("merchant_kpi_config.weights_table_unavailable", exc_info=True)
 
     # 合并内置默认值
     result = []
@@ -294,7 +294,7 @@ async def get_store_kpi_score(
         if row:
             weights = row["weights"]
     except SQLAlchemyError:
-        pass
+        logger.warning("merchant_kpi_config.weights_lookup_failed", merchant_code=code, exc_info=True)
 
     # 采集各项原始指标（简化版：直接查本月数据）
     from .monthly_brief_routes import _month_compliance_score, _month_member_metrics, _month_metrics
