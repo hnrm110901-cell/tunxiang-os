@@ -161,7 +161,7 @@ async def _sync_dishes_for_merchant(merchant_code: str) -> dict:
         try:
             await adapter.client.aclose()  # type: ignore[possibly-undefined]
         except Exception:  # noqa: BLE001 — 关闭客户端失败不应上报
-            pass
+            log.warning("sync_scheduler.adapter_aclose_failed", exc_info=True)
 
     # 写日志由调用方 _run_dishes_sync 统一处理，此处返回结果
 
@@ -201,7 +201,7 @@ async def _sync_tables_for_merchant(merchant_code: str, db: Any) -> dict:
             try:
                 await adapter.client.aclose()
             except Exception:  # noqa: BLE001
-                pass
+                log.warning("sync_scheduler.adapter_aclose_failed", exc_info=True)
 
 
 async def _sync_employees_for_merchant(merchant_code: str, db: Any) -> dict:
@@ -236,7 +236,7 @@ async def _sync_employees_for_merchant(merchant_code: str, db: Any) -> dict:
             try:
                 await adapter.client.aclose()
             except Exception:  # noqa: BLE001
-                pass
+                log.warning("sync_scheduler.adapter_aclose_failed", exc_info=True)
 
 
 async def _sync_orders_incremental_for_merchant(merchant_code: str) -> dict:
@@ -282,7 +282,7 @@ async def _sync_orders_incremental_for_merchant(merchant_code: str) -> dict:
             try:
                 await adapter.client.aclose()
             except Exception:  # noqa: BLE001
-                pass
+                log.warning("sync_scheduler.adapter_aclose_failed", exc_info=True)
 
 
 async def _sync_members_incremental_for_merchant(merchant_code: str, db: Any) -> dict:
@@ -320,7 +320,7 @@ async def _sync_members_incremental_for_merchant(merchant_code: str, db: Any) ->
             try:
                 await adapter.client.aclose()
             except Exception:  # noqa: BLE001
-                pass
+                log.warning("sync_scheduler.adapter_aclose_failed", exc_info=True)
 
 
 # ── 带重试的包装器 ───────────────────────────────────────────────────────────
