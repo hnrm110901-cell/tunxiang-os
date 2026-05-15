@@ -149,6 +149,7 @@ _UPDATE_SURVEY_STATUS_SQL = """
     WHERE id        = :survey_id
       AND tenant_id = :tenant_id
       AND is_deleted = FALSE
+      AND status     = :current_status
 """
 
 _DELETE_SURVEY_SQL = """
@@ -383,15 +384,25 @@ async def transition_status(
             f"(允许: draft↔submitted / submitted→verified / verified=终态)"
         )
 
-    await db.execute(
+    # §19 round-1 P1-1 fix: 乐观锁守卫 — UPDATE WHERE AND status = :current_status,
+    # 防并发两 caller 同时 transition 同 survey (e.g. submitted→verified vs
+    # submitted→draft) 后者覆写前者 → verified 训练池数据被静默降级到 draft.
+    # 实测场景: 200 桌峰值低频但训练池数据完整性是 P1 (AI 训练数据集质量门禁).
+    result = await db.execute(
         text(_UPDATE_SURVEY_STATUS_SQL),
         {
             "survey_id": survey_id,
             "tenant_id": _uuid_str(tenant_id),
             "status": target_status,
+            "current_status": current,
             "now": datetime.now(timezone.utc),
         },
     )
+    if result.rowcount == 0:
+        # 并发 race: 另一 worker 已改 status → 让 caller 重试 (而非静默覆写)
+        raise ValueError(
+            f"status 并发冲突: survey_id={survey_id} 当前 status 已被其他操作修改, 请刷新后重试"
+        )
 
     logger.info(
         "market_survey_status_transitioned",

@@ -280,9 +280,14 @@ def _mk_db_add_photo(
     *,
     parent_survey: dict | None,
     parent_item: dict | None = None,
+    fail_with: Exception | None = None,
 ):
     sql_log: list[str] = []
     db = AsyncMock()
+    rollback_called: dict[str, bool] = {"v": False}
+
+    async def rollback_side_effect():
+        rollback_called["v"] = True
 
     async def execute_side_effect(query, params=None):
         sql = str(query)
@@ -294,12 +299,14 @@ def _mk_db_add_photo(
         if "FROM market_survey_items" in sql:
             return _FakeResult(parent_item)
         if "INSERT INTO market_survey_photos" in sql:
+            if fail_with is not None:
+                raise fail_with
             return _FakeResult(_photo_row())
         return _FakeResult(None)
 
     db.execute = AsyncMock(side_effect=execute_side_effect)
-    db.rollback = AsyncMock()
-    return db, sql_log
+    db.rollback = AsyncMock(side_effect=rollback_side_effect)
+    return db, sql_log, rollback_called
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -570,6 +577,48 @@ class TestTransitionStatus:
                 db, _TENANT_XUJI, _SURVEY_ID, target_status="archived"
             )
 
+    @pytest.mark.asyncio
+    async def test_concurrent_race_optimistic_lock_rowcount_zero(self):
+        """§19 round-1 P1-1 regression: UPDATE 乐观锁守卫.
+
+        模拟并发 race — 另一 worker 已先修改 status, 本 UPDATE 失败 (rowcount=0):
+          - T1 读 status=submitted, 校验 submitted→verified OK
+          - T2 在 T1 UPDATE 前已抢先把 status 改为 draft (rowcount=1 占位)
+          - T1 UPDATE WHERE ... AND status = 'submitted' → rowcount=0
+          - 修法: 抛 ValueError 提示并发冲突, 让 caller 重试 (而非静默覆写)
+
+        若无乐观锁守卫, verified 训练池数据会被静默降级到 draft.
+        """
+        sql_log: list[str] = []
+        db = AsyncMock()
+
+        async def execute_side_effect(query, params=None):
+            sql = str(query)
+            sql_log.append(sql)
+            if "set_config" in sql:
+                return _FakeResult(None)
+            if "FROM market_surveys" in sql:
+                return _FakeResult(_survey_row(status="submitted"))
+            if "UPDATE market_surveys" in sql and "status" in sql:
+                # 模拟 rowcount=0 (另一 worker 已先改 status)
+                res = MagicMock()
+                res.rowcount = 0
+                return res
+            return _FakeResult(None)
+
+        db.execute = AsyncMock(side_effect=execute_side_effect)
+        with pytest.raises(ValueError, match="并发冲突"):
+            await transition_status(
+                db, _TENANT_XUJI, _SURVEY_ID, target_status="verified"
+            )
+        # UPDATE SQL 必须含 status = :current_status 乐观锁子句
+        update_sqls = [
+            s for s in sql_log if "UPDATE market_surveys" in s and "status" in s
+        ]
+        assert len(update_sqls) == 1
+        assert "status     = :current_status" in update_sqls[0] or \
+               "status = :current_status" in update_sqls[0]
+
 
 # ═════════════════════════════════════════════════════════════════════════════
 # 3. items CRUD
@@ -647,6 +696,32 @@ class TestAddItem:
                 unit_price_fen=2800,
                 qty_per_unit=Decimal("0"),
             )
+
+    @pytest.mark.asyncio
+    async def test_add_item_integrity_error_rollback_and_reset_rls(self):
+        """§19 round-1 P1-2 regression: add_item IntegrityError 后 rollback + 重设 RLS.
+
+        PRD-08 P0-3 lesson 对称守门: asyncpg IntegrityError 后底层 connection ABORTED,
+        若不 rollback + 重设 RLS, 后续 db.execute() 会触 InFailedSqlTransactionError → 500.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        fake_orig = Exception("fk_violation")
+        db, sql_log, rollback_called = _mk_db_add_item(
+            parent_survey=_survey_row(),
+            fail_with=IntegrityError(None, None, fake_orig),
+        )
+        with pytest.raises(ValueError, match="IntegrityError"):
+            await add_item(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                ingredient_name="鲈鱼",
+                unit_price_fen=2800,
+            )
+        assert rollback_called["v"] is True, "rollback 必须被调用"
+        set_configs = [s for s in sql_log if "set_config" in s]
+        assert len(set_configs) >= 2, "rollback 后必须重设 RLS (set_config 至少调 2 次)"
 
 
 class TestUpdateItem:
@@ -757,7 +832,7 @@ class TestAddPhoto:
     @pytest.mark.asyncio
     async def test_add_cover_photo_no_item_id(self):
         """调研封面图 (item_id=None) — 早市全景照."""
-        db, sql_log = _mk_db_add_photo(parent_survey=_survey_row())
+        db, sql_log, _ = _mk_db_add_photo(parent_survey=_survey_row())
         result = await add_photo(
             db,
             _TENANT_XUJI,
@@ -771,7 +846,7 @@ class TestAddPhoto:
     @pytest.mark.asyncio
     async def test_add_item_level_photo(self):
         """item-level 价签照 (鲈鱼价签近景)."""
-        db, _ = _mk_db_add_photo(
+        db, _, _ = _mk_db_add_photo(
             parent_survey=_survey_row(),
             parent_item=_item_row(survey_id=_SURVEY_ID),
         )
@@ -789,7 +864,7 @@ class TestAddPhoto:
     async def test_add_photo_cross_survey_item_raises(self):
         """item_id 属于别的 survey → ValueError (业务校验)."""
         other_item = _item_row(survey_id="99999999-0009-0009-0009-999999999999")
-        db, _ = _mk_db_add_photo(
+        db, _, _ = _mk_db_add_photo(
             parent_survey=_survey_row(),
             parent_item=other_item,
         )
@@ -804,7 +879,7 @@ class TestAddPhoto:
 
     @pytest.mark.asyncio
     async def test_add_photo_empty_url_raises(self):
-        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        db, _, _ = _mk_db_add_photo(parent_survey=_survey_row())
         with pytest.raises(ValueError, match="photo_url"):
             await add_photo(
                 db,
@@ -812,6 +887,31 @@ class TestAddPhoto:
                 survey_id=_SURVEY_ID,
                 photo_url="   ",
             )
+
+    @pytest.mark.asyncio
+    async def test_add_photo_integrity_error_rollback_and_reset_rls(self):
+        """§19 round-1 P1-2 regression: add_photo IntegrityError 后 rollback + 重设 RLS.
+
+        PRD-08 P0-3 lesson 对称守门 — 同 add_item 模式, 三处 mutation (create_survey /
+        add_item / add_photo) 全部 IntegrityError 路径必须 rollback + _set_tenant.
+        """
+        from sqlalchemy.exc import IntegrityError
+
+        fake_orig = Exception("fk_violation")
+        db, sql_log, rollback_called = _mk_db_add_photo(
+            parent_survey=_survey_row(),
+            fail_with=IntegrityError(None, None, fake_orig),
+        )
+        with pytest.raises(ValueError, match="IntegrityError"):
+            await add_photo(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                photo_url="https://cos.example.com/x.jpg",
+            )
+        assert rollback_called["v"] is True, "rollback 必须被调用"
+        set_configs = [s for s in sql_log if "set_config" in s]
+        assert len(set_configs) >= 2, "rollback 后必须重设 RLS (set_config 至少调 2 次)"
 
 
 class TestUpdatePhoto:
