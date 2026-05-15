@@ -478,8 +478,9 @@ async def publish_scheme(
                 source_service="tx-menu",
             )
         )
-    except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
-        pass
+    except (ImportError, AttributeError):
+        # 事件发射失败不影响主业务 (events module 未就绪 / MenuEventType 枚举缺失)
+        log.warning("scheme_routes.plan_published_event_emit_failed", scheme_id=scheme_id, exc_info=True)
 
     return {
         "ok": True,
@@ -610,8 +611,9 @@ async def distribute_scheme(
                 source_service="tx-menu",
             )
         )
-    except Exception:  # noqa: BLE001 — 事件发射失败不影响主业务
-        pass
+    except (ImportError, AttributeError):
+        # 事件发射失败不影响主业务 (events module 未就绪 / MenuEventType 枚举缺失)
+        log.warning("scheme_routes.plan_distributed_event_emit_failed", scheme_id=scheme_id, exc_info=True)
 
     return {
         "ok": True,
