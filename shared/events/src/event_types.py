@@ -82,6 +82,7 @@ class InventoryEventType(str, Enum):
     LOW_STOCK = "inventory.low_stock"  # 库存预警
     TRANSFER_IN = "inventory.transfer_in"  # 调拨入库
     TRANSFER_OUT = "inventory.transfer_out"  # 调拨出库
+    SPLIT_ATTRIBUTED = "inventory.split_attributed"  # PRD-11 多人合点成本分摊归属（BOM 不变, cost 切分到 N share）
 
 
 class ChannelEventType(str, Enum):

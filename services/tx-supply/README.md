@@ -371,10 +371,23 @@ class WarehouseRequisitionTemplateBinding(Base):
 - **模型**: `ProductTestStandard(ingredient_id, test_item, gb_code, threshold, frequency)`
 - **工时**: 6 人日
 
-### PRD-11 POS 销售分成转入库设置
-- **价值**: 多人合点（"2 人共享一份酸菜鱼"）按比例转入库扣料
-- **模型**: 现有 `auto_deduction` 加 `share_split_rule` 配置层
-- **工时**: 4 人日
+### PRD-11 POS 销售分成转入库设置 🚧 sub-A ship (Phase 2 W11 / v434)
+- **价值**: 多人合点（"2 人共享一份酸菜鱼"）按比例转入库扣料 — BOM 物理不变, cost 分摊到 N share, emit inventory.split_attributed event 让 tx-analytics (sub-C) 做 per-customer cost attribution
+- **模型**: `ShareSplitRule(dish_id, allow_share, default_method enum, max_share_count, is_active)`
+- **工时**: 全 scope ~10 人日 = sub-A 5 人日 + sub-B 4 人日 + sub-C 3 人日 (创始人锁定 3-way 枚举 + 业务流报表集成)
+- **集成路径**:
+  - `share_split_service.resolve_split` — 3-way enum (EVEN 余数 fen 给 share[0..r-1] / WEIGHTED 加权 + remainder 给最大 weight / MANUAL strict sum check)
+  - `auto_deduction.deduct_for_dish/order` — share_split opt-in 参数 (Tier 1 邻接, caller 激活为 sub-B follow-up)
+  - 新事件 `InventoryEventType.SPLIT_ATTRIBUTED` (`inventory.split_attributed`)
+- **3-way 拆分方法** (创始人 D2 锁定):
+  - EVEN: 1/N + 余数 fen 给 share[0..r-1] (公平)
+  - WEIGHTED: caller 传 weights[], 归一化分摊 + remainder 给 weight 最大
+  - MANUAL: caller 传 amounts_fen[], strict `sum == bom_cost_total_fen` 校验
+- **Tier 1 邻接 explicit-ask 第 28 例** ← 触 TIER1_SOURCE_PATTERNS 邻接 (auto_deduction 食安+毛利底线)
+- **sub-A 范围 (本次 ship)**: v434 schema + service CRUD + auto_deduction opt-in + 7 endpoints + Web-admin UI
+- **sub-B follow-up** (Tier 1 explicit-ask 第 29 例预期): tx-trade OrderItem.share_count 字段 + cashier_engine 集成 + caller activation
+- **sub-C follow-up**: tx-analytics per-customer cost attribution dashboard + POS UI 拆单 modal
+- **未来扩展**: dish→dept 自动 mapping (P1) / 跨日累计 (P1) / AI 推荐拆单 (Phase 4)
 
 ### PRD-12 资质证件类型字典维护 UI
 - **价值**: PRD-01 的基础数据 — 不同地区/品类要求不同证件
@@ -522,8 +535,9 @@ T3 obs Phase 4 W17+: #599/#600/#605/#614
 - **PRD-04 sub-B RFQ award 路径 + 二级审批 + #579 200 桌并发（W9 PR #647 ✅ ship，复用 v431 schema 无新 migration）**
 - **PRD-04 sub-C state transitions + supplier-portal scope + 前端 RFQManagementPage/QuotePage + AI 推荐 UI（W9-W10 本 PR，复用 v431 schema 无新 migration）**
 - **v432 PRD-07 RequisitionTemplate 3 表 + #589 purchase_orders 3 表 建表（W10 PR #651 ✅ ship）**
-- **v433 PRD-08 department_ingredient_whitelists 1 表 + RLS 四联（W11 本 PR ship，第 27 例 explicit-ask）**
-- v434+ PRD-13 sub-A MarketSurvey schema（W11-W12）
+- **v433 PRD-08 department_ingredient_whitelists 1 表 + RLS 四联（W11 PR #660 ✅ ship，第 27 例 explicit-ask）**
+- **v434 PRD-11 sub-A share_split_rules 1 表 + RLS 四联 + 3-way enum (W11 本 PR ship, 第 28 例 explicit-ask)**
+- v435+ PRD-13 sub-A MarketSurvey schema（W11-W12）
 
 #### W9 sub-B PR 立项参数（PRD-04 RFQ award 路径 + 二级审批 + #579 200 桌并发）
 
