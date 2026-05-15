@@ -323,6 +323,7 @@ def _parse_datetime(value: Any) -> datetime | None:
     try:
         return datetime.fromisoformat(str(value).replace("T", " "))
     except (ValueError, TypeError):
+        logger.warning("analytics.parse_datetime_failed", value=str(value), exc_info=True)
         return None
 
 
