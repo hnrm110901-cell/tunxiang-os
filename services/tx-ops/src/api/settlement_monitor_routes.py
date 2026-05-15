@@ -72,6 +72,7 @@ def _overdue_minutes(store: Dict[str, Any], now: datetime) -> Optional[int]:
             return int(delta.total_seconds() / 60)
         return None
     except (ValueError, AttributeError):
+        log.warning("settlement_monitor.expected_time_parse_failed", expected_str=expected_str, exc_info=True)
         return None
 
 

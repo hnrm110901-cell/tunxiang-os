@@ -284,7 +284,7 @@ async def list_sync_logs(
                     try:
                         payload_data = _json.loads(row.payload) if isinstance(row.payload, str) else row.payload
                     except (ValueError, TypeError):
-                        pass
+                        log.warning("sync_management.payload_json_parse_failed", row_id=str(row.id), exc_info=True)
 
                 items.append(
                     {

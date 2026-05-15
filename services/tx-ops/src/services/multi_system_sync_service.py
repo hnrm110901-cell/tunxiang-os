@@ -789,7 +789,7 @@ class MultiSystemSyncService:
                         errs = _json.loads(r.errors_json)
                         last_errors.extend(errs[:3])
                     except (ValueError, TypeError):
-                        pass
+                        logger.warning("multi_system_sync.errors_json_parse_failed", exc_info=True)
 
             status["systems"][system] = {
                 "last_sync_at": last_record.created_at.isoformat() if last_record.created_at else None,

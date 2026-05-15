@@ -429,7 +429,7 @@ async def get_stats(
             return {"ok": True, "data": {"stats": stats, "source": "mv_public_opinion"}}
         except SQLAlchemyError:
             # 视图不存在时降级到明细表聚合
-            pass
+            log.warning("public_opinion.mv_view_unavailable", exc_info=True)
 
         fallback_sql = text(
             f"""
