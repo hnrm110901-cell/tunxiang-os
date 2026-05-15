@@ -60,6 +60,17 @@ import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# **CI/local 兼容 fix** (round-1 §19 P2-3 fix 副作用 + first-push CI 已暴露同问题):
+# `delivery_adapter.py` L19 顶层 import `shared.ontology.src.database` →
+# database.py L14 `create_async_engine(DATABASE_URL, ...)` 触发 module-level engine 创建.
+# CI workflow 设 DATABASE_URL=postgresql://... (sync 前缀) → SQLAlchemy InvalidRequestError
+# "asyncio extension requires async driver, loaded 'psycopg2' is not async".
+# 业务源不改 (per cold-start prompt scope), 在测试模块顶端 rewrite env 为 async DSN.
+# 必须在 ANY business import 前执行 (Python 模块加载顺序保证).
+_db_url = os.environ.get("DATABASE_URL", "")
+if _db_url.startswith("postgresql://") and not _db_url.startswith("postgresql+"):
+    os.environ["DATABASE_URL"] = "postgresql+asyncpg://" + _db_url[len("postgresql://"):]
+
 # ── 路径 + namespace 包 (与 PR-2/3/4 同 pattern) ──────────────────────────────
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TX_TRADE_DIR = os.path.join(ROOT, "services", "tx-trade")
@@ -310,18 +321,13 @@ async def test_delivery_adapter_receive_order_concurrent_n10_no_duplicate(
             {"count": 1},
         )
 
-    # 主断言 (Issue #643 P2-A distinct-set + duplicate 计数):
+    # 主断言 (worker 返回率): 10 worker 全部完成应均返回 dict
+    # **§19 round-1 P2-1 fix**: 不用 workers_lock idx 串行 — 用 uuid4 worker_id 现场
+    # 生成 (天然 distinct, 不强 assert; 真信号是下方 duplicate_count/distinct_order_ids)
     dict_results = [r for r in results if isinstance(r, dict)]
     assert len(dict_results) == 10, (
         f"worker 应返回 dict, actual {len(dict_results)}/10. "
         f"non-dict: {[r for r in results if not isinstance(r, dict)][:3]}"
-    )
-    # **§19 P2-1 fix**: 用 distinct uuid worker_id 替代 workers_lock idx (后者
-    # 串行化会削弱 IntegrityError catch path 触发概率)
-    distinct_worker_ids = {r["worker_id"] for r in dict_results}
-    assert len(distinct_worker_ids) == 10, (
-        f"Issue #643 P2-A: distinct worker_id actual={len(distinct_worker_ids)} "
-        f"expected=10. uuid4 现场生成应天然 distinct (撞概率 ≈ 0)"
     )
     duplicate_count = sum(1 for r in dict_results if r["was_duplicate"])
     assert duplicate_count == 9, (
