@@ -75,7 +75,7 @@ iPad（可选）： 纯显示和触控，不连任何外设
 ```
 L4  多形态前端层    安卓POS / Windows POS / 安卓KDS / 员工PWA / iPad(可选) / 小程序 / 总部Web / 企业微信
 L3  Agent OS 层     Master Agent 编排 + 9个 Skill Agent（边缘+云端双层推理）
-L2  业务中台层      14 个微服务 × 9 大产品域 = 360+ 路由模块
+L2  业务中台层      19 个微服务 × 9 大产品域 = 540+ 路由模块（W12 战略收敛终态 17）
 L1  Ontology 层     6大实体 + 4层治理 + 3条硬约束 + PostgreSQL RLS
 L0  设备适配层      安卓POS外设接口 + Mac mini智能后台 + 旧系统Adapter（可插拔）
 ```
@@ -103,7 +103,7 @@ tunxiang-os/
     android-shell/              # Kotlin — 安卓壳层新版
     ios-shell/                  # Swift — iOS 壳层（WKWebView）
     windows-pos-shell/          # Electron — Windows POS 壳层（WebView2）
-  services/                     # 14 个业务微服务 + 2 个支撑服务（FastAPI + SQLAlchemy 2.0 + asyncpg）
+  services/                     # 19 个微服务 + gateway = 20 (5/15 实测；战略 5/12 路线图 W12 收敛终态 17)
     gateway/           :8000    # API Gateway + 域路由代理 + 租户管理
     tx-trade/          :8001    # 交易履约（90 路由文件：收银/桌台/KDS/预订/宴席/外卖）
     tx-menu/           :8002    # 菜品菜单（20 路由文件：菜品/发布/定价/套餐/做法）
@@ -114,12 +114,17 @@ tunxiang-os/
     tx-finance/        :8007    # 财务结算（20 路由文件：成本/P&L/预算/发票/月报）
     tx-agent/          :8008    # Agent OS（Master + 9 Skill Agent + 73 Actions）
     tx-analytics/      :8009    # 经营分析（28 路由文件：驾驶舱/健康度/叙事/报表）
-    tx-brain/          :8010    # AI 智能决策中枢（Claude API）
-    tx-intel/          :8011    # 商业智能（12 路由文件）
+    tx-brain/          :8010    # AI 智能决策中枢（Claude API）— W9 计划接收 tx-predict 合并
+    tx-intel/          :8011    # 商业智能（12 路由文件）— W10 计划合并入 tx-analytics
     tx-org/            :8012    # 组织人事（45 路由文件：员工/排班/角色/绩效/薪资）
-    tx-civic/          :8014    # 城市监管平台（9 路由文件：食安追溯/明厨亮灶/环保/消防/证照/上报/合规评分）
-    mcp-server/                 # MCP Protocol Server（对接 Claude Code）
-    tunxiang-api/               # 遗留 API 兼容层
+    tx-forge/          :8013    # Forge ISV 开发者市场后端 — W9 计划合并 tx-devforge
+    tx-civic/          :8014    # 城市监管平台（9 路由文件：食安追溯/明厨亮灶/环保/消防/证照/上报/合规评分）— W11 计划改回路由模块
+    tx-expense/        :8015    # 费控报销（宪法首次列入；root-dev 已实现）
+    tx-pay/            :8016    # 支付结算（微信/支付宝/云闪付/银联聚合）
+    tx-devforge/       :8017    # DevForge 内部研发平台 — W9 计划合并入 tx-forge
+    mcp-server/        :8018    # MCP Protocol Server（对接 Claude Code）
+    tx-predict/        :8019    # 预测引擎 V2（traffic_predictor / demand_predictor / staff_schedule_predictor）— W9 计划合并入 tx-brain
+    # ⚠️ tunxiang-api 已 decom（2026-05 之前）；战略 W12 终态新增 tx-ontology:8019 抽 Ontology Layer 服务
   edge/                         # Mac mini M4 边缘智能后台
     mac-station/                # FastAPI — 门店本地 API + PostgreSQL 副本
                                 # 含: print_queue.py（打印重试队列）+ order_offline_buffer.py（订单离线缓冲）+ offline_buffer.py（通用 skill 缓冲）
@@ -128,7 +133,7 @@ tunxiang-os/
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
   shared/
     ontology/                   # Ontology 实体定义（Pydantic models）
-    db-migrations/              # Alembic 迁移（229 个版本，v001-v229）
+    db-migrations/              # Alembic 迁移（5/15 实测 v417；v229→v417 = 188 版本累积）
       # v147: 统一事件存储表（events + projector_checkpoints）
       # v148: 8个物化视图（mv_discount_health/mv_channel_margin/mv_inventory_bom
       #        mv_member_clv/mv_store_pnl/mv_daily_settlement/mv_safety_compliance/mv_energy_efficiency）
