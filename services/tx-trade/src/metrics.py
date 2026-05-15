@@ -60,3 +60,13 @@ payment_saga_compensated_total = Counter(
     "支付 Saga 补偿（退款）计数，按原因分维",
     ["reason"],  # 见 payment_saga_service.compensate() 的 reason 字符串
 )
+
+# PRD-11 sub-B ITEMS_SETTLED query 失败计数
+# 当 cashier_engine.settle_order 末尾 SELECT OrderItem 抛 SQLAlchemyError 时 inc,
+# 让 SRE 能监测 share_split projector 数据源缺失 (sub-A INVENTORY.split_attributed
+# 静默丢失). 与 §19 round-1 P1-2 监控约束对齐.
+cashier_items_settled_query_failed_total = Counter(
+    "cashier_items_settled_query_failed_total",
+    "settle_order 末尾 SELECT OrderItem 失败计数 (ITEMS_SETTLED 事件缺失)",
+    ["error_class"],  # SQLAlchemyError 子类名 / "attribute_error"
+)

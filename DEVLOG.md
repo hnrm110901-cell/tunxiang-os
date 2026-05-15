@@ -1,3 +1,47 @@
+## 2026-05-15 W11 第五发 — PRD-11 sub-B OrderItem.share_count Tier 1 第 29 例 (Phase 2 W11 第五发, 5 files / +~450 / -10, 待 ship)
+
+### 今日完成
+
+- **本 session 立项**: PRD-11 sub-B tx-trade OrderItem.share_count — 激活 sub-A (PR #665 / v434 share_split_rules) 的 auto_deduction share_split opt-in 链路, 让 POS 实际开始记录每 OrderItem 的拆单人数, 给 sub-C tx-analytics per-customer cost attribution 提供数据源.
+
+- **创始人 5/15 explicit OK 4+1 决策** (本 PR 立项前):
+  - D1: **授权 + 改 entities.py** (正统 Ontology 改动, 触 §18 冻结令豁免) — 选 SoT 单源避 ORM/DB 漂移
+  - D2: **NOT NULL DEFAULT 1** — 历史 OrderItem 自动回填, 与 quantity NOT NULL 同模式
+  - D3: **share_count>1 默认 EVEN** — settle 时自动构造 share_split={method:'EVEN', count:N}
+  - D4: **settle 前可改 / settle 后冻结** — 与 §17-A/B 终态保护一致
+  - 范围决策: **settle 后异步 emit_event** (与 Phase 1 事件总线一致, **不**新增 cashier_engine → auto_deduction 跨服务 import, Tier 1 边界不裂)
+
+- **5 files 改动**:
+  - `shared/db-migrations/versions/v436_order_item_share_count.py` (新) — ALTER order_items ADD COLUMN share_count INTEGER NOT NULL DEFAULT 1 + CHECK >= 1, inspector-and-skip 模式, down_revision=v435_market_survey_schema
+  - `shared/ontology/src/entities.py` OrderItem (L447 后) — 加 share_count Mapped[int] NOT NULL server_default="1"
+  - `shared/events/src/event_types.py` OrderEventType — 加 ITEMS_SETTLED = "order.items_settled"
+  - `services/tx-trade/src/services/cashier_engine.py` 3 处:
+    - `add_item` 加 kwonly `share_count: int = 1` + 校验 >= 1 + INSERT 持久化 + emit ITEM_ADDED payload 携 share_count (sub-B.2 projector 对账双源)
+    - `update_item` 加 kwonly `share_count: Optional[int] = None` + D4 终态守门 (completed/cancelled 时 share_count 改动 ValueError) + 校验 >= 1
+    - `settle_order` 末尾新增: SELECT OrderItem WHERE order_id+tenant_id+return_flag=False → emit ITEMS_SETTLED payload 含 items[] (order_item_id/dish_id/qty/share_count/subtotal_fen) + fail-open SQLAlchemyError 兜底 (查询失败 log warn 不阻塞 settle return)
+    - imports: 加 `from sqlalchemy.exc import SQLAlchemyError`
+  - `services/tx-trade/tests/test_orderitem_share_count_tier1.py` (新, ~470 行 / 13 用例) — 4 类 TestAddItemShareCount (默认 1 / =2 / =0 ValueError / =-1 ValueError / emit payload 携 share_count) + TestUpdateItemShareCountFreeze (confirmed allowed / completed freezes / cancelled freezes / =0 raises / 不传 share_count backward compat) + TestSettleOrderEmitsItemsSettled (emit payload / fail-open / return_flag 排除) + TestEventTypeRegistered (enum 注册)
+
+### 数据变化
+- 迁移版本：v435 → **v436_order_item_share_count**
+- 新增 API 模块：0 个 (cashier_engine 内部 method signature 扩展)
+- 新增测试：13 个 (tier1)
+- 新增 event type：`OrderEventType.ITEMS_SETTLED = "order.items_settled"`
+
+### 遗留问题
+- **sub-B.2 follow-up**: tx-supply projector 消费 OrderEventType.ITEMS_SETTLED 调 auto_deduction.deduct_for_order(share_split=...) — 本 PR 仅持久化 + emit, 实际触发 deduct 留独立 PR (需 architect 评估投影器框架)
+- **sub-C follow-up**: tx-analytics per-customer cost attribution dashboard + POS UI 拆单 modal
+- **§17-D2 互补**: D4 终态守门仅限 share_count 改动 (其他字段 notes/quantity 维持 pre-existing settle 后可改行为, §17 范围外)
+- **本机 Python 3.9 测试 skip**: 与 sub-A test_share_split 一致, CI Python 3.11 才跑真用例 (feedback_pytest_stub_setdefault_pitfall lesson)
+
+### 明日计划
+- §19 reviewer round-N (业务/数据安全/Tier 1 邻接独立眼光)
+- CI 真门禁全绿 (Tier 1 Gate + Tier 1 测试 + alembic chain + RLS gate)
+- explicit-ask 创始人 admin-merge (Tier 1 第 29 例)
+- 累计 W11 第五发后, MEMORY.md `project_tunxiang_supply_phase2_w7w12.md` 同步加 entry
+
+---
+
 ## 2026-05-15 早段 (postscript) — §17-C 补遗: PR #655 OrderItem FOR UPDATE 4 路径 ship (D2 第三发 / Tier 1 fund/源 explicit-ask 第 28 例 reconciled — 最终 tally)
 
 ### 今日完成 (补遗)

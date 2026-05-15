@@ -1,3 +1,49 @@
+## 2026-05-15 W11 第五发 (in-flight) · PRD-11 sub-B OrderItem.share_count Tier 1 第 29 例 (Phase 2 W11, 待 ship)
+
+### 完成状态
+
+- [x] **范围澄清完成** — settle 后异步 emit_event (选项 1 推荐) 锁定, 不新增跨服务 import
+- [x] **5 files 改动** (5 file / +~450 / -10 / 13 用例 tier1)
+- [x] **PR #681 created** — `feat/prd11-subb-share-count` (commit `cb4babf7`)
+- [x] **§19 critic round-1 BLOCK** (2 P1):
+  - P1-1: add_item / update_item 缺 share_split_rules.allow_share 业务一致性校验 → POS 假成功 + projector 静默吞致 INVENTORY.split_attributed 永久缺失
+  - P1-2: ITEMS_SETTLED query 失败缺 Prometheus counter (graceful degradation pattern 标配, sub-A round-2 同模式 lesson)
+- [x] **§19 round-2 fix** (2 P1 修完, 3 files 改动 + 5 新测试):
+  - `cashier_engine.py` 加 `_check_share_split_rule` helper (raw SQL text() 查 share_split_rules + RLS-safe + 显式 tenant_id) + add_item / update_item share_count>1 时调用 (POS 端 fail-loud)
+  - `metrics.py` 加 `cashier_items_settled_query_failed_total` Counter (graceful prometheus stub fallback 模式与 payment_saga_total 一致)
+  - `cashier_engine.settle_order` except SQLAlchemyError block 加 `.labels(error_class=type(exc).__name__).inc()`
+  - 测试 +5 用例 (rule=None / allow_share=False / 超 max_share_count / is_active=False / share_count=1 跳过 rule check)
+- [x] **push round-2 fix** (`e65d3b08`) + CI 关键 gate 全绿 (Run Tier 1 tx-trade 22s ✅ / Fresh PG 34s ✅ / Tier 1 supply ✅ / Verify Migration Chain ✅ / frontend-build ✅ / edge-mac-station ✅ / CodeRabbit ✅ / Tier 1 brain/member ✅) + 预存漂移忽略 (python-lint-test (*) / Ruff / RLS Runtime / Test Changed Services / Tier 1 Row-Lock 自加入起所有 PR fail 按 carve-out 处理)
+- [x] **§19 critic round-2 verify**: P1-1 + P1-2 修法 PASS, 0 回归. **但新发现 P1-3** (cashier_api.py 路由层 AddItemReq/UpdateItemReq 未含 share_count → sub-B 数据面在 HTTP 边界永远 share_count=1, engine 层 dead code)
+- [x] **§19 round-3 fix** (选项 A: 本 PR 补 HTTP wiring):
+  - `cashier_api.py` AddItemReq 加 `share_count: int = Field(default=1, ge=1)` + UpdateItemReq 加 `share_count: Optional[int] = Field(default=None, ge=1)`
+  - 路由 add_item / update_item engine 调用透传 `share_count=req.share_count`
+  - 测试 +2 用例 `TestCashierApiShareCountWiring` (AddItemReq schema 默认 1 + ge=1 / UpdateItemReq 默认 None + 显式 N + ge=1)
+- [ ] **待: push round-3 fix + §19 round-3 verify + explicit-ask admin-merge**
+
+### 关键决策
+
+- **D1 (Ontology 边界)**: 改 entities.py — 正统 Ontology 改动, 创始人 OK 触 §18 冻结令豁免. **Why**: SoT 单源避 ORM/DB 漂移, 后续 sub-C tx-analytics ORM 查询不缺字段
+- **D2 (NOT NULL DEFAULT 1)**: PG 14+ ALTER ADD COLUMN ... DEFAULT 是 O(1) catalog 操作不锁表, 历史 OrderItem 自动回填 1. **Why**: 简单一致, 与 quantity NOT NULL 同模式
+- **D3 (share_count>1 默认 EVEN)**: settle 时自动构造 share_split={method:'EVEN', count:N}, POS 收银员零额外操作. **Why**: 与 W11 sub-A 3-way enum 默认行为对齐
+- **D4 (settle 前可改 / settle 后冻结)**: update_item share_count + status==completed/cancelled → ValueError 拒绝. **Why**: 与 §17-A/B 终态保护一致, ITEMS_SETTLED emit 后改 share_count 让 projector attribution 与 event payload 不一致
+- **范围 (settle 后异步 emit_event vs settle 内同进程 import deduct)**: 选 settle 后 emit, 留 tx-supply projector 异步消费. **Why**: 与 Phase 1 事件总线架构一致, **不**新增跨服务 import (Tier 1 边界不裂); 200 桌并发 settle 不直接同步等 BOM SELECT FOR UPDATE; 工时 ~4 人日合理
+
+### 下一步
+
+- push → create PR — Tier 1 fund/源 explicit-ask 第 29 例
+- §19 reviewer round-N (业务/数据安全/Tier 1 邻接独立眼光)
+- CI 真门禁全绿: Tier 1 Gate + Tier 1 测试 (Python 3.11) + alembic chain integrity + RLS gate
+- explicit-ask 创始人 admin-merge
+
+### 已知风险
+
+- **跨服务 emit 但无 projector 消费**: 本 PR emit ITEMS_SETTLED 后无下游消费者. sub-B.2 follow-up PR 必须接 projector 才让 deduct 链路真正闭环. 若不接, **生产中 INVENTORY.split_attributed 不会被 emit**, sub-A 落地仍为零
+- **fail-open 查询失败掩盖**: SQLAlchemyError 路径只 log warn 不抛, 若长期 DB 异常会让 ITEMS_SETTLED 永久缺失. 需要 Prometheus counter `items_settled_query_failed_total` 监控 (本 PR 范围外, 见 feedback_graceful_degradation_pattern)
+- **D4 仅守门 share_count**: notes/quantity settle 后改动 pre-existing 行为不动. §17 后续 PR 范围扩到全字段冻结后, 此处 D4 守门需 align 到更强约束
+
+---
+
 ## 2026-05-15 早段 (postscript) · §17-C 补遗 sediment: PR #655 OrderItem FOR UPDATE 4 路径 ship + 前 sediment PR #654 漏抓校正 (Tier 1 fund/源 explicit-ask 第 28 例 reconciled — 最终 tally)
 
 ### 完成状态
