@@ -22,6 +22,7 @@ from shared.events.src.event_types import DiscountEventType, OrderEventType, Pay
 from shared.ontology.src.entities import Customer, Dish, Order, OrderItem, Store
 from shared.ontology.src.enums import OrderStatus
 
+from ..metrics import cashier_items_settled_query_failed_total
 from ..models.enums import TableStatus
 from ..models.tables import Table
 from .payment_gateway import PaymentGateway
@@ -357,6 +358,57 @@ class CashierEngine:
     # 2. Order Items
     # ─────────────────────────────────────
 
+    async def _check_share_split_rule(self, dish_id: str, share_count: int) -> None:
+        """PRD-11 sub-B (§19 round-1 P1-1 fix) — share_count > 1 业务一致性校验.
+
+        校验 share_split_rules (v434 sub-A 配置层):
+          - rule 必须存在 (sub-A 后台已配置)
+          - rule.is_active 必须 TRUE
+          - rule.allow_share 必须 TRUE (单人套餐 / 不可拆分项 allow_share=FALSE)
+          - share_count <= rule.max_share_count (NULL 不限)
+
+        fail-loud 在 POS 端 (settle 之前) 比 projector 端 raise 更好 —
+        前者收银员还能改, 后者只能 log warn 静默吞致 INVENTORY.split_attributed
+        永久缺失 (与 sub-A apply_split L555-572 同一致校验链).
+
+        实现: raw SQL text() 不裂跨服务 import (与 wine_storage_routes 跨表
+        SELECT biz_wine_storage 同模式), 显式 WHERE tenant_id defense-in-depth
+        (cashier 类不调 _set_tenant, §17-D1 模式).
+
+        Raises:
+            ValueError: 任一约束不满足 → caller route 422 (与 sub-A pydantic
+                       ValidationError fail-loud lesson 一致, 不放 fail-open).
+        """
+        rule_result = await self.db.execute(
+            text(
+                "SELECT allow_share, max_share_count, is_active "
+                "FROM share_split_rules "
+                "WHERE tenant_id = :tenant_id AND dish_id = :dish_id "
+                "AND is_deleted = FALSE "
+                "LIMIT 1"
+            ),
+            {"tenant_id": str(self.tenant_id), "dish_id": dish_id},
+        )
+        rule_row = rule_result.fetchone()
+        if rule_row is None:
+            raise ValueError(
+                f"dish_id={dish_id} 未配置 share_split_rule, "
+                f"share_count={share_count}>1 拒绝拆单 (先在 share_split 后台添加规则)"
+            )
+        if not rule_row.is_active:
+            raise ValueError(
+                f"dish_id={dish_id} share_split_rule 已禁用 (is_active=FALSE)"
+            )
+        if not rule_row.allow_share:
+            raise ValueError(
+                f"dish_id={dish_id} 不允许分享 (allow_share=FALSE) — 单人套餐 / 不可拆分项"
+            )
+        if rule_row.max_share_count is not None and share_count > rule_row.max_share_count:
+            raise ValueError(
+                f"share_count={share_count} 超过 dish {dish_id} 上限 "
+                f"max_share_count={rule_row.max_share_count}"
+            )
+
     async def add_item(
         self,
         order_id: str,
@@ -383,6 +435,14 @@ class CashierEngine:
             raise ValueError(f"share_count 必须 >= 1, 收到 {share_count}")
         order_uuid = uuid.UUID(order_id)
         dish_uuid = uuid.UUID(dish_id) if dish_id else None
+
+        # PRD-11 sub-B §19 round-1 P1-1 fix — share_count > 1 时校验 share_split_rules
+        # (rule 存在 + is_active + allow_share=TRUE + share_count <= max_share_count).
+        # 在 POS 端 fail-loud 比 projector 端静默吞强 (前者收银员还能改).
+        # share_count==1 跳过校验 backward compat (旧 caller 不传).
+        # dish_id 为空跳过 (无菜的特殊 OrderItem 不走 share_split 路径).
+        if share_count > 1 and dish_id:
+            await self._check_share_split_rule(dish_id, share_count)
 
         # 单次查询同时获取 Order + Dish（合并 2 次 DB 往返为 1 次）
         # Tier 1 资金路径：对 Order 行加 FOR UPDATE，防 200 桌并发加菜丢更新
@@ -533,6 +593,9 @@ class CashierEngine:
                 raise ValueError(
                     f"订单状态 {order.status}, 拆单人数 share_count 冻结无法修改"
                 )
+            # §19 round-1 P1-1 fix — share_count > 1 时校验 share_split_rules.
+            # update_item 路径 dish_id 从 item.dish_id 拿 (item SELECT 在 L540+);
+            # 此处校验在 SELECT 之后 (下方 L545 处插入).
 
         # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen 算 diff 错乱
         # (audit §4.1 P1). Order 已在 L495 lock=True, OrderItem 锁是显式 + 防御性.
@@ -572,6 +635,11 @@ class CashierEngine:
             item.notes = notes
 
         if share_count is not None:
+            # §19 round-1 P1-1 fix — share_count > 1 时校验 share_split_rules.
+            # 在 item SELECT FOR UPDATE 之后, 拿到 item.dish_id (无 dish 的 OrderItem 跳过).
+            # share_count==1 跳过 (允许撤销拆单, e.g. "不拆了" 回单人).
+            if share_count > 1 and item.dish_id:
+                await self._check_share_split_rule(str(item.dish_id), share_count)
             item.share_count = share_count
 
         await self.db.flush()
@@ -1006,12 +1074,20 @@ class CashierEngine:
             # fail-open: settle 已完成 (transition_order completed + emit PAID),
             # ITEMS_SETTLED 是事件总线旁路, 读失败 log warn 不阻塞 settle return.
             # 与 inventory.split_attributed event emit 失败 fail-open 一致.
+            #
+            # §19 round-1 P1-2 fix — Prometheus counter `cashier_items_settled_query_failed_total`
+            # 监控静默缺失. SRE 通过 rate(...[5m]) > 0 告警 → 排查 share_split projector
+            # 数据源缺失 (sub-A INVENTORY.split_attributed 不再 emit).
+            # 与 feedback_graceful_degradation_pattern 一致 (structlog warn + exc_info + Prom).
             logger.warning(
                 "items_settled_query_failed",
                 order_id=order_id,
                 error=str(exc),
                 exc_info=True,
             )
+            cashier_items_settled_query_failed_total.labels(
+                error_class=type(exc).__name__
+            ).inc()
 
         if items_payload:
             asyncio.create_task(

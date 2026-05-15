@@ -89,11 +89,20 @@ def _make_item(**kw):
     return item
 
 
-def _build_db_capture(*, order=None, item=None, items_list=None, raise_items_query=False):
+def _build_db_capture(
+    *,
+    order=None,
+    item=None,
+    items_list=None,
+    raise_items_query=False,
+    share_split_rule=None,
+):
     """构造 AsyncSession mock + capture stmts.
 
     items_list: settle_order 末尾 SELECT OrderItem WHERE order_id+tenant_id+return_flag=False 返回的列表
     raise_items_query: True → settle items 查询抛 SQLAlchemyError 测 fail-open 路径
+    share_split_rule: dict(allow_share, max_share_count, is_active) | None — _check_share_split_rule
+                     调 text("SELECT ... FROM share_split_rules") 时 fetchone() 返回. None 模拟 rule 不存在.
     """
     from sqlalchemy.exc import SQLAlchemyError
 
@@ -104,9 +113,24 @@ def _build_db_capture(*, order=None, item=None, items_list=None, raise_items_que
         captured.append(stmt)
         result = MagicMock()
         stmt_str = str(stmt) if stmt is not None else ""
-        is_orderitem = "FROM order_items" in stmt_str
-        is_order = "FROM orders" in stmt_str and "FROM order_items" not in stmt_str
-        if is_orderitem:
+        is_share_split = "share_split_rules" in stmt_str.lower()
+        is_orderitem = "FROM order_items" in stmt_str and not is_share_split
+        is_order = (
+            "FROM orders" in stmt_str
+            and "FROM order_items" not in stmt_str
+            and not is_share_split
+        )
+        if is_share_split:
+            # _check_share_split_rule text() 查 share_split_rules, .fetchone() 返回 row 或 None
+            if share_split_rule is None:
+                result.fetchone = MagicMock(return_value=None)
+            else:
+                row = MagicMock()
+                row.allow_share = share_split_rule.get("allow_share", True)
+                row.max_share_count = share_split_rule.get("max_share_count", None)
+                row.is_active = share_split_rule.get("is_active", True)
+                result.fetchone = MagicMock(return_value=row)
+        elif is_orderitem:
             if raise_items_query and items_list is not None:
                 raise SQLAlchemyError("simulated query failure")
             if items_list is not None:
@@ -180,9 +204,15 @@ class TestAddItemShareCount:
 
     @pytest.mark.asyncio
     async def test_add_item_share_count_two_persists(self):
-        """share_count=2 → OrderItem.share_count=2 持久化 (徐记 2 人合点酸菜鱼场景)."""
+        """share_count=2 → OrderItem.share_count=2 持久化 (徐记 2 人合点酸菜鱼场景).
+
+        sub-A rule.allow_share=True 后, P1-1 校验通过, 持久化成功.
+        """
         order = _make_order()
-        db, _ = _build_db_capture(order=order)
+        db, _ = _build_db_capture(
+            order=order,
+            share_split_rule={"allow_share": True, "is_active": True, "max_share_count": None},
+        )
         eng = _make_engine(db)
 
         await eng.add_item(
@@ -234,10 +264,116 @@ class TestAddItemShareCount:
             )
 
     @pytest.mark.asyncio
+    async def test_add_item_share_count_two_no_rule_raises(self):
+        """§19 round-1 P1-1: share_count=2 + share_split_rule 不存在 → ValueError."""
+        order = _make_order()
+        # share_split_rule=None 模拟 sub-A 后台未配置规则
+        db, _ = _build_db_capture(order=order, share_split_rule=None)
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="未配置 share_split_rule"):
+            await eng.add_item(
+                order_id=str(ORDER_ID),
+                dish_id=str(DISH_SUANCAIYU),
+                dish_name="酸菜鱼",
+                qty=1,
+                unit_price_fen=9800,
+                share_count=2,
+            )
+
+    @pytest.mark.asyncio
+    async def test_add_item_share_count_two_allow_share_false_raises(self):
+        """§19 round-1 P1-1: share_count=2 + rule.allow_share=False → ValueError.
+
+        徐记场景: 单人套餐 (e.g. 个人小份酸菜鱼) 后台显式 allow_share=FALSE,
+        收银员误点 "2 人合点" 应在 POS 端立即拒绝, 不进入 settle 路径.
+        """
+        order = _make_order()
+        db, _ = _build_db_capture(
+            order=order,
+            share_split_rule={"allow_share": False, "is_active": True, "max_share_count": None},
+        )
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="不允许分享|allow_share"):
+            await eng.add_item(
+                order_id=str(ORDER_ID),
+                dish_id=str(DISH_SUANCAIYU),
+                dish_name="单人小份酸菜鱼",
+                qty=1,
+                unit_price_fen=4800,
+                share_count=2,
+            )
+
+    @pytest.mark.asyncio
+    async def test_add_item_share_count_exceeds_max_share_count_raises(self):
+        """§19 round-1 P1-1: share_count=5 + rule.max_share_count=3 → ValueError."""
+        order = _make_order()
+        db, _ = _build_db_capture(
+            order=order,
+            share_split_rule={"allow_share": True, "is_active": True, "max_share_count": 3},
+        )
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="超过|max_share_count"):
+            await eng.add_item(
+                order_id=str(ORDER_ID),
+                dish_id=str(DISH_SUANCAIYU),
+                dish_name="酸菜鱼",
+                qty=1,
+                unit_price_fen=9800,
+                share_count=5,
+            )
+
+    @pytest.mark.asyncio
+    async def test_add_item_share_count_inactive_rule_raises(self):
+        """§19 round-1 P1-1: share_count=2 + rule.is_active=False → ValueError."""
+        order = _make_order()
+        db, _ = _build_db_capture(
+            order=order,
+            share_split_rule={"allow_share": True, "is_active": False, "max_share_count": None},
+        )
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="已禁用|is_active"):
+            await eng.add_item(
+                order_id=str(ORDER_ID),
+                dish_id=str(DISH_SUANCAIYU),
+                dish_name="酸菜鱼",
+                qty=1,
+                unit_price_fen=9800,
+                share_count=2,
+            )
+
+    @pytest.mark.asyncio
+    async def test_add_item_share_count_one_skips_rule_check(self):
+        """share_count=1 (默认) 跳过 rule 校验 — backward compat, 旧 caller 不传时无 rule
+        也能正常下单 (sub-A 配置层落地前的过渡期不阻断业务)."""
+        order = _make_order()
+        # share_split_rule=None, 若代码错调校验会 raise; 默认 share_count=1 应跳过
+        db, _ = _build_db_capture(order=order, share_split_rule=None)
+        eng = _make_engine(db)
+
+        # 不传 share_count, 默认 1, 不应 raise
+        await eng.add_item(
+            order_id=str(ORDER_ID),
+            dish_id=str(DISH_SUANCAIYU),
+            dish_name="酸菜鱼",
+            qty=1,
+            unit_price_fen=9800,
+        )
+
+        item_added = db.add.call_args.args[0]
+        assert item_added.share_count == 1
+
+    @pytest.mark.asyncio
     async def test_add_item_emits_share_count_in_payload(self):
         """add_item emit ITEM_ADDED event payload 携 share_count (sub-B.2 projector 对账双源)."""
         order = _make_order()
-        db, _ = _build_db_capture(order=order)
+        db, _ = _build_db_capture(
+            order=order,
+            share_split_rule={"allow_share": True, "is_active": True, "max_share_count": None},
+        )
         eng = _make_engine(db)
 
         emit_calls: list = []
@@ -277,12 +413,19 @@ class TestUpdateItemShareCountFreeze:
 
     @pytest.mark.asyncio
     async def test_update_item_share_count_confirmed_allowed(self):
-        """order.status=confirmed → share_count 改动成功 (settle 前)."""
+        """order.status=confirmed → share_count 改动成功 (settle 前).
+
+        sub-A rule.allow_share=True 让 P1-1 校验通过.
+        """
         from shared.ontology.src.enums import OrderStatus
 
         order = _make_order(status=OrderStatus.confirmed.value)
         item = _make_item(share_count=1)
-        db, _ = _build_db_capture(order=order, item=item)
+        db, _ = _build_db_capture(
+            order=order,
+            item=item,
+            share_split_rule={"allow_share": True, "is_active": True, "max_share_count": None},
+        )
         eng = _make_engine(db)
 
         result = await eng.update_item(

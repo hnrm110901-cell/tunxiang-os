@@ -3,14 +3,17 @@
 ### 完成状态
 
 - [x] **范围澄清完成** — settle 后异步 emit_event (选项 1 推荐) 锁定, 不新增跨服务 import
-- [x] **5 files 改动** (5 file / +~450 / -10 / 13 用例 tier1):
-  - `shared/db-migrations/versions/v436_order_item_share_count.py` (新, 80 行) — ALTER order_items ADD COLUMN share_count + CHECK >= 1
-  - `shared/ontology/src/entities.py:447` — OrderItem 加 share_count Mapped[int] NOT NULL server_default=1
-  - `shared/events/src/event_types.py:38` — OrderEventType.ITEMS_SETTLED 注册
-  - `services/tx-trade/src/services/cashier_engine.py` — add_item / update_item kwonly share_count + settle_order 末尾 emit ITEMS_SETTLED + SQLAlchemyError fail-open
-  - `services/tx-trade/tests/test_orderitem_share_count_tier1.py` (新, ~470 行 / 13 tier1 用例)
-- [x] **syntax check 4 files OK** + Python 3.9 自身 skip guard 与 sub-A 一致
-- [ ] **待: push + create PR + §19 reviewer round-N + explicit-ask admin-merge**
+- [x] **5 files 改动** (5 file / +~450 / -10 / 13 用例 tier1)
+- [x] **PR #681 created** — `feat/prd11-subb-share-count` (commit `cb4babf7`)
+- [x] **§19 critic round-1 BLOCK** (2 P1):
+  - P1-1: add_item / update_item 缺 share_split_rules.allow_share 业务一致性校验 → POS 假成功 + projector 静默吞致 INVENTORY.split_attributed 永久缺失
+  - P1-2: ITEMS_SETTLED query 失败缺 Prometheus counter (graceful degradation pattern 标配, sub-A round-2 同模式 lesson)
+- [x] **§19 round-2 fix** (2 P1 修完, 3 files 改动 + 5 新测试):
+  - `cashier_engine.py` 加 `_check_share_split_rule` helper (raw SQL text() 查 share_split_rules + RLS-safe + 显式 tenant_id) + add_item / update_item share_count>1 时调用 (POS 端 fail-loud)
+  - `metrics.py` 加 `cashier_items_settled_query_failed_total` Counter (graceful prometheus stub fallback 模式与 payment_saga_total 一致)
+  - `cashier_engine.settle_order` except SQLAlchemyError block 加 `.labels(error_class=type(exc).__name__).inc()`
+  - 测试 +5 用例 (rule=None / allow_share=False / 超 max_share_count / is_active=False / share_count=1 跳过 rule check)
+- [ ] **待: push round-2 fix + §19 round-2 verify + CI 真门禁全绿 + explicit-ask admin-merge**
 
 ### 关键决策
 
