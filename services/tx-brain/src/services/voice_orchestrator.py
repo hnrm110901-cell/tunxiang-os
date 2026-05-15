@@ -234,7 +234,7 @@ class VoiceOrchestrator:
                 try:
                     os.unlink(tmp_path)
                 except OSError:
-                    pass
+                    logger.warning("voice_orchestrator.tmp_audio_unlink_failed", path=str(tmp_path), exc_info=True)
 
     def _transcribe_mock(self, audio_bytes: bytes, language: str, start: float) -> dict[str, Any]:
         """Mock 转写（Whisper 不可用时）。根据音频长度模拟。"""

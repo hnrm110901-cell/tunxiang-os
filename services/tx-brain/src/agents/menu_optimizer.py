@@ -205,7 +205,7 @@ class MenuOptimizer:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("menu_optimizer.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "menu_optimizer_parse_failed",

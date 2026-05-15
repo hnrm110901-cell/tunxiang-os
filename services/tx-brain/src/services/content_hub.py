@@ -629,7 +629,7 @@ class ContentHub:
                 try:
                     await db_gen.aclose()
                 except (OSError, RuntimeError):
-                    pass
+                    logger.warning("content_hub.db_session_aclose_failed", exc_info=True)
 
     def _build_generation_prompt(self, request: CampaignContentRequest) -> str:
         """构建发给 Claude 的生成提示词。

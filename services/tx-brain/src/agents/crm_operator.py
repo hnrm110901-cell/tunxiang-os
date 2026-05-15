@@ -213,7 +213,7 @@ class CRMOperator:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("crm_operator.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "crm_operator_parse_failed",

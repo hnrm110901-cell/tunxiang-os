@@ -251,7 +251,7 @@ class InventorySentinelAgent:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("inventory_sentinel.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "inventory_sentinel_parse_failed",

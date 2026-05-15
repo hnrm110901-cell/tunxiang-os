@@ -123,7 +123,7 @@ class MemberInsightAgent:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("member_insight.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "member_insight_parse_failed",
