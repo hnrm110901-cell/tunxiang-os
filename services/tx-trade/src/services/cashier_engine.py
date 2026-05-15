@@ -494,11 +494,15 @@ class CashierEngine:
         item_uuid = uuid.UUID(item_id)
         order = await self._get_order(order_uuid, lock=True)
 
+        # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen 算 diff 错乱
+        # (audit §4.1 P1). Order 已在 L495 lock=True, OrderItem 锁是显式 + 防御性.
         result = await self.db.execute(
-            select(OrderItem).where(
+            select(OrderItem)
+            .where(
                 OrderItem.id == item_uuid,
                 OrderItem.order_id == order_uuid,
             )
+            .with_for_update()
         )
         item = result.scalar_one_or_none()
         if not item:
@@ -540,15 +544,23 @@ class CashierEngine:
         item_id: str,
         reason: str = "",
     ) -> dict:
-        """删菜 — 记录原因并自动重算总额"""
+        """删菜 — 记录原因并自动重算总额
+
+        §17-C: OrderItem FOR UPDATE 防 stale subtotal 算 deducted 错乱 +
+        Order FOR UPDATE 防 Python-side `new_total = total - deducted` UPDATE
+        literal value 的 SELECT-then-UPDATE race (audit §4.1 P1).
+        """
         item_uuid = uuid.UUID(item_id)
         order_uuid = uuid.UUID(order_id)
 
+        # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal
         result = await self.db.execute(
-            select(OrderItem).where(
+            select(OrderItem)
+            .where(
                 OrderItem.id == item_uuid,
                 OrderItem.order_id == order_uuid,
             )
+            .with_for_update()
         )
         item = result.scalar_one_or_none()
         if not item:
@@ -560,8 +572,8 @@ class CashierEngine:
         item.return_flag = True
         item.return_reason = reason
 
-        # 更新订单总额
-        order = await self._get_order(order_uuid)
+        # §17-C: _get_order(lock=True) 防 Python-side recalc race
+        order = await self._get_order(order_uuid, lock=True)
         new_total = order.total_amount_fen - deducted
         new_final = new_total - order.discount_amount_fen
 
