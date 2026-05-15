@@ -469,7 +469,7 @@ async def get_dispatch_dashboard(
             if now_ > sla_deadline:
                 is_overdue = True
         except (ValueError, TypeError):
-            pass
+            log.warning("auto_dispatch.sla_deadline_parse_failed", sla_deadline=sla_deadline_str, exc_info=True)
 
         if is_overdue or status == "escalated":
             overdue.append(task)

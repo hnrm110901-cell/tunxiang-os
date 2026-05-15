@@ -137,7 +137,7 @@ def _row_to_task(row: Any) -> Dict[str, Any]:
             if deadline_dt < datetime.now(tz=timezone.utc):
                 api_status = "overdue"
         except (ValueError, TypeError):
-            pass
+            log.warning("rectification.deadline_parse_failed", deadline=deadline_str, exc_info=True)
 
     severity_raw = row.severity or "info"
     severity_api = _SEVERITY_MAP.get(severity_raw, "medium")
@@ -426,7 +426,7 @@ async def create_rectification_task(
         try:
             due_date_val = datetime.fromisoformat(body.deadline).date().isoformat()
         except (ValueError, TypeError):
-            pass
+            log.warning("rectification.due_date_parse_failed", deadline=body.deadline, exc_info=True)
 
         await db.execute(
             text(

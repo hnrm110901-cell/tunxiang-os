@@ -248,7 +248,8 @@ async def _build_node_statuses(
                 "E8_巡店质检": e8,
             }
         except (ConnectionRefusedError, OSError, RuntimeError):
-            pass  # fall through to memory
+            log.warning("daily_settlement.redis_check_failed", exc_info=True)
+            # fall through to memory
 
     return {
         "E1_班次交班": _check_e1_status_fallback(store_id, date_str, tenant_id),
