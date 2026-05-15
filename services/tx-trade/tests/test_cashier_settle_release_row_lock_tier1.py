@@ -300,6 +300,8 @@ class TestCashierTransferTableReleaseOrderId:
         source_table = MagicMock()
         source_table.table_no = "A01"
         source_table.status = "occupied"
+        # §17-D2 不变量: source.current_order_id 必须 == order.id
+        source_table.current_order_id = order.id
         target_table = MagicMock()
         target_table.table_no = "B01"
         target_table.status = "free"
