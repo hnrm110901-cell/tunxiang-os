@@ -265,9 +265,19 @@ class OrderService:
         return {"item_id": str(item.id), "subtotal_fen": subtotal_fen}
 
     async def update_item_quantity(self, item_id: str, new_quantity: int) -> dict:
+        """改菜数量
+
+        §17-C: SELECT OrderItem FOR UPDATE 防 200 桌并发改同 item 用 stale
+        subtotal_fen 算 diff 错乱 (audit §4.1 P1). Order UPDATE 用 raw
+        arithmetic `Order.total_amount_fen + diff` 是 PG 原子, 不需 Order FOR UPDATE.
+        """
         await self._set_tenant()
+        # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen
         result = await self.db.execute(
-            select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id)
+            select(OrderItem)
+            .where(OrderItem.id == uuid.UUID(item_id))
+            .where(OrderItem.tenant_id == self.tenant_id)
+            .with_for_update()
         )
         item = result.scalar_one_or_none()
         if not item:
@@ -288,9 +298,19 @@ class OrderService:
         return {"item_id": item_id, "new_quantity": new_quantity, "diff_fen": diff}
 
     async def remove_item(self, item_id: str) -> dict:
+        """删菜
+
+        §17-C: SELECT OrderItem FOR UPDATE 防 200 桌并发删/改同 item 用 stale
+        subtotal_fen 算 deducted 错乱 (audit §4.1 P1). Order UPDATE 用 raw
+        arithmetic `Order.total_amount_fen - item.subtotal_fen` 是 PG 原子.
+        """
         await self._set_tenant()
+        # §17-C: SELECT OrderItem FOR UPDATE 防 stale subtotal_fen
         result = await self.db.execute(
-            select(OrderItem).where(OrderItem.id == uuid.UUID(item_id)).where(OrderItem.tenant_id == self.tenant_id)
+            select(OrderItem)
+            .where(OrderItem.id == uuid.UUID(item_id))
+            .where(OrderItem.tenant_id == self.tenant_id)
+            .with_for_update()
         )
         item = result.scalar_one_or_none()
         if not item:
