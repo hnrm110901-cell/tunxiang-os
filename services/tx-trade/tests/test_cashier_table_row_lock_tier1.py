@@ -278,7 +278,8 @@ class TestTransferTableRowLock:
         deterministic 安全.
         """
         order = _make_order_for_transfer(table_number="A01")
-        source = _make_table(table_no="A01", status="occupied")
+        # §17-D2 不变量: source.current_order_id 必须 == order.id (transfer 入口 guard)
+        source = _make_table(table_no="A01", status="occupied", current_order_id=ORDER_ID)
         target = _make_table(table_no="B01", status="free")
 
         db, captured = _build_db_capture(
@@ -318,7 +319,8 @@ class TestTransferTableRowLock:
         )
 
         order = _make_order_for_transfer(table_number="A01")
-        source = _make_table(table_no="A01", status="occupied")
+        # §17-D2 不变量: source.current_order_id 必须 == order.id
+        source = _make_table(table_no="A01", status="occupied", current_order_id=ORDER_ID)
         # 目标桌已 occupied (其他订单)
         target_occupied = _make_table(table_no="B01", status="occupied")
 
@@ -329,6 +331,76 @@ class TestTransferTableRowLock:
         eng = _make_engine(db)
 
         with pytest.raises(TableOccupiedError, match="并发占用"):
+            await eng.transfer_table(
+                order_id=str(ORDER_ID),
+                target_table_no="B01",
+            )
+
+
+# ─── §17-D2 transfer_table source_table.current_order_id 不变量 ───────────────
+
+
+class TestTransferTableSourceInvariant:
+    """§17-D2: transfer_table source_table.current_order_id 不变量校验.
+
+    §17-A pre-existing scope (PR #652 仅校验 source 存在) + §17-B round-1 P2 落
+    follow-up. race 场景: settle 已释放源桌 (current_order_id 切 NULL 或被新 order
+    重 occupy), transfer 不应继续把 target 占住 + 改 completed 订单 table_number.
+
+    与 §17-B 3B 幂等下游污染面收紧互补 — §17-B 让 _release_table 旧 order_id
+    不污染新 occupy; §17-D2 让 transfer 入口直接拒绝 stale source 引用.
+
+    关联: §17-C PR #655 round-1 P2 / audit doc §11.4 §17-D2.
+    """
+
+    @pytest.mark.asyncio
+    async def test_transfer_table_raises_when_source_released_by_settle(self):
+        """§17-D2: settle 已释放源桌 (source.current_order_id=None) → transfer 拒绝.
+
+        真实场景: 服务员 POS 触发 settle 完成 → 源桌 release → 同时 PWA 触发 transfer
+        操作落地; transfer 拿到 source.current_order_id=None ≠ order_uuid → 拒绝.
+        """
+        order = _make_order_for_transfer(table_number="A01")
+        # source 已被 settle 释放: current_order_id=None
+        source_released = _make_table(table_no="A01", status="free", current_order_id=None)
+        target = _make_table(table_no="B01", status="free")
+
+        db, _ = _build_db_capture(
+            order_to_return=order,
+            tables_in_clause=[source_released, target],
+        )
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="不匹配"):
+            await eng.transfer_table(
+                order_id=str(ORDER_ID),
+                target_table_no="B01",
+            )
+
+    @pytest.mark.asyncio
+    async def test_transfer_table_raises_when_source_reoccupied_by_other_order(self):
+        """§17-D2: source 被新 order 重 occupy → transfer 拒绝, 不污染新 order.
+
+        race 场景: settle 释放源桌 → 新 order 重 occupy → 旧 transfer 重试.
+        source.current_order_id = 新 order_id ≠ 旧 order_uuid → 拒绝.
+        """
+        import uuid as _u
+
+        order = _make_order_for_transfer(table_number="A01")
+        # source 已被新 order 重 occupy
+        new_order_id = _u.uuid4()
+        source_reoccupied = _make_table(
+            table_no="A01", status="occupied", current_order_id=new_order_id
+        )
+        target = _make_table(table_no="B01", status="free")
+
+        db, _ = _build_db_capture(
+            order_to_return=order,
+            tables_in_clause=[source_reoccupied, target],
+        )
+        eng = _make_engine(db)
+
+        with pytest.raises(ValueError, match="不匹配"):
             await eng.transfer_table(
                 order_id=str(ORDER_ID),
                 target_table_no="B01",

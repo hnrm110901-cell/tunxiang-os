@@ -1471,6 +1471,19 @@ class CashierEngine:
                 f"源桌台不存在或已停用: {old_table_no} — 无法转台"
             )
 
+        # §17-D2 (§17-A pre-existing scope / §17-B round-1 P2): source_table
+        # current_order_id 不变量校验 — 若并发 settle/cancel 已释放源桌
+        # (current_order_id 切到 NULL 或被新 order 重 occupy), transfer 不能
+        # 继续把 target_table 占住 + 改 completed 订单 table_number.
+        # 与 §17-B 3B 幂等下游污染面收紧互补 (§17-B 让 _release_table 旧 order_id
+        # 不污染新 occupy; §17-D2 让 transfer 入口直接拒绝).
+        if source_table.current_order_id != order_uuid:
+            raise ValueError(
+                f"源桌台 {old_table_no} 当前关联 order "
+                f"({source_table.current_order_id}) 与请求 order ({order_uuid}) "
+                "不匹配 — 可能并发 settle/cancel 已释放源桌, 请刷新桌台地图"
+            )
+
         if target_table.status != TableStatus.free.value:
             raise TableOccupiedError(
                 f"目标桌台 {target_table_no} 当前状态 {target_table.status}，"

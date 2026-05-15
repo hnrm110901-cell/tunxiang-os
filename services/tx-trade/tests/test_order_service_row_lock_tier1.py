@@ -248,34 +248,25 @@ class TestGetOrderHelperContract:
         )
 
 
-class TestApplyDiscountStatusValidationGap:
-    """Issue #559 verification: `order_service.apply_discount` 不校验 order.status.
+class TestApplyDiscountStatusGuard:
+    """§17-D2 (closes issue #559): `order_service.apply_discount` status guard.
 
-    main 既存 bug（PR-E #560 未引入）— `apply_discount` 在 status=completed/cancelled
-    的终态订单上仍可写 discount_amount_fen / final_amount_fen, 无 status guard.
+    main fix: apply_discount 拒绝 completed/cancelled 终态订单 — 防 POS 误操作 /
+    后台脚本 bug 让已结订单 discount + final_amount_fen 漂移.
 
-    本类两用例:
-    - T1 (PASS): 文档化当前 broken 行为 — apply_discount on completed order **当前会通过**,
-      返回 final_fen 而不抛异常. 锁定 main 既存状态防意外 silent fix 不被发现.
-    - T2 (XFAIL strict): 期望 fix 后 apply_discount 抛 ValueError. 当 fix ship,
-      test 应翻 PASS → strict xfail 强制 unxfail 提醒维护者移除 xfail 标记.
+    与 cashier_engine.cancel_order L965-968 同模式 status guard.
 
-    与 §17 桌台并发对齐 follow-up 关联: fix 路径属 §17-D follow-up PR scope
-    (audit doc §11.4) — 本 verification test 不阻塞 §17 PR ship, 仅作 audit 占位.
-
-    关联: issue #559 / PR #560 (PR-E) §19 reviewer P1#1 / audit doc §11.1 "与 §17 关联".
+    关联: issue #559 / PR #560 (PR-E) §19 reviewer P1#1 / audit doc §11.4 §17-D2.
     """
 
     @pytest.mark.asyncio
-    async def test_apply_discount_currently_accepts_completed_order_broken_state(self):
-        """文档化 main broken state — apply_discount(status=completed) 当前不抛异常.
+    async def test_apply_discount_rejects_completed_order(self):
+        """§17-D2: apply_discount(status=completed) → raise ValueError "已结算".
 
-        若本测试 fail (即未来 apply_discount 加了 status guard), 应同时检查 T2 xfail
-        是否需翻为 PASS + 移除 xfail 标记. 见 issue #559.
+        真实场景: POS 收银员对已结订单误操作打折 / 后台批量改折扣脚本未过滤 status.
         """
         from shared.ontology.src.enums import OrderStatus
 
-        # 已结订单 — 真实场景: POS 收银员误操作 / 后台批量改折扣脚本 bug
         order = _make_order(
             status=OrderStatus.completed.value,
             total_amount_fen=10000,
@@ -284,54 +275,28 @@ class TestApplyDiscountStatusValidationGap:
         db, _captured = _build_db_capture(order)
         svc = _make_service(db)
 
-        # main 既存行为: 不抛异常, 返回 discount 应用结果
-        result = await svc.apply_discount(
-            order_id=str(ORDER_ID), discount_fen=2000, reason="audit"
-        )
+        with pytest.raises(ValueError, match="已结算订单无法应用折扣"):
+            await svc.apply_discount(
+                order_id=str(ORDER_ID), discount_fen=2000, reason="audit"
+            )
 
-        # 锁定 broken 行为 — 应用成功, final_fen 计算出
-        assert result["order_id"] == str(ORDER_ID), (
-            "issue #559 audit: 当前 main apply_discount 不校验 status, "
-            "在 completed 订单上仍返回成功. 若本断言 fail, 表明 status guard 已加, "
-            "应同步翻 T2 xfail 为 PASS 并移除 strict xfail 标记."
-        )
-        assert result["final_fen"] == 8000, (
-            "issue #559 audit: discount 在 completed 订单仍生效, final_amount_fen "
-            "= total - discount = 8000. 这是 main 既存 bug."
-        )
-
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "issue #559 — apply_discount 应校验 order.status 拒绝终态订单 "
-            "(completed/cancelled), 但 main 既存 bug 未加 guard. "
-            "fix 路径属 §17-D follow-up PR scope (audit doc §11.4). "
-            "Strict: fix ship 后本测试翻 PASS → strict 强制 unxfail 提醒移除标记."
-        ),
-    )
     @pytest.mark.asyncio
-    async def test_apply_discount_should_reject_completed_order_after_fix(self):
-        """期望 fix 后行为 — apply_discount(status=completed) 抛 ValueError.
+    async def test_apply_discount_rejects_cancelled_order(self):
+        """§17-D2: apply_discount(status=cancelled) → raise ValueError "已取消".
 
-        修复模板 (建议 fix PR 实现):
-            if order.status not in (OrderStatus.confirmed.value, OrderStatus.preparing.value):
-                raise ValueError(f"Cannot apply discount to order in status: {order.status}")
-
-        修复决策点: confirmed / preparing 后能否改折扣 (§17 创始人对齐场景).
-        修复 PR 模板见 issue #559 body 末尾.
+        与 completed 拒绝同模式 — 已取消订单不应再改折扣.
         """
         from shared.ontology.src.enums import OrderStatus
 
         order = _make_order(
-            status=OrderStatus.completed.value,
+            status=OrderStatus.cancelled.value,
             total_amount_fen=10000,
-            completed_at=datetime.now(timezone.utc),
+            order_metadata={"cancel_reason": "客户改单"},
         )
         db, _captured = _build_db_capture(order)
         svc = _make_service(db)
 
-        # 期望 fix 后抛 ValueError; 当前 main 不抛 → xfail 标记吸收
-        with pytest.raises(ValueError, match=r"(status|完结|completed|cancelled)"):
+        with pytest.raises(ValueError, match="订单已取消"):
             await svc.apply_discount(
                 order_id=str(ORDER_ID), discount_fen=2000, reason="audit"
             )
