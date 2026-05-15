@@ -3,12 +3,16 @@
 领用流程: 创建领用单 → 出库 → 退回(可选)
 部门间调拨: 发起 → 确认
 出料率抽检: 实际产出量 / 理论产出量
+
+PRD-08（2026-05-15）：create_issue_order 集成 dept_whitelist_service.validate_ingredient_allowed
+硬阻塞违反白名单的领料请求，防早餐档"串货"领高档食材（毛利底线硬约束）。
 """
 
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
 import structlog
@@ -36,6 +40,8 @@ async def create_issue_order(
     operator_id: str,
     tenant_id: str,
     db: Any,
+    *,
+    enforce_whitelist: bool = True,
 ) -> Dict[str, Any]:
     """创建部门领用单。
 
@@ -46,12 +52,46 @@ async def create_issue_order(
         operator_id: 操作人 ID
         tenant_id: 租户 ID
         db: 数据库会话
+        enforce_whitelist: PRD-08 — True 时领料前校验部门用料白名单 (D2 硬阻塞)；
+                           db=None 或非真实 session 时（如 stub 测试）自动跳过校验。
+                           违反 raise IngredientNotAllowedError。
 
     Returns:
         领用单
+
+    Raises:
+        IngredientNotAllowedError: PRD-08 白名单硬阻塞 — 部门未授权领该食材或超日上限
     """
     if not items:
         raise ValueError("领用单必须包含至少一项商品")
+
+    # PRD-08 白名单硬阻塞 — 领料前逐行校验 (D2 锁定: 硬阻塞 + audit log)
+    # 校验失败 raise IngredientNotAllowedError, 调用方（路由层）映射 403 Forbidden
+    # 注意: enforce_whitelist=False 仅供 unit test stub 场景使用; 生产路径必须 True
+    if enforce_whitelist:
+        # 延迟 import 避免循环依赖 (dept_whitelist_service 不依赖 dept_issue)
+        from .dept_whitelist_service import validate_ingredient_allowed
+
+        for item in items:
+            ingredient_id = item.get("ingredient_id")
+            if not ingredient_id:
+                continue  # 容忍 broken row, 与 auto_deduction 一致
+            qty_raw = item.get("quantity")
+            qty: Optional[Decimal] = None
+            if qty_raw is not None:
+                try:
+                    qty = Decimal(str(qty_raw))
+                except (ValueError, TypeError, ArithmeticError):
+                    qty = None  # 非数值 quantity 视为未提供, 仅校验白名单存在性
+            await validate_ingredient_allowed(
+                db,
+                tenant_id,
+                dept_id=dept_id,
+                ingredient_id=str(ingredient_id),
+                qty=qty,
+                raise_on_violation=True,
+                ingredient_name_hint=item.get("name"),
+            )
 
     issue_id = _gen_id("iss")
     now = _now_iso()

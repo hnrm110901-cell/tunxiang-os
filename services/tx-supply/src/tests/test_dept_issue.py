@@ -28,7 +28,10 @@ class TestCreateIssueOrder:
             {"ingredient_id": "i1", "name": "鲈鱼", "quantity": 5, "unit": "kg", "unit_cost_fen": 3500},
             {"ingredient_id": "i2", "name": "虾", "quantity": 3, "unit": "kg", "unit_cost_fen": 5000},
         ]
-        result = await create_issue_order("store_1", "kitchen", items, "emp_1", "t1", db=None)
+        # PRD-08: enforce_whitelist=False 保留 stub 测试语义（db=None 不可调白名单 service）
+        result = await create_issue_order(
+            "store_1", "kitchen", items, "emp_1", "t1", db=None, enforce_whitelist=False
+        )
         assert result["issue_id"].startswith("iss_")
         assert result["status"] == "issued"
         assert result["item_count"] == 2
@@ -39,7 +42,9 @@ class TestCreateIssueOrder:
     @pytest.mark.asyncio
     async def test_empty_items_raises(self):
         with pytest.raises(ValueError, match="至少一项"):
-            await create_issue_order("store_1", "kitchen", [], "emp_1", "t1", db=None)
+            await create_issue_order(
+                "store_1", "kitchen", [], "emp_1", "t1", db=None, enforce_whitelist=False
+            )
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
