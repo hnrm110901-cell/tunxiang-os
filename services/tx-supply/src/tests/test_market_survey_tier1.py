@@ -44,10 +44,12 @@ from services.tx_supply.src.services.market_survey_service import (  # noqa: E40
     list_items_by_survey,
     list_photos_by_survey,
     list_surveys,
+    search_ingredients_by_name,
     transition_status,
     update_item,
     update_photo,
     update_survey,
+    upload_photo_for_survey,
 )
 
 
@@ -1035,3 +1037,253 @@ class TestGetSurveyDetail:
         db.execute = AsyncMock(side_effect=execute_side_effect)
         detail = await get_survey_detail(db, _TENANT_XUJI, _SURVEY_ID)
         assert detail is None
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. sub-B: upload_photo_for_survey (mime + size 守门 + 复用 add_photo)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _tiny_jpeg_bytes() -> bytes:
+    """最小合法 JPEG (SOI + EOI marker, 2 字节). 测试用, size 校验时通过."""
+    return b"\xff\xd8\xff\xd9"
+
+
+class TestUploadPhotoForSurvey:
+    @pytest.mark.asyncio
+    async def test_upload_jpeg_basic_round_trip(self):
+        """采购总监 iPad 拍照上传鲈鱼价签 — 完整流程."""
+        db, sql_log = _mk_db_add_photo(parent_survey=_survey_row())
+        result = await upload_photo_for_survey(
+            db,
+            _TENANT_XUJI,
+            survey_id=_SURVEY_ID,
+            raw_bytes=_tiny_jpeg_bytes(),
+            mime_type="image/jpeg",
+            caption="鲈鱼 28/斤 价签",
+        )
+        assert result is not None
+        # 验证 add_photo 真被调用 (INSERT INTO market_survey_photos)
+        insert_sqls = [s for s in sql_log if "INSERT INTO market_survey_photos" in s]
+        assert len(insert_sqls) == 1
+
+    @pytest.mark.asyncio
+    async def test_upload_png_allowed(self):
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        result = await upload_photo_for_survey(
+            db,
+            _TENANT_XUJI,
+            survey_id=_SURVEY_ID,
+            raw_bytes=_tiny_jpeg_bytes(),
+            mime_type="image/png",
+        )
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_upload_webp_allowed(self):
+        """webp 是 iOS 17+ 默认共享格式, 必须支持."""
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        result = await upload_photo_for_survey(
+            db,
+            _TENANT_XUJI,
+            survey_id=_SURVEY_ID,
+            raw_bytes=_tiny_jpeg_bytes(),
+            mime_type="image/webp",
+        )
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_upload_heic_allowed(self):
+        """heic 是 iOS 默认相机格式, 必须支持避免转码."""
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        result = await upload_photo_for_survey(
+            db,
+            _TENANT_XUJI,
+            survey_id=_SURVEY_ID,
+            raw_bytes=_tiny_jpeg_bytes(),
+            mime_type="image/heic",
+        )
+        assert result is not None
+
+    @pytest.mark.asyncio
+    async def test_upload_unsupported_mime_raises(self):
+        """text/plain 等非图片类型必须拦截 (415 unsupported_media_type)."""
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        with pytest.raises(ValueError, match="不支持的 mime_type"):
+            await upload_photo_for_survey(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                raw_bytes=b"\x00\x01\x02",
+                mime_type="text/plain",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_pdf_unsupported(self):
+        """application/pdf 也必须拦 (恶意伪装上传)."""
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        with pytest.raises(ValueError, match="不支持的 mime_type"):
+            await upload_photo_for_survey(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                raw_bytes=b"%PDF-1.4",
+                mime_type="application/pdf",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_empty_file_raises(self):
+        """0 字节文件 (前端误传) → ValueError."""
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        with pytest.raises(ValueError, match="为空"):
+            await upload_photo_for_survey(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                raw_bytes=b"",
+                mime_type="image/jpeg",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_oversize_raises(self):
+        """超 5MB 拦截 (413 payload_too_large) — 防 OOM + 防恶意."""
+        oversize = b"\xff\xd8" + b"\x00" * (5 * 1024 * 1024 + 1)
+        db, _ = _mk_db_add_photo(parent_survey=_survey_row())
+        with pytest.raises(ValueError, match="超过单张上限"):
+            await upload_photo_for_survey(
+                db,
+                _TENANT_XUJI,
+                survey_id=_SURVEY_ID,
+                raw_bytes=oversize,
+                mime_type="image/jpeg",
+            )
+
+    @pytest.mark.asyncio
+    async def test_upload_with_item_id_passes_to_add_photo(self):
+        """item-level 上传 (鲈鱼价签近景) — item_id 必须透传到 add_photo 业务校验."""
+        db, sql_log = _mk_db_add_photo(
+            parent_survey=_survey_row(),
+            parent_item=_item_row(survey_id=_SURVEY_ID),
+        )
+        result = await upload_photo_for_survey(
+            db,
+            _TENANT_XUJI,
+            survey_id=_SURVEY_ID,
+            raw_bytes=_tiny_jpeg_bytes(),
+            mime_type="image/jpeg",
+            item_id=_ITEM_ID,
+            caption="鲈鱼价签近景",
+        )
+        assert result is not None
+        # 关键: add_photo 路径里有 get_item 校验跨 survey, 应该被命中 (SELECT FROM market_survey_items)
+        item_sqls = [s for s in sql_log if "FROM market_survey_items" in s]
+        assert len(item_sqls) >= 1
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 7. sub-B: search_ingredients_by_name (autocomplete)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+def _ingredient_row(*, name: str = "鲈鱼", unit: str = "斤") -> dict:
+    return {
+        "id": "22222222-0001-0001-0001-222222222222",
+        "ingredient_name": name,
+        "unit": unit,
+        "category": "海鲜",
+    }
+
+
+def _mk_db_search_ingredients(rows: list[dict]):
+    sql_log: list[str] = []
+    captured_params: list[dict] = []
+    db = AsyncMock()
+
+    async def execute_side_effect(query, params=None):
+        sql = str(query)
+        sql_log.append(sql)
+        if params is not None:
+            captured_params.append(dict(params))
+        if "set_config" in sql:
+            return _FakeResult(None)
+        if "FROM ingredients" in sql:
+            res = MagicMock()
+            res.mappings.return_value.all.return_value = rows
+            return res
+        return _FakeResult(None)
+
+    db.execute = AsyncMock(side_effect=execute_side_effect)
+    return db, sql_log, captured_params
+
+
+class TestSearchIngredientsByName:
+    @pytest.mark.asyncio
+    async def test_search_basic_returns_rows(self):
+        """采购总监输入'鲈' → autocomplete 返回鲈鱼候选."""
+        rows = [_ingredient_row(name="鲈鱼"), _ingredient_row(name="鲈鱼片")]
+        db, sql_log, params = _mk_db_search_ingredients(rows)
+        result = await search_ingredients_by_name(db, _TENANT_XUJI, q="鲈")
+        assert len(result) == 2
+        # 验证 ILIKE pattern 含 q 字面量 + % 通配
+        assert any("ILIKE :pattern" in s for s in sql_log)
+        assert params[-1]["pattern"] == "%鲈%"
+
+    @pytest.mark.asyncio
+    async def test_search_empty_q_raises(self):
+        db, _, _ = _mk_db_search_ingredients([])
+        with pytest.raises(ValueError, match="q 不能为空"):
+            await search_ingredients_by_name(db, _TENANT_XUJI, q="")
+
+    @pytest.mark.asyncio
+    async def test_search_whitespace_q_raises(self):
+        db, _, _ = _mk_db_search_ingredients([])
+        with pytest.raises(ValueError, match="q 不能为空"):
+            await search_ingredients_by_name(db, _TENANT_XUJI, q="   ")
+
+    @pytest.mark.asyncio
+    async def test_search_too_long_q_raises(self):
+        """q 超 100 字符防大正则 + 性能."""
+        long_q = "x" * 101
+        db, _, _ = _mk_db_search_ingredients([])
+        with pytest.raises(ValueError, match="q 长度"):
+            await search_ingredients_by_name(db, _TENANT_XUJI, q=long_q)
+
+    @pytest.mark.asyncio
+    async def test_search_limit_out_of_range_raises(self):
+        db, _, _ = _mk_db_search_ingredients([])
+        with pytest.raises(ValueError, match="limit"):
+            await search_ingredients_by_name(db, _TENANT_XUJI, q="鲈", limit=51)
+        with pytest.raises(ValueError, match="limit"):
+            await search_ingredients_by_name(db, _TENANT_XUJI, q="鲈", limit=0)
+
+    @pytest.mark.asyncio
+    async def test_search_escapes_like_wildcards(self):
+        """用户传 '%鲈' 期望字面量匹配 % → pattern 必须含 \\% 转义."""
+        db, _, params = _mk_db_search_ingredients([])
+        await search_ingredients_by_name(db, _TENANT_XUJI, q="%鲈")
+        # pattern 应该是 %\%鲈% (中间的 \% 是字面量 % 的转义)
+        assert params[-1]["pattern"] == "%\\%鲈%"
+
+    @pytest.mark.asyncio
+    async def test_search_escapes_underscore_wildcard(self):
+        """用户传 'a_b' 期望字面量匹配 _ → pattern 含 \\_ 转义."""
+        db, _, params = _mk_db_search_ingredients([])
+        await search_ingredients_by_name(db, _TENANT_XUJI, q="a_b")
+        assert params[-1]["pattern"] == "%a\\_b%"
+
+    @pytest.mark.asyncio
+    async def test_search_distinct_on_name_in_sql(self):
+        """跨 store 同名 ingredient 仅返回 1 条 — SQL 必须 DISTINCT ON."""
+        db, sql_log, _ = _mk_db_search_ingredients([])
+        await search_ingredients_by_name(db, _TENANT_XUJI, q="鲈")
+        select_sqls = [s for s in sql_log if "FROM ingredients" in s]
+        assert len(select_sqls) == 1
+        assert "DISTINCT ON (ingredient_name)" in select_sqls[0]
+
+    @pytest.mark.asyncio
+    async def test_search_rls_set_tenant_called(self):
+        """每次 search 必须先 _set_tenant (RLS 隔离守门)."""
+        db, sql_log, _ = _mk_db_search_ingredients([])
+        await search_ingredients_by_name(db, _TENANT_XUJI, q="鲈")
+        set_configs = [s for s in sql_log if "set_config" in s]
+        assert len(set_configs) >= 1

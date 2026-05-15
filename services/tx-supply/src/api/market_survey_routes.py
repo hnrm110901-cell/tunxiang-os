@@ -32,7 +32,18 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+import json
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    Header,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db as _get_db
@@ -59,10 +70,12 @@ from ..services.market_survey_service import (
     list_items_by_survey,
     list_photos_by_survey,
     list_surveys,
+    search_ingredients_by_name,
     transition_status,
     update_item,
     update_photo,
     update_survey,
+    upload_photo_for_survey,
 )
 
 logger = structlog.get_logger(__name__)
@@ -411,4 +424,135 @@ async def delete_market_survey_photo(
     return {"ok": True, "data": {"deleted": True, "photo_id": photo_id}}
 
 
-__all__ = ["router"]
+# ═════════════════════════════════════════════════════════════════════════════
+# 4. sub-B: 照片上传 (multipart/form-data → mock COS → add_photo)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@router.post("/{survey_id}/photos/upload")
+async def upload_market_survey_photo(
+    survey_id: str,
+    file: UploadFile = File(..., description="图片文件 (image/jpeg|png|webp|heic, ≤5MB)"),
+    item_id: str | None = Form(default=None, description="可选 item_id (item-level 详细照)"),
+    caption: str | None = Form(default=None, max_length=500),
+    exif_meta_json: str | None = Form(
+        default=None,
+        max_length=4000,
+        description="EXIF/GPS 元数据 JSON (移动端上传时附加)",
+    ),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    """sub-B 移动端拍照上传 — 服务端代理.
+
+    流程: 前端 multipart POST 图片 + form fields → 服务读取 bytes →
+    mime_type 白名单 + size 校验 → upload_to_object_storage (mock COS) →
+    add_photo 入 DB. exif_meta 是 JSON 字符串 (form 不支持 nested object).
+
+    错误码:
+      - 415 unsupported_media_type — mime_type 不在白名单
+      - 413 payload_too_large — size 超 5 MB
+      - 422 invalid_payload — exif_meta_json 不可解析 / 父 survey 缺失 / 跨 survey item
+      - 404 survey/item not found
+    """
+    raw_bytes = await file.read()
+    mime_type = file.content_type or ""
+
+    # exif_meta JSON 解析 (前端可选传 GPS / 拍摄时间 / 相机参数)
+    exif_meta: dict | None = None
+    if exif_meta_json:
+        try:
+            parsed = json.loads(exif_meta_json)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "EXIF_META_JSON_INVALID",
+                    "message": f"exif_meta_json 不可解析: {e}",
+                },
+            ) from e
+        if not isinstance(parsed, dict):
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "code": "EXIF_META_NOT_OBJECT",
+                    "message": "exif_meta 必须是 JSON object, 实际类型 "
+                    f"{type(parsed).__name__}",
+                },
+            )
+        exif_meta = parsed
+
+    try:
+        photo = await upload_photo_for_survey(
+            db=db,
+            tenant_id=x_tenant_id,
+            survey_id=survey_id,
+            raw_bytes=raw_bytes,
+            mime_type=mime_type,
+            item_id=item_id,
+            caption=caption,
+            exif_meta=exif_meta,
+            file_name=file.filename,
+        )
+    except ValueError as e:
+        msg = str(e)
+        # size 超限 → 413
+        if "超过单张上限" in msg:
+            raise HTTPException(
+                status_code=413,
+                detail={"code": "PAYLOAD_TOO_LARGE", "message": msg},
+            ) from e
+        # mime_type 不支持 → 415
+        if "不支持的 mime_type" in msg:
+            raise HTTPException(
+                status_code=415,
+                detail={"code": "UNSUPPORTED_MEDIA_TYPE", "message": msg},
+            ) from e
+        # 父 survey / item_id 业务错 → 404 或 422
+        raise _map_value_error(e, default_code="PHOTO_UPLOAD_INVALID") from e
+
+    return {"ok": True, "data": photo}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 5. sub-B: ingredient autocomplete (独立 router, prefix=/api/v1/supply/ingredients)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+ingredients_router = APIRouter(
+    prefix="/api/v1/supply/ingredients",
+    tags=["ingredients-search"],
+)
+
+
+@ingredients_router.get("/search")
+async def search_supply_ingredients(
+    q: str = Query(..., min_length=1, max_length=100, description="搜索关键字 (ILIKE 模糊)"),
+    limit: int = Query(default=20, ge=1, le=50),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(_get_db),
+) -> dict:
+    """ingredient autocomplete — 调研明细录入用 (sub-B 减少自由文本兜底).
+
+    DISTINCT ON (ingredient_name) 跨 store 同名 ingredient 仅返回 1 条.
+    返回字段: id / ingredient_name / unit / category.
+
+    业务场景: 创始人在调研明细中输入"鲈鱼" → 调本接口 → 返回所有候选 ingredient
+    → 选中 → 落 market_survey_items.ingredient_id 关联 (而非自由文本).
+    """
+    try:
+        items = await search_ingredients_by_name(
+            db=db,
+            tenant_id=x_tenant_id,
+            q=q,
+            limit=limit,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={"code": "INGREDIENT_SEARCH_INVALID", "message": str(e)},
+        ) from e
+    return {"ok": True, "data": items}
+
+
+__all__ = ["router", "ingredients_router"]
