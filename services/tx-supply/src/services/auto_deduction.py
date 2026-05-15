@@ -12,10 +12,17 @@ PRD-08（2026-05-15）：deduct_for_dish / deduct_for_order 增加 dept_id 可�
 当 dept_id 提供时，扣料前 BOM 每行 ingredient 经 dept_whitelist_service 校验；
 违反 raise IngredientNotAllowedError，savepoint 回滚整单。
 caller (tx-trade) 当前未传 dept_id（保 backward compat），激活为 follow-up。
+
+PRD-11 sub-A（2026-05-15）：deduct_for_dish / deduct_for_order 增加 share_split 可选参数 —
+当 caller 提供 ShareSplitSpec (method/count/weights/amounts_fen) + dish_id 时,
+扣料后 emit inventory.split_attributed event 携 cost 切分到 N share. BOM 物理消耗
+**不变** (1 dish 仍消耗 1 份 BOM, 只是 cost 分摊到多 share). caller (tx-trade) 当前
+未传 share_split (保 backward compat); 激活为 PR-B follow-up.
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from decimal import Decimal
 from typing import Any, Optional
@@ -95,6 +102,9 @@ async def deduct_for_dish(
     db: AsyncSession,
     *,
     dept_id: Optional[str] = None,
+    share_split: Optional[dict[str, Any]] = None,
+    order_id_for_event: Optional[str] = None,
+    order_item_id_for_event: Optional[str] = None,
 ) -> dict[str, Any]:
     """对单道菜执行 BOM 扣料
 
@@ -108,12 +118,23 @@ async def deduct_for_dish(
                  经 dept_whitelist_service 校验 BOM 每行 ingredient；违反
                  raise IngredientNotAllowedError（毛利底线硬约束）。当前
                  caller (tx-trade) 未传，None 默认跳过校验保 backward compat。
+        share_split: PRD-11 sub-A — caller (PR-B tx-trade) 提供 ShareSplitSpec dict
+                     (method/count/weights/amounts_fen) 时, 扣料后 emit
+                     inventory.split_attributed event 携 cost 切分到 N share.
+                     BOM 物理消耗**不变**, 只是 cost 分摊到多 share. 当前 caller
+                     未传 None 默认跳过保 backward compat. 提供时经 share_split_service
+                     .apply_split 双层校验 (规则+spec) 再 resolve.
+        order_id_for_event: PRD-11 — event payload order_id (caller PR-B 传)
+        order_item_id_for_event: PRD-11 — event payload order_item_id (caller PR-B 传)
 
     Returns:
-        {deducted: [...], missing_bom: bool, insufficient_stock: [...]}
+        {deducted: [...], missing_bom: bool, insufficient_stock: [...],
+         split_attribution?: {method, count, shares} — 当 share_split 提供时}
 
     Raises:
         IngredientNotAllowedError: 当 dept_id 提供且该档口未授权某 BOM ingredient 时
+        ValueError: 当 share_split 提供但 dish 未配置 rule / allow_share=FALSE /
+                    超 max_share_count / sum(amounts_fen) != bom_cost_total_fen
     """
     tenant_uuid = uuid.UUID(tenant_id)
     dish_uuid = uuid.UUID(dish_id)
@@ -248,16 +269,100 @@ async def deduct_for_dish(
                 "stock_before": old_qty,
                 "stock_after": new_qty,
                 "transaction_id": str(txn.id),
+                # PRD-11 sub-A: 暴露 total_cost_fen 让 share_split 路径汇总分摊
+                "total_cost_fen": txn.total_cost_fen,
             }
         )
 
     await db.flush()
 
-    return {
+    result: dict[str, Any] = {
         "deducted": deducted,
         "missing_bom": False,
         "insufficient_stock": insufficient_stock,
     }
+
+    # PRD-11 sub-A: share_split 提供时 emit inventory.split_attributed event
+    # BOM 物理扣料**不变** (loop 已完成), 只是 cost attribution 切分到多 share
+    if share_split is not None:
+        try:
+            from .share_split_service import apply_split
+            from ..models.share_split_models import ShareSplitSpec
+            from shared.events.src.emitter import emit_event
+            from shared.events.src.event_types import InventoryEventType
+
+            spec = ShareSplitSpec(**share_split)
+            total_bom_cost_fen = sum(
+                d.get("total_cost_fen") or 0 for d in deducted
+            )
+            split_result = await apply_split(
+                db,
+                tenant_id,
+                dish_id=dish_id,
+                spec=spec,
+                bom_cost_total_fen=total_bom_cost_fen,
+            )
+            # event fire-and-forget (CLAUDE.md §15: asyncio.create_task)
+            asyncio.create_task(
+                emit_event(
+                    event_type=InventoryEventType.SPLIT_ATTRIBUTED,
+                    tenant_id=tenant_id,
+                    stream_id=order_id_for_event or dish_id,
+                    payload={
+                        "order_id": order_id_for_event,
+                        "order_item_id": order_item_id_for_event,
+                        "dish_id": dish_id,
+                        "method": split_result.method.value,
+                        "count": split_result.count,
+                        "bom_cost_total_fen": split_result.bom_cost_total_fen,
+                        "shares": [
+                            {
+                                "share_index": s.share_index,
+                                "weight": str(s.weight),
+                                "attributed_cost_fen": s.attributed_cost_fen,
+                            }
+                            for s in split_result.shares
+                        ],
+                    },
+                    store_id=store_id,
+                    source_service="tx-supply",
+                )
+            )
+            result["split_attribution"] = {
+                "method": split_result.method.value,
+                "count": split_result.count,
+                "bom_cost_total_fen": split_result.bom_cost_total_fen,
+                "shares": [
+                    {
+                        "share_index": s.share_index,
+                        "weight": str(s.weight),
+                        "attributed_cost_fen": s.attributed_cost_fen,
+                    }
+                    for s in split_result.shares
+                ],
+            }
+            log.info(
+                "share_split_attributed",
+                dish_id=dish_id,
+                order_id=order_id_for_event,
+                method=split_result.method.value,
+                count=split_result.count,
+                bom_cost_total_fen=split_result.bom_cost_total_fen,
+            )
+        except ValueError:
+            # 规则/spec 校验失败 — 业务异常, 让 caller 处理 (route 422)
+            raise
+        except (ImportError, RuntimeError) as exc:
+            # 事件 emitter 不可用 — fail-open 记 warning 不阻塞 BOM 扣料
+            log.warning(
+                "share_split_event_emit_failed",
+                dish_id=dish_id,
+                error=str(exc),
+                error_type=type(exc).__name__,
+                exc_info=True,
+            )
+
+    return result
 
 
 # ─── 订单级扣料（事务性） ───
@@ -357,6 +462,9 @@ async def deduct_for_order(
                 log.warning("order_item_no_dish_id", item_name=item_name)
                 continue
 
+            # PRD-11 sub-A: 透传 share_split + order_item_id 元数据 (caller 在 item dict 上传)
+            item_share_split = item.get("share_split")
+            item_order_item_id = item.get("order_item_id")
             result = await deduct_for_dish(
                 dish_id=dish_id,
                 quantity=quantity,
@@ -364,6 +472,9 @@ async def deduct_for_order(
                 tenant_id=tenant_id,
                 db=db,
                 dept_id=dept_id,
+                share_split=item_share_split,
+                order_id_for_event=order_id,
+                order_item_id_for_event=item_order_item_id,
             )
 
             if result["missing_bom"]:
