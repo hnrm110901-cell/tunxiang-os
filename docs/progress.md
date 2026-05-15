@@ -1,3 +1,40 @@
+## 2026-05-15 早段 (postscript) · §17-C 补遗 sediment: PR #655 OrderItem FOR UPDATE 4 路径 ship + 前 sediment PR #654 漏抓校正 (Tier 1 fund/源 explicit-ask 第 28 例 reconciled — 最终 tally)
+
+### 完成状态
+
+- [x] **PR #655** fix(tx-trade) §17-C OrderItem FOR UPDATE 4 路径 MERGED `af49f99a` (**Tier 1 fund/源 explicit-ask 第 28 例 reconciled**, 5/15 07:12 UTC / 15:12 CST, D2 锁定第三发, 4 files / +972 / -7) — cashier_engine `update_item` + `remove_item` (双锁) + order_service `update_item_quantity` + `remove_item` (单锁 raw arithmetic) / 非对称锁设计 / 6 mock + 3 真 PG 用例 / §19 round-1 1 P0 ABBA → in-PR fix `1adbee4f` → APPROVE
+- [x] **前 sediment PR #654 漏抓校正** — PR #655 mergedAt 5/15 07:12 UTC, PR #654 mergedAt 5/15 07:14 UTC, **本 sediment 进行中并发 ship 仅 2 分钟差**, 前 sediment final fetch (push 前 ~15:01 CST) 未检出. 本补遗 sediment 覆盖
+- [x] **§17 桌台并发对齐 4 段进度** — ✅ §17-A (PR #652) + ✅ §17-B (PR #653) + ✅ §17-C (PR #655); ⏳ §17-D follow-up bundle (#549/#557/#559) 等创始人答复 §17 选择题 2
+- [x] **Tier 1 explicit-ask tally 最终重校准** — 5/15 早段累计 **28 例 reconciled**:
+  - 17-24 (5/14 18:22-22:31): 8 例
+  - 25 = #652 (5/15 05:57, §17-A)
+  - 26 = #650 (5/15 06:26, PR-5)
+  - 27 = #653 (5/15 06:38, §17-B)
+  - **28 = #655** (5/15 07:12, §17-C)
+  - 16 prior + 12 (17-28) = **5/15 早段累计 28 例 [Tier1] explicit-ask** (最终)
+
+### 关键决策
+
+- **Tally lesson 第四次累计** (5/14 末段 + 5/15 上午 + 5/15 早段 + 本补遗) — sediment session 中 CI 等待期 (~5-10min) 是并发 ship 窗口. **最后一次 fetch 必须在 PR create 之后 + admin-merge 之前再做一次**, 不只是 push 之前. PR #654 push 前 fetch (~15:01 CST) 未检出 PR #655 (15:12 CST 才 merge), CI 等了 ~13 分钟期间 PR #655 完成 §19 round-1 → fix → merge. lesson 已落 `feedback_concurrent_pr_race.md` 同类
+- **非对称锁设计** (PR #655 内部决策) — cashier-side Python recalc 必须双锁 (OrderItem + Order), order_service-side raw arithmetic `Order.total + diff` PG 原子可单锁. 跳过不必要锁减低 contention
+- **本补遗采用 docs-only carve-out 类 2 + 同模式** — 与 PR #654 / #648 / #632 同流程: 起 worktree → 写 entry → commit → push → PR → admin-merge. auto 不需 explicit-ask
+- **本 sediment 范围最小化** — 仅补 §17-C entry + tally 校正, 不重写已 merged 内容. lesson "sediment-of-sediment 模式" 首例实证 — 同 user 维 2 个 Claude session 节奏匹配模式
+
+### 下一步
+
+- 优先 **PR-6 pg_dump cache 加速** (可选, audit doc §6.2 第 2 期) — concurrent workflow ~5min → ~30s, `key=hashFiles('shared/db-migrations/versions/**')`. 6-PR concurrent_runner roadmap 6/6 收官
+- 或 **§17-D follow-up bundle** (#549 ABBA architect + #557 OrderItem 不变量 + #559 apply_discount status 校验) — 前提创始人答复 §17 选择题 2 (转桌争抢)
+- 或 **Mac mini M4 真机部署** / 等创始人 P0 输入
+
+### 已知风险
+
+- **§17-D 等创始人对齐** — 选择题 2 转桌争抢 未答复, 阻塞 §17-D bundle
+- **drift-tolerant CI 6 例累积** (carve-out 第 12 类 5/14 末段正式启用) 已稳定
+- pre-existing CI 漂移 12+ 项 与本批无关
+- **Sediment session 并发 ship race lesson** — 第四次实战 (本补遗 + 前 sediment + 5/15 上午 + 5/14 末段). 已落 `feedback_concurrent_pr_race.md` + 新维度: post-create + pre-merge fetch 必须再做一次
+
+---
+
 ## 2026-05-15 早段 · 6-PR concurrent_runner roadmap 收官 PR #650 PR-5 + §17 系列首发 PR #652 §17-A + 并发 ship PR #653 §17-B + PRD-07 W10 PR #651 4 PR ship 收尾 sediment (Tier 1 fund/源/邻接 explicit-ask 第 27 例 reconciled)
 
 ### 完成状态

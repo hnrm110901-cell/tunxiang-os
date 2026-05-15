@@ -1,3 +1,62 @@
+## 2026-05-15 早段 (postscript) — §17-C 补遗: PR #655 OrderItem FOR UPDATE 4 路径 ship (D2 第三发 / Tier 1 fund/源 explicit-ask 第 28 例 reconciled — 最终 tally)
+
+### 今日完成 (补遗)
+
+前 sediment PR #654 (5/15 07:14 UTC) 漏抓并发 ship PR #655 §17-C (5/15 07:12 UTC, 仅 2 分钟差), 本补遗 sediment 补 entry + tally 最终校正。
+
+- **PR #655 ship `af49f99a`** (5/15 07:12 UTC / 15:12 CST, **Tier 1 fund/源 explicit-ask 第 28 例 reconciled**, §17-C / D2 锁定第三发, 4 files / +972 / -7):
+  - `cashier_engine.py` `update_item` L497 + `remove_item` L547 — SELECT OrderItem 加 `.with_for_update()` (双锁, Python-side recalc 不是 PG 原子, Order lock=True 自 PR #227)
+  - `order_service.py` `update_item_quantity` L267 + `remove_item` L290 — SELECT OrderItem 加 `.with_for_update()` (单锁, Order UPDATE 用 raw arithmetic `Order.total + diff` PG 原子)
+  - 关闭 audit doc §4.1 P1 + §7 verifier #1
+
+- **非对称锁设计** (减低 contention):
+
+| 服务 | OrderItem | Order | 原因 |
+|---|---|---|---|
+| cashier_engine.update_item | ✅ FOR UPDATE | ✅ lock=True (PR #227) | Python-side recalc 不是 PG 原子 |
+| cashier_engine.remove_item | ✅ FOR UPDATE | ✅ lock=True (本 PR) | 同上 |
+| order_service.update_item_quantity | ✅ FOR UPDATE | ❌ raw arithmetic | `Order.total + diff` PG 原子 |
+| order_service.remove_item | ✅ FOR UPDATE | ❌ raw arithmetic | 同上 |
+
+- **测试 9 用例** (双模式, audit §8.3 金标准):
+  - 正面 mock 6 用例 `test_orderitem_row_lock_tier1.py`: 4 路径 OrderItem + cashier 双锁 SQL grep
+  - 负面真 PG 3 用例 `test_cashier_orderitem_concurrent_tier1.py`:
+    - T1 N=10 `order_service.update_item_quantity` 同 item → 终态 `Order.total == item.subtotal` (OrderItem 锁 + raw arithmetic 累积)
+    - T2 N=10 `cashier_engine.update_item` 同 item → 终态自洽 (Python recalc 已 Order lock 串行化, OrderItem 锁防御性)
+    - T3 N=5 `order_service.update_item_quantity` **不同** item 同 order → cross-item raw arithmetic PG 原子
+
+### §19 reviewer 多轮 fix verify
+
+- **Initial 2 commits `ed330d40` + `a2d42bf0`** (5/15 06:59 UTC) — 源 + 测试
+- **Round-1 verdict** 1 P0 → in-PR fix `1adbee4f` (5/15 07:07 UTC):
+  - **P0-1 fix** `cashier_engine.remove_item` 锁顺序统一防 ABBA — 加 OrderItem FOR UPDATE 后 `remove_item` 锁序变 OrderItem→Order, 但 `update_item` 是 Order→OrderItem (PR #227 Order lock=True 先于 OrderItem 加锁). ABBA 风险 — 改 `remove_item` 锁序为 Order→OrderItem 统一
+
+### §17 系列 4 段最终进度
+
+- ✅ §17-A (PR #652 1A/2A FOR UPDATE 双锁排序, 5/15 05:57 UTC)
+- ✅ §17-B (PR #653 settle 终态保护 + 3B 幂等释放, 5/15 06:38 UTC)
+- ✅ §17-C (PR #655 OrderItem FOR UPDATE 4 路径, 5/15 07:12 UTC) — **本补遗 sediment 覆盖**
+- ⏳ §17-D follow-up bundle (#549 ABBA architect + #557 OrderItem 不变量 + #559 apply_discount status 校验) — 等创始人答复 §17 选择题 2 (转桌争抢)
+
+### 数据变化
+
+- 迁移版本: 无 (源 + 测试)
+- 新增 API 模块: 0 (cashier_engine + order_service 4 路径补 FOR UPDATE)
+- 新增测试: 2 file / 9 用例 (mock 6 + 真 PG 3)
+- 修改源: services/tx-trade/src/services/cashier_engine.py + order_service.py (4 路径)
+
+### 遗留问题
+
+- §17-D follow-up bundle — 等创始人答复 §17 选择题 2 (转桌争抢)
+- PR-6 pg_dump cache 加速 (可选, audit §6.2 第 2 期)
+- pre-existing CI 漂移 12+ 项 与本 PR 无关
+
+### 明日计划
+
+PR-6 pg_dump cache 加速 / §17-D follow-up (前提选择题 2 答复) / Mac mini M4 / 等创始人 P0 输入
+
+---
+
 ## 2026-05-15 早段 — 6-PR concurrent_runner roadmap 收官 PR-5 #650 order_service + delivery_adapter 真行为 ship (Tier 1 fund/源/邻接 explicit-ask 第 26 例 reconciled)
 
 ### 今日完成
