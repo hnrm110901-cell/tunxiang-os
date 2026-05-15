@@ -49,13 +49,8 @@ app = FastAPI(
 Instrumentator().instrument(app).expose(app)
 
 # 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
-# 目标入站链：Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → CORS → 路由
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# 目标入站链：CORS → Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → 路由
+# CORSMiddleware 必须最后 add（最外层），OPTIONS preflight 在此直接 204 返回，不进认证链。
 app.add_middleware(PersonalizationMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(DomainAuthzMiddleware)  # 域级授权 + MFA（必须在 Auth 内侧，认证完成后执行）
@@ -63,6 +58,12 @@ app.add_middleware(AuthMiddleware)
 app.add_middleware(ApiKeyMiddleware)  # ApiKey 必须外于 Auth（先处理 X-API-Key 再进入 JWT 校验）
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(AuditMiddleware)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # ── APScheduler 定时任务 ──────────────────────────────────────────
 
