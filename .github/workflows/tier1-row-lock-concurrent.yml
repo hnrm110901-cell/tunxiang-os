@@ -111,46 +111,51 @@ jobs:
         continue-on-error: true
         run: python -m alembic upgrade head
 
-      - name: Verify required tables exist + RLS enabled (PR-1+PR-2+PR-3+PR-4 hard gate)
+      - name: Verify required tables exist + RLS enabled (PR-1+PR-2+PR-3+PR-4+PR-5 hard gate)
         # 真 gate — alembic 上一步成功/失败不重要, 关键是 smoke / 业务 test 需要的表
         # 必须存在 + RLS 启用。失败时本 step 硬 fail, 阻塞 workflow。
         #
         # PR-2 扩展: orders / order_items / payments (cashier_engine 3 P0 路径)
         # PR-3 扩展: payment_sagas (payment_saga_service 2 P0 路径 — compensate
         #   FOR UPDATE + recover_pending_sagas FOR UPDATE SKIP LOCKED)
-        # PR-4 扩展（本 PR）: dishes / dish_ingredients / ingredients /
+        # PR-4 扩展: dishes / dish_ingredients / ingredients /
         #   ingredient_transactions (auto_deduction + inventory_io 2 P0 路径 —
         #   T1 receive_stock FOR UPDATE 防加权平均单价 lost update / T2 deduct_for_order
         #   ADR 0002 跨 dish ABBA 死锁防护 sorted(key=str))
-        # PR-5 扩展时继续加入对应业务表 (delivery_orders 等)。
+        # PR-5 扩展（本 PR）: delivery_orders (delivery_adapter 2 路径 —
+        #   T3 receive_order INSERT race IntegrityError catch / T4 confirm_order
+        #   state machine FOR UPDATE; order_service 复用 PR-2 已有 orders 表)
         run: |
-          # 9 表 (PR-1 smoke: stores; PR-2 cashier: orders/order_items/payments;
+          # 10 表 (PR-1 smoke: stores; PR-2 cashier: orders/order_items/payments;
           # PR-3 payment_saga: payment_sagas; PR-4 inventory: dishes/dish_ingredients/
-          # ingredients/ingredient_transactions)
+          # ingredients/ingredient_transactions; PR-5 delivery: delivery_orders)
           # 全部在 v301 drift 之前已可用 — v001 创建 stores/orders/order_items/payments/
-          # dishes/dish_ingredients/ingredients/ingredient_transactions, v091 创建
-          # payment_sagas, v010 add 列 (ingredient_transactions store_id/quantity_before
-          # /quantity_after/total_cost_fen/performed_by/transaction_time + dish_ingredients
-          # notes + ingredients supplier_contact). 全 << v301 drift 边界
+          # dishes/dish_ingredients/ingredients/ingredient_transactions, v058 创建
+          # delivery_orders, v091 创建 payment_sagas, v010 add 列 (ingredient_transactions
+          # store_id/quantity_before/quantity_after/total_cost_fen/performed_by/
+          # transaction_time + dish_ingredients notes + ingredients supplier_contact).
+          # 全 << v301 drift 边界
           PGPASSWORD=test_password_dev_only psql \
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
             --set ON_ERROR_STOP=1 \
             -c "SELECT relname, relrowsecurity FROM pg_class
                 WHERE relname IN ('stores', 'orders', 'order_items', 'payments',
                                   'payment_sagas', 'dishes', 'dish_ingredients',
-                                  'ingredients', 'ingredient_transactions')
+                                  'ingredients', 'ingredient_transactions',
+                                  'delivery_orders')
                   AND relkind='r'
                 ORDER BY relname;"
-          # Assert all 9 tables exist + RLS enabled
+          # Assert all 10 tables exist + RLS enabled
           COUNT=$(PGPASSWORD=test_password_dev_only psql \
             -h localhost -p 5432 -U tunxiang_test -d tunxiang_os_test \
             -tA -c "SELECT COUNT(*) FROM pg_class
                     WHERE relname IN ('stores', 'orders', 'order_items', 'payments',
                                       'payment_sagas', 'dishes', 'dish_ingredients',
-                                      'ingredients', 'ingredient_transactions')
+                                      'ingredients', 'ingredient_transactions',
+                                      'delivery_orders')
                       AND relkind='r' AND relrowsecurity")
-          if [ "$COUNT" != "9" ]; then
-            echo "::error::PR-4 hard gate fail: 期望 9 表 (stores/orders/order_items/payments/payment_sagas/dishes/dish_ingredients/ingredients/ingredient_transactions) RLS 全启用, 实际 $COUNT 满足"
+          if [ "$COUNT" != "10" ]; then
+            echo "::error::PR-5 hard gate fail: 期望 10 表 (stores/orders/order_items/payments/payment_sagas/dishes/dish_ingredients/ingredients/ingredient_transactions/delivery_orders) RLS 全启用, 实际 $COUNT 满足"
             exit 1
           fi
 

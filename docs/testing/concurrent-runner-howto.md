@@ -190,6 +190,64 @@ PR-1 暂未做此重构（YAGNI — 方式 A 足够覆盖 PR-2/3/4/5）；当首
 预含 6 row-lock 源文件（cashier/order/payment_saga/delivery/inventory_io/auto_deduction）。
 新服务文件请 PR 内加入 paths。
 
+### 3.5 distinct-set 升级模板（Issue #643 P2-A — PR-4/PR-5 已实战）
+
+invariant `sum(per-worker counts) = N` 必要不充分 — 让 worker 返回 tuple/dict 携带
+distinct identifier + observable state, 终态断言 distinct-set 才能区分「自然分裂」与
+「串行 FOR UPDATE 阻塞」/「lost update」/「state machine 守卫拒绝」:
+
+```python
+async def _worker(session) -> dict:
+    async with workers_lock:
+        idx = workers_count[0]
+        workers_count[0] += 1
+    result = await service.do_thing(session)
+    return {"worker_idx": idx, "observed_state": result["x"], ...}
+
+results = await run_concurrent(...)
+
+# distinct workers: 串行化生效 (workers_lock + commit ordering)
+distinct_indices = {r["worker_idx"] for r in results if isinstance(r, dict)}
+assert len(distinct_indices) == 10
+
+# 真信号断言: 严格递增序列 (FOR UPDATE 串行) / distinct UUIDs / count==9 duplicate / etc.
+sorted_observed = sorted(r["observed_state"] for r in results if isinstance(r, dict))
+expected = [...]
+assert sorted_observed == expected, "FOR UPDATE 失效 → lost update / split-state"
+```
+
+实战参考:
+- **PR-4** (`test_inventory_concurrent_tier1.py` T1) — `(tx_id, new_quantity)` 严格
+  递增序列 [10, 20, ..., 100] 检 FOR UPDATE 真生效
+- **PR-5** (`test_order_service_concurrent_tier1.py` T1) — `(worker_idx, my_discount,
+  my_final)` + 自洽断言 `my_final == 10000 - my_discount` 检 FOR UPDATE 防 split-state
+- **PR-5** (`test_delivery_adapter_concurrent_tier1.py` T3) — `(worker_idx, was_duplicate,
+  order_id)` + duplicate=True 数==9 + distinct order_ids==1 检 IntegrityError catch
+
+### 3.6 新增并发表 schema drift 检查清单（Issue #643 P2-D — PR-5 落 SoT）
+
+PR-N 加新业务表入 `_CONCURRENT_TABLES` 时必须验证「新表自创建迁移后无 column drift」
+(避免业务 SELECT 在 v301 drift 边界后 fail). 一行命令:
+
+```bash
+# 扫 vXXX (创建表的 migration version) 之后 (vXXX+1 .. v300) 的所有 ALTER TABLE
+grep -rn "ALTER TABLE <表名>" shared/db-migrations/versions/ \
+  | sort | awk -F: '{print $1}' | xargs -I{} basename {} \
+  | grep -E "^v(0[9-9][2-9]|[1-2][0-9][0-9])_" | sort -u
+```
+
+实战记录:
+- **PR-3 payment_saga** (PR #642) — 扫 v092~v229 ALTER TABLE payment_sagas: 仅 v092 ADD
+  payments.idempotency_key (相邻表) + v284 RLS ENABLE/FORCE (非 column add). **无 column
+  drift, 不需要 _ensure_post_v206_schema fixture**.
+- **PR-4 inventory** (PR #644) — 扫 ingredients/dish_ingredients/ingredient_transactions
+  自 v001/v010 后无 column drift. PR-2 cashier 既有 `_ensure_v342_schema` autouse fixture
+  (order_items barcode 列) 仍需保留.
+- **PR-5 delivery_orders** (本 PR) — v058 创建后, v032 ADD platform_order_no/customer_name
+  /special_request/estimated_prep_time/actual_revenue_fen/auto_accepted/accepted_at/
+  rejected_at/rejected_reason 多列, **均允许 NULL 默认**, _seed_delivery_order 不传也安全.
+  ORM 模型 DeliveryOrder 已映射全部列, SELECT/UPDATE 路径 robust.
+
 ---
 
 ## 4. 常见陷阱
