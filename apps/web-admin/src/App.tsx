@@ -75,6 +75,7 @@ import { RFQSupplierQuotePage } from './pages/supply/RFQSupplierQuotePage';  // 
 import { RequisitionTemplatesPage } from './pages/supply/RequisitionTemplatesPage';  // PRD-07 申购模板 / Phase 2 W10 / T2
 import { DeptWhitelistPage } from './pages/supply/DeptWhitelistPage';  // PRD-08 部门用料白名单 / Phase 2 W11 / T2 + Tier 1 邻接
 import { ShareSplitRulesPage } from './pages/supply/ShareSplitRulesPage';  // PRD-11 sub-A 销售分成转入库 / Phase 2 W11 / T2 + Tier 1 邻接
+import { MarketSurveysPage } from './pages/supply/MarketSurveysPage';  // PRD-13 sub-A/B 市场调研双轨 / Phase 2 W11 / T2 normal
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
@@ -311,6 +312,7 @@ function AppContent() {
           <Route path="/supply/requisition-templates" element={<RequisitionTemplatesPage />} />  {/* PRD-07 申购模板管理 / T2 */}
           <Route path="/supply/dept-whitelists" element={<DeptWhitelistPage />} />  {/* PRD-08 部门用料白名单 / T2 + Tier 1 邻接 */}
           <Route path="/supply/share-split-rules" element={<ShareSplitRulesPage />} />  {/* PRD-11 sub-A 销售分成转入库 / T2 + Tier 1 邻接 */}
+          <Route path="/supply/market-surveys" element={<MarketSurveysPage />} />  {/* PRD-13 sub-A/B 市场调研双轨 / T2 normal */}
           <Route path="/ops/reviews" element={<ReviewManagePage />} />
           <Route path="/ops/settlement-monitor" element={<SettlementMonitorPage />} />
           <Route path="/store/manage" element={<StoreManagePage />} />

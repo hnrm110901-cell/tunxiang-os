@@ -52,7 +52,7 @@ export interface TxFetchOptions extends RequestInit {
   skipAuth?: boolean;
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 export async function txFetch<T>(path: string, options?: TxFetchOptions): Promise<TxResponse<T>> {
   const { skipAuth, ...fetchOptions } = options ?? {};

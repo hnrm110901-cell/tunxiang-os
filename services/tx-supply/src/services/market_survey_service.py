@@ -981,6 +981,168 @@ async def get_survey_detail(
     return {"survey": survey, "items": items, "photos": photos}
 
 
+# ═════════════════════════════════════════════════════════════════════════════
+# 5. sub-B: 上传辅助 (复用 delivery_proof_service.upload_to_object_storage mock COS)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+# 允许的图片 MIME 类型 (与 delivery_proof 模式一致)
+_ALLOWED_PHOTO_MIME_TYPES = frozenset(
+    [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/heic",  # iOS 默认相机格式
+    ]
+)
+
+# 单张照片上限 5 MB (与 delivery_proof MAX_ATTACHMENT_SIZE_BYTES 一致)
+_MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024
+
+
+async def upload_photo_for_survey(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    survey_id: str,
+    raw_bytes: bytes,
+    mime_type: str,
+    item_id: Optional[str] = None,
+    caption: Optional[str] = None,
+    exif_meta: Optional[dict] = None,
+    file_name: Optional[str] = None,
+) -> dict:
+    """sub-B 移动端上传照片入口 — 服务端代理 (multipart/form-data → 对象存储 → DB).
+
+    流程:
+      1. 校验 mime_type ∈ _ALLOWED_PHOTO_MIME_TYPES
+      2. 校验 size ≤ _MAX_PHOTO_SIZE_BYTES (防 OOM + 防恶意上传)
+      3. 调 delivery_proof_service.upload_to_object_storage (mock COS, 写 /tmp)
+      4. 调 add_photo() 入 market_survey_photos 表
+      5. 返回 add_photo 结果 (含 photo_id + photo_url + ...)
+
+    设计要点:
+      - 沿用 delivery_proof_service.upload_to_object_storage 保证 mock COS 单一入口
+      - mime_type 白名单 = 4 类图片 (其他 415 unsupported_media_type)
+      - size 校验在 upload 前 + 内核传上来的 spool 文件已读全, 防止大于 _MAX 的恶意 chunk
+      - 错误链: ValueError (业务) → 路由 422 / 415
+    """
+    if mime_type not in _ALLOWED_PHOTO_MIME_TYPES:
+        raise ValueError(
+            f"不支持的 mime_type: {mime_type} "
+            f"(允许: {sorted(_ALLOWED_PHOTO_MIME_TYPES)})"
+        )
+    if len(raw_bytes) == 0:
+        raise ValueError("上传文件为空 (0 字节)")
+    if len(raw_bytes) > _MAX_PHOTO_SIZE_BYTES:
+        raise ValueError(
+            f"上传文件 {len(raw_bytes)} 字节超过单张上限 "
+            f"{_MAX_PHOTO_SIZE_BYTES} 字节 (5 MB)"
+        )
+
+    # 复用 delivery_proof_service mock COS (与 PR 一致, 单一对象存储入口)
+    from .delivery_proof_service import upload_to_object_storage
+
+    upload_meta = upload_to_object_storage(
+        tenant_id=tenant_id,
+        raw_bytes=raw_bytes,
+        mime_type=mime_type,
+        file_name=file_name,
+    )
+
+    # 调 add_photo (含 父 survey + optional item_id 跨 survey 业务校验 +
+    # asyncpg IntegrityError rollback + _set_tenant 重设)
+    photo = await add_photo(
+        db,
+        tenant_id,
+        survey_id=survey_id,
+        photo_url=upload_meta["url"],
+        item_id=item_id,
+        caption=caption,
+        exif_meta=exif_meta,
+    )
+
+    logger.info(
+        "market_survey_photo_uploaded",
+        survey_id=survey_id,
+        item_id=item_id,
+        tenant_id=str(tenant_id),
+        size=len(raw_bytes),
+        mime_type=mime_type,
+        photo_url=upload_meta["url"],
+    )
+    return photo
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 6. sub-B: ingredient 自动补全 (减少自由文本兜底比例)
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+_SEARCH_INGREDIENTS_BY_NAME_SQL = """
+    SELECT DISTINCT ON (ingredient_name)
+        id::text          AS id,
+        ingredient_name,
+        unit,
+        category
+    FROM ingredients
+    WHERE tenant_id     = :tenant_id
+      AND is_deleted    = FALSE
+      AND ingredient_name ILIKE :pattern
+    ORDER BY ingredient_name ASC, id ASC
+    LIMIT :limit
+"""
+
+
+def _escape_like_pattern(q: str) -> str:
+    """转义 SQL LIKE/ILIKE 通配符 (% 和 _ 和 \\) 防 q 含 % 的注入扩展.
+
+    SQL injection 本身由 bound param 防 (不拼字符串), 但用户传 'a%' 期望
+    精确匹配字面量 '%', 必须先转义.
+    """
+    return q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+async def search_ingredients_by_name(
+    db: AsyncSession,
+    tenant_id: str,
+    *,
+    q: str,
+    limit: int = 20,
+) -> list[dict]:
+    """按名称模糊查 ingredients (autocomplete).
+
+    - q 必填, 最小 1 字符, 最大 100 字符 (防大 q 性能问题)
+    - ILIKE %q% 模糊匹配 (中间匹配, 不只前缀)
+    - DISTINCT ON (ingredient_name) 跨 store 同名 ingredient 仅返回 1 条 (id arbitrary)
+    - limit ∈ (0, 50] (autocomplete 不应超过 50 个候选)
+    - 转义 q 中的 % / _ / \\ 防字面量绕过
+
+    Returns:
+        list[{id, ingredient_name, unit, category}] (id arbitrary, 同 name 取最先 id)
+    """
+    if not q or not q.strip():
+        raise ValueError("q 不能为空 (autocomplete 至少 1 字符)")
+    if len(q) > 100:
+        raise ValueError(f"q 长度 {len(q)} 超过上限 100 字符")
+    if limit <= 0 or limit > 50:
+        raise ValueError(f"limit 必须 in (0, 50], 实际 {limit}")
+
+    escaped = _escape_like_pattern(q.strip())
+    pattern = f"%{escaped}%"
+
+    await _set_tenant(db, tenant_id)
+    result = await db.execute(
+        text(_SEARCH_INGREDIENTS_BY_NAME_SQL),
+        {
+            "tenant_id": _uuid_str(tenant_id),
+            "pattern": pattern,
+            "limit": limit,
+        },
+    )
+    return [dict(r) for r in result.mappings().all()]
+
+
 __all__ = [
     # 主表
     "create_survey",
@@ -1003,4 +1165,7 @@ __all__ = [
     "delete_photo",
     # 聚合
     "get_survey_detail",
+    # sub-B: 上传 + autocomplete
+    "upload_photo_for_survey",
+    "search_ingredients_by_name",
 ]
