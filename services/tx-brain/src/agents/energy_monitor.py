@@ -264,7 +264,7 @@ class EnergyMonitorAgent:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("energy_monitor.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "energy_monitor_parse_failed",

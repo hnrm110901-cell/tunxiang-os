@@ -244,7 +244,7 @@ class CustomerServiceAgent:
                     force_escalate = True
                     break
             except ValueError:
-                pass
+                logger.warning("customer_service.amount_extract_parse_failed", amount_str=amount_str, exc_info=True)
 
         # 规则3：食品安全关键词 → 强制 action_required，高优先级
         for keyword in _FOOD_SAFETY_KEYWORDS:
@@ -305,7 +305,7 @@ class CustomerServiceAgent:
                 result["source"] = "claude"
                 return result
             except json.JSONDecodeError:
-                pass
+                logger.warning("customer_service.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "customer_service_parse_failed",

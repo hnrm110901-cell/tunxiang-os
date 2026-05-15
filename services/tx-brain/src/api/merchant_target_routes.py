@@ -91,7 +91,7 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                     # _fen 字段必须 int（CLAUDE.md §10/§15）；round 防 Decimal 截断
                     actuals["avg_ticket_fen"] = int(round(r.avg_ticket))
             except SQLAlchemyError:
-                pass
+                logger.warning("merchant_target.avg_ticket_db_failed", tenant_id=str(tenant_id), exc_info=True)
         if "table_turnover_rate" in kpi_keys:
             try:
                 r1 = await session.execute(
@@ -109,7 +109,7 @@ async def _fetch_actuals(tenant_id: str, kpi_keys: list[str]) -> dict[str, Optio
                 if t > 0 and o > 0:
                     actuals["table_turnover_rate"] = round(o / (t * 30), 2)
             except SQLAlchemyError:
-                pass
+                logger.warning("merchant_target.turnover_rate_db_failed", tenant_id=str(tenant_id), exc_info=True)
     return actuals
 
 

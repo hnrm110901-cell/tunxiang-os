@@ -139,7 +139,7 @@ class DiscountGuardianAgent:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("discount_guardian.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "discount_guardian_parse_failed",

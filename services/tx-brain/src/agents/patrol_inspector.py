@@ -297,7 +297,7 @@ class PatrolInspector:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("patrol_inspector.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "patrol_inspector_parse_failed",

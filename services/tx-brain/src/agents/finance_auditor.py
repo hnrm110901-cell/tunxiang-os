@@ -288,7 +288,7 @@ class FinanceAuditor:
             try:
                 return json.loads(json_match.group())
             except json.JSONDecodeError:
-                pass
+                logger.warning("finance_auditor.claude_response_json_parse_failed", exc_info=True)
 
         logger.warning(
             "finance_auditor_parse_failed",
