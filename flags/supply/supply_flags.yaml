@@ -50,9 +50,12 @@ flags:
     defaultValue: false
     environments:
       dev: true
+      demo: true       # P1-2: 与 PR #698/#718 dev/demo 双 ON 既定行为对齐
       test: true
       uat: false
       pilot: false
+      staging: false   # P1-2 defensive: 防 env override unset 后 SDK fall-back 误判
+      gray: false      # P1-2 defensive: 同上
       prod: false
     targeting_rules:
       pilot:
