@@ -1,3 +1,49 @@
+## 2026-05-16 续 · issue #714 PR-A main.py import smoke 补全 (T2 normal / Tier 1 邻接 carve-out 第 13 类候选)
+
+### 完成状态
+
+- [x] **PR #351 audit 完成** — 发现 13 服务 + helper 已 ship, 真实 gap 是 5 服务 + helper 扩 mode B + extra_copies + shell wrapper
+- [x] 扩展 PR #351 helper `assert_main_app_imports` 加 `mode` + `extra_copies` 参数 (BC 保持: 默认 mode="A")
+- [x] 5 新 wrapper: tx-devforge / tx-expense / tx-forge / tx-pay / tx-predict (用 PR #351 命名 `test_main_import_smoke_tier1.py`)
+- [x] tx-brain wrapper 更新: 移 `@pytest.mark.skip` + 加 `mode="B"`
+- [x] tx-trade wrapper 更新: 移 `@pytest.mark.xfail` + 加 `extra_copies` 复刻 Dockerfile cross-service COPY
+- [x] tx-devforge / tx-expense 补 `src/tests/__init__.py`
+- [x] `scripts/main-import-smoke.sh` generic shell wrapper
+- [x] 本机 dry-run per-service: tx-pay PASSED, 其余 SKIPPED (helper 智能识别本机 deps 缺)
+- [ ] gh pr create + §19 reviewer round-N
+- [ ] 创始人 explicit-ack ship
+- [ ] 立 follow-up issue: workflow path 补 5 新服务
+
+### 关键决策
+
+- **scope 缩到 PR #351 漏的真实 gap** (5 服务 + helper 二次设计 + shell wrapper): 不重复 PR #351 已 ship 的 13 服务 + helper. 应用 `feedback_issue_text_scope_drift.md` 验证 issue #714 文本与实际 main 状态偏差.
+- **BC 保持**: helper `mode: str = "A"` 默认值让 PR #351 13 个 wrapper 不需要改 (除了 tx-brain skip 翻 mode B + tx-trade xfail 翻 extra_copies).
+- **tx-trade xfail 翻 extra_copies**: PR #351 xfail reason 写 "bare-import-services.permission_service" 实际不是 main.py bug, 是 Dockerfile cross-service COPY 没被 helper 复刻. 真 PR (本) 给 helper 加 `extra_copies` + tx-trade 显式传, false-positive xfail 自动 lift.
+- **5 wrapper 与 PR #351 命名一致** (`test_main_import_smoke_tier1.py`): 避免双重命名 + 测试两次同一 main.py.
+
+### 关键技术细节
+
+- 18 非-gateway 服务 Dockerfile 两种模式 (验证 `grep COPY services` 18 个):
+  - mode A (16): `COPY services/tx-X/src/ ./services/tx_X/src/`
+  - mode B (2, tx-brain / tx-predict): `COPY services/tx-X/src/ ./src/`
+- 仅 tx-trade Dockerfile 有 cross-service COPY (`permission_service.py`) — `grep "COPY services" 18 个 Dockerfile` 验证
+- mcp-server 无 `src/main.py`, 不在 18 scope
+- helper 现 `_repo_root() = Path(__file__).parents[2]` (PR #351 决定), 本 PR 不动
+
+### 下一步
+
+- gh pr create with audit 说明 + scope 缩窗
+- §19 reviewer opus B (真 BUG only) round-1
+- round-N APPROVE 0 P0/P1 + 创始人 explicit-ack → admin-merge / normal merge
+- 立 follow-up issue: `.github/workflows/python-ci.yml` 加 5 新服务 import-smoke 路径
+
+### 已知风险
+
+- shell wrapper 本机 macOS `python3 = 3.9` 不支持 PEP 604, 跑会爆 (与 `scripts/gateway-import-smoke.sh` 一致). CI 装 3.11 正常.
+- 5 wrapper 在本机 SKIPPED 因为本机 deps 缺. CI 装 service requirements.txt 后真跑暴露真实 main.py 健康度 — 这才是 #714 目的.
+
+---
+
 ## 2026-05-16 续 PR-A · PRD-11 sub-B.2 + sub-C projector 灰度路径接入 feature_flags (Phase 2 W12 收官 / Tier 1 邻接第 36 例)
 
 ### 完成状态

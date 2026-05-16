@@ -1,3 +1,59 @@
+## 2026-05-16 续 — issue #714 PR-A main.py import smoke 补全 (T2 normal / Tier 1 邻接 carve-out 第 13 类候选)
+
+### 关键发现 — 前置 audit (做完 18 个文件后才发现, 应用 `feedback_issue_text_scope_drift.md` 教训重新缩 scope)
+
+- **PR #351 (2026-05-13 merged)** 已 ship "14 服务 main.py 容器布局 import 烟测网" — 含 helper `shared/test_infra/main_import_smoke.py` (139 行, `assert_main_app_imports`) + 13 个 `test_main_import_smoke_tier1.py` (tx-agent/tx-analytics/tx-brain/tx-civic/tx-finance/tx-growth/tx-intel/tx-member/tx-menu/tx-ops/tx-org/tx-supply/tx-trade)
+- issue #714 立时未注意 PR #351 已存在 — 真实 gap 不是 18 服务, 而是:
+  1. **5 服务漏覆盖** (后立的): tx-devforge / tx-expense / tx-forge / tx-pay / tx-predict
+  2. **PR #351 helper 不支持 mode B** (tx-brain wrapper 当时 `@pytest.mark.skip`, 等 helper 二次设计)
+  3. **PR #351 helper 不复刻 cross-service Dockerfile COPY** (tx-trade `@pytest.mark.xfail` "bare-import-services.permission_service" 实际是 false-positive)
+  4. **没有 generic shell wrapper** (PR #351 没做)
+
+### 今日完成 (本 PR-A, scope 缩到真 gap)
+
+- [shared/test_infra/main_import_smoke.py] **扩展** PR #351 helper `assert_main_app_imports`: 加 `mode: str = "A"` (默认保持 BC) + `extra_copies: list[tuple[str, str]] | None = None`. mode B 复刻 tx-brain / tx-predict 非标 Dockerfile (`COPY services/tx-X/src/ → ./src/` + `uvicorn src.main:app`). extra_copies 复刻 Dockerfile cross-service COPY.
+- [services/tx-{devforge,expense,forge,pay,predict}/src/tests/test_main_import_smoke_tier1.py] **新增** 5 个 thin wrapper (与 PR #351 现存 13 个文件命名一致). tx-predict 用 `mode="B"`.
+- [services/tx-brain/src/tests/test_main_import_smoke_tier1.py] **更新** PR #351 既存文件: 移除 `@pytest.mark.skip` + 改用 `mode="B"`. helper 二次设计补齐后该 skip 不再需要.
+- [services/tx-trade/src/tests/test_main_import_smoke_tier1.py] **更新** PR #351 既存文件: 移除 `@pytest.mark.xfail` + 加 `extra_copies=[("services/tx-org/src/services/permission_service.py", "services/permission_service.py")]` 复刻 Dockerfile 第 5 行的 cross-service COPY. false-positive xfail 修复.
+- [services/tx-{devforge,expense}/src/tests/__init__.py] 补 `__init__.py` (这两个服务之前没 src/tests/ 目录).
+- [scripts/main-import-smoke.sh] **新增** generic shell wrapper, 接 service 名参数 (与 `scripts/gateway-import-smoke.sh` 风格一致).
+- [DEVLOG.md / docs/progress.md] 本 entry 反映 audit 后的真实 scope.
+
+### 本机 5/16 dry-run 健康度 (5 新 wrapper + tx-brain + tx-trade 修后, python3.11 直接调用 pytest)
+
+- ✅ tx-pay PASSED (本机 deps + 容器布局都满足)
+- 🟡 tx-devforge / tx-expense / tx-forge / tx-predict / tx-brain / tx-trade 全 SKIPPED — PR #351 helper 智能识别本机 deps 缺触发 `pytest.skip` (不是 fail), CI 装 service requirements.txt 后应转 PASSED.
+- 全套 smoke 在本机批量跑 (gateway + 18 服务一起跑) 因 pytest 同名文件 module name collision 全 fail, 但每个 service **per-service 单独跑** (CI matrix 模式) 全部 pass/skip — PR #351 既存现象, 不归本 PR 修.
+
+### Tier 邻接判定
+
+- 本 PR 触 tx-trade / tx-brain 既存 wrapper (CLAUDE.md §17 列 tx-trade Tier 1 服务). 改动是删 xfail/skip marker + 加 helper 参数, **不动业务源 / 不接 CI 真门禁 / 不动 .github/workflows**.
+- 应是 carve-out 第 13 类 (测试基础设施 only). 走 §19 reviewer (opus B 真 BUG only) + 创始人 explicit-ask 确认.
+
+### 不动 (并发警告)
+
+- `cashier_engine.py / order_service.py / payment_saga_service.py` (Tier 1 业务路径)
+- `shared/ontology/` (creation-only)
+- `.github/workflows/python-ci.yml` (PR #351 时 workflow 已配 13 服务 + gateway, 5 新服务工作流路径补留独立 PR)
+- 任何业务 main.py — PR #351 已立 6 xfail 跟踪真 main.py bug, 本 PR 仅修 tx-trade false-positive xfail (helper 不完备所致, 不算修业务源)
+
+### 已知风险
+
+- shell wrapper 用 `python3` 默认, 本机 macOS `python3 = 3.9` (PEP 604 不支持) 会爆 sqlalchemy `Mapped[str | None]` — 与 `scripts/gateway-import-smoke.sh` 行为一致, CI 装 3.11 正常. dev 本地可 `PYTHON=python3.11` env 覆盖 (留 follow-up if 需要).
+- PR #351 helper `_detect_missing_third_party` 把 `services/shared/api/models/repositories/edge/scripts` 内模块判为代码 bug (非第三方). mode B 模式下子进程的 `src.main` 引用 `from .api.X` 是相对 import 走 src 包内, 不触 false-positive deps detect. 已验证 tx-brain / tx-predict 走 helper 正常 skip / pass.
+
+### 明日计划
+
+- gh pr create + §19 reviewer round-N
+- 立 follow-up issue: gateway+13 服务 + 5 新服务 的 CI workflow 路径补 (`.github/workflows/python-ci.yml` 加跑 18 服务 main-import-smoke fail-fast step) — 独立 PR
+- 创始人 explicit-ack ship PR
+
+### Tier 1 邻接累计
+
+- 本 PR 候选 carve-out 第 13 类 (测试基础设施 only); 创始人确认后正式 +1.
+
+---
+
 ## 2026-05-16 续 PR-A — PRD-11 sub-B.2 + sub-C projector 灰度路径接入 feature_flags + prod/staging/gray 显式 OFF (Phase 2 W12 收官 / Tier 1 邻接第 36 例, 待 ship)
 
 ### 今日完成 (本 PR-A)

@@ -51,6 +51,8 @@ def assert_main_app_imports(
     min_routes: int = 1,
     extra_env: dict[str, str] | None = None,
     timeout: int = 30,
+    mode: str = "A",
+    extra_copies: list[tuple[str, str]] | None = None,
 ) -> None:
     """验证 services/<service>/src/main.py 在 Docker 容器布局下能干净 import。
 
@@ -58,10 +60,22 @@ def assert_main_app_imports(
       1. mkdir <tmp>/services/<py_svc>/
       2. cp -r services/<svc>/src <tmp>/services/<py_svc>/
       3. cp -r shared <tmp>/
-      4. PYTHONPATH=<tmp> python -c "from services.<py_svc>.src import main; assert main.app"
+      4. extra_copies 复刻 Dockerfile cross-service ``COPY``
+      5. PYTHONPATH=<tmp> python -c "from services.<py_svc>.src import main; assert main.app"
 
     任何 main.py 内部 import 失败 / app 不存在 / routes 数 < min_routes → AssertionError。
+
+    **mode 区分两种 Dockerfile 布局** (issue #714 W22 补全):
+      - "A" (16 服务): ``COPY services/tx-X/src/ ./services/tx_X/src/`` + ``uvicorn services.tx_X.src.main:app``
+      - "B" (2 服务, tx-brain / tx-predict): ``COPY services/tx-X/src/ ./src/`` + ``uvicorn src.main:app``
+
+    **extra_copies** 复刻 Dockerfile cross-service ``COPY`` 指令 (issue #714):
+      tx-trade 的 ``COPY services/tx-org/src/services/permission_service.py
+      ./services/permission_service.py`` 表达为
+      ``[("services/tx-org/src/services/permission_service.py", "services/permission_service.py")]``.
     """
+    if mode not in {"A", "B"}:
+        raise ValueError(f"mode must be 'A' or 'B', got {mode!r}")
     root = _repo_root()
     py_svc = service.replace("-", "_")
     src_dir = root / "services" / service / "src"
@@ -72,13 +86,29 @@ def assert_main_app_imports(
 
     with tempfile.TemporaryDirectory(prefix=f"smoke-{service}-") as tmp:
         tmp_path = Path(tmp)
-        target_svc = tmp_path / "services" / py_svc
-        target_svc.mkdir(parents=True)
-        shutil.copytree(src_dir, target_svc / "src")
+        if mode == "A":
+            target_svc = tmp_path / "services" / py_svc
+            target_svc.mkdir(parents=True)
+            shutil.copytree(src_dir, target_svc / "src")
+            import_target = f"services.{py_svc}.src"
+        else:  # mode B
+            shutil.copytree(src_dir, tmp_path / "src")
+            import_target = "src"
         shutil.copytree(root / "shared", tmp_path / "shared")
 
+        for src_rel, dst_rel in extra_copies or []:
+            src_path = root / src_rel
+            if not src_path.exists():
+                raise AssertionError(f"extra_copies src missing: {src_path}")
+            dst_path = tmp_path / dst_rel
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path)
+            else:
+                shutil.copy2(src_path, dst_path)
+
         code = (
-            f"from services.{py_svc}.src import main as m; "
+            f"from {import_target} import main as m; "
             f"assert hasattr(m, 'app'), 'no app attribute'; "
             f"assert len(m.app.routes) >= {min_routes}, "
             f"f'routes={{len(m.app.routes)}} < {min_routes}'; "
