@@ -25,15 +25,98 @@ from shared.ontology.src.database import async_session_factory
 
 from .index_split import IndexSplitProjector
 
+# Feature Flag SDK（try/except 保护，SDK 不可用时降级为 env-only 模式）
+try:
+    from shared.feature_flags import FlagContext
+    from shared.feature_flags import is_enabled as _ff_is_enabled
+    from shared.feature_flags.flag_names import SupplyFlags
+
+    _FLAG_SDK_AVAILABLE = True
+except ImportError:
+    _FLAG_SDK_AVAILABLE = False
+
+    def _ff_is_enabled(flag, context=None):  # type: ignore[no-redef]
+        return False
+
+    class FlagContext:  # type: ignore[no-redef]
+        def __init__(self, **kwargs):
+            for k, v in kwargs.items():
+                setattr(self, k, v)
+
+    class SupplyFlags:  # type: ignore[no-redef]
+        PRD11_INDEX_SPLIT_PROJECTOR = "supply.prd11.index_split_projector.enable"
+
+
 log = structlog.get_logger(__name__)
 
 _PROJECTOR_TASKS: dict[str, "asyncio.Task[Any]"] = {}
 
 
+def _env_override() -> bool | None:
+    """env override (优先级最高, 紧急停用走 false / 强制启用走 true).
+
+    返回 None 表示未设置 env (走 feature_flags SDK 评估).
+    """
+    val = os.getenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR")
+    if val is None:
+        return None
+    val_lower = val.lower()
+    if val_lower in ("1", "true", "yes", "on"):
+        return True
+    if val_lower in ("0", "false", "no", "off"):
+        return False
+    return None
+
+
 def is_enabled() -> bool:
-    """Feature flag gate — 默认 OFF, 激活 PR 改 default 或 env."""
-    val = os.getenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "false")
-    return val.lower() in ("1", "true", "yes", "on")
+    """全局 gate (lifespan startup 用) — env > feature_flags SDK > False.
+
+    PRD-11 sub-B.2 灰度入口:
+    - env TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR 优先级最高 (紧急停用 / 强制启用).
+    - 未设 env 时走 feature_flags SDK 评估 SupplyFlags.PRD11_INDEX_SPLIT_PROJECTOR
+      (无 tenant context, 看全局 env defaultValue + environments).
+    - SDK 抛异常 fail-open False + structlog.warn (不阻塞 lifespan).
+
+    per-tenant gate 走 `is_enabled_for_tenant(tenant_id)` 函数.
+    """
+    override = _env_override()
+    if override is not None:
+        return override
+    try:
+        return bool(_ff_is_enabled(SupplyFlags.PRD11_INDEX_SPLIT_PROJECTOR))
+    except Exception as exc:  # noqa: BLE001 — fail-open SDK 异常
+        log.warning(
+            "index_split_projector_flag_sdk_failed",
+            error=str(exc),
+            exc_info=True,
+        )
+        return False
+
+
+def is_enabled_for_tenant(tenant_id: UUID | str) -> bool:
+    """per-tenant gate (lifespan refresh loop 用) — env > feature_flags SDK > False.
+
+    与 `is_enabled()` 互补:
+    - env 强制 true → 所有 tenant 启 daemon (紧急强制启用).
+    - env 强制 false → 所有 tenant 跳过 daemon (紧急停用, 与 is_enabled 一致).
+    - 未设 env → 走 feature_flags SDK + FlagContext(tenant_id=...) 评估
+      targeting_rules.prod.tenant_id 白名单 (5%→50%→100% 灰度).
+    - SDK 抛异常 fail-open False + structlog.warn (不阻塞 lifespan).
+    """
+    override = _env_override()
+    if override is not None:
+        return override
+    try:
+        ctx = FlagContext(tenant_id=str(tenant_id))
+        return bool(_ff_is_enabled(SupplyFlags.PRD11_INDEX_SPLIT_PROJECTOR, ctx))
+    except Exception as exc:  # noqa: BLE001 — fail-open SDK 异常
+        log.warning(
+            "index_split_projector_flag_sdk_failed",
+            tenant_id=str(tenant_id),
+            error=str(exc),
+            exc_info=True,
+        )
+        return False
 
 
 async def start_index_split_projector(tenant_id: UUID | str) -> None:

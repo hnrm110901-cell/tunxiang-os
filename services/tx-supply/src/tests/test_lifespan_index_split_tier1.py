@@ -46,9 +46,14 @@ async def _test_lifespan():
 
     §19 round-1 fix mirrored:
     - P1-1: shutdown 用 stop_all_index_split_projectors() 兜底, 不靠 started_tenants 闭包.
+
+    PR-A (2026-05-16 Tier 1 邻接第 36 例) per-tenant gating:
+    - refresh loop 每轮按 _index_split_enabled_for_tenant(tid) 二次过滤
+    - 已 start 但本轮 flag 翻 OFF → stop
     """
     from services.tx_supply.src.projectors.registry import (
         is_enabled as _index_split_enabled,
+        is_enabled_for_tenant as _index_split_enabled_for_tenant,
         list_active_tenants as _list_active_tenants,
         start_index_split_projector as _start,
         stop_all_index_split_projectors as _stop_all,
@@ -69,12 +74,17 @@ async def _test_lifespan():
             while not stop_event.is_set():
                 try:
                     tenants = await _list_active_tenants()
-                    current = set(tenants)
-                    for tid in current - started_tenants:
+                    # PRD-11 sub-B.2 灰度: per-tenant gating
+                    enabled_set = {
+                        tid
+                        for tid in tenants
+                        if _index_split_enabled_for_tenant(tid)
+                    }
+                    for tid in enabled_set - started_tenants:
                         await _start(tid)
-                    for tid in started_tenants - current:
+                    for tid in started_tenants - enabled_set:
                         await _stop(tid)
-                    started_tenants = current
+                    started_tenants = enabled_set
                 except Exception as exc:  # noqa: BLE001
                     _logger.error(
                         "index_split_tenant_refresh_failed",
@@ -117,8 +127,13 @@ _REGISTRY_PATH = "services.tx_supply.src.projectors.registry"
 
 @pytest.mark.asyncio
 async def test_lifespan_env_off_skip(monkeypatch: pytest.MonkeyPatch) -> None:
-    """env OFF → projector daemon 完全跳过，start/list 均未被调."""
-    monkeypatch.delenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", raising=False)
+    """env OFF → projector daemon 完全跳过，start/list 均未被调.
+
+    PR-A (2026-05-16): env 显式 "false" 走 env override = OFF (优先级最高, 绕过 SDK).
+    若仅 delenv (env unset), 新语义会走 SDK 评估 — dev 环境 YAML defaultValue=true 会启;
+    本测试明确 emergent stop 场景: env 强制 OFF.
+    """
+    monkeypatch.setenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "false")
 
     mock_start = AsyncMock()
     mock_list = AsyncMock(return_value=[_T1])
@@ -266,3 +281,149 @@ async def test_list_active_tenants_uses_status_filter() -> None:
         "list_active_tenants 不可用 is_deleted = FALSE — tenants 表 v006 无此列, "
         "会运行时 ProgrammingError 致 projector 静默 noop. 用 status='active' 替代."
     )
+
+
+# ─── PR-A (2026-05-16 Tier 1 邻接第 36 例) feature_flags 灰度路径测试 ────────
+# 覆盖 feature_flags SDK 接入 + per-tenant gating + emergency env override + fail-open
+
+
+@pytest.mark.asyncio
+async def test_feature_flag_off_all_tenants_skip(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """feature_flags SDK 返 False (无 tenant 命中 targeting_rules) → refresh loop 0 daemon start.
+
+    场景: prod env (YAML environments.prod=false, targeting_rules.prod.tenant_id=[]),
+    env var 未设 → 全局 is_enabled() 返 False → lifespan 直接跳过 refresh_task 启动.
+    模拟法: env=false 走 env override → 等价 SDK 返 False.
+    """
+    monkeypatch.setenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "false")
+    monkeypatch.setenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "0.05")
+
+    mock_start = AsyncMock()
+    mock_list = AsyncMock(return_value=[_T1, _T2])
+
+    with (
+        patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
+        patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
+    ):
+        async with _test_lifespan():
+            await asyncio.sleep(0.15)
+
+    # SDK 返 False → 全局 gate fail → refresh loop 不启 → list/start 0 调用
+    mock_start.assert_not_called()
+    mock_list.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_feature_flag_prod_whitelist_tenant_starts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """feature_flags 模拟 prod targeting_rules 命中 1 tenant → 仅启该 tenant daemon.
+
+    场景: 全局 gate 通过 (env override = true), per-tenant gate 模拟仅 _T1 命中
+    targeting_rules.prod.tenant_id 白名单, _T2 不命中.
+    模拟法: mock is_enabled_for_tenant 返 True for _T1, False for _T2.
+    """
+    monkeypatch.setenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "true")
+    monkeypatch.setenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "0.05")
+
+    mock_start = AsyncMock()
+    mock_stop = AsyncMock()
+    mock_stop_all = AsyncMock()
+    mock_list = AsyncMock(return_value=[_T1, _T2])
+
+    def _per_tenant_gate(tenant_id: str) -> bool:
+        # 模拟 targeting_rules.prod.tenant_id = [_T1] 白名单
+        return str(tenant_id) == _T1
+
+    with (
+        patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
+        patch(f"{_REGISTRY_PATH}.stop_index_split_projector", mock_stop),
+        patch(f"{_REGISTRY_PATH}.stop_all_index_split_projectors", mock_stop_all),
+        patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
+        patch(
+            f"{_REGISTRY_PATH}.is_enabled_for_tenant",
+            side_effect=_per_tenant_gate,
+        ),
+    ):
+        async with _test_lifespan():
+            await asyncio.sleep(0.15)
+
+    started_args = {call.args[0] for call in mock_start.call_args_list}
+    assert started_args == {_T1}, (
+        f"Expected only T1 (whitelist) to start daemon, got: {started_args}"
+    )
+    # T2 不在白名单 → 从未 start
+    assert _T2 not in started_args
+
+
+@pytest.mark.asyncio
+async def test_emergency_env_override_force_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """env TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=true 强制覆盖 SDK 返 False (优先级最高).
+
+    场景: prod 紧急 force-on (例如 SDK YAML 错配, 但运维确认需启用) — env 显式 true
+    必须 override SDK 评估结果. 通过 mock SDK 返 False 验证 env 优先级.
+    """
+    monkeypatch.setenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "true")
+    monkeypatch.setenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "0.05")
+
+    mock_start = AsyncMock()
+    mock_stop = AsyncMock()
+    mock_stop_all = AsyncMock()
+    mock_list = AsyncMock(return_value=[_T1])
+
+    # mock 整个 feature_flags SDK 返 False — 但 env=true 必须 override
+    with (
+        patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
+        patch(f"{_REGISTRY_PATH}.stop_index_split_projector", mock_stop),
+        patch(f"{_REGISTRY_PATH}.stop_all_index_split_projectors", mock_stop_all),
+        patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
+        patch(f"{_REGISTRY_PATH}._ff_is_enabled", return_value=False),
+    ):
+        async with _test_lifespan():
+            await asyncio.sleep(0.15)
+
+    # env=true 强制 override → T1 仍被 start (SDK 返 False 不影响)
+    started_args = {call.args[0] for call in mock_start.call_args_list}
+    assert _T1 in started_args, (
+        "env=true 必须 override SDK 返 False — 紧急 force-on 路径"
+    )
+
+
+@pytest.mark.asyncio
+async def test_feature_flag_sdk_failure_fail_open_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """feature_flags SDK 抛异常 → fail-open False (不阻塞 lifespan), env 未设时 noop.
+
+    场景: SDK YAML 文件读取失败 / 解析异常 etc. registry is_enabled / is_enabled_for_tenant
+    必须 fail-open 返 False 并 structlog.warn, lifespan 仍正常进退.
+    """
+    # env 未设 → 走 SDK 评估
+    monkeypatch.delenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", raising=False)
+    monkeypatch.setenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "0.05")
+
+    mock_start = AsyncMock()
+    mock_list = AsyncMock(return_value=[_T1])
+
+    # mock SDK is_enabled 抛异常 — registry.is_enabled() 应 fail-open False
+    with (
+        patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
+        patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
+        patch(
+            f"{_REGISTRY_PATH}._ff_is_enabled",
+            side_effect=RuntimeError("SDK YAML parse error"),
+        ),
+    ):
+        # lifespan 进退不应抛异常 (fail-open)
+        async with _test_lifespan():
+            await asyncio.sleep(0.15)
+
+    # SDK fail-open False → 全局 gate fail → refresh loop 不启
+    mock_start.assert_not_called()
+    mock_list.assert_not_called()
+
+

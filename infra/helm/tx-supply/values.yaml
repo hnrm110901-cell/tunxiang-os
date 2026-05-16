@@ -37,6 +37,12 @@ env:
   TRANSFER_LOSS_DETECTION: "true"
   # 加权均价成本：多批次成本按加权均价法核算，符合会计准则
   WEIGHTED_AVG_COST: "true"
+  # PRD-11 sub-B.2 灰度入口 (Phase 2 W12 / 2026-05-16 / Tier 1 邻接第 36 例)
+  # IndexSplitProjector lifespan 默认 OFF。灰度走 feature_flags SDK
+  # (flags/supply/supply_flags.yaml supply.prd11.index_split_projector.enable).
+  # 紧急停用走此 env="false" (优先级最高，绕过 SDK)。
+  # dev/demo helm 环境如需翻 ON 用 `helm --set env.TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=true`。
+  TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "false"
 
 # Secret中存放的敏感环境变量（由外部Secret Manager注入）
 secretRef:

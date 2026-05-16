@@ -1,3 +1,43 @@
+## 2026-05-16 续 PR-A — PRD-11 sub-B.2 + sub-C projector 灰度路径接入 feature_flags + prod/staging/gray 显式 OFF (Phase 2 W12 收官 / Tier 1 邻接第 36 例, 待 ship)
+
+### 今日完成 (本 PR-A)
+
+- [tx-supply] IndexSplitProjector registry.py 接 feature_flags SDK + per-tenant gating (`is_enabled_for_tenant`)
+- [tx-analytics] SplitAttributionProjector registry.py 同模式
+- [shared] AnalyticsFlags 枚举新增 + SupplyFlags 加 `PRD11_INDEX_SPLIT_PROJECTOR` + `__init__.py` 导出
+- [flags] `flags/supply/supply_flags.yaml` 加 PRD-11 flag 定义 (defaultValue=false; dev/test=true; uat/pilot/prod=false; targeting_rules.prod.tenant_id=[])
+- [flags] 新建 `flags/analytics/analytics_flags.yaml` 镜像 supply schema (`analytics.prd11.split_attribution_projector.enable`)
+- [tx-supply/main.py] lifespan refresh loop per-tenant gate: `enabled_set = {tid for tid in tenants if _index_split_enabled_for_tenant(tid)}`, 已 start 但 flag 翻 OFF → stop
+- [tx-analytics/main.py] lifespan refresh loop 同 sub-C 模式
+- [infra/compose/envs] prod.yml/staging.yml/gray.yml tx-supply + tx-analytics environment 段加 `TX_*_ENABLE_*_PROJECTOR: "false"` 显式 OFF + runbook 注释
+- [infra/helm] tx-supply + tx-analytics values.yaml env 段加 `TX_*_ENABLE_*_PROJECTOR: "false"` + runbook 注释 (`helm --set` 翻 dev/demo ON)
+- [tests] tx-supply test_lifespan_index_split_tier1.py + tx-analytics test_lifespan_split_attribution_tier1.py 各加 4 个 PR-A 灰度路径测试 (env_off_skip 改用 explicit "false"; feature_flag_off_all_tenants_skip / feature_flag_prod_whitelist_tenant_starts / emergency_env_override_force_on / feature_flag_sdk_failure_fail_open_off)
+
+### 灰度后续路径
+
+- **PR-B**: 加 czyz tenant_id 到 supply + analytics flags.yaml prod targeting_rules (5%)
+- **PR-C**: 加 zqx (50%)
+- **PR-D**: 翻 defaultValue: true (100%)
+- 观察期: 5% = 2d / 50% = 3d
+
+### 已知风险
+
+- **P0-1 connection pool**: 3 tenant 阶段 6 connections 安全; 100% 翻 default=true 前 follow-up issue 立项 baseline (本 PR 不改 helm DSN pool size, 留 follow-up)
+- **P2 feature_flags YAML 热 reload 不秒级**: 紧急回滚走 `FEATURE_*=false` env override 或 `TX_*_ENABLE_*_PROJECTOR=false` (优先级最高)
+- **registry 接 feature_flags 后 dev/demo 行为变**: SDK 初始化失败 fail-open False, lifespan 仅 startup 时一次性 gate, 重启才生效; 紧急停用走 env override
+
+### 明日计划
+
+- 等 §19 reviewer round-1/round-2
+- 创始人 explicit-ack ship PR-A
+- ship 后立 PR-B 加 czyz 5% 灰度
+
+### Tier 1 邻接累计
+
+- PRD-11 sub-B.2 sub-C 灰度路径合并完整闭环, Tier 1 邻接第 36 例 (Phase 2 W12 收官).
+
+---
+
 ## 2026-05-16 W11 闭环 / W12 起手 — PRD-11 sub-B.2 IndexSplitProjector Tier 1 第 30 例 (Phase 2 W11 第六发 / W12 起手, 待 ship)
 
 ### 今日完成
