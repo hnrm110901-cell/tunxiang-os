@@ -111,6 +111,8 @@ services:
              uvicorn services.tx-supply.src.main:app --host 0.0.0.0 --port 8006 --reload"
     ports:
       - "8006:8006"
+    environment:
+      TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "true"
     volumes:
       - ../../services/tx-supply:/app/services/tx-supply
       - ../../shared:/app/shared

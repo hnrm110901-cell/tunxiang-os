@@ -125,6 +125,10 @@ services:
       - ../../services/tx-finance:/app/services/tx-finance
       - ../../shared:/app/shared
 
+  tx-supply:
+    environment:
+      TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "true"
+
   tx-analytics:
     image: python:3.11-slim
     working_dir: /app
