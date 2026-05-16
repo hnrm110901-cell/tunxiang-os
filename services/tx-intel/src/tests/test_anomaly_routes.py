@@ -540,3 +540,228 @@ class TestPerDetectorTry:
         # high_refund (detector 3) 正常返回数据
         types_ = {a["type"] for a in body["data"]["anomalies"]}
         assert "high_refund" in types_
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Regression: _fetch_anomalies_from_db 每 sub-fetch 独立 try (issue #716)
+#   compliance/revenue 任一 fail 不短路另一; rollback + RLS 重设防事务污染
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestSubFetchTry:
+    """_fetch_anomalies_from_db 每 sub-fetch 独立 try, 单 fail 不短路另一 (issue #716)."""
+
+    def test_sub_fetch_compliance_failure_revenue_succeeds(self, monkeypatch):
+        """compliance sub-fetch SQLAlchemyError → rollback + 重设 RLS, revenue 数据仍返回."""
+        import asyncio
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+        mock_db.rollback = AsyncMock()
+
+        revenue_fixture = [
+            {
+                "id": "rev-1",
+                "type": "revenue_drop",
+                "severity": "warning",
+                "description": "store-X 营收下滑",
+                "detail": {"store_id": "store-X"},
+                "occurred_at": "2026-05-16T00:00:00+00:00",
+                "dismissed": False,
+            }
+        ]
+
+        compliance_calls = {"n": 0}
+        revenue_calls = {"n": 0}
+
+        async def _fail_compliance(*a, **kw):
+            compliance_calls["n"] += 1
+            raise _SQLAlchemyError("compliance_alerts not found")
+
+        async def _ok_revenue(*a, **kw):
+            revenue_calls["n"] += 1
+            return revenue_fixture
+
+        monkeypatch.setattr(_anomaly_mod, "_fetch_compliance_anomalies", _fail_compliance)
+        monkeypatch.setattr(_anomaly_mod, "_fetch_revenue_anomalies", _ok_revenue)
+
+        tid = uuid.UUID(TENANT_ID)
+        result = asyncio.get_event_loop().run_until_complete(
+            _anomaly_mod._fetch_anomalies_from_db(mock_db, tid, None, 7)
+        )
+
+        # compliance fail 后 revenue 仍跑且返
+        assert compliance_calls["n"] == 1
+        assert revenue_calls["n"] == 1
+        assert len(result) == 1
+        assert result[0]["id"] == "rev-1"
+        # AsyncSession rollback + _set_rls 重调
+        mock_db.rollback.assert_awaited_once()
+        # _set_rls 通过 db.execute(set_config) 实现; 验证至少有一次 execute (重设 RLS)
+        assert mock_db.execute.await_count >= 1
+
+    def test_sub_fetch_revenue_failure_compliance_already_collected(self, monkeypatch):
+        """compliance 先成功收集, revenue fail → compliance 数据保住."""
+        import asyncio
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+        mock_db.rollback = AsyncMock()
+
+        compliance_fixture = [
+            {
+                "id": "comp-1",
+                "type": "compliance_alert",
+                "severity": "critical",
+                "description": "证件过期",
+                "detail": {},
+                "occurred_at": "2026-05-16T00:00:00+00:00",
+                "dismissed": False,
+            }
+        ]
+
+        async def _ok_compliance(*a, **kw):
+            return compliance_fixture
+
+        async def _fail_revenue(*a, **kw):
+            raise _SQLAlchemyError("orders table missing total_fen column")
+
+        monkeypatch.setattr(_anomaly_mod, "_fetch_compliance_anomalies", _ok_compliance)
+        monkeypatch.setattr(_anomaly_mod, "_fetch_revenue_anomalies", _fail_revenue)
+
+        tid = uuid.UUID(TENANT_ID)
+        result = asyncio.get_event_loop().run_until_complete(
+            _anomaly_mod._fetch_anomalies_from_db(mock_db, tid, None, 7)
+        )
+
+        # compliance 保住, revenue fail 不短路
+        assert len(result) == 1
+        assert result[0]["id"] == "comp-1"
+        mock_db.rollback.assert_awaited_once()
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Regression: 外层 except 保留 inner 已收集数据 (issue #716)
+#   原 anomalies=[] 覆盖丢弃 detector + sub-fetch 已 extend; 应保留并返回
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestOuterExceptPreserves:
+    """list_anomalies 外层 except 保留 inner 已收集 detector + sub-fetch 数据 (issue #716)."""
+
+    def test_outer_except_preserves_partial_anomalies(self, monkeypatch):
+        """detector 收集 N 条 → 外层 except 触发时仍返回 N 条 (非空数组)."""
+        # detector 收集 1 条 expiry_risk; _fetch_anomalies_from_db 抛 → 外层 except 接住
+        fake_expiry = [
+            {
+                "id": "exp-1",
+                "type": "expiry_risk",
+                "severity": "critical",
+                "description": "7天内临期食材10种",
+                "detail": {},
+                "occurred_at": "2026-05-16T00:00:00+00:00",
+                "dismissed": False,
+            }
+        ]
+
+        async def _ok_empty(*a, **kw):
+            return []
+
+        async def _ok_expiry(*a, **kw):
+            return fake_expiry
+
+        async def _fail_fetch(*a, **kw):
+            raise _SQLAlchemyError("compliance + revenue 全死")
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_expiry)
+        monkeypatch.setattr(_anomaly_mod, "_fetch_anomalies_from_db", _fail_fetch)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        # 关键: 不是空数组. detector 已 extend 的 expiry_risk 必保留
+        assert body["data"]["total"] >= 1
+        types_ = {a["type"] for a in body["data"]["anomalies"]}
+        assert "expiry_risk" in types_
+        # 不是 mock 数据
+        assert body["data"]["_is_mock"] is False
+
+    def test_outer_except_empty_when_set_rls_fails_first(self, monkeypatch):
+        """_set_rls 自己 fail → anomalies 仍空 list (空安全, 不 NameError)."""
+
+        async def _fail_set_rls(*a, **kw):
+            raise _SQLAlchemyError("RLS set_config fail")
+
+        monkeypatch.setattr(_anomaly_mod, "_set_rls", _fail_set_rls)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        # 空 list, 非 NameError
+        assert body["data"]["total"] == 0
+        assert body["data"]["anomalies"] == []
+        assert body["data"]["_is_mock"] is False
+
+    def test_outer_except_logger_includes_partial_count(self, monkeypatch):
+        """外层 except log 含 partial_count 便于排查 (data is preserved, not silently lost)."""
+        captured: list[dict] = []
+
+        def _capture_warning(event: str, **kwargs):
+            captured.append({"event": event, **kwargs})
+
+        fake_logger = types.SimpleNamespace(
+            warning=_capture_warning,
+            info=lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(_anomaly_mod, "logger", fake_logger)
+
+        fake_anomaly = [
+            {
+                "id": "a-1",
+                "type": "expiry_risk",
+                "severity": "critical",
+                "description": "test",
+                "detail": {},
+                "occurred_at": "2026-05-16T00:00:00+00:00",
+                "dismissed": False,
+            }
+        ]
+
+        async def _ok_empty(*a, **kw):
+            return []
+
+        async def _ok_one(*a, **kw):
+            return fake_anomaly
+
+        async def _fail_fetch(*a, **kw):
+            raise _SQLAlchemyError("force outer except")
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_one)
+        monkeypatch.setattr(_anomaly_mod, "_fetch_anomalies_from_db", _fail_fetch)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock())
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+
+        # 验证 anomalies.outer_db_error log 含 partial_count=1
+        outer_logs = [c for c in captured if c.get("event") == "anomalies.outer_db_error"]
+        assert len(outer_logs) >= 1
+        assert outer_logs[0].get("partial_count") == 1
