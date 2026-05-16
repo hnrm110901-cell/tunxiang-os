@@ -453,10 +453,39 @@ async def _fetch_anomalies_from_db(
     store_id: str | None,
     days: int,
 ) -> list[dict[str, Any]]:
-    """汇总 compliance_alerts + orders 营收异常"""
+    """汇总 compliance_alerts + orders 营收异常.
+
+    每个 sub-fetch 独立 try, 单 sub-fetch fail 不短路另一 (复用 issue #712
+    per-detector 模式). AsyncSession 失败事务污染时必须 rollback + 重设 RLS
+    (set_config local=true 在 rollback 后丢失).
+    """
     anomalies: list[dict[str, Any]] = []
-    anomalies.extend(await _fetch_compliance_anomalies(db, tenant_id, store_id, days))
-    anomalies.extend(await _fetch_revenue_anomalies(db, tenant_id, store_id, days))
+    sub_fetches = (
+        ("compliance", _fetch_compliance_anomalies),
+        ("revenue", _fetch_revenue_anomalies),
+    )
+    for sub_name, sub_fn in sub_fetches:
+        try:
+            anomalies.extend(await sub_fn(db, tenant_id, store_id, days))
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "anomaly_subfetch_db_error",
+                sub_fetch=sub_name,
+                error=str(exc),
+                exc_info=True,
+            )
+            # AsyncSession SELECT 失败后事务污染: 必须 rollback + 重设 RLS,
+            # 否则下一个 sub_fetch 会触 InFailedSqlTransactionError.
+            try:
+                await db.rollback()
+                await _set_rls(db, tenant_id)
+            except SQLAlchemyError as rb_exc:
+                logger.warning(
+                    "anomaly_subfetch_rollback_failed",
+                    sub_fetch=sub_name,
+                    error=str(rb_exc),
+                )
+                break  # rollback 都失败 session 已死, 后续 sub_fetch 必失败
     severity_order = {"critical": 0, "warning": 1, "info": 2}
     anomalies.sort(key=lambda x: (severity_order.get(x["severity"], 9), x["occurred_at"]))
     return anomalies
@@ -474,9 +503,10 @@ async def list_anomalies(
     include_dismissed: bool = False,
 ) -> dict:
     """获取最近N天的经营异常列表（统计检测 + 合规告警，不调用Claude）"""
+    # anomalies 提前 try 外初始化, 外层 except 可访问已收集部分数据 (issue #716)
+    anomalies: list[dict[str, Any]] = []
     try:
         await _set_rls(db, tenant_id)
-        anomalies: list[dict[str, Any]] = []
 
         # 优先运行已有的细粒度统计检测函数（依赖 cost_records/kitchen_orders/inventory_items）
         # 每个 detector 独立 try, 单失败 graceful skip 不短路其他 detector
@@ -535,14 +565,26 @@ async def list_anomalies(
             "error": None,
         }
     except (SQLAlchemyError, NotImplementedError) as exc:
-        logger.warning("anomalies.db_error", exc=str(exc))
+        # 外层 except 保留 inner 已收集的 detector + sub-fetch 数据 (issue #716);
+        # 排序 + dismissed filter 仍跑, 防止 5 detector + sub-fetch 已 extend
+        # 的 N 条数据被静默丢弃.
+        logger.warning(
+            "anomalies.outer_db_error",
+            error=str(exc),
+            partial_count=len(anomalies),
+            exc_info=True,
+        )
+        if not include_dismissed:
+            anomalies = [a for a in anomalies if not a.get("dismissed")]
+        severity_order = {"critical": 0, "warning": 1, "info": 2}
+        anomalies.sort(key=lambda x: (severity_order.get(x["severity"], 9), x["occurred_at"]))
         return {
             "ok": True,
             "data": {
-                "anomalies": [],
-                "total": 0,
-                "critical_count": 0,
-                "warning_count": 0,
+                "anomalies": anomalies,
+                "total": len(anomalies),
+                "critical_count": sum(1 for a in anomalies if a.get("severity") == "critical"),
+                "warning_count": sum(1 for a in anomalies if a.get("severity") == "warning"),
                 "_is_mock": False,
             },
             "error": None,
