@@ -62,6 +62,7 @@ def _dlq_row(
     error_msg="dish 不允许分享 (allow_share=False)",
     payload=None,
     acknowledged_at=None,
+    total=None,
 ):
     if payload is None:
         payload = {"order_id": str(order_id), "items": [{"share_count": 3}]}
@@ -80,14 +81,25 @@ def _dlq_row(
     row.acknowledged_at = acknowledged_at
     row.acknowledged_by = None
     row.ack_notes = None
+    # window function COUNT(*) OVER () 在每行同值; 未传时 mock 默认 MagicMock 即可
+    if total is not None:
+        row.total = total
     return row
 
 
-def _override_db(*, list_rows=None, unack_row=None, detail_row=None, update_row=None):
+def _override_db(
+    *,
+    list_rows=None,
+    unack_row=None,
+    detail_row=None,
+    update_row=None,
+    fallback_total_row=None,
+):
     """构造 fake get_db_with_tenant.
 
-    list_rows: 第一个 execute 返回 fetchall
-    unack_row: 第二个 execute 返回 fetchone (列表端点的 unack count)
+    list_rows: 第一个 execute (主 list query) 返回 fetchall (含 .total window 字段)
+    fallback_total_row: list_rows 空时第二个 execute (独立 COUNT 兜底) 返回 fetchone
+    unack_row: list/fallback 之后下一个 execute 返回 fetchone (unack 红点 count)
     detail_row: detail endpoint 返回 fetchone
     update_row: acknowledge endpoint 返回 fetchone
     """
@@ -104,7 +116,18 @@ def _override_db(*, list_rows=None, unack_row=None, detail_row=None, update_row=
                 er.fetchall.return_value = list_rows
                 er.fetchone.return_value = None
                 return er
-            if unack_row is not None and n == 2:
+            # 第二步: list_rows 空 → fallback COUNT 查询; list_rows 非空 → 直接 unack
+            if list_rows is not None and not list_rows and n == 2:
+                er.fetchone.return_value = fallback_total_row
+                er.fetchall.return_value = []
+                return er
+            if (
+                unack_row is not None
+                and (
+                    (list_rows and n == 2)
+                    or (not list_rows and list_rows is not None and n == 3)
+                )
+            ):
                 er.fetchone.return_value = unack_row
                 er.fetchall.return_value = []
                 return er
@@ -133,6 +156,13 @@ def _unack_count_row(count=0):
     return row
 
 
+def _total_row(total=0):
+    """fallback 独立 COUNT 查询 fetchone (rows 空时触发)."""
+    row = MagicMock()
+    row.total = total
+    return row
+
+
 def _update_row(id="aaaaaaaa-1111-1111-1111-111111111111"):
     row = MagicMock()
     row.id = id
@@ -151,7 +181,11 @@ class TestListDlq:
         with patch.object(
             _dlq_mod,
             "get_db_with_tenant",
-            _override_db(list_rows=[], unack_row=_unack_count_row(0)),
+            _override_db(
+                list_rows=[],
+                fallback_total_row=_total_row(0),
+                unack_row=_unack_count_row(0),
+            ),
         ):
             resp = _client.get(
                 "/api/v1/dlq/split-attribution", headers=HEADERS
@@ -161,12 +195,16 @@ class TestListDlq:
         assert body["ok"] is True
         assert body["data"]["items"] == []
         assert body["data"]["page"]["limit"] == 50
+        assert body["data"]["page"]["total"] == 0
         assert body["data"]["summary"]["unack_count"] == 0
 
     def test_returns_rows_with_unack_count(self):
         from unittest.mock import patch
 
-        rows = [_dlq_row(), _dlq_row(id="dddddddd-4444-4444-4444-444444444444")]
+        rows = [
+            _dlq_row(total=2),
+            _dlq_row(id="dddddddd-4444-4444-4444-444444444444", total=2),
+        ]
         with patch.object(
             _dlq_mod,
             "get_db_with_tenant",
@@ -181,6 +219,7 @@ class TestListDlq:
         assert body["data"]["items"][0]["error_class"] == "ValueError"
         assert body["data"]["page"]["count"] == 2
         assert body["data"]["page"]["limit"] == 10
+        assert body["data"]["page"]["total"] == 2
         assert body["data"]["summary"]["unack_count"] == 5
 
     def test_status_filter_unack_ack_all(self):
@@ -190,7 +229,11 @@ class TestListDlq:
             with patch.object(
                 _dlq_mod,
                 "get_db_with_tenant",
-                _override_db(list_rows=[], unack_row=_unack_count_row(0)),
+                _override_db(
+                    list_rows=[],
+                    fallback_total_row=_total_row(0),
+                    unack_row=_unack_count_row(0),
+                ),
             ):
                 resp = _client.get(
                     f"/api/v1/dlq/split-attribution?status={s}",
@@ -204,7 +247,11 @@ class TestListDlq:
         with patch.object(
             _dlq_mod,
             "get_db_with_tenant",
-            _override_db(list_rows=[], unack_row=_unack_count_row(0)),
+            _override_db(
+                list_rows=[],
+                fallback_total_row=_total_row(0),
+                unack_row=_unack_count_row(0),
+            ),
         ):
             resp = _client.get(
                 "/api/v1/dlq/split-attribution?status=bogus", headers=HEADERS
@@ -218,12 +265,144 @@ class TestListDlq:
         with patch.object(
             _dlq_mod,
             "get_db_with_tenant",
-            _override_db(list_rows=[], unack_row=_unack_count_row(0)),
+            _override_db(
+                list_rows=[],
+                fallback_total_row=_total_row(0),
+                unack_row=_unack_count_row(0),
+            ),
         ):
             resp = _client.get(
                 "/api/v1/dlq/split-attribution?limit=999", headers=HEADERS
             )
         assert resp.status_code == 422
+
+
+# ═══════════════════════════════════════
+# page.total (issue #725)
+# ═══════════════════════════════════════
+
+
+class TestPageTotal:
+    """issue #725: backend list 加 page.total 字段, web-admin sub-C 替换乐观推断."""
+
+    def test_list_returns_page_total(self):
+        """3 unack rows + status=unack 应返回 page.total=3."""
+        from unittest.mock import patch
+
+        rows = [
+            _dlq_row(id=f"aaaaaaaa-1111-1111-1111-11111111111{i}", total=3)
+            for i in range(3)
+        ]
+        with patch.object(
+            _dlq_mod,
+            "get_db_with_tenant",
+            _override_db(list_rows=rows, unack_row=_unack_count_row(3)),
+        ):
+            resp = _client.get(
+                "/api/v1/dlq/split-attribution?status=unack", headers=HEADERS
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["page"]["count"] == 3
+        assert body["data"]["page"]["total"] == 3
+        assert body["data"]["summary"]["unack_count"] == 3
+
+    def test_page_total_with_pagination_offset(self):
+        """5 rows + limit=2 + offset=2 应 page.total=5, count=2."""
+        from unittest.mock import patch
+
+        # 模拟 5 条总数下 page 2 (offset=2 limit=2) 返回 2 条; window function .total=5
+        rows = [
+            _dlq_row(id=f"bbbbbbbb-2222-2222-2222-22222222222{i}", total=5)
+            for i in range(2)
+        ]
+        with patch.object(
+            _dlq_mod,
+            "get_db_with_tenant",
+            _override_db(list_rows=rows, unack_row=_unack_count_row(5)),
+        ):
+            resp = _client.get(
+                "/api/v1/dlq/split-attribution?status=unack&limit=2&offset=2",
+                headers=HEADERS,
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["page"]["count"] == 2
+        assert body["data"]["page"]["limit"] == 2
+        assert body["data"]["page"]["offset"] == 2
+        assert body["data"]["page"]["total"] == 5
+
+    def test_page_total_respects_status_filter(self):
+        """3 unack + 2 ack + status=ack 应 page.total=2, summary.unack_count 仍 3.
+
+        page.total 是当前 status filter 下总数 (ack=2), summary.unack_count
+        语义不同 (全量 unack 红点 =3), 两者必须独立.
+        """
+        from unittest.mock import patch
+
+        # status=ack 列出 2 条 ack 行; window function .total=2
+        ack_rows = [
+            _dlq_row(
+                id=f"cccccccc-3333-3333-3333-33333333333{i}",
+                acknowledged_at=datetime(2026, 5, 16, 13, 0, 0, tzinfo=timezone.utc),
+                total=2,
+            )
+            for i in range(2)
+        ]
+        with patch.object(
+            _dlq_mod,
+            "get_db_with_tenant",
+            _override_db(list_rows=ack_rows, unack_row=_unack_count_row(3)),
+        ):
+            resp = _client.get(
+                "/api/v1/dlq/split-attribution?status=ack", headers=HEADERS
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["page"]["total"] == 2
+        # 关键: unack_count 不受 status filter 影响 (全量未确认红点)
+        assert body["data"]["summary"]["unack_count"] == 3
+
+    def test_page_total_empty_no_match(self):
+        """status=unack 时全部 acked → rows 空 → 走 fallback COUNT → total=0."""
+        from unittest.mock import patch
+
+        with patch.object(
+            _dlq_mod,
+            "get_db_with_tenant",
+            _override_db(
+                list_rows=[],
+                fallback_total_row=_total_row(0),
+                unack_row=_unack_count_row(0),
+            ),
+        ):
+            resp = _client.get(
+                "/api/v1/dlq/split-attribution?status=unack", headers=HEADERS
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["data"]["items"] == []
+        assert body["data"]["page"]["total"] == 0
+
+    def test_page_total_does_not_pollute_row_dict(self):
+        """_row_to_dict 输出不应含 total 字段 (window function 列只取一次)."""
+        from unittest.mock import patch
+
+        rows = [_dlq_row(total=1)]
+        with patch.object(
+            _dlq_mod,
+            "get_db_with_tenant",
+            _override_db(list_rows=rows, unack_row=_unack_count_row(1)),
+        ):
+            resp = _client.get(
+                "/api/v1/dlq/split-attribution?status=unack", headers=HEADERS
+            )
+        assert resp.status_code == 200
+        body = resp.json()
+        item = body["data"]["items"][0]
+        assert "total" not in item, (
+            "_row_to_dict 不应把 window function 的 total 字段泄露到 item dict"
+        )
 
 
 # ═══════════════════════════════════════
