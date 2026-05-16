@@ -66,8 +66,14 @@ class HREventConsumer:
                 id="0",
                 mkstream=True,
             )
-        except Exception:  # noqa: BLE001 — 组已存在时 Redis 抛 BUSYGROUP
-            pass
+        except Exception as exc:  # noqa: BLE001 — 组已存在时 Redis 抛 BUSYGROUP
+            # BUSYGROUP 是正常的幂等启动场景, 留 debug 便于运维确认 group 已存在
+            log.debug(
+                "hr_event_consumer.xgroup_create_skipped",
+                stream=self.STREAM_KEY,
+                group=self.GROUP_NAME,
+                error=str(exc),
+            )
         self.running = True
         log.info("hr_event_consumer_started", stream=self.STREAM_KEY, group=self.GROUP_NAME)
 

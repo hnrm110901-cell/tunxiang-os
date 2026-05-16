@@ -491,14 +491,23 @@ def _parse_location_payload(loc: str | None) -> tuple[float, float] | None:
         obj = json.loads(s)
         if isinstance(obj, dict) and "lat" in obj and "lng" in obj:
             return float(obj["lat"]), float(obj["lng"])
-    except (json.JSONDecodeError, TypeError, ValueError):
-        pass
+    except (json.JSONDecodeError, TypeError, ValueError) as exc:
+        # JSON 解析失败：继续尝试 comma-separated 格式 (多格式 GPS payload 兜底)
+        logger.debug(
+            "attendance_compliance.location_json_parse_skipped",
+            error=str(exc),
+        )
     if "," in s:
         parts = [p.strip() for p in s.split(",", 1)]
         if len(parts) == 2:
             try:
                 return float(parts[0]), float(parts[1])
-            except ValueError:
+            except ValueError as exc:
+                # comma-split 但 float 转换失败：GPS payload 不可解析
+                logger.debug(
+                    "attendance_compliance.location_csv_parse_failed",
+                    error=str(exc),
+                )
                 return None
     return None
 

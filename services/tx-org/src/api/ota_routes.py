@@ -283,8 +283,13 @@ async def ota_stats(
                 code = int(parts[0]) * 10000 + int(parts[1]) * 100 + int(parts[2]) if len(parts) == 3 else 0
                 if code >= latest_code:
                     stats[dtype]["updated_count"] += row["total"]
-            except (ValueError, IndexError):
-                pass
+            except (ValueError, IndexError) as exc:
+                logger.debug(
+                    "ota.app_version_parse_skipped",
+                    device_type=dtype,
+                    app_version=row["app_version"],
+                    error=str(exc),
+                )
 
     result = []
     for s in stats.values():

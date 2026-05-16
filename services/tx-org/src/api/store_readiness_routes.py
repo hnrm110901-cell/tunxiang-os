@@ -615,8 +615,13 @@ async def append_action_items(
     if isinstance(action_items, str):
         try:
             action_items = json.loads(action_items)
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.debug(
+                "store_readiness.action_items_json_decode_skipped",
+                record_id=record_id,
+                tenant_id=tenant_id,
+                error=str(exc),
+            )
 
     return _ok({"id": result["id"], "action_items": action_items})
 
