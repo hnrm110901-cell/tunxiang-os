@@ -38,6 +38,7 @@ from services.tx_org.src.services.attendance_compliance_service import (
     check_overtime_compliance,
     check_rest_compliance,
     check_same_device,
+    scan_all_compliance,
 )
 
 TENANT_ID = str(uuid4())
@@ -454,3 +455,154 @@ async def test_log_service_stats_aggregation():
     assert stats["by_type"]["overtime_exceed"] == 2
     assert stats["by_severity"]["medium"] == 4
     assert stats["by_status"]["pending"] == 3
+
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#  7. issue #703 — GPS payload parse fail caller-side log + Prom counter
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+def _make_sql_router_db(handlers: dict) -> AsyncMock:
+    """构造 SQL-text-based 路由 mock db.
+
+    handlers: {sql_keyword: result_mock} — 按 SQL text 模糊匹配返回对应 result.
+              未匹配的 SQL 返回 _mk_result(rows=[]) 默认空 (兼容 set_config 等).
+    """
+    db = _make_db()
+
+    async def _execute(stmt, *args, **kwargs):
+        # stmt 是 sqlalchemy.text() 包装, 转 str 后查询
+        sql_text = str(stmt)
+        for keyword, result in handlers.items():
+            if keyword in sql_text:
+                return result
+        return _mk_result(rows=[])
+
+    db.execute = AsyncMock(side_effect=_execute)
+    return db
+
+
+@pytest.mark.asyncio
+async def test_scan_all_compliance_garbage_gps_logs_warning_and_increments_counter(monkeypatch):
+    """issue #703: 垃圾 GPS payload 解析失败 -> caller 升 warning + Prom counter inc.
+
+    防员工故意输入非法 GPS payload (CSV 格式错 / 空 / 非法字符) 绕过出勤合规
+    审查 (违规打卡不在排班点也能通过 GPS 校验)。
+    """
+    from services.tx_org.src.services import attendance_compliance_service as svc_mod
+
+    # mock counter helper — 捕获调用次数与参数
+    counter_calls: list[dict] = []
+
+    def fake_record(tenant_id: str, employee_id: str) -> None:
+        counter_calls.append({"tenant_id": tenant_id, "employee_id": employee_id})
+
+    monkeypatch.setattr(svc_mod, "record_attendance_location_parse_failed", fake_record)
+
+    # mock logger.warning — 捕获日志事件
+    warning_events: list[tuple[str, dict]] = []
+    original_warning = svc_mod.logger.warning
+
+    def fake_warning(event: str, **kwargs):
+        warning_events.append((event, kwargs))
+        return original_warning(event, **kwargs)
+
+    monkeypatch.setattr(svc_mod.logger, "warning", fake_warning)
+
+    garbage_emp_id = str(uuid4())
+    clock_records = [
+        {
+            "id": uuid4(),
+            "employee_id": garbage_emp_id,
+            "clock_time": datetime(2026, 4, 1, 9, 0, 0, tzinfo=timezone.utc),
+            "location": "not_a_valid_gps_payload_xxx",  # 垃圾 payload
+            "device_info": "",
+        },
+    ]
+    store_row = {"latitude": 28.2, "longitude": 112.9}
+
+    # SQL-text routed handlers — 比 side_effect 列表更稳健 (不依赖调用顺序)
+    db = _make_sql_router_db({
+        "latitude, longitude": _mk_result(first=store_row),
+        "SELECT id, employee_id, clock_time, location": _mk_result(rows=clock_records),
+    })
+
+    await scan_all_compliance(
+        db,
+        TENANT_ID,
+        STORE_ID,
+        ("2026-04-01", "2026-04-01"),
+    )
+
+    # 验证 counter 调用 — 1 row 垃圾 GPS = 1 次 inc
+    assert len(counter_calls) == 1
+    assert counter_calls[0]["tenant_id"] == TENANT_ID
+    assert counter_calls[0]["employee_id"] == garbage_emp_id
+
+    # 验证 warning 日志被发射
+    matching = [e for e in warning_events if e[0] == "attendance_location_parse_failed"]
+    assert len(matching) == 1
+    _event_name, event_kwargs = matching[0]
+    assert event_kwargs["tenant_id"] == TENANT_ID
+    assert event_kwargs["employee_id"] == garbage_emp_id
+    # payload_preview 必须截断 (防日志炸 / PII)
+    assert len(event_kwargs["payload_preview"]) <= 50
+
+
+@pytest.mark.asyncio
+async def test_scan_all_compliance_valid_gps_no_counter_inc(monkeypatch):
+    """issue #703: 合法 GPS payload -> counter 不动 (无误报)."""
+    from services.tx_org.src.services import attendance_compliance_service as svc_mod
+
+    counter_calls: list[dict] = []
+
+    def fake_record(tenant_id: str, employee_id: str) -> None:
+        counter_calls.append({"tenant_id": tenant_id, "employee_id": employee_id})
+
+    monkeypatch.setattr(svc_mod, "record_attendance_location_parse_failed", fake_record)
+
+    valid_emp_id = str(uuid4())
+    clock_records = [
+        {
+            "id": uuid4(),
+            "employee_id": valid_emp_id,
+            "clock_time": datetime(2026, 4, 1, 9, 0, 0, tzinfo=timezone.utc),
+            "location": '{"lat": 28.2, "lng": 112.9}',  # 合法 GPS, 与门店同点
+            "device_info": "",
+        },
+    ]
+    store_row = {"latitude": 28.2, "longitude": 112.9}
+
+    db = _make_sql_router_db({
+        "latitude, longitude": _mk_result(first=store_row),
+        "SELECT id, employee_id, clock_time, location": _mk_result(rows=clock_records),
+    })
+
+    await scan_all_compliance(
+        db,
+        TENANT_ID,
+        STORE_ID,
+        ("2026-04-01", "2026-04-01"),
+    )
+
+    # 合法 GPS, counter 不应被调用
+    assert counter_calls == []
+
+
+def test_metrics_module_fallback_stub_when_prometheus_missing(monkeypatch):
+    """tx-org metrics.py 在 prometheus_client 缺失时走 _NoOpCounter (fail-open).
+
+    与 feedback_tier1_ci_minimal_deps_trap.md 模式一致: CI minimal deps 不装
+    prometheus_client, 模块必须 fail-open stub, record_* helper 不能 raise.
+    """
+    from services.tx_org.src import metrics as metrics_mod
+
+    # record helper 不 raise (无论 prometheus_client 是否真实安装)
+    metrics_mod.record_attendance_location_parse_failed(
+        tenant_id=TENANT_ID, employee_id=EMP_ID
+    )
+    # 调用 5 次连续无异常
+    for _ in range(5):
+        metrics_mod.record_attendance_location_parse_failed(
+            tenant_id=TENANT_ID, employee_id="unknown"
+        )
