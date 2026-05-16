@@ -241,7 +241,13 @@ class ChannelEngine:
                         "channel": channel,
                         "status": "blocked",
                     }
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            _logger.warning(
+                "channel_engine_get_config_db_error",
+                channel=channel,
+                error=str(exc),
+                exc_info=True,
+            )
             pass  # 表不存在时使用默认值
 
         # 频率检查：查今日已发送数
@@ -281,21 +287,36 @@ class ChannelEngine:
         if customer_id:
             try:
                 customer_uuid = uuid.UUID(customer_id)
-            except ValueError:
+            except ValueError as exc:
+                _logger.debug(
+                    "channel_engine_customer_uuid_parse_failed",
+                    value=customer_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         offer_uuid: Optional[uuid.UUID] = None
         if offer_id:
             try:
                 offer_uuid = uuid.UUID(offer_id)
-            except ValueError:
+            except ValueError as exc:
+                _logger.debug(
+                    "channel_engine_offer_uuid_parse_failed",
+                    value=offer_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         campaign_uuid: Optional[uuid.UUID] = None
         if campaign_id:
             try:
                 campaign_uuid = uuid.UUID(campaign_id)
-            except ValueError:
+            except ValueError as exc:
+                _logger.debug(
+                    "channel_engine_campaign_uuid_parse_failed",
+                    value=campaign_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         now = datetime.now(timezone.utc)
