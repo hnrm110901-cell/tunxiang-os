@@ -301,7 +301,14 @@ def _classify_threshold(days_until_expiry: int) -> Optional[str]:
 
 
 async def _fetch_active_tenants() -> list[str]:
-    """查询 tenants 表返回所有 active tenant_id 列表。"""
+    """查询 tenants 表返回所有 active tenant_id 列表。
+
+    Filter 语义: `status = 'active'` 匹配 v006 建表 schema
+    (id/code/name/brand_name/pos_system/pos_config/status/created_at/updated_at,
+    无软删列). PR #698 §19 round-1 P1-2 反查 v006 发现原 SQL 用软删列过滤会
+    运行时 ProgrammingError, 被外层 fail-open 吞 → worker 永不告警,
+    supplier cert 食安合规 alert 静默失效. 见 feedback_tenants_v006_schema_no_is_deleted.
+    """
     engine = _get_engine()
     async with engine.connect() as conn:
         rows = await conn.execute(
@@ -309,7 +316,7 @@ async def _fetch_active_tenants() -> list[str]:
                 """
                 SELECT id::text AS tenant_id
                 FROM tenants
-                WHERE is_deleted = FALSE
+                WHERE status = 'active'
                 ORDER BY id
                 LIMIT 1000
                 """
@@ -332,7 +339,7 @@ async def _get_tenant_webhook_urls(conn: AsyncConnection, tenant_id: str) -> dic
                     extra_data->>'purchaser_webhook'       AS purchaser_webhook
                 FROM tenants
                 WHERE id = :tenant_id::uuid
-                  AND is_deleted = FALSE
+                  AND status = 'active'
                 LIMIT 1
                 """
             ),
