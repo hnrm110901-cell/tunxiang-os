@@ -1,0 +1,38 @@
+# 经营分析域 Feature Flags
+# 域：analytics
+# 命名格式：analytics.{module}.{feature}.{action}
+# 镜像 flags/supply/supply_flags.yaml schema（PRD-11 sub-B.2 + sub-C 同模式灰度）
+
+flags:
+  # ──────────────────────────────────────────────────────────────
+  # PRD-11 sub-C (Phase 2 W12 / 2026-05-16 / Tier 1 邻接第 36 例)
+  # SplitAttributionProjector lifespan per-tenant gating
+  # 灰度路径：prod targeting_rules.tenant_id 空 → PR-B czyz 5% → PR-C zqx 50% → PR-D defaultValue: true 100%
+  # 观察期：5%=2d / 50%=3d（与 sub-B.2 同节奏）
+  # 紧急停用走 env TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR=false（优先级最高，绕过 SDK）
+  # ──────────────────────────────────────────────────────────────
+  - identifier: analytics_prd11_split_attribution_projector_enable
+    name: analytics.prd11.split_attribution_projector.enable
+    description: >
+      PRD-11 sub-C SplitAttributionProjector lifespan per-tenant gating。
+      ON 时 tx-analytics lifespan refresh loop 仅为命中 targeting_rules 的 tenant 启动
+      SplitAttributionProjector daemon（消费 INVENTORY.split_attributed 事件 → 汇总写
+      cost_attribution_summary 表供 dashboard 消费）。OFF 时全 tenant 跳过 daemon
+      启动（不影响 tx-analytics dashboard/DLQ 看板 API 路由 — 仅断 projector 实时
+      汇总，历史汇总数据仍可查）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: tenant_id
+          values: []
+      prod:
+        - dimension: tenant_id
+          values: []  # PR-B 加 czyz(5%) → PR-C 加 zqx(50%) → PR-D 翻 defaultValue: true(100%)
+    rollout: [5, 50, 100]
+    tags: [analytics, prd11, projector, lifespan, tier1-adjacent]
