@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
+logger = structlog.get_logger(__name__)
+
 from .agents.domain_event_consumer import DomainEventConsumer
 from .api.agent_hub_routes import router as agent_hub_router
 from .api.agent_kpi_routes import router as agent_kpi_router
