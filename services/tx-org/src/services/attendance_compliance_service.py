@@ -8,6 +8,7 @@ from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
 import structlog
+from services.tx_org.src.metrics import record_attendance_location_parse_failed
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -589,6 +590,22 @@ async def scan_all_compliance(
     for row in cr.mappings().fetchall():
         parsed = _parse_location_payload(row.get("location"))
         if parsed is None:
+            # issue #703: 员工故意输入垃圾 GPS payload 可绕过出勤合规审查
+            # (违规打卡不在排班点也能通过). 升 logger.warning + Prom counter
+            # 让运维侧可见, Grafana 可告警异常员工 (e.g. 1h > 3 次同员工).
+            # _parse_location_payload 函数本身保持纯 (无 tenant/employee context),
+            # log + metric 加在 caller-side, label 真实有效.
+            employee_id = str(row.get("employee_id") or "unknown")
+            payload_preview = str(row.get("location") or "")[:50]
+            logger.warning(
+                "attendance_location_parse_failed",
+                tenant_id=tenant_id,
+                employee_id=employee_id,
+                payload_preview=payload_preview,
+            )
+            record_attendance_location_parse_failed(
+                tenant_id=tenant_id, employee_id=employee_id
+            )
             continue
         lat, lng = parsed
         if slat is None or slng is None:
