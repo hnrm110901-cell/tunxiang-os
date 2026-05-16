@@ -126,6 +126,9 @@ services:
     environment:
       TX_ENV: gray
       GRAY_MODE: "true"
+      # PRD-11 sub-B.2 灰度入口：IndexSplitProjector lifespan 默认 OFF (gray 与 prod 一致).
+      # 灰度走 feature_flags SDK; 紧急停用走此 env="false" (优先级最高, 绕过 SDK).
+      TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "false"
     restart: unless-stopped
     labels:
       tunxiang.env: "${TUNXIANG_ENV:-gray}"
@@ -159,6 +162,9 @@ services:
     environment:
       TX_ENV: gray
       GRAY_MODE: "true"
+      # PRD-11 sub-C 灰度入口：SplitAttributionProjector lifespan 默认 OFF (gray 与 prod 一致).
+      # 灰度走 feature_flags SDK; 紧急停用走此 env="false" (优先级最高, 绕过 SDK).
+      TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "false"
     restart: unless-stopped
     labels:
       tunxiang.env: "${TUNXIANG_ENV:-gray}"

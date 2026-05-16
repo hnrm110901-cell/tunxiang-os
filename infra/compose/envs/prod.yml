@@ -299,6 +299,12 @@ services:
       args:
         SERVICE_NAME: tx-supply
         SERVICE_PORT: "8006"
+    environment:
+      # 继承 *prod-defaults environment (TX_ENV/TX_AUTH_ENABLED/TX_RATE_LIMIT_ENABLED/LOG_LEVEL)
+      # PRD-11 sub-B.2 灰度入口：IndexSplitProjector lifespan 默认 OFF。
+      # 灰度走 feature_flags SDK (flags/supply/supply_flags.yaml supply.prd11.index_split_projector.enable).
+      # 紧急停用走此 env="false" (优先级最高, 绕过 SDK).
+      TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "false"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
       interval: 15s
@@ -349,6 +355,12 @@ services:
       args:
         SERVICE_NAME: tx-analytics
         SERVICE_PORT: "8009"
+    environment:
+      # 继承 *prod-defaults environment (TX_ENV/TX_AUTH_ENABLED/TX_RATE_LIMIT_ENABLED/LOG_LEVEL)
+      # PRD-11 sub-C 灰度入口：SplitAttributionProjector lifespan 默认 OFF。
+      # 灰度走 feature_flags SDK (flags/analytics/analytics_flags.yaml analytics.prd11.split_attribution_projector.enable).
+      # 紧急停用走此 env="false" (优先级最高, 绕过 SDK).
+      TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "false"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
       interval: 15s

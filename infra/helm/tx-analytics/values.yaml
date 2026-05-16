@@ -37,6 +37,12 @@ env:
   MATERIALIZED_VIEW_REFRESH_INTERVAL: "300"
   # P&L计算引擎：自动计算门店/品牌/集团多层损益
   PNL_CALC_ENABLED: "true"
+  # PRD-11 sub-C 灰度入口 (Phase 2 W12 / 2026-05-16 / Tier 1 邻接第 36 例)
+  # SplitAttributionProjector lifespan 默认 OFF。灰度走 feature_flags SDK
+  # (flags/analytics/analytics_flags.yaml analytics.prd11.split_attribution_projector.enable).
+  # 紧急停用走此 env="false" (优先级最高，绕过 SDK)。
+  # dev/demo helm 环境如需翻 ON 用 `helm --set env.TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR=true`。
+  TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "false"
 
 # Secret中存放的敏感环境变量（由外部Secret Manager注入）
 secretRef:
