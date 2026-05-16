@@ -4,6 +4,8 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.dish_intelligence import (
@@ -91,11 +93,8 @@ class TestCalculateDishReputation:
         assert result["recommend_rate"] == round(40 / 60, 4)
 
     def test_tenant_id_required(self):
-        try:
+        with pytest.raises(ValueError):
             calculate_dish_reputation("dish-001", "")
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
 
 
 class TestAutoDeriveStatus:
@@ -348,8 +347,5 @@ class TestSuggestDishAction:
         assert result["priority"] == "high"
 
     def test_tenant_id_required(self):
-        try:
+        with pytest.raises(ValueError):
             suggest_dish_action("dish-001", "")
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
