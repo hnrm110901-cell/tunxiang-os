@@ -83,6 +83,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
         is_enabled as _index_split_enabled,
         list_active_tenants,
         start_index_split_projector,
+        stop_all_index_split_projectors,
         stop_index_split_projector,
     )
 
@@ -133,16 +134,10 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
                     await refresh_task
                 except asyncio.CancelledError:
                     pass
-        for tid in list(started_tenants):
-            try:
-                await stop_index_split_projector(tid)
-            except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "index_split_projector_stop_failed",
-                    tenant_id=tid,
-                    error=str(exc),
-                    exc_info=True,
-                )
+        # §19 round-1 P1-1: 以 _PROJECTOR_TASKS 真实状态为准, 而非 started_tenants 闭包.
+        # refresh loop 中途被 cancel 时, started_tenants 可能漏掉新 started 的 task,
+        # 走 stop_all_index_split_projectors() 兜底遍历真实 dict 防孤儿 task.
+        await stop_all_index_split_projectors()
         logger.info("index_split_projector_lifespan_stopped")
 
 

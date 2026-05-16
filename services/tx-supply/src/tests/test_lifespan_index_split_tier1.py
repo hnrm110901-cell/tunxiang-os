@@ -42,11 +42,16 @@ from services.tx_supply.src.projectors.registry import (  # noqa: E402
 
 @asynccontextmanager
 async def _test_lifespan():
-    """仿 main.py lifespan 的测试版（只依赖 registry，不依赖 FastAPI app）."""
+    """仿 main.py lifespan 的测试版（只依赖 registry，不依赖 FastAPI app）.
+
+    §19 round-1 fix mirrored:
+    - P1-1: shutdown 用 stop_all_index_split_projectors() 兜底, 不靠 started_tenants 闭包.
+    """
     from services.tx_supply.src.projectors.registry import (
         is_enabled as _index_split_enabled,
         list_active_tenants as _list_active_tenants,
         start_index_split_projector as _start,
+        stop_all_index_split_projectors as _stop_all,
         stop_index_split_projector as _stop,
     )
     import structlog
@@ -95,11 +100,8 @@ async def _test_lifespan():
                     await refresh_task
                 except asyncio.CancelledError:
                     pass
-        for tid in list(started_tenants):
-            try:
-                await _stop(tid)
-            except Exception:  # noqa: BLE001
-                pass
+        # §19 round-1 P1-1 mirror: use stop_all_index_split_projectors() not started_tenants
+        await _stop_all()
 
 
 # ─── 常量（徐记海鲜场景）─────────────────────────────────────────────────────
@@ -134,17 +136,19 @@ async def test_lifespan_env_off_skip(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_lifespan_env_on_two_tenants(monkeypatch: pytest.MonkeyPatch) -> None:
-    """env ON + 2 tenants → start 各调 1 次，shutdown 后 stop 至少调 2 次."""
+    """env ON + 2 tenants → start 各调 1 次，shutdown 调用 stop_all 兜底."""
     monkeypatch.setenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", "true")
     monkeypatch.setenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "0.05")
 
     mock_start = AsyncMock()
     mock_stop = AsyncMock()
+    mock_stop_all = AsyncMock()
     mock_list = AsyncMock(return_value=[_T1, _T2])
 
     with (
         patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
         patch(f"{_REGISTRY_PATH}.stop_index_split_projector", mock_stop),
+        patch(f"{_REGISTRY_PATH}.stop_all_index_split_projectors", mock_stop_all),
         patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
     ):
         async with _test_lifespan():
@@ -155,10 +159,8 @@ async def test_lifespan_env_on_two_tenants(monkeypatch: pytest.MonkeyPatch) -> N
     started_args = {call.args[0] for call in mock_start.call_args_list}
     assert started_args == {_T1, _T2}, f"Expected start for both tenants, got: {started_args}"
 
-    # shutdown 后 stop 应被调（started_tenants 有 _T1 和 _T2）
-    assert mock_stop.call_count >= 2, f"Expected stop >= 2, got {mock_stop.call_count}"
-    stopped_args = {call.args[0] for call in mock_stop.call_args_list}
-    assert _T1 in stopped_args and _T2 in stopped_args
+    # §19 round-1 P1-1 fix: shutdown 应调一次 stop_all (兜底), 不靠 started_tenants 闭包
+    mock_stop_all.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -169,11 +171,13 @@ async def test_lifespan_db_failure_fail_open(monkeypatch: pytest.MonkeyPatch) ->
 
     mock_start = AsyncMock()
     mock_stop = AsyncMock()
+    mock_stop_all = AsyncMock()
     mock_list = AsyncMock(side_effect=RuntimeError("DB down"))
 
     with (
         patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
         patch(f"{_REGISTRY_PATH}.stop_index_split_projector", mock_stop),
+        patch(f"{_REGISTRY_PATH}.stop_all_index_split_projectors", mock_stop_all),
         patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
     ):
         # lifespan 进退不应抛出异常
@@ -182,6 +186,8 @@ async def test_lifespan_db_failure_fail_open(monkeypatch: pytest.MonkeyPatch) ->
 
     # DB 一直失败 → start 从未被调
     mock_start.assert_not_called()
+    # shutdown 仍走 stop_all 兜底 (即使从未 start, stop_all 是 noop 不抛错)
+    mock_stop_all.assert_awaited_once()
 
 
 @pytest.mark.asyncio
@@ -207,11 +213,13 @@ async def test_lifespan_tenant_delta(monkeypatch: pytest.MonkeyPatch) -> None:
 
     mock_start = AsyncMock()
     mock_stop = AsyncMock()
+    mock_stop_all = AsyncMock()
     mock_list = AsyncMock(side_effect=_side_effect)
 
     with (
         patch(f"{_REGISTRY_PATH}.start_index_split_projector", mock_start),
         patch(f"{_REGISTRY_PATH}.stop_index_split_projector", mock_stop),
+        patch(f"{_REGISTRY_PATH}.stop_all_index_split_projectors", mock_stop_all),
         patch(f"{_REGISTRY_PATH}.list_active_tenants", mock_list),
     ):
         async with _test_lifespan():
@@ -223,6 +231,38 @@ async def test_lifespan_tenant_delta(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _T1 in started_args, "T1 应在轮 1 被 start"
     assert _T2 in started_args, "T2 应在轮 2 被 start"
 
-    # stop 应包含 T1（轮 3 移除）或 shutdown 时
+    # mid-refresh diff: T1 在轮 3 被移除时 stop 调过
     stopped_args = {call.args[0] for call in mock_stop.call_args_list}
-    assert _T1 in stopped_args, "T1 应在轮 3 移除时或 shutdown 时被 stop"
+    assert _T1 in stopped_args, "T1 应在轮 3 移除时被 stop_index_split_projector"
+    # §19 round-1 P1-1 fix: shutdown 兜底 stop_all
+    mock_stop_all.assert_awaited_once()
+
+
+# ─── §19 round-1 P1-2 fix regression ─────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_list_active_tenants_uses_status_filter() -> None:
+    """§19 round-1 P1-2 regression: SQL 必须用 `status = 'active'` 而非 `is_deleted = FALSE`.
+
+    v006 建 tenants 表只含 id/code/name/brand_name/pos_system/pos_config/status/
+    created_at/updated_at — 无 is_deleted 列. 用 is_deleted 过滤会运行时 ProgrammingError,
+    被 _refresh_loop fail-open 吞掉 → projector 永不启动 (静默 noop).
+    """
+    from services.tx_supply.src.projectors import registry as _registry
+    import re
+
+    src = _registry.list_active_tenants.__doc__ or ""
+    # 通过查询的 SQL 文本断言 (sqlalchemy.text 包装的字符串可被 .text 属性读)
+    # 这里直接 grep 源码: 用 inspect 拿函数源
+    import inspect
+    body = inspect.getsource(_registry.list_active_tenants)
+
+    assert "status = 'active'" in body or 'status = "active"' in body, (
+        "list_active_tenants SQL 必须 filter status='active' (v006 schema). "
+        "WHERE is_deleted = FALSE 是 cert_expiry_alerter 的 pre-existing bug (out-of-scope)."
+    )
+    assert not re.search(r"is_deleted\s*=\s*FALSE", body), (
+        "list_active_tenants 不可用 is_deleted = FALSE — tenants 表 v006 无此列, "
+        "会运行时 ProgrammingError 致 projector 静默 noop. 用 status='active' 替代."
+    )

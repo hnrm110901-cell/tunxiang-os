@@ -76,16 +76,41 @@ async def stop_index_split_projector(tenant_id: UUID | str) -> None:
     log.info("index_split_projector_stopped", tenant_id=tenant_str)
 
 
+async def stop_all_index_split_projectors() -> None:
+    """停止所有已启动的 projector daemon (lifespan shutdown 兜底).
+
+    与 stop_index_split_projector 互补: lifespan refresh loop 在 shutdown 时可能
+    维护的 `started_tenants` 闭包集合与 `_PROJECTOR_TASKS` 真实状态不一致
+    (refresh loop 中途被 cancel 时), 本 helper 以 _PROJECTOR_TASKS 为准
+    遍历真实已启动 task. §19 reviewer round-1 P1-1 修复.
+    """
+    for tenant_str in list(_PROJECTOR_TASKS.keys()):
+        try:
+            await stop_index_split_projector(tenant_str)
+        except Exception as exc:  # noqa: BLE001 — shutdown 兜底, 单 task 失败不阻塞其他
+            log.error(
+                "stop_all_index_split_projectors_failed",
+                tenant_id=tenant_str,
+                error=str(exc),
+                exc_info=True,
+            )
+
+
 async def list_active_tenants() -> list[str]:
     """从 tenants 表读取活跃租户 ID 列表 (lifespan refresh 用).
 
     Returns list[str] of UUID strings.
     Raises on DB error — caller decides how to handle (lifespan loop 应 log + 跳过).
+
+    Filter 语义: `status = 'active'` 匹配 v006 建表 schema
+    (id/code/name/brand_name/pos_system/pos_config/status/created_at/updated_at,
+    无 is_deleted 列). 与 cert_expiry_alerter._fetch_active_tenants 的现有 'is_deleted'
+    模式不一致 — 后者是 pre-existing bug, 单独 follow-up.
     """
     _sql = text(
         "SELECT id::text AS tenant_id"
         " FROM tenants"
-        " WHERE is_deleted = FALSE"
+        " WHERE status = 'active'"
         " ORDER BY id"
         " LIMIT 1000"
     )
