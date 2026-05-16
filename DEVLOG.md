@@ -1,3 +1,51 @@
+## 2026-05-16 W11 闭环 / W12 起手 — PRD-11 sub-B.2 IndexSplitProjector Tier 1 第 30 例 (Phase 2 W11 第六发 / W12 起手, 待 ship)
+
+### 今日完成
+
+- **本 session 立项**: PRD-11 sub-B.2 tx-supply IndexSplitProjector — 闭环 PRD-11 数据流, 让 PR #681 sub-B 的 ITEMS_SETTLED event 真正被消费, 触发 auto_deduction.deduct_for_order(share_split=...) → BOM 物理扣料 + emit InventoryEventType.SPLIT_ATTRIBUTED, 供 sub-C tx-analytics dashboard 消费.
+
+- **创始人 5/16 deep-interview 锁定 4 项决策 (D1-D4 全选架构师推荐项)**:
+  - **D1**: A 方案 tx-supply 内 service-local daemon (隔离 mv_* '只读' 心智, 不污染全局 9 个 mv_* projector 语义/checkpoint/rebuild)
+  - **D2**: ingredient_transactions.source_event_id UNIQUE (tenant_id, source_event_id) WHERE NOT NULL (F2 P0 防 projector crash 重放重复扣料)
+  - **D3**: skip + dlq_split_attribution_failed 表 + sub-C 死信看板 (F4 share_split_rule 禁用/超上限处理, 与 Phase 4 治理四件套对齐)
+  - **D4**: **Tier 1 邻接 explicit-ask 第 30 例** (触 auto_deduction.deduct_for_order 写 ingredients/ingredient_transactions, 与 #547 同模式) + §19 reviewer multi-round 0 P0/P1 + 200 桌并发 regression (mock 已 ship / 真 PG 单 event dedup ship / 200 桌 full 留 P2 follow-up)
+
+- **6 files 改动** (~+700 / 19 mock tier1 用例 + 2 真 PG dedup 用例):
+  - `shared/db-migrations/versions/v437_ingredient_split_attribution_dedup.py` (新) — ingredient_transactions ADD source_event_id UUID NULLABLE + UNIQUE 部分索引 (NOT NULL 才生效) + dlq_split_attribution_failed 死信表 + RLS 四联 + 2 索引 (tenant+occurred_at DESC partial unack / tenant+event_id) + inspector-and-skip 模式. down_revision=v436_order_item_share_count
+  - `shared/ontology/src/entities.py` IngredientTransaction — 加 source_event_id Mapped[uuid.UUID | None] NULLABLE (SoT 单源, sub-B precedent §18 冻结令豁免, 创始人 D2 ① 已锁定)
+  - `services/tx-supply/src/services/auto_deduction.py` (2 处) — deduct_for_dish + deduct_for_order 加 kwonly `source_event_id: Optional[uuid.UUID] = None`; 内部派生 per-row uuid5(seed=event_id, f"{event_id}|{order_item_id}|{dish_id}|{ingredient_id}|{line_idx}") 让重放命中 v437 UNIQUE 触 IntegrityError; 非 projector 路径 None → NULL 写入保 backward compat
+  - `services/tx-supply/src/projectors/__init__.py` (新) + `index_split.py` (新) — IndexSplitProjector(ProjectorBase) name=inventory_split_attribution event_types={"order.items_settled"}, handle() 在独立 SQLAlchemy session SAVEPOINT 内调 deduct_for_order, 捕获 IntegrityError (dedup_skip log + return success) + ValueError (dlq INSERT via asyncpg conn + log warning + return success). DLQ INSERT 用 projector_base 的 conn 直接 raw SQL (RLS context 已 set)
+  - `services/tx-supply/src/projectors/registry.py` (新) — start/stop_index_split_projector helpers, env `TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR` 默认 OFF gate (代码层 ready, lifespan 钩子接入留 Phase 2 W12 灰度激活独立 PR)
+  - `services/tx-supply/src/tests/test_index_split_projector_tier1.py` (新, ~360 行 / 19 mock 用例) — TestProjectorRouting (3) + TestF2DedupOnReplay (2) + TestF4DeadLetterQueue (3) + TestPayloadBoundaries (4) + TestEventTypeRegistration (2) + TestProjectorRegistry (2) + TestSourceEventIdDerivation (3)
+  - `tests/concurrent/test_index_split_projector_dedup_pg.py` (新, ~250 行 / 2 真 PG 用例 opt-in via INTEGRATION_PG_DSN)
+
+- **测试本机验证**: `PYTHONPATH=. python3.11 -m pytest services/tx-supply/src/tests/test_index_split_projector_tier1.py` → **19 passed in 0.30s** (Python 3.11). 真 PG 用例 opt-in skip 默认.
+
+### 数据变化
+
+- 迁移版本：v436 → **v437_ingredient_split_attribution_dedup**
+- 新增 API 模块：0 个 (projector 后台 daemon, 不暴露 HTTP)
+- 新增测试：19 mock + 2 真 PG = 21 个 (tier1)
+- 新增表：dlq_split_attribution_failed (RLS 四联)
+- 新增列：ingredient_transactions.source_event_id UUID NULLABLE
+- 新增索引：uq_ingredient_transactions_tenant_source_event (partial UNIQUE WHERE NOT NULL) + 2 dlq 索引
+
+### 遗留问题
+
+- **激活 follow-up (Phase 2 W12 灰度)**: tx-supply main.py lifespan 钩子调 start_index_split_projector — 独立 PR, env `TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=true` 切灰度. 当前 ship 代码层 ready, 默认 OFF 避免触 prod 行为.
+- **200 桌真并发 regression (P2 follow-up)**: 当前真 PG 测试限 F2 单 event 路径. 200 桌晚高峰 N 并发消费 + projector 单实例 batch=100 容量测试留独立 PR (复用 #547 PR-4 inventory_concurrent 框架, 2h 工作量).
+- **F1 真 Outbox 依赖**: ITEMS_SETTLED emit 后 settle 事务回滚仍可能让 projector 拿 stale event (Phase 1 commit 后 emit, 风险窗口小). 真 fix 依赖 5/12 战略 FOUNDATION 真 Outbox W7-W12 立项 — 本 PR P1 接受.
+- **F3 dish.bom cost 漂移 (P3 接受)**: settle 后 projector 消费前 bom_items 改 cost_fen → split attribution 算错. 与 ORDER.PAID final_amount 不同账本. 接受.
+
+### 明日计划
+
+- §19 reviewer multi-round (业务/数据安全/Tier 1 邻接独立眼光, 复用 PRD-11 sub-A/sub-B 模板)
+- CI 真门禁全绿 (Tier 1 门禁判定 + Run Tier 1 supply src+tests + Fresh PG 19 alembics + Migration Chain Integrity + RLS 严格 + 源改动配对 + CodeRabbit)
+- explicit-ask 创始人 admin-merge (Tier 1 fund/源 explicit-ask 第 30 例 — merge 后不可回退)
+- 累计 W11 第六发 + W12 起手后, MEMORY.md `project_tunxiang_supply_phase2_w7w12.md` 同步加 entry (sub-B.2 PRD-11 闭环 / Tier 1 第 30 例 tally 29→30)
+
+---
+
 ## 2026-05-15 W11 第五发 — PRD-11 sub-B OrderItem.share_count Tier 1 第 29 例 (Phase 2 W11 第五发, 5 files / +~450 / -10, 待 ship)
 
 ### 今日完成

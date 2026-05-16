@@ -538,6 +538,18 @@ class IngredientTransaction(TenantBase):
     reference_id: Mapped[str | None] = mapped_column(String(100), comment="关联单据号")
     notes: Mapped[str | None] = mapped_column(String(500))
 
+    # PRD-11 sub-B.2 (v437) — IndexSplitProjector 幂等键. NULLABLE 保 backward compat
+    # (非 projector 路径不需提供). projector 路径必须传, 由 auto_deduction 内部派生
+    # uuid5(event_id, f"{ingredient_id}|{idx}|...") 让同 event 重放命中 UNIQUE
+    # (tenant_id, source_event_id) WHERE NOT NULL 触 IntegrityError → projector
+    # savepoint rollback + 推进 checkpoint (视为消费成功). F2 P0 防重复扣料.
+    source_event_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+        index=False,
+        comment="PRD-11 sub-B.2 projector 幂等键 (uuid5 派生)",
+    )
+
     ingredient = relationship("Ingredient", back_populates="transactions")
 
 
