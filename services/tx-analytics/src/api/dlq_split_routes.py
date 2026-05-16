@@ -100,12 +100,15 @@ async def list_dlq_split_attribution(
     where_sql = " AND ".join(where_clauses)
 
     try:
+        # 主查询用 COUNT(*) OVER () window function 单 SQL 同时取分页 rows + status filter
+        # 下的精确总数 — 配合 web-admin sub-C 看板精确分页 (issue #725)
         result = await db.execute(
             text(
                 f"""
                 SELECT id, event_id, event_type, order_id, order_item_id, dish_id,
                        error_class, error_msg, payload, occurred_at, created_at,
-                       acknowledged_at, acknowledged_by, ack_notes
+                       acknowledged_at, acknowledged_by, ack_notes,
+                       COUNT(*) OVER () AS total
                 FROM dlq_split_attribution_failed
                 WHERE {where_sql}
                 ORDER BY occurred_at DESC
@@ -116,6 +119,23 @@ async def list_dlq_split_attribution(
         )
         rows = result.fetchall()
         items = [_row_to_dict(r) for r in rows]
+        # window function 每行同值; rows 空时 (offset 超 total / 无匹配) 用独立 COUNT 兜底
+        # 防止前端拿到 total=0 误判 "无数据" (实际是 offset 越界)
+        if rows:
+            page_total = int(rows[0].total)
+        else:
+            count_result = await db.execute(
+                text(
+                    f"""
+                    SELECT COUNT(*)::int AS total
+                    FROM dlq_split_attribution_failed
+                    WHERE {where_sql}
+                    """  # noqa: S608
+                ),
+                {k: v for k, v in params.items() if k not in ("limit", "offset")},
+            )
+            count_row = count_result.fetchone()
+            page_total = int(count_row.total) if count_row else 0
 
         # 同时返回未确认总数 (sub-C 看板顶部红点)
         unack_result = await db.execute(
@@ -133,6 +153,7 @@ async def list_dlq_split_attribution(
     except SQLAlchemyError as exc:
         logger.warning("dlq_split_list_query_failed", error=str(exc))
         items = []
+        page_total = 0
         unack_count = 0
 
     return {
@@ -143,6 +164,7 @@ async def list_dlq_split_attribution(
                 "limit": limit,
                 "offset": offset,
                 "count": len(items),
+                "total": page_total,
             },
             "summary": {
                 "unack_count": unack_count,
