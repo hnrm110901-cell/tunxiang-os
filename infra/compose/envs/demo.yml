@@ -141,6 +141,7 @@ services:
       - "8009:8009"
     environment:
       TX_ENV: demo
+      TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "true"
     volumes:
       - ../../services/tx-analytics:/app/services/tx-analytics
       - ../../shared:/app/shared

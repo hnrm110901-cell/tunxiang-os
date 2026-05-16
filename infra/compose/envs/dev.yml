@@ -149,6 +149,8 @@ services:
              uvicorn services.tx-analytics.src.main:app --host 0.0.0.0 --port 8009 --reload"
     ports:
       - "8009:8009"
+    environment:
+      TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "true"
     volumes:
       - ../../services/tx-analytics:/app/services/tx-analytics
       - ../../shared:/app/shared
