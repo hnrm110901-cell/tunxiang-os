@@ -11,6 +11,10 @@ export interface OrderItem {
   priceFen: number;
   notes: string;
   kitchenStation: string;
+  /** 服务端 item_id (addItem 接口返回, 拆单等服务端操作需要) — PRD-11 sub-C */
+  serverItemId?: string;
+  /** 多人合点拆分人数, 默认 1 = 独享 — PRD-11 sub-C */
+  shareCount?: number;
 }
 
 interface OrderState {
@@ -26,6 +30,8 @@ interface OrderState {
   addItem: (item: Omit<OrderItem, 'id'>) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, qty: number) => void;
+  /** 更新 OrderItem.shareCount (拆单 modal 成功后调) — PRD-11 sub-C */
+  updateShareCount: (id: string, shareCount: number) => void;
   applyDiscount: (fen: number) => void;
   clear: () => void;
 }
@@ -56,6 +62,11 @@ export const useOrderStore = create<OrderState>()((set, _get) => ({
   updateQuantity: (id, qty) => set((state) => {
     const items = state.items.map((i) => i.id === id ? { ...i, quantity: qty } : i);
     return { items, totalFen: items.reduce((s, i) => s + i.priceFen * i.quantity, 0) };
+  }),
+
+  updateShareCount: (id, shareCount) => set((state) => {
+    const items = state.items.map((i) => i.id === id ? { ...i, shareCount } : i);
+    return { items };
   }),
 
   applyDiscount: (fen) => set({ discountFen: fen }),

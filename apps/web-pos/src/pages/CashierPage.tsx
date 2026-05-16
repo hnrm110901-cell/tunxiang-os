@@ -11,7 +11,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useOrderStore } from '../store/orderStore';
-import { createOrder, addItem as apiAddItem } from '../api/tradeApi';
+import { createOrder, addItem as apiAddItem, updateItemShareCount } from '../api/tradeApi';
+import { SplitOrderItemModal } from '../components/modals/SplitOrderItemModal';
+import { showToast } from '../hooks/useToast';
 import { fetchDishes, type DishItem } from '../api/menuApi';
 import { DishGrid, CategoryNav, MenuSearch, CartPanel } from '@tx-ds/biz';
 import type { DishData, CartItem } from '@tx-ds/biz';
@@ -185,6 +187,70 @@ export function CashierPage() {
     dish: ExtendedDishItem | null;
   }>({ visible: false, dish: null });
 
+  // PRD-11 sub-C 拆单 modal 状态
+  const [splitModal, setSplitModal] = useState<{
+    visible: boolean;
+    localItemId: string | null;
+    serverItemId: string | null;
+    dishName: string;
+    currentShareCount: number;
+  }>({
+    visible: false,
+    localItemId: null,
+    serverItemId: null,
+    dishName: '',
+    currentShareCount: 1,
+  });
+
+  const handleOpenSplit = useCallback((localItemId: string) => {
+    const target = items.find((i) => i.id === localItemId);
+    if (!target) return;
+    if (!target.serverItemId) {
+      showToast('该菜品未上传到服务端, 暂不能拆单', 'warning');
+      return;
+    }
+    if (!orderId) {
+      showToast('订单未创建, 暂不能拆单', 'warning');
+      return;
+    }
+    setSplitModal({
+      visible: true,
+      localItemId,
+      serverItemId: target.serverItemId,
+      dishName: target.name,
+      currentShareCount: target.shareCount ?? 1,
+    });
+  }, [items, orderId]);
+
+  const handleSplitSubmit = useCallback(async (shareCount: number) => {
+    if (!orderId || !splitModal.serverItemId || !splitModal.localItemId) {
+      throw new Error('订单或菜品 ID 缺失');
+    }
+    // PUT /api/v1/trade/orders/{orderId}/items/{itemId} {share_count}
+    // 后端 422 (allow_share=false / 超 max_share_count / settled 已冻结) 时
+    // updateItemShareCount throw, modal 内显示 message.
+    await updateItemShareCount(orderId, splitModal.serverItemId, shareCount);
+    store.updateShareCount(splitModal.localItemId, shareCount);
+    showToast(`已设置 ${splitModal.dishName} 为 ${shareCount} 人合点`, 'success');
+    setSplitModal({
+      visible: false,
+      localItemId: null,
+      serverItemId: null,
+      dishName: '',
+      currentShareCount: 1,
+    });
+  }, [orderId, splitModal.serverItemId, splitModal.localItemId, splitModal.dishName, store]);
+
+  const handleSplitClose = useCallback(() => {
+    setSplitModal({
+      visible: false,
+      localItemId: null,
+      serverItemId: null,
+      dishName: '',
+      currentShareCount: 1,
+    });
+  }, []);
+
   /* ── 键盘快捷键（收银页面）── */
   const { altPressed, shortcuts, activeKey } = useKeyboardShortcuts([
     {
@@ -318,7 +384,30 @@ export function CashierPage() {
       });
     }
     if (orderId) {
-      apiAddItem(orderId, dish.id, dish.name, 1, dish.priceFen).catch(() => {});
+      // PRD-11 sub-C: 捕获 server item_id 写回 store (拆单 modal 需要), 兼容
+      // 失败静默 — 加菜失败不阻塞 UI (复用原有 .catch noop 行为)
+      apiAddItem(orderId, dish.id, dish.name, 1, dish.priceFen)
+        .then((res) => {
+          if (res?.item_id) {
+            // 用 zustand getState 拿最新 items (闭包里 existing 可能 stale)
+            const current = useOrderStore.getState().items;
+            const justAdded =
+              existing
+                ? null
+                : [...current].reverse().find((it) => it.dishId === dish.id);
+            if (justAdded && !justAdded.serverItemId) {
+              // 复用 updateShareCount 的方式做最小变动: 此处直接 set
+              useOrderStore.setState((s) => ({
+                items: s.items.map((it) =>
+                  it.id === justAdded.id
+                    ? { ...it, serverItemId: res.item_id }
+                    : it,
+                ),
+              }));
+            }
+          }
+        })
+        .catch(() => {});
     }
   }, [items, orderId, store]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -501,6 +590,57 @@ export function CashierPage() {
         </div>
       )}
 
+      {/* ── PRD-11 sub-C: 拆单操作条 (仅展示 serverItemId 在线的菜品 — 已下单到 tx-trade) ── */}
+      {items.filter((i) => !!i.serverItemId).length > 0 && (
+        <div
+          style={{
+            flexShrink: 0,
+            padding: '8px 16px',
+            background: 'rgba(255,255,255,0.04)',
+            borderTop: '1px solid #1c2c33',
+            borderBottom: '1px solid #1c2c33',
+            display: 'flex',
+            gap: 8,
+            overflowX: 'auto',
+          }}
+          data-testid="split-action-bar"
+        >
+          <span style={{ fontSize: 16, color: '#999', flexShrink: 0, padding: '12px 0' }}>
+            多人合点拆单:
+          </span>
+          {items
+            .filter((i) => !!i.serverItemId)
+            .map((i) => (
+              <button
+                key={i.id}
+                type="button"
+                onClick={() => handleOpenSplit(i.id)}
+                style={{
+                  flexShrink: 0,
+                  padding: '12px 16px',
+                  minHeight: 48,
+                  borderRadius: 6,
+                  border: '1px solid #2a3f47',
+                  background: 'transparent',
+                  color: '#fff',
+                  fontSize: 16,
+                  cursor: 'pointer',
+                }}
+                aria-label={`拆单 ${i.name}`}
+              >
+                {i.name}
+                {i.shareCount && i.shareCount > 1 ? (
+                  <span style={{ marginLeft: 6, color: '#52c41a' }}>
+                    × {i.shareCount} 人
+                  </span>
+                ) : (
+                  <span style={{ marginLeft: 6, color: '#999' }}>拆单</span>
+                )}
+              </button>
+            ))}
+        </div>
+      )}
+
       {/* ── 主体：菜品网格 + 侧边购物车 ── */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
 
@@ -572,6 +712,15 @@ export function CashierPage() {
           onClose={() => setComboSheet({ visible: false, dish: null })}
         />
       )}
+
+      {/* ── PRD-11 sub-C 拆单弹层 ── */}
+      <SplitOrderItemModal
+        visible={splitModal.visible}
+        dishName={splitModal.dishName}
+        currentShareCount={splitModal.currentShareCount}
+        onSubmit={handleSplitSubmit}
+        onClose={handleSplitClose}
+      />
     </div>
       <SmartSidebar open={sidebarOpen} onToggle={() => setSidebarOpen((v) => !v)} storeId={STORE_ID} tenantId={TENANT_ID} />
       <VoiceCommandBar

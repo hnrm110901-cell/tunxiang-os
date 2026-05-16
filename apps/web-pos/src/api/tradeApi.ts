@@ -515,6 +515,28 @@ export async function removeItem(orderId: string, itemId: string): Promise<void>
   await txFetch(`/api/v1/trade/orders/${orderId}/items/${itemId}`, { method: 'DELETE' });
 }
 
+/**
+ * 改 OrderItem.share_count (PRD-11 sub-C 拆单 modal 调用).
+ *
+ * 后端 tx-trade PUT /api/v1/trade/orders/{orderId}/items/{itemId} 接 UpdateItemReq:
+ *   { share_count: int (>=1) }
+ * 后端校验 share_split_rules:
+ *   - settled 后冻结 → 422
+ *   - allow_share=false → 422
+ *   - share_count > max_share_count → 422
+ * 调用方应 catch 错误并在 UI 显示后端 message (BUSINESS_REJECT).
+ */
+export async function updateItemShareCount(
+  orderId: string,
+  itemId: string,
+  shareCount: number,
+): Promise<Record<string, unknown>> {
+  return txFetch(`/api/v1/trade/orders/${orderId}/items/${itemId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ share_count: shareCount }),
+  });
+}
+
 export async function settleOrder(orderId: string): Promise<{ order_no: string; final_amount_fen: number }> {
   return txFetch(`/api/v1/trade/orders/${orderId}/settle`, {
     method: 'POST',

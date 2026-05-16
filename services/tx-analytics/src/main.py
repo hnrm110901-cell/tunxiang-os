@@ -60,6 +60,16 @@ from .api.store_analysis_routes import router as store_analysis_router
 from .api.stream_report_routes import router as stream_report_router
 from .api.weekly_brief_routes import router as weekly_brief_router  # W2 4/13 周报
 
+# PRD-11 sub-C — SplitAttributionProjector (env-gated OFF 默认, follow-up 灰度激活)
+from .api.cost_attribution_routes import router as cost_attribution_router
+from .api.dlq_split_routes import router as dlq_split_router
+from .projectors.registry import (
+    is_enabled as split_projector_enabled,
+    list_active_tenants as split_projector_list_tenants,
+    start_split_attribution_projector,
+    stop_all_split_attribution_projectors,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -77,8 +87,34 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _load_overrides_from_db()
     except Exception as exc:
         logger.warning("merchant_targets_overrides_load_skipped", error=str(exc))
+    # PRD-11 sub-C — env-gated 启动 SplitAttributionProjector daemon. 默认 OFF;
+    # 激活留 follow-up PR (灰度 1 → 5 → 100 租户)。lifespan 启动失败不阻塞 service.
+    if split_projector_enabled():
+        try:
+            tenants = await split_projector_list_tenants()
+            for tid in tenants:
+                await start_split_attribution_projector(tid)
+            logger.info(
+                "split_attribution_projector_bootstrap_complete",
+                tenant_count=len(tenants),
+            )
+        except Exception as exc:  # noqa: BLE001 — bootstrap 兜底, 单失败不阻塞 service
+            logger.warning(
+                "split_attribution_projector_bootstrap_failed",
+                error=str(exc),
+                exc_info=True,
+            )
     logger.info("tx_analytics_started", etl_scheduler="running")
     yield
+    # 优雅停止: 所有已启动的 SplitAttributionProjector daemon
+    try:
+        await stop_all_split_attribution_projectors()
+    except Exception as exc:  # noqa: BLE001 — shutdown 兜底
+        logger.warning(
+            "split_attribution_projector_shutdown_failed",
+            error=str(exc),
+            exc_info=True,
+        )
     scheduler.shutdown()
     logger.info("tx_analytics_stopped")
 
@@ -133,6 +169,8 @@ app.include_router(self_service_router)  # BI-1.2: 自助取数（8端点）
 app.include_router(alert_router)  # BI-2.2: 预警闭环引擎（8端点）
 app.include_router(demo_monitor_router)  # May W2: C-04 演示环境监控面板
 app.include_router(pinned_dashboard_router)  # S4-04 PR2.C 驾驶舱 Pin（issue #291）
+app.include_router(cost_attribution_router)  # PRD-11 sub-C: 成本分摊 dashboard（3 端点）
+app.include_router(dlq_split_router)  # PRD-11 sub-C: split-attribution 死信看板（3 端点）
 
 
 @app.get("/health")
