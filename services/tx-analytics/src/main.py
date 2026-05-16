@@ -67,6 +67,7 @@ from .api.cost_attribution_routes import router as cost_attribution_router
 from .api.dlq_split_routes import router as dlq_split_router
 from .projectors.registry import (
     is_enabled as split_projector_enabled,
+    is_enabled_for_tenant as split_projector_enabled_for_tenant,
     list_active_tenants as split_projector_list_tenants,
     start_split_attribution_projector,
     stop_all_split_attribution_projectors,
@@ -107,12 +108,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             while not stop_event.is_set():
                 try:
                     tenants = await split_projector_list_tenants()
-                    current = set(tenants)
-                    for tid in current - started_tenants:
+                    # PRD-11 sub-C 灰度: per-tenant gating via feature_flags SDK.
+                    # 全局 gate (`split_projector_enabled()`) 通过后, refresh loop 仍按
+                    # tenant 维度二次过滤 — targeting_rules.prod.tenant_id 白名单命中
+                    # 才启 daemon. 已 start 但本轮 flag 翻 OFF 的 tenant 走 stop.
+                    enabled_set = {
+                        tid
+                        for tid in tenants
+                        if split_projector_enabled_for_tenant(tid)
+                    }
+                    for tid in enabled_set - started_tenants:
                         await start_split_attribution_projector(tid)
-                    for tid in started_tenants - current:
+                    for tid in started_tenants - enabled_set:
                         await stop_split_attribution_projector(tid)
-                    started_tenants = current
+                    started_tenants = enabled_set
                 except Exception as exc:  # noqa: BLE001 — lifespan 周期任务必须 fail-open
                     logger.error(
                         "split_attribution_tenant_refresh_failed",
