@@ -612,8 +612,14 @@ class DailyScorecardService:
                     tbl_r = tbl_row.mappings().first()
                     if tbl_r and int(tbl_r["cnt"] or 0) > 0:
                         table_count = int(tbl_r["cnt"])
-                except (ProgrammingError, DBAPIError):
-                    pass  # 降级使用默认桌数
+                except (ProgrammingError, DBAPIError) as exc:
+                    # 降级使用默认桌数 (turnover_rate 估算精度略降, 不阻塞 scorecard)
+                    log.debug(
+                        "scorecard.table_count_fallback_default",
+                        store_id=store_id,
+                        default_count=table_count,
+                        error=str(exc),
+                    )
 
                 result["turnover_rate"] = round(order_count / max(table_count, 1), 2)
                 # _fen 字段必须 int（CLAUDE.md §10/§15）；round 防 Decimal 截断

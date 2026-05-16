@@ -607,8 +607,13 @@ async def accept_suggestion(
     if isinstance(suggestions, str):
         try:
             suggestions = json.loads(suggestions)
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.debug(
+                "coach_session.suggestions_json_decode_skipped",
+                session_id=session_id,
+                tenant_id=tenant_id,
+                error=str(exc),
+            )
 
     return _ok({"id": result["id"], "suggestions": suggestions})
 
@@ -668,8 +673,13 @@ async def append_action(
     if isinstance(actions_taken, str):
         try:
             actions_taken = json.loads(actions_taken)
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.debug(
+                "coach_session.actions_taken_json_decode_skipped",
+                session_id=session_id,
+                tenant_id=tenant_id,
+                error=str(exc),
+            )
 
     return _ok({"id": result["id"], "actions_taken": actions_taken})
 
@@ -745,8 +755,14 @@ async def complete_action(
     if isinstance(actions_taken, str):
         try:
             actions_taken = json.loads(actions_taken)
-        except (json.JSONDecodeError, TypeError):
-            pass
+        except (json.JSONDecodeError, TypeError) as exc:
+            log.debug(
+                "coach_session.action_complete_json_decode_skipped",
+                session_id=session_id,
+                act_idx=act_idx,
+                tenant_id=tenant_id,
+                error=str(exc),
+            )
 
     return _ok({"id": result["id"], "actions_taken": actions_taken})
 
