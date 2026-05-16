@@ -498,7 +498,20 @@ async def list_anomalies(
                     error=str(exc),
                     exc_info=True,
                 )
-                # 单 detector 失败不短路其他, 该 detector 数据缺失但其他正常
+                # AsyncSession 失败事务污染: SELECT 失败后, 后续 db.execute() 全部
+                # 抛 InFailedSqlTransactionError 直到 rollback. 必须 rollback +
+                # 重设 RLS (rollback 会清掉 set_config(local=true)).
+                # Ref: feedback_asyncpg_rollback_after_integrity_error.md
+                try:
+                    await db.rollback()
+                    await _set_rls(db, tenant_id)
+                except SQLAlchemyError as rb_exc:
+                    logger.warning(
+                        "anomaly_detector_rollback_failed",
+                        detector=detector_name,
+                        error=str(rb_exc),
+                    )
+                    break  # rollback 都失败说明 session 已死, 不必继续
 
         # 从 compliance_alerts + orders 补充通用异常数据
         anomalies.extend(await _fetch_anomalies_from_db(db, tenant_id, store_id, days))

@@ -492,3 +492,51 @@ class TestPerDetectorTry:
         detector_logs = [c for c in captured if c.get("event") == "anomaly_detector_db_error"]
         assert len(detector_logs) >= 1
         assert detector_logs[0].get("detector") == "cost_spike"
+
+    def test_session_pollution_recovers_after_rollback(self, monkeypatch):
+        """detector 1 fail 后 rollback+RLS 重设, session 恢复, detector 2 能成功跑
+
+        验证 feedback_asyncpg_rollback_after_integrity_error.md 描述的 session
+        污染问题已修复: SELECT 失败 → rollback → _set_rls → 后续 detector 可继续执行.
+        """
+        mock_set_rls = AsyncMock()
+        monkeypatch.setattr(_anomaly_mod, "_set_rls", mock_set_rls)
+
+        call_count = 0
+
+        async def _fail_first_then_ok(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise _SQLAlchemyError("table not exist: cost_records")
+            return []
+
+        fake_result = [{"type": "high_refund", "severity": "warning", "occurred_at": "2026-05-16T00:00:00Z"}]
+
+        async def _ok_refund(*a, **kw):
+            return fake_result
+
+        async def _ok_empty(*a, **kw):
+            return []
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _fail_first_then_ok)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_refund)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_empty)
+
+        mock_db = AsyncMock()
+        mock_db.rollback = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+        body = resp.json()
+
+        # revenue_drop fail → rollback + RLS 重设 → 后续 detector 继续
+        mock_db.rollback.assert_awaited()
+        # _set_rls 应被调用至少 2 次: 1 次初始 + 1 次 rollback 后重设
+        assert mock_set_rls.await_count >= 2
+        # high_refund (detector 3) 正常返回数据
+        types_ = {a["type"] for a in body["data"]["anomalies"]}
+        assert "high_refund" in types_
