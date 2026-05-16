@@ -9,6 +9,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from brand_management import BrandManagementService
@@ -78,11 +80,8 @@ class TestBrandRegistry:
 
     def test_get_brand_not_found(self):
         svc = BrandManagementService()
-        try:
+        with pytest.raises(ValueError):
             svc.get_brand_detail("nonexistent")
-            assert False, "Should raise ValueError"
-        except ValueError:
-            pass
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -156,11 +155,8 @@ class TestMenuInheritance:
 
     def test_create_brand_menu_invalid_parent(self):
         svc, b1, _, _ = _make_service_with_brands()
-        try:
+        with pytest.raises(ValueError):
             svc.create_brand_menu(b1["brand_id"], "nonexistent", [])
-            assert False, "Should raise ValueError"
-        except ValueError:
-            pass
 
     def test_resolve_effective_menu_full_chain(self):
         svc, master, brand_menu, store_menu = self._setup()
@@ -202,11 +198,8 @@ class TestMenuInheritance:
 
     def test_store_menu_not_found(self):
         svc = BrandManagementService()
-        try:
+        with pytest.raises(ValueError):
             svc.resolve_effective_menu("nonexistent_store")
-            assert False, "Should raise ValueError"
-        except ValueError:
-            pass
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -240,11 +233,8 @@ class TestCrossBrandMember:
 
     def test_link_member_invalid_brand(self):
         svc, b1, _, _ = _make_service_with_brands()
-        try:
+        with pytest.raises(ValueError):
             svc.link_member_across_brands("m001", [b1["brand_id"], "fake_brand"])
-            assert False, "Should raise ValueError"
-        except ValueError:
-            pass
 
     def test_transfer_points(self):
         svc, b1, b2, b3 = self._setup()
@@ -361,11 +351,8 @@ class TestUnifiedProcurement:
 
     def test_split_delivery_invalid_plan(self):
         svc = BrandManagementService()
-        try:
+        with pytest.raises(ValueError):
             svc.split_delivery("nonexistent")
-            assert False, "Should raise ValueError"
-        except ValueError:
-            pass
 
     def test_allocate_cost(self):
         svc, plan = self._make_plan()
