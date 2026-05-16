@@ -62,7 +62,7 @@ interface DLQItem {
 
 interface DLQListResponse {
   items: DLQItem[];
-  page: { limit: number; offset: number; count: number };
+  page: { limit: number; offset: number; count: number; total: number };
   summary: { unack_count: number };
   generated_at: string;
 }
@@ -77,6 +77,7 @@ export function SplitAttributionDLQPage() {
   const [status, setStatus] = useState<DLQStatus>('unack');
   const [items, setItems] = useState<DLQItem[]>([]);
   const [unackCount, setUnackCount] = useState(0);
+  const [pageTotal, setPageTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -98,6 +99,7 @@ export function SplitAttributionDLQPage() {
       );
       setItems(data.items);
       setUnackCount(data.summary.unack_count);
+      setPageTotal(data.page.total);
     } catch (e) {
       message.error('加载死信列表失败：' + (e instanceof Error ? e.message : String(e)));
     } finally {
@@ -281,13 +283,7 @@ export function SplitAttributionDLQPage() {
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
-            // P0 修法：backend list 响应未提供 page.total, antd 默认按 dataSource.length 推总页 → Next 灰掉。
-            // 用乐观推断: 满页假设至少还有 1 条; 不满页时 (page-1)*size + items.length 精确。
-            // TODO(follow-up): backend 加 page.total 字段后改为精确分页
-            total:
-              items.length >= PAGE_SIZE
-                ? page * PAGE_SIZE + 1
-                : (page - 1) * PAGE_SIZE + items.length,
+            total: pageTotal,
             onChange: (p) => setPage(p),
             showSizeChanger: false,
           }}
