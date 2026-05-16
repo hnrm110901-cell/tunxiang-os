@@ -13,6 +13,8 @@ from typing import Optional
 
 import structlog
 
+from ..metrics import record_silent_fallback
+
 log = structlog.get_logger()
 
 
@@ -230,6 +232,17 @@ def _find_active_bom(
         row = result.mappings().first()
         return dict(row) if row else None
     except (ImportError, AttributeError):
+        # T2 邻接 (毛利辅助): sqlalchemy import 或 db.execute attr 缺失时
+        # graceful fail-open 返 None (调用方可走 fallback 估算路径), 但补 warn
+        # + counter 让"测试 mock 缺 spec / 生产 db handle 异常"可被运维定位.
+        # silent failure 治理 issue #663 Wave 1 sub-A, plan §2 表 #7.
+        log.warning(
+            "bom_template_lookup_dep_failed",
+            dish_id=str(dish_id),
+            tenant_id=str(tenant_id),
+            exc_info=True,
+        )
+        record_silent_fallback("theoretical_cost.get_current_bom")
         return None
 
 
