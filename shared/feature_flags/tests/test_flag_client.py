@@ -445,6 +445,58 @@ class TestGlobalSingleton:
 
 
 # ---------------------------------------------------------------------------
+# 测试组 6.5：env 识别 fall-back chain (PR-A §19 round-1 P1-1)
+# ---------------------------------------------------------------------------
+
+
+class TestEnvFallbackChain:
+    """fall-back chain: 显式 env > TUNXIANG_ENV > TX_ENV > "dev".
+
+    修复 PR-A §19 round-1 P1-1: docker-compose 部署只在每 service 设 TX_ENV,
+    SDK 仅读 TUNXIANG_ENV → fall-back "dev" → 灰度 control plane 失效。
+    """
+
+    def test_tunxiang_env_takes_precedence_over_tx_env(self, flags_dir: Path):
+        """两者都设时, TUNXIANG_ENV 优先。"""
+        with patch.dict(
+            os.environ,
+            {"TUNXIANG_ENV": "prod", "TX_ENV": "dev"},
+            clear=False,
+        ):
+            client = FeatureFlagClient(flags_dir=str(flags_dir))
+            assert client.env == "prod"
+
+    def test_tx_env_used_when_tunxiang_env_unset(self, flags_dir: Path):
+        """TUNXIANG_ENV 未设但 TX_ENV 设了 → 用 TX_ENV (修复 docker-compose 部署场景)。"""
+        with patch.dict(
+            os.environ,
+            {"TX_ENV": "prod"},
+            clear=False,
+        ):
+            os.environ.pop("TUNXIANG_ENV", None)
+            client = FeatureFlagClient(flags_dir=str(flags_dir))
+            assert client.env == "prod"
+
+    def test_dev_fallback_when_both_unset(self, flags_dir: Path):
+        """两者都未设 → fall-back "dev" (原行为保留)。"""
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("TUNXIANG_ENV", None)
+            os.environ.pop("TX_ENV", None)
+            client = FeatureFlagClient(flags_dir=str(flags_dir))
+            assert client.env == "dev"
+
+    def test_explicit_env_arg_takes_precedence_over_both(self, flags_dir: Path):
+        """显式 env 参数优先于两个 env var (test 场景注入)。"""
+        with patch.dict(
+            os.environ,
+            {"TUNXIANG_ENV": "prod", "TX_ENV": "staging"},
+            clear=False,
+        ):
+            client = FeatureFlagClient(env="uat", flags_dir=str(flags_dir))
+            assert client.env == "uat"
+
+
+# ---------------------------------------------------------------------------
 # 测试组 7：Flag 名称常量完整性
 # ---------------------------------------------------------------------------
 

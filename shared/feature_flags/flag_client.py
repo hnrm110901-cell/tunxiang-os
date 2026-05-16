@@ -74,7 +74,11 @@ class FeatureFlagClient:
         env: Optional[str] = None,
         flags_dir: Optional[str] = None,
     ) -> None:
-        self.env = env or os.getenv("TUNXIANG_ENV", "dev")
+        # Fall-back chain: 显式 env > TUNXIANG_ENV > TX_ENV > "dev"
+        # TX_ENV 兜底: compose env files 已在每 service inline 设置 TX_ENV (prod/staging/gray/dev/demo).
+        # 修复 PR-A §19 round-1 P1-1: 仅 TUNXIANG_ENV fall-back "dev" 致 docker-compose 部署下 SDK 误判
+        # prod 流量为 dev → environments.dev=true → 灰度 control plane 失效.
+        self.env = env or os.getenv("TUNXIANG_ENV") or os.getenv("TX_ENV", "dev")
         self.flags_dir = Path(flags_dir or str(Path(__file__).parent.parent.parent / "flags"))
         # flag_name -> flag definition dict
         self._flag_cache: dict[str, dict[str, Any]] = {}
