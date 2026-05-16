@@ -403,16 +403,29 @@ class AutoProcurementService:
 
             if ing.supplier_name:
                 supplier_name = ing.supplier_name
-                # 尝试从历史获取评分
+                # 尝试从历史获取评分 (silent failure 治理 issue #663 Wave 1 sub-A:
+                # §13 broad except 零容忍 — 收窄至 supplier_score 调用栈实际可能的
+                # 异常类型 + structlog.warn 让评分计算失败可被运维定位).
+                # SQLAlchemyError: get_supplier_score 内 DB 查询异常
+                # KeyError: score_data 缺字段 (on_time_rate/quality_rate/price_score)
+                # TypeError/ValueError: calc_supplier_score 数值类型不匹配
                 try:
+                    from sqlalchemy.exc import SQLAlchemyError
+
                     score_data = await self.get_supplier_score("", ingredient_id, tenant_id, db)
                     supplier_score = self.calc_supplier_score(
                         score_data["on_time_rate"],
                         score_data["quality_rate"],
                         score_data["price_score"],
                     )
-                except Exception:  # noqa: BLE001
-                    pass
+                except (SQLAlchemyError, KeyError, TypeError, ValueError):
+                    log.warning(
+                        "supplier_score_calc_failed",
+                        ingredient_id=ingredient_id,
+                        tenant_id=tenant_id,
+                        supplier_name=supplier_name,
+                        exc_info=True,
+                    )
 
             estimated_cost_fen = int(recommended_qty * unit_price_fen)
 
