@@ -246,7 +246,13 @@ async def _dlq_insert(
         payload_json = json.dumps(payload, default=str)
     else:
         payload_json = json.dumps(str(payload))
-    order_id = payload.get("order_id") if isinstance(payload, dict) else None
+    # §19 round-2 P2 follow-up: order_id 与 handle() 主路径对齐取 stream_id 兜底
+    # (cashier_engine payload 只有 order_no, 真 order_id 在 stream_id 列). 避免 DLQ
+    # 行 order_id 永远 NULL 导致 sub-C 看板无法直接 JOIN orders.
+    order_id = (
+        (payload.get("order_id") if isinstance(payload, dict) else None)
+        or event.get("stream_id")
+    )
     items = payload.get("items") if isinstance(payload, dict) else None
     first_item = items[0] if isinstance(items, list) and items else {}
     order_item_id = first_item.get("order_item_id") if isinstance(first_item, dict) else None
