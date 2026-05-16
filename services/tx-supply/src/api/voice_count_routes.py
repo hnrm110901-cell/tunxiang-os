@@ -161,11 +161,10 @@ def _cn_integer_to_int(cn_str: str) -> Optional[int]:
     if not cn_str:
         return None
 
-    # 全是阿拉伯数字，直接返回
-    try:
+    # 全是阿拉伯数字，直接返回 (显式判断 — 不靠 exception control flow)
+    # 支持可选前导 '-' (与原 int() 行为一致)。
+    if cn_str.lstrip("-").isdigit():
         return int(cn_str)
-    except ValueError:
-        pass
 
     # 含有中文数字
     result = 0
