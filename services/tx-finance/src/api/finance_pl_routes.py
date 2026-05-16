@@ -311,7 +311,8 @@ async def get_pl_mom(
             d = _pl_summary(pl.to_dict())
             d["month"] = m
             return d
-        except ValueError:
+        except ValueError as exc:
+            logger.warning("pl_mom_fetch_failed", month=m, store_id=str(sid), error=str(exc))
             return None
 
     current, prev, yoy = (

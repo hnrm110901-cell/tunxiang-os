@@ -221,8 +221,9 @@ async def list_payroll_records(
             conditions.append("pay_period_start >= :ps AND pay_period_start < :pe")
             params["ps"] = period_start
             params["pe"] = period_end
-        except (ValueError, IndexError):
-            pass  # 忽略格式错误，不过滤月份
+        except (ValueError, IndexError) as exc:
+            log.debug("payroll_month_filter_parse_failed", month=month, error=str(exc))
+            # 忽略格式错误，不过滤月份
 
     where_clause = " AND ".join(conditions)
 
