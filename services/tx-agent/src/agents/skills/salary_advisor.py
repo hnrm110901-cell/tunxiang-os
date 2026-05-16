@@ -133,7 +133,8 @@ def _parse_perf_score(raw: Any) -> Optional[float]:
         return None
     try:
         return float(str(raw).strip())
-    except ValueError:
+    except ValueError as exc:
+        logger.debug("salary_advisor_perf_score_coerce_failed", error=str(exc))
         return None
 
 

@@ -312,7 +312,8 @@ class AttendanceComplianceAgent(SkillAgent):
         try:
             h, m = hhmm.split(":")
             return int(h) * 60 + int(m)
-        except (ValueError, AttributeError):
+        except (ValueError, AttributeError) as exc:
+            logger.debug("attendance_hhmm_parse_failed", value=hhmm, error=str(exc))
             return None
 
     @staticmethod

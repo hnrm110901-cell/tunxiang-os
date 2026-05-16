@@ -344,7 +344,8 @@ class MemoryRetriever:
                     days = (now - updated_at).total_seconds() / 86400.0
                     decay = max(math.exp(-0.01 * days), 0.1)
                     item["score"] = item.get("score", 0) * decay
-                except (ValueError, TypeError):
+                except (ValueError, TypeError) as exc:
+                    logger.debug("memory_retriever_date_parse_failed", updated_str=updated_str[:32], error=str(exc))
                     pass  # 无法解析日期时不衰减
 
         return results

@@ -88,7 +88,8 @@ class BillingAnomalyAgent(SkillAgent):
                 )
                 if resp:
                     ai_analysis = resp.strip()
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("billing_anomaly_ai_router_failed", error=str(exc), exc_info=True)
                 pass
 
         if risk_level == "high":

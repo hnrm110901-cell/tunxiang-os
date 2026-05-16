@@ -257,7 +257,8 @@ async def _load_training_courses(
         rows = [dict(r) for r in result.mappings()]
         if rows:
             return rows
-    except (OperationalError, ProgrammingError):
+    except (OperationalError, ProgrammingError) as exc:
+        logger.warning("growth_coach_db_query_failed", error=str(exc), exc_info=True)
         pass
     # 降级为内置课程库
     return _TRAINING_COURSES

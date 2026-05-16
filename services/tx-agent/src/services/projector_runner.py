@@ -97,7 +97,8 @@ class ProjectorRunner:
                 task.cancel()
                 try:
                     await asyncio.wait_for(task, timeout=5.0)
-                except (asyncio.CancelledError, asyncio.TimeoutError):
+                except (asyncio.CancelledError, asyncio.TimeoutError) as exc:
+                    logger.debug("projector_runner_task_stop_timeout", key=key, error=str(exc))
                     pass
 
         self._tasks.clear()

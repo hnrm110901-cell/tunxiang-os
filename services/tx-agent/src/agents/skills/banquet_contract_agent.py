@@ -1031,7 +1031,8 @@ def _coerce_uuid(value: Any) -> Optional[uuid.UUID]:
         return value
     try:
         return uuid.UUID(str(value))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        logger.debug("banquet_contract_coerce_uuid_failed", value=str(value)[:64], error=str(exc))
         return None
 
 
@@ -1044,7 +1045,8 @@ def _coerce_date(value: Any) -> Optional[date]:
         return value.date()
     try:
         return date.fromisoformat(str(value))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        logger.debug("banquet_contract_coerce_date_failed", value=str(value)[:32], error=str(exc))
         return None
 
 
@@ -1137,12 +1139,14 @@ def _import_tx_trade(module_suffix: str, attr: str) -> Any:
     try:
         mod = importlib.import_module(f"src.{module_suffix}")
         return getattr(mod, attr)
-    except ImportError:
+    except ImportError as exc:
+        logger.debug("banquet_contract_dyn_import_src_path_failed", module=module_suffix, error=str(exc))
         pass
     try:
         mod = importlib.import_module(module_suffix)
         return getattr(mod, attr)
-    except ImportError:
+    except ImportError as exc:
+        logger.debug("banquet_contract_dyn_import_bare_path_failed", module=module_suffix, error=str(exc))
         pass
     # 兜底：python 包的 "-" 在 import 路径里不合法，约定用下划线目录；实际未命中时抛
     raise ImportError(f"Unable to import {module_suffix}.{attr}; Agent 需在测试 conftest 加 tx-trade/src 到 sys.path")

@@ -1192,7 +1192,8 @@ async def get_roi_report(
                     _json.loads(row["last_metadata"]) if isinstance(row["last_metadata"], str) else row["last_metadata"]
                 )
                 waste_reduction_pct = md.get("waste_reduction_pct")
-            except (ValueError, TypeError, AttributeError):
+            except (ValueError, TypeError, AttributeError) as exc:
+                logger.debug("agent_kpi_metadata_json_parse_failed", error=str(exc))
                 pass
 
         items.append(item)

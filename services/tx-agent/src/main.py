@@ -14,6 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db_with_tenant
 
+logger = structlog.get_logger(__name__)
+
 from .agents.domain_event_consumer import DomainEventConsumer
 from .api.agent_hub_routes import router as agent_hub_router
 from .api.agent_kpi_routes import router as agent_kpi_router
@@ -187,12 +189,14 @@ async def lifespan(app: FastAPI):
         try:
             await consumer_task
         except asyncio.CancelledError:
+            logger.debug("consumer_task_cancelled_on_shutdown")
             pass
         await skill_consumer.stop()
         skill_consumer_task.cancel()
         try:
             await skill_consumer_task
         except asyncio.CancelledError:
+            logger.debug("skill_consumer_task_cancelled_on_shutdown")
             pass
         # 停止所有投影器
         await runner.stop()

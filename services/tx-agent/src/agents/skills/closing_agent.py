@@ -287,7 +287,8 @@ class ClosingAgent(SkillAgent):
                 )
                 if resp:
                     ai_summary = resp.strip()
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("closing_agent_ai_router_failed", error=str(exc), exc_info=True)
                 pass
 
         return AgentResult(

@@ -142,7 +142,8 @@ class KitchenOvertimeAgent(SkillAgent):
                 )
                 if resp:
                     ai_suggestion = resp.strip()
-            except (ValueError, RuntimeError, ConnectionError, TimeoutError):
+            except (ValueError, RuntimeError, ConnectionError, TimeoutError) as exc:
+                logger.warning("kitchen_overtime_ai_router_failed", error=str(exc), exc_info=True)
                 pass
 
         return AgentResult(
