@@ -1,5 +1,7 @@
 """tx-analytics — 域G 经营分析微服务"""
 
+import asyncio
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -60,7 +62,7 @@ from .api.store_analysis_routes import router as store_analysis_router
 from .api.stream_report_routes import router as stream_report_router
 from .api.weekly_brief_routes import router as weekly_brief_router  # W2 4/13 周报
 
-# PRD-11 sub-C — SplitAttributionProjector (env-gated OFF 默认, follow-up 灰度激活)
+# PRD-11 sub-C — SplitAttributionProjector (env-gated, dev/demo 默认 ON 激活)
 from .api.cost_attribution_routes import router as cost_attribution_router
 from .api.dlq_split_routes import router as dlq_split_router
 from .projectors.registry import (
@@ -68,6 +70,7 @@ from .projectors.registry import (
     list_active_tenants as split_projector_list_tenants,
     start_split_attribution_projector,
     stop_all_split_attribution_projectors,
+    stop_split_attribution_projector,
 )
 
 
@@ -87,36 +90,81 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _load_overrides_from_db()
     except Exception as exc:
         logger.warning("merchant_targets_overrides_load_skipped", error=str(exc))
-    # PRD-11 sub-C — env-gated 启动 SplitAttributionProjector daemon. 默认 OFF;
-    # 激活留 follow-up PR (灰度 1 → 5 → 100 租户)。lifespan 启动失败不阻塞 service.
+
+    # PRD-11 sub-C 激活 — env-gated SplitAttributionProjector daemon (镜像 tx-supply
+    # sub-B.2 lifespan refresh loop, PR #698 模式). dev/demo 默认 ON, prod/staging/gray
+    # 默认 OFF 灰度. lifespan 启动失败不阻塞 service (fail-open).
+    refresh_task: "asyncio.Task[None] | None" = None
+    stop_event = asyncio.Event()
+    started_tenants: set[str] = set()
+
     if split_projector_enabled():
-        try:
-            tenants = await split_projector_list_tenants()
-            for tid in tenants:
-                await start_split_attribution_projector(tid)
-            logger.info(
-                "split_attribution_projector_bootstrap_complete",
-                tenant_count=len(tenants),
+        async def _refresh_loop() -> None:
+            nonlocal started_tenants
+            refresh_sec = float(
+                os.getenv("TX_ANALYTICS_SPLIT_ATTRIBUTION_TENANT_REFRESH_SEC", "300")
             )
-        except Exception as exc:  # noqa: BLE001 — bootstrap 兜底, 单失败不阻塞 service
+            while not stop_event.is_set():
+                try:
+                    tenants = await split_projector_list_tenants()
+                    current = set(tenants)
+                    for tid in current - started_tenants:
+                        await start_split_attribution_projector(tid)
+                    for tid in started_tenants - current:
+                        await stop_split_attribution_projector(tid)
+                    started_tenants = current
+                except Exception as exc:  # noqa: BLE001 — lifespan 周期任务必须 fail-open
+                    logger.error(
+                        "split_attribution_tenant_refresh_failed",
+                        error=str(exc),
+                        exc_info=True,
+                    )
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=refresh_sec)
+                except asyncio.TimeoutError:
+                    pass
+
+        refresh_sec_val = float(
+            os.getenv("TX_ANALYTICS_SPLIT_ATTRIBUTION_TENANT_REFRESH_SEC", "300")
+        )
+        refresh_task = asyncio.create_task(
+            _refresh_loop(), name="split_attribution_tenant_refresh"
+        )
+        logger.info(
+            "split_attribution_projector_lifespan_started",
+            refresh_sec=refresh_sec_val,
+        )
+    else:
+        logger.info("split_attribution_projector_lifespan_skipped", reason="env_off")
+
+    logger.info("tx_analytics_started", etl_scheduler="running")
+    try:
+        yield
+    finally:
+        stop_event.set()
+        if refresh_task is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(refresh_task), timeout=5.0)
+            except asyncio.TimeoutError:
+                refresh_task.cancel()
+                try:
+                    await refresh_task
+                except asyncio.CancelledError:
+                    pass
+        # §19 round-1 P1-1 mirror (sub-B.2 PR #698 教训): 以 _PROJECTOR_TASKS 真实
+        # 状态为准, 而非 started_tenants 闭包. refresh loop 中途 cancel 时, started_tenants
+        # 可能漏掉新 started 的 task, 走 stop_all_split_attribution_projectors() 兜底.
+        try:
+            await stop_all_split_attribution_projectors()
+        except Exception as exc:  # noqa: BLE001 — shutdown 兜底
             logger.warning(
-                "split_attribution_projector_bootstrap_failed",
+                "split_attribution_projector_shutdown_failed",
                 error=str(exc),
                 exc_info=True,
             )
-    logger.info("tx_analytics_started", etl_scheduler="running")
-    yield
-    # 优雅停止: 所有已启动的 SplitAttributionProjector daemon
-    try:
-        await stop_all_split_attribution_projectors()
-    except Exception as exc:  # noqa: BLE001 — shutdown 兜底
-        logger.warning(
-            "split_attribution_projector_shutdown_failed",
-            error=str(exc),
-            exc_info=True,
-        )
-    scheduler.shutdown()
-    logger.info("tx_analytics_stopped")
+        scheduler.shutdown()
+        logger.info("split_attribution_projector_lifespan_stopped")
+        logger.info("tx_analytics_stopped")
 
 
 app = FastAPI(title="TunxiangOS tx-analytics", version="3.0.0", lifespan=lifespan)
