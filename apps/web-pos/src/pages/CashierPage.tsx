@@ -605,7 +605,7 @@ export function CashierPage() {
           }}
           data-testid="split-action-bar"
         >
-          <span style={{ fontSize: 12, color: '#999', flexShrink: 0, padding: '6px 0' }}>
+          <span style={{ fontSize: 16, color: '#999', flexShrink: 0, padding: '12px 0' }}>
             多人合点拆单:
           </span>
           {items
@@ -617,12 +617,13 @@ export function CashierPage() {
                 onClick={() => handleOpenSplit(i.id)}
                 style={{
                   flexShrink: 0,
-                  padding: '6px 12px',
+                  padding: '12px 16px',
+                  minHeight: 48,
                   borderRadius: 6,
                   border: '1px solid #2a3f47',
                   background: 'transparent',
                   color: '#fff',
-                  fontSize: 12,
+                  fontSize: 16,
                   cursor: 'pointer',
                 }}
                 aria-label={`拆单 ${i.name}`}

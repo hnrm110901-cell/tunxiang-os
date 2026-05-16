@@ -97,7 +97,7 @@ export function SplitOrderItemModal({
 
         <div
           style={{
-            fontSize: 13,
+            fontSize: 16,
             color: '#ccc',
             lineHeight: 1.8,
             marginBottom: 16,
@@ -112,7 +112,7 @@ export function SplitOrderItemModal({
         </div>
 
         <div style={{ marginBottom: 12 }}>
-          <label htmlFor="split-share-count" style={{ fontSize: 12, color: '#999' }}>
+          <label htmlFor="split-share-count" style={{ fontSize: 16, color: '#999' }}>
             新拆分人数（1-{maxShareCount}）
           </label>
           <input
@@ -133,13 +133,14 @@ export function SplitOrderItemModal({
             aria-label="拆分人数"
             style={{
               width: '100%',
-              padding: 8,
+              padding: 12,
               marginTop: 4,
               borderRadius: 6,
               border: '1px solid #333',
               background: '#0B1A20',
               color: '#fff',
-              fontSize: 14,
+              fontSize: 16,
+              minHeight: 48,
             }}
           />
         </div>
@@ -149,12 +150,12 @@ export function SplitOrderItemModal({
             role="alert"
             style={{
               marginBottom: 12,
-              padding: '8px 10px',
+              padding: '10px 12px',
               borderRadius: 6,
               background: 'rgba(235,87,87,0.1)',
               border: '1px solid rgba(235,87,87,0.4)',
               color: '#ff4d4f',
-              fontSize: 12,
+              fontSize: 16,
             }}
           >
             {errorMsg}
@@ -168,7 +169,9 @@ export function SplitOrderItemModal({
             disabled={submitting}
             style={{
               flex: 1,
-              padding: 10,
+              padding: 14,
+              minHeight: 48,
+              fontSize: 16,
               background: '#333',
               color: '#fff',
               border: 'none',
@@ -185,7 +188,9 @@ export function SplitOrderItemModal({
             disabled={submitting}
             style={{
               flex: 1,
-              padding: 10,
+              padding: 14,
+              minHeight: 48,
+              fontSize: 16,
               background: txColors.primary,
               color: '#fff',
               border: 'none',
