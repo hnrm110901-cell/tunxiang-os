@@ -29,6 +29,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.utils.date_parsing import parse_year_month
 
 router = APIRouter(prefix="/api/v1/org", tags=["payslips"])
 
@@ -203,12 +204,10 @@ async def generate_payslips(
     if not req.employees:
         raise HTTPException(status_code=400, detail="employees list is empty")
 
-    try:
-        year, mon = int(req.month.split("-")[0]), int(req.month.split("-")[1])
-        if mon < 1 or mon > 12:
-            raise ValueError
-    except (ValueError, IndexError) as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid month format: {req.month}") from exc
+    parsed = parse_year_month(req.month)
+    if parsed is None:
+        raise HTTPException(status_code=400, detail=f"Invalid month format: {req.month}")
+    year, mon = parsed
 
     payslips: list[dict] = []
     errors: list[dict] = []
