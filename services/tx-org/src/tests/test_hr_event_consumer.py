@@ -13,9 +13,13 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from redis import exceptions as redis_exceptions
 
-from services.tx_org.src.services.hr_event_consumer import HREventConsumer
+# CI 最小依赖集不装 redis (per sediment feedback_tier1_ci_minimal_deps_trap.md);
+# 本地 / 生产容器有 redis 时才跑, 否则整文件 skip, 不让"扩 CI workflow install redis"
+# 这种反 sediment 动作发生.
+redis_exceptions = pytest.importorskip("redis.exceptions")
+
+from services.tx_org.src.services.hr_event_consumer import HREventConsumer  # noqa: E402
 
 
 def _make_redis_mock(xgroup_side_effect=None) -> MagicMock:
