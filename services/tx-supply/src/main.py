@@ -4,6 +4,10 @@
 来源：12 个 service 文件迁移自 tunxiang V2.x
 """
 
+import asyncio
+import os
+from contextlib import asynccontextmanager
+
 import structlog
 from fastapi import FastAPI
 
@@ -73,7 +77,76 @@ from .api.transfer_routes import router as transfer_router
 from .api.warehouse_location_routes import router as warehouse_location_router
 from .api.warehouse_ops_routes import router as warehouse_ops_router
 
-app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: ARG001
+    from .projectors.registry import (
+        is_enabled as _index_split_enabled,
+        list_active_tenants,
+        start_index_split_projector,
+        stop_index_split_projector,
+    )
+
+    refresh_task: "asyncio.Task[None] | None" = None
+    stop_event = asyncio.Event()
+    started_tenants: set[str] = set()
+
+    if _index_split_enabled():
+        async def _refresh_loop() -> None:
+            nonlocal started_tenants
+            refresh_sec = float(os.getenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "300"))
+            while not stop_event.is_set():
+                try:
+                    tenants = await list_active_tenants()
+                    current = set(tenants)
+                    for tid in current - started_tenants:
+                        await start_index_split_projector(tid)
+                    for tid in started_tenants - current:
+                        await stop_index_split_projector(tid)
+                    started_tenants = current
+                except Exception as exc:  # noqa: BLE001 — lifespan 周期任务必须 fail-open
+                    logger.error(
+                        "index_split_tenant_refresh_failed",
+                        error=str(exc),
+                        exc_info=True,
+                    )
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=refresh_sec)
+                except asyncio.TimeoutError:
+                    pass
+
+        refresh_sec_val = float(os.getenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "300"))
+        refresh_task = asyncio.create_task(_refresh_loop(), name="index_split_tenant_refresh")
+        logger.info("index_split_projector_lifespan_started", refresh_sec=refresh_sec_val)
+    else:
+        logger.info("index_split_projector_lifespan_skipped", reason="env_off")
+
+    try:
+        yield
+    finally:
+        stop_event.set()
+        if refresh_task is not None:
+            try:
+                await asyncio.wait_for(asyncio.shield(refresh_task), timeout=5.0)
+            except asyncio.TimeoutError:
+                refresh_task.cancel()
+                try:
+                    await refresh_task
+                except asyncio.CancelledError:
+                    pass
+        for tid in list(started_tenants):
+            try:
+                await stop_index_split_projector(tid)
+            except Exception as exc:  # noqa: BLE001
+                logger.error(
+                    "index_split_projector_stop_failed",
+                    tenant_id=tid,
+                    error=str(exc),
+                    exc_info=True,
+                )
+        logger.info("index_split_projector_lifespan_stopped")
+
+
+app = FastAPI(title="TunxiangOS tx-supply", version="3.0.0", lifespan=lifespan)
 
 from prometheus_fastapi_instrumentator import Instrumentator
 

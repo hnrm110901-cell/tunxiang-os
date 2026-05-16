@@ -19,6 +19,9 @@ from typing import Any
 from uuid import UUID
 
 import structlog
+from sqlalchemy import text
+
+from shared.ontology.src.database import async_session_factory
 
 from .index_split import IndexSplitProjector
 
@@ -71,3 +74,25 @@ async def stop_index_split_projector(tenant_id: UUID | str) -> None:
             pass
     _PROJECTOR_TASKS.pop(tenant_str, None)
     log.info("index_split_projector_stopped", tenant_id=tenant_str)
+
+
+async def list_active_tenants() -> list[str]:
+    """从 tenants 表读取活跃租户 ID 列表 (lifespan refresh 用).
+
+    Returns list[str] of UUID strings.
+    Raises on DB error — caller decides how to handle (lifespan loop 应 log + 跳过).
+    """
+    _sql = text(
+        "SELECT id::text AS tenant_id"
+        " FROM tenants"
+        " WHERE is_deleted = FALSE"
+        " ORDER BY id"
+        " LIMIT 1000"
+    )
+    try:
+        async with async_session_factory() as session:
+            result = await session.execute(_sql)
+            return [row.tenant_id for row in result]
+    except Exception as exc:
+        log.error("list_active_tenants_failed", error=str(exc), exc_info=True)
+        raise
