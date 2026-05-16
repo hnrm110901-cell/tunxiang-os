@@ -398,3 +398,145 @@ class TestDismissAnomaly:
         assert "ok" in body
         assert "data" in body
         assert "error" in body
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Regression: 5 detector per-detector try (issue #701)
+#   单 detector 失败不应短路其他 4, 200 桌并发场景防驾驶舱"假空白"误判
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+class TestPerDetectorTry:
+    """单 detector 失败 graceful skip, 其他 4 detector 数据照常返回 (issue #701)"""
+
+    def test_single_detector_failure_others_succeed(self, monkeypatch):
+        """mock cost_spike 抛 SQLAlchemyError, 其他 4 detector 返 fixture → 不短路"""
+        # 给其他 4 detector 各注入 1 条假 anomaly, cost_spike 失败
+        fake_revenue = [{"type": "revenue_drop", "severity": "critical", "occurred_at": "2026-05-16T00:00:00Z"}]
+        fake_refund = [{"type": "high_refund", "severity": "warning", "occurred_at": "2026-05-16T00:00:00Z"}]
+        fake_slow = [{"type": "slow_kitchen", "severity": "warning", "occurred_at": "2026-05-16T00:00:00Z"}]
+        fake_expiry = [{"type": "expiry_risk", "severity": "warning", "occurred_at": "2026-05-16T00:00:00Z"}]
+
+        async def _ok_revenue(*a, **kw):
+            return fake_revenue
+
+        async def _fail_cost(*a, **kw):
+            raise _SQLAlchemyError("cost_records table not exist")
+
+        async def _ok_refund(*a, **kw):
+            return fake_refund
+
+        async def _ok_slow(*a, **kw):
+            return fake_slow
+
+        async def _ok_expiry(*a, **kw):
+            return fake_expiry
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _ok_revenue)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _fail_cost)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_refund)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_slow)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_expiry)
+
+        mock_db = AsyncMock()
+        # _set_rls + _fetch_anomalies_from_db (compliance_alerts + orders 2次 execute)
+        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+        body = resp.json()
+        types_ = {a["type"] for a in body["data"]["anomalies"]}
+        # cost_spike 失败 graceful skip, 其他 4 都应回来
+        assert "revenue_drop" in types_
+        assert "high_refund" in types_
+        assert "slow_kitchen" in types_
+        assert "expiry_risk" in types_
+        # cost_spike 未返
+        assert "cost_spike" not in types_
+        # 至少 4 (cost_spike skip 但其他 4 都在)
+        assert body["data"]["total"] >= 4
+
+    def test_logger_includes_detector_name(self, monkeypatch):
+        """单 detector fail 时 log 事件含 detector 名便于排查"""
+        captured: list[dict] = []
+
+        def _capture_warning(event: str, **kwargs):
+            captured.append({"event": event, **kwargs})
+
+        # 替换模块 logger 为 capture stub
+        fake_logger = types.SimpleNamespace(
+            warning=_capture_warning,
+            info=lambda *a, **kw: None,
+        )
+        monkeypatch.setattr(_anomaly_mod, "logger", fake_logger)
+
+        async def _ok_empty(*a, **kw):
+            return []
+
+        async def _fail_cost(*a, **kw):
+            raise _SQLAlchemyError("boom")
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _fail_cost)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_empty)
+
+        mock_db = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+
+        # 验证至少 1 条 anomaly_detector_db_error log 含 detector="cost_spike"
+        detector_logs = [c for c in captured if c.get("event") == "anomaly_detector_db_error"]
+        assert len(detector_logs) >= 1
+        assert detector_logs[0].get("detector") == "cost_spike"
+
+    def test_session_pollution_recovers_after_rollback(self, monkeypatch):
+        """detector 1 fail 后 rollback+RLS 重设, session 恢复, detector 2 能成功跑
+
+        验证 feedback_asyncpg_rollback_after_integrity_error.md 描述的 session
+        污染问题已修复: SELECT 失败 → rollback → _set_rls → 后续 detector 可继续执行.
+        """
+        mock_set_rls = AsyncMock()
+        monkeypatch.setattr(_anomaly_mod, "_set_rls", mock_set_rls)
+
+        call_count = 0
+
+        async def _fail_first_then_ok(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise _SQLAlchemyError("table not exist: cost_records")
+            return []
+
+        fake_result = [{"type": "high_refund", "severity": "warning", "occurred_at": "2026-05-16T00:00:00Z"}]
+
+        async def _ok_refund(*a, **kw):
+            return fake_result
+
+        async def _ok_empty(*a, **kw):
+            return []
+
+        monkeypatch.setattr(_anomaly_mod, "_detect_revenue_drop", _fail_first_then_ok)
+        monkeypatch.setattr(_anomaly_mod, "_detect_cost_spike", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_high_refund", _ok_refund)
+        monkeypatch.setattr(_anomaly_mod, "_detect_slow_kitchen", _ok_empty)
+        monkeypatch.setattr(_anomaly_mod, "_detect_expiry_risk", _ok_empty)
+
+        mock_db = AsyncMock()
+        mock_db.rollback = AsyncMock()
+        mock_db.execute = AsyncMock(return_value=MagicMock(fetchall=lambda: []))
+        client = _make_app(mock_db)
+        resp = client.get("/api/v1/intel/anomalies", headers=HEADERS)
+        assert resp.status_code == 200
+        body = resp.json()
+
+        # revenue_drop fail → rollback + RLS 重设 → 后续 detector 继续
+        mock_db.rollback.assert_awaited()
+        # _set_rls 应被调用至少 2 次: 1 次初始 + 1 次 rollback 后重设
+        assert mock_set_rls.await_count >= 2
+        # high_refund (detector 3) 正常返回数据
+        types_ = {a["type"] for a in body["data"]["anomalies"]}
+        assert "high_refund" in types_

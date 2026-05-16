@@ -479,15 +479,39 @@ async def list_anomalies(
         anomalies: list[dict[str, Any]] = []
 
         # 优先运行已有的细粒度统计检测函数（依赖 cost_records/kitchen_orders/inventory_items）
-        try:
-            anomalies.extend(await _detect_revenue_drop(db, tenant_id, min(days, 7)))
-            anomalies.extend(await _detect_cost_spike(db, tenant_id, min(days, 7)))
-            anomalies.extend(await _detect_high_refund(db, tenant_id, days))
-            anomalies.extend(await _detect_slow_kitchen(db, tenant_id, days))
-            anomalies.extend(await _detect_expiry_risk(db, tenant_id))
-        except SQLAlchemyError as exc:
-            logger.warning("anomaly_detection_db_error", error=str(exc), exc_info=True)
-            # 部分检测表不存在时跳过，继续后续查询
+        # 每个 detector 独立 try, 单失败 graceful skip 不短路其他 detector
+        # 200 桌并发场景下任一 detector DB 出错不应导致驾驶舱"假空白"误判"无异常"
+        detectors: list[tuple[str, Any]] = [
+            ("revenue_drop", lambda: _detect_revenue_drop(db, tenant_id, min(days, 7))),
+            ("cost_spike", lambda: _detect_cost_spike(db, tenant_id, min(days, 7))),
+            ("high_refund", lambda: _detect_high_refund(db, tenant_id, days)),
+            ("slow_kitchen", lambda: _detect_slow_kitchen(db, tenant_id, days)),
+            ("expiry_risk", lambda: _detect_expiry_risk(db, tenant_id)),
+        ]
+        for detector_name, detector_factory in detectors:
+            try:
+                anomalies.extend(await detector_factory())
+            except SQLAlchemyError as exc:
+                logger.warning(
+                    "anomaly_detector_db_error",
+                    detector=detector_name,
+                    error=str(exc),
+                    exc_info=True,
+                )
+                # AsyncSession 失败事务污染: SELECT 失败后, 后续 db.execute() 全部
+                # 抛 InFailedSqlTransactionError 直到 rollback. 必须 rollback +
+                # 重设 RLS (rollback 会清掉 set_config(local=true)).
+                # Ref: feedback_asyncpg_rollback_after_integrity_error.md
+                try:
+                    await db.rollback()
+                    await _set_rls(db, tenant_id)
+                except SQLAlchemyError as rb_exc:
+                    logger.warning(
+                        "anomaly_detector_rollback_failed",
+                        detector=detector_name,
+                        error=str(rb_exc),
+                    )
+                    break  # rollback 都失败说明 session 已死, 不必继续
 
         # 从 compliance_alerts + orders 补充通用异常数据
         anomalies.extend(await _fetch_anomalies_from_db(db, tenant_id, store_id, days))
