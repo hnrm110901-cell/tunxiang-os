@@ -88,3 +88,45 @@ def record_doc_number_fallback(service: str, doc_type: str) -> None:
     except Exception:  # noqa: BLE001 — metrics 写入失败不能阻塞 Tier 1 业务
         # prometheus_client 内部已保证不 raise，此处兜底防注册表损坏等极端场景
         pass
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# silent failure 治理 Wave 1 sub-A (issue #663): tx-supply 业务 silent fallback
+# ─────────────────────────────────────────────────────────────────────────────
+# 设计参照 doc_number_fallback 同模式 (PR #586 §19 / issue #592)，复用 fail-open
+# 契约 + Tier 1 CI minimal deps no-op stub。
+#
+# 4 个 (b)/(c) site (Plan §2 表 #3/#6/#7/#8/#9) 共用此 counter，以 `site` label
+# 区分 callsite — 与 doc_number 用 (service, doc_type) 双 label 同模式，
+# cardinality 封闭：5 个固定 site 字符串。
+#
+# Site 枚举（plan §2 表）:
+#   smart_procurement.supplier_history  — 供应商最近供货查询 (Tier 1 邻接, 触毛利)
+#   expiry_monitor.parse_notes          — 批次效期解析 (Tier 1 邻接, 食安)
+#   theoretical_cost.get_current_bom    — BOM 查询 (毛利辅助)
+#   actual_cost.last_purchase           — 实际采购价查询 (毛利辅助)
+#   actual_cost.ledger_price            — 台账价查询 (毛利辅助)
+silent_fallback_total: Final[Counter] = Counter(
+    "tx_supply_silent_fallback_total",
+    "tx-supply 业务 silent fallback 落 None 次数 (issue #663 Wave 1 sub-A)",
+    ["site"],
+)
+
+
+def record_silent_fallback(site: str) -> None:
+    """记录一次 tx-supply silent fallback (fail-open).
+
+    fail-open 契约：metrics 写入不能 raise，绝不阻塞 Tier 1 业务路径
+    （毛利底线 / 食安合规 / 客户体验）。本 fn 在 graceful degradation
+    except arm 内调用，必须吞掉自身任何异常。
+
+    Args:
+        site: callsite 标识（plan §2 site 枚举 — smart_procurement.supplier_history /
+              expiry_monitor.parse_notes / theoretical_cost.get_current_bom /
+              actual_cost.last_purchase / actual_cost.ledger_price）
+    """
+    try:
+        silent_fallback_total.labels(site=site).inc()
+    except Exception:  # noqa: BLE001 — metrics 写入失败不能阻塞 Tier 1 业务
+        # prometheus_client 内部已保证不 raise，此处兜底防注册表损坏等极端场景
+        pass
