@@ -1,3 +1,40 @@
+## 2026-05-16 续 PR-A · PRD-11 sub-B.2 + sub-C projector 灰度路径接入 feature_flags (Phase 2 W12 收官 / Tier 1 邻接第 36 例)
+
+### 完成状态
+
+- [x] PR-A ship 准备完成: feature_flags 接入 + flag 定义 + env 显式 OFF + 8 _tier1.py 测试 (4 + 4 新增)
+- [ ] 等 §19 reviewer round-1/round-2
+- [ ] 等创始人 explicit-ack ship
+
+### 关键决策 (主 context 5 项)
+
+- **方案 B**: feature_flags per-tenant gating (符合 §17 灰度路径)
+- **5% 起步 czyz**: 后续 PR-B 加白名单 (本 PR-A targeting_rules.prod 留空)
+- **观察期**: 5%=2d / 50%=3d
+- **helm DSN pool ratchet follow-up**: 100% 翻 default=true 前立 baseline (本 PR scope 外)
+- **flags/analytics/ 新建独立域**: 镜像 supply schema
+
+### 关键技术细节 (实际探索 vs planner spec 偏离)
+
+- **targeting_rules schema 校正**: 使用 `dimension` + `values` (非 planner spec 的 `type` + `values`), 与 trade_flags.yaml + flag_client.py:286 一致
+- **YAML key 校正**: 使用 `name` + `identifier` (非 planner spec 的 `key`), 与 trade/edge/org 现有 flag 一致
+- **环境枚举校正**: 现有 YAML environments 仅含 `dev/test/uat/pilot/prod` (无 `staging/gray/demo`); compose env files + helm values 仍按 planner spec 分文件加 env var, 但 YAML environments 段保持现有枚举
+- **helm env 格式校正**: 现有 helm values.yaml `env:` 是 flat KEY: "value" dict (非 planner spec 的 `KEY: { value: "..." }` 结构)
+- **shared/feature_flags/__init__.py**: 之前未导出 SupplyFlags, 本 PR 补充 + 加 AnalyticsFlags 导出
+
+### 下一步
+
+- PR-A ship 后 PR-B 加 czyz 5% 灰度 (本 PR-A 不含)
+
+### 已知风险
+
+- Tier 1 邻接第 36 例 explicit-ask 创始人 (PR-A ship 前)
+- registry 接 feature_flags 后 dev/demo 行为变 (SDK 初始化失败可能 fail-open OFF → 已 running projector 不受影响, 重启才生效)
+- env 未设 + SDK YAML 错配场景 fail-open 静默 OFF (structlog.warn 可观测)
+- 现有测试 `test_lifespan_env_off_skip` 已改用 explicit "false" 覆盖新语义 (env unset 不再等价 OFF)
+
+---
+
 ## 2026-05-16 W11 闭环 / W12 起手 (in-flight) · PRD-11 sub-B.2 IndexSplitProjector Tier 1 第 30 例 (Phase 2 W11 第六发 / W12 起手, 待 ship)
 
 ### 完成状态
