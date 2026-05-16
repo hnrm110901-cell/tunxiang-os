@@ -326,7 +326,16 @@ async def _fetch_active_tenants() -> list[str]:
 
 
 async def _get_tenant_webhook_urls(conn: AsyncConnection, tenant_id: str) -> dict:
-    """从 tenants.extra_data 读取企微 webhook URLs（D2 决策：2a JSON 存储）。
+    """从 tenants.systems_config 读取企微 webhook URLs（issue #708 fix B 决策）。
+
+    Issue #708: v006 建 tenants 表无 extra_data 列；自 PR #608 (2026-05-14)
+    IM 通道接线起读路径全 fail-open silent OFF。修法 B (复用 v232 systems_config
+    JSONB) — 不加新 schema，不与 v232 已有 tenants 列重叠。
+
+    JSON 路径：`systems_config->>'safety_director_webhook'` 和
+    `systems_config->>'purchaser_webhook'`（顶层 keys，与 v232 skeleton 的
+    pinzhi/aoqiwei_crm/aoqiwei_supply/yiding 系统配置嵌套同层；ops 端在
+    tenants 管理 API 写入真值）。
 
     返回 {"safety_director_webhook": str | None, "purchaser_webhook": str | None}
     """
@@ -335,8 +344,8 @@ async def _get_tenant_webhook_urls(conn: AsyncConnection, tenant_id: str) -> dic
             text(
                 """
                 SELECT
-                    extra_data->>'safety_director_webhook' AS safety_director_webhook,
-                    extra_data->>'purchaser_webhook'       AS purchaser_webhook
+                    systems_config->>'safety_director_webhook' AS safety_director_webhook,
+                    systems_config->>'purchaser_webhook'       AS purchaser_webhook
                 FROM tenants
                 WHERE id = :tenant_id::uuid
                   AND status = 'active'
