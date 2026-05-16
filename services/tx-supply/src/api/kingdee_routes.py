@@ -12,10 +12,9 @@ from typing import Any, Optional
 
 import httpx
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from pydantic import BaseModel, Field
 
-from shared.ontology.src.database import Header
 from shared.ontology.src.database import get_db as _get_db
 from shared.security.src.error_handler import safe_http_exception
 
