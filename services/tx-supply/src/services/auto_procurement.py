@@ -595,7 +595,15 @@ class AutoProcurementService:
                 result["recommendation_ids"] = [r.recommendation_id for r in recommendations]
                 return result
             except ImportError:
-                pass  # 测试环境无此依赖，继续走mock路径
+                # 测试环境无此依赖, 继续走 mock 路径; 改 debug 让 silent
+                # 治理 issue #663 Wave 1 sub-A 范畴下"测试 isolation import fallback"
+                # 可追踪 (plan §2 表 #5 模式 c)
+                log.debug(
+                    "requisition_module_unavailable_using_mock",
+                    store_id=store_id,
+                    tenant_id=tenant_id,
+                    requester_id=requester_id,
+                )
 
         # 测试模式 / 备用路径：直接生成申购单结构
         requisition_id = _gen_id("req")
