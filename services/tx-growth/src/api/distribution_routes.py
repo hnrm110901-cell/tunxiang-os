@@ -644,8 +644,14 @@ async def calculate_rewards(
                     "reward_type": rules_row["reward_type"],
                     "trigger_type": rules_row["trigger_type"],
                 }
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             # 规则表不存在时静默降级到默认值
+            logger.warning(
+                "distribution_rules_db_error",
+                tenant_id=str(x_tenant_id),
+                error=str(exc),
+                exc_info=True,
+            )
             pass
 
         # 查询推荐关系

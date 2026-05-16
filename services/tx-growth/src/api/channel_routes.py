@@ -147,8 +147,14 @@ async def send_message(
             cfg = cfg_result.fetchone()
             if cfg:
                 max_daily = cfg.max_daily_per_user
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
             # 表不存在时使用默认值
+            logger.warning(
+                "channel_routes_check_config_db_error",
+                channel=req.channel,
+                error=str(exc),
+                exc_info=True,
+            )
             pass
 
         # 频率检查：查今日已发送数
@@ -169,7 +175,13 @@ async def send_message(
                 {"tid": tid, "channel": req.channel, "uid": req.user_id, "today": today},
             )
             sent_today = count_result.scalar() or 0
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "channel_routes_check_count_db_error",
+                channel=req.channel,
+                error=str(exc),
+                exc_info=True,
+            )
             sent_today = 0
 
         if sent_today >= max_daily:
@@ -187,21 +199,36 @@ async def send_message(
         if req.customer_id:
             try:
                 customer_uuid = uuid.UUID(req.customer_id)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug(
+                    "channel_routes_customer_uuid_parse_failed",
+                    value=req.customer_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         offer_uuid: Optional[uuid.UUID] = None
         if req.offer_id:
             try:
                 offer_uuid = uuid.UUID(req.offer_id)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug(
+                    "channel_routes_offer_uuid_parse_failed",
+                    value=req.offer_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         campaign_uuid: Optional[uuid.UUID] = None
         if req.campaign_id:
             try:
                 campaign_uuid = uuid.UUID(req.campaign_id)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug(
+                    "channel_routes_campaign_uuid_parse_failed",
+                    value=req.campaign_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         now = datetime.now(timezone.utc)
@@ -308,7 +335,13 @@ async def check_frequency(
             cfg = cfg_result.fetchone()
             if cfg:
                 max_daily = cfg.max_daily_per_user
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "channel_routes_check_get_config_db_error",
+                channel=channel,
+                error=str(exc),
+                exc_info=True,
+            )
             pass
 
         # 查今日发送次数
@@ -329,7 +362,13 @@ async def check_frequency(
                 {"tid": tid, "channel": channel, "uid": user_id, "today": today},
             )
             sent_today = count_result.scalar() or 0
-        except SQLAlchemyError:
+        except SQLAlchemyError as exc:
+            logger.warning(
+                "channel_routes_check_get_count_db_error",
+                channel=channel,
+                error=str(exc),
+                exc_info=True,
+            )
             pass
 
         allowed = sent_today < max_daily

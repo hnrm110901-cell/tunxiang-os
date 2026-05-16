@@ -87,6 +87,7 @@ class EventBridge:
             try:
                 await self._worker_task
             except asyncio.CancelledError:
+                logger.debug("event_bridge_worker_cancelled_on_stop")
                 pass
         logger.info("event_bridge_stopped")
 

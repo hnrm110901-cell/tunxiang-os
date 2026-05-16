@@ -339,7 +339,12 @@ class OfferEngine:
         if order_id:
             try:
                 order_uuid = uuid.UUID(order_id)
-            except ValueError:
+            except ValueError as exc:
+                logger.debug(
+                    "offer_engine_order_uuid_parse_failed",
+                    value=order_id[:64],
+                    error=str(exc),
+                )
                 pass
 
         # 检查优惠是否存在

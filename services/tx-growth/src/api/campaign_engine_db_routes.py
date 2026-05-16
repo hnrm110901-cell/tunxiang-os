@@ -849,7 +849,8 @@ def _try_uuid(value: Optional[str]) -> Optional[uuid.UUID]:
         return None
     try:
         return uuid.UUID(value)
-    except ValueError:
+    except ValueError as exc:
+        logger.debug("campaign_engine_try_uuid_failed", value=value[:64], error=str(exc))
         return None
 
 

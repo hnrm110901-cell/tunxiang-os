@@ -922,7 +922,8 @@ async def lifespan(app: FastAPI):
         if _eb is not None:
             await _eb.stop()
             logger.info("journey_event_bridge_stopped")
-    except (OSError, RuntimeError, ImportError):
+    except (OSError, RuntimeError, ImportError) as exc:
+        logger.debug("journey_event_bridge_stop_failed", error=str(exc))
         pass
 
     await MemberEventPublisher.close()
