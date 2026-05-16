@@ -676,7 +676,8 @@ def _ocr_raw_summary(ocr_raw) -> Optional[dict]:
 
         try:
             ocr_raw = _json.loads(ocr_raw)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError) as exc:
+            log.debug("ocr_raw_summary_parse_failed", error=str(exc))
             return None
     if not isinstance(ocr_raw, dict):
         return None

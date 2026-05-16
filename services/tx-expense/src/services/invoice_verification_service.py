@@ -63,7 +63,8 @@ def _parse_amount_to_fen(amount_str: str) -> Optional[int]:
         cleaned = amount_str.replace(",", "").replace("¥", "").replace("￥", "").strip()
         yuan = Decimal(cleaned)
         return int(yuan * 100)
-    except (InvalidOperation, ValueError):
+    except (InvalidOperation, ValueError) as exc:
+        log.warning("invoice_amount_parse_failed", amount_str=amount_str, error=str(exc))
         return None
 
 
@@ -199,7 +200,8 @@ def _parse_tax_rate(rate_str: str) -> Optional[float]:
         if val > 1:
             val = val / 100
         return round(val, 4)
-    except ValueError:
+    except ValueError as exc:
+        log.warning("invoice_tax_rate_parse_failed", rate_str=rate_str, error=str(exc))
         return None
 
 

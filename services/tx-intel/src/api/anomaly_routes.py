@@ -485,8 +485,9 @@ async def list_anomalies(
             anomalies.extend(await _detect_high_refund(db, tenant_id, days))
             anomalies.extend(await _detect_slow_kitchen(db, tenant_id, days))
             anomalies.extend(await _detect_expiry_risk(db, tenant_id))
-        except SQLAlchemyError:
-            pass  # 部分检测表不存在时跳过，继续后续查询
+        except SQLAlchemyError as exc:
+            logger.warning("anomaly_detection_db_error", error=str(exc), exc_info=True)
+            # 部分检测表不存在时跳过，继续后续查询
 
         # 从 compliance_alerts + orders 补充通用异常数据
         anomalies.extend(await _fetch_anomalies_from_db(db, tenant_id, store_id, days))
