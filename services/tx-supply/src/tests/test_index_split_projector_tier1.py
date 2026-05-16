@@ -66,8 +66,11 @@ def _settled_event(
                 "subtotal_fen": 9800,
             }
         ]
+    # §19 round-1 P2 fix — cashier_engine.settle_order emit ITEMS_SETTLED payload
+    # 实际字段是 "order_no" (不是 "order_id"), order_id 在 events 表 stream_id 列.
+    # 测试 payload 必须与生产一致, projector 通过 event.get("stream_id") 提取 order_id.
     payload = payload_override or {
-        "order_id": _ORDER_ID,
+        "order_no": "TX20260516001",
         "store_id": _STORE_XUJI,
         "items": items,
     }
@@ -309,14 +312,18 @@ class TestF4DeadLetterQueue:
             await proj.handle(event, conn)
 
         assert deduct.await_count == 1
-        # DLQ INSERT 一次
-        assert conn.execute.await_count == 1
-        # 验证 INSERT 参数 (event_id + error_class=ValueError + error_msg 携规则原因)
-        positional = conn.execute.await_args.args
+        # §19 round-1 P1 fix: conn.execute 调 2 次 = set_config(RLS context) + INSERT dlq
+        assert conn.execute.await_count == 2
+        # 第 1 次: set_config('app.tenant_id', $1, FALSE) (RLS context for FORCE RLS dlq table)
+        first_call = conn.execute.await_args_list[0].args
+        assert "set_config" in first_call[0]
+        assert first_call[1] == str(proj.tenant_id)
+        # 第 2 次: INSERT dlq_split_attribution_failed (实际死信写入)
+        positional = conn.execute.await_args_list[1].args
         sql = positional[0]
         assert "dlq_split_attribution_failed" in sql
         # args[1] = tenant_id, args[2] = event_id, args[7] = error_class, args[8] = error_msg
-        assert positional[1] == proj.tenant_id  # tenant_id
+        assert positional[1] == proj.tenant_id
         assert positional[2] == event["event_id"]
         assert positional[7] == "ValueError"
         assert "allow_share" in positional[8]
@@ -350,7 +357,8 @@ class TestF4DeadLetterQueue:
         ):
             await proj.handle(event, conn)
 
-        assert conn.execute.await_count == 1
+        # §19 round-1 P1 fix: conn.execute = set_config + INSERT dlq = 2 calls
+        assert conn.execute.await_count == 2
 
     @pytest.mark.asyncio
     async def test_non_dedup_integrity_error_writes_dlq(self) -> None:
@@ -371,7 +379,8 @@ class TestF4DeadLetterQueue:
         ):
             await proj.handle(event, conn)
 
-        assert conn.execute.await_count == 1
+        # §19 round-1 P1 fix: conn.execute = set_config + INSERT dlq = 2 calls
+        assert conn.execute.await_count == 2
         # error_class 是 IntegrityError 子类名
         positional = conn.execute.await_args.args
         assert "IntegrityError" in positional[7]

@@ -94,7 +94,12 @@ class IndexSplitProjector(ProjectorBase):
             log.info("index_split_no_items", event_id=str(event_id))
             return
 
-        order_id = payload.get("order_id")
+        # §19 round-1 P0 fix — cashier_engine.settle_order emit ITEMS_SETTLED payload
+        # 字段名为 "order_no" (订单号字符串), order_id 由 emit_event 的 stream_id 参数
+        # 传入 events 表 stream_id 列. projector_base._fetch_next_batch SELECT 出来
+        # event 字典含 stream_id. 用 stream_id 作 order_id 来源 (payload.order_id 兜底
+        # 兼容未来 cashier 显式补字段).
+        order_id = payload.get("order_id") or event.get("stream_id")
         store_id = payload.get("store_id") or event.get("store_id")
         if not order_id or not store_id:
             log.warning(
@@ -248,6 +253,15 @@ async def _dlq_insert(
     dish_id = first_item.get("dish_id") if isinstance(first_item, dict) else None
 
     occurred_at = event.get("occurred_at")
+    # §19 round-1 P1 fix — projector_base._process_backlog 先 set_config(...TRUE)
+    # 是 autocommit 模式下的语句级事务, 提交后 transaction-local 设置即失效;
+    # 进入随后的 conn.transaction() 时 app.tenant_id 已为空, dlq 表 FORCE RLS WITH CHECK
+    # NULL=NULL false → INSERT 被拒. 此处显式补设 tenant context (FALSE = session-level
+    # 在 conn.transaction() 内仍有效) 让 RLS WITH CHECK 通过.
+    await conn.execute(  # type: ignore[attr-defined]
+        "SELECT set_config('app.tenant_id', $1, FALSE)",
+        str(tenant_id),
+    )
     await conn.execute(  # type: ignore[attr-defined]
         """
         INSERT INTO dlq_split_attribution_failed
