@@ -437,3 +437,81 @@ def test_get_brand_pl_bad_month_format():
         headers=HEADERS,
     )
     assert resp.status_code == 400
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# finance_pl_routes.mom._fetch regression tests (issue #700 cargo cult cleanup)
+# ───────────────────────────────────────────────────────────────────────────
+
+
+def _fake_pl_with_values(revenue_fen: int, opex_fen: int):
+    """构造 PLStatement-like mock，覆盖 _fetch 内部访问的属性 + to_dict 兼容 _pl_summary."""
+    pl = MagicMock()
+    pl.total_revenue_fen = revenue_fen
+    pl.opex.total_fen = opex_fen
+    pl.to_dict.return_value = {
+        "revenue": {"total_fen": revenue_fen},
+        "gross_profit_fen": int(revenue_fen * 0.7),
+        "gross_margin_rate_pct": 70.0,
+        "food_cost_rate_pct": 30.0,
+        "operating_profit_fen": int(revenue_fen * 0.7) - opex_fen,
+        "operating_margin_rate_pct": 40.0,
+        "opex": {"total_fen": opex_fen},
+        "cost": {"is_estimated": False},
+    }
+    return pl
+
+
+def test_mom_with_data_returns_summary():
+    """正常数据 (revenue > 0): _fetch 返回 _pl_summary dict 并附带 month。"""
+    svc = MagicMock()
+    svc.get_store_pl = AsyncMock(return_value=_fake_pl_with_values(revenue_fen=100000, opex_fen=20000))
+    client = _make_pl_client(svc)
+
+    resp = client.get(
+        f"/pl/mom?store_id={STORE_ID}&month=2026-03",
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["data"]["current"] is not None
+    assert body["data"]["current"]["month"] == "2026-03"
+    assert body["data"]["current"]["total_revenue_fen"] == 100000
+
+
+def test_mom_no_data_returns_none():
+    """业务"无数据" (revenue=0 且 opex=0): _fetch 返回 None，外层得 current=None。"""
+    svc = MagicMock()
+    svc.get_store_pl = AsyncMock(return_value=_fake_pl_with_values(revenue_fen=0, opex_fen=0))
+    client = _make_pl_client(svc)
+
+    resp = client.get(
+        f"/pl/mom?store_id={STORE_ID}&month=2026-03",
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    # 三个月全部 revenue=0+opex=0 → None
+    assert body["data"]["current"] is None
+    assert body["data"]["prev_month"] is None
+    assert body["data"]["yoy_month"] is None
+
+
+def test_mom_keyerror_returns_none():
+    """get_store_pl raise KeyError → _fetch 返回 None (warning log)，不抛 500。"""
+    svc = MagicMock()
+    svc.get_store_pl = AsyncMock(side_effect=KeyError("missing_key"))
+    client = _make_pl_client(svc)
+
+    resp = client.get(
+        f"/pl/mom?store_id={STORE_ID}&month=2026-03",
+        headers=HEADERS,
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True
+    assert body["data"]["current"] is None
+    assert body["data"]["prev_month"] is None
+    assert body["data"]["yoy_month"] is None

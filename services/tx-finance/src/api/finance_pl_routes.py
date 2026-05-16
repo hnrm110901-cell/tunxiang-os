@@ -305,15 +305,39 @@ async def get_pl_mom(
     yoy_m = _same_month_last_year(month)
 
     async def _fetch(m: str) -> dict | None:
+        """返 None 表示该月份无数据 (revenue=0 且 opex=0); 其他错误让外层 HTTPException 兜底."""
         s, e = _month_to_date_range(m)
         try:
             pl = await _pl_svc.get_store_pl(sid, s, e, tid, db)
-            d = _pl_summary(pl.to_dict())
-            d["month"] = m
-            return d
-        except ValueError as exc:
-            logger.warning("pl_mom_fetch_failed", month=m, store_id=str(sid), error=str(exc))
+        except (KeyError, TypeError) as exc:
+            # cost_engine / repo 层 dict/type 异常防御 (issue #700 cargo cult 修正)
+            # pl_service.py 当前不 raise, 但保留 defense-in-depth log
+            logger.warning(
+                "pl_mom_fetch_unexpected_error",
+                month=m,
+                store_id=str(sid),
+                tenant_id=str(tid),
+                error_type=type(exc).__name__,
+                error=str(exc),
+                exc_info=True,
+            )
             return None
+
+        # 业务"无数据"探测: 真正无营运 (revenue=0 且 opex=0)
+        # 注: revenue=0 单独不算"无数据" (可能是 opex 已发生但未开张); opex 单独 0 也不算
+        # (例如新店未配固定费用但已运营). 双零才视为该月完全无运营数据.
+        if pl.total_revenue_fen == 0 and pl.opex.total_fen == 0:
+            logger.info(
+                "pl_mom_no_data",
+                month=m,
+                store_id=str(sid),
+                tenant_id=str(tid),
+            )
+            return None
+
+        d = _pl_summary(pl.to_dict())
+        d["month"] = m
+        return d
 
     current, prev, yoy = (
         await _fetch(month),
