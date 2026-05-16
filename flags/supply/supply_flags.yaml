@@ -31,3 +31,35 @@ flags:
       uat: false
       pilot: false
       prod: false  # 等AI补货验证后开启
+
+  # ──────────────────────────────────────────────────────────────
+  # PRD-11 sub-B.2 (Phase 2 W12 / 2026-05-16 / Tier 1 邻接第 36 例)
+  # IndexSplitProjector lifespan per-tenant gating
+  # 灰度路径：prod targeting_rules.tenant_id 空 → PR-B czyz 5% → PR-C zqx 50% → PR-D defaultValue: true 100%
+  # 观察期：5%=2d / 50%=3d
+  # 紧急停用走 env TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=false（优先级最高，绕过 SDK）
+  # ──────────────────────────────────────────────────────────────
+  - identifier: supply_prd11_index_split_projector_enable
+    name: supply.prd11.index_split_projector.enable
+    description: >
+      PRD-11 sub-B.2 IndexSplitProjector lifespan per-tenant gating。
+      ON 时 tx-supply lifespan refresh loop 仅为命中 targeting_rules 的 tenant 启动
+      IndexSplitProjector daemon（消费 ITEMS_SETTLED 事件 → auto_deduction → 触发
+      INVENTORY.split_attributed）。OFF 时全 tenant 跳过 daemon 启动（不影响
+      tx-supply API 路由）。
+    defaultValue: false
+    environments:
+      dev: true
+      test: true
+      uat: false
+      pilot: false
+      prod: false
+    targeting_rules:
+      pilot:
+        - dimension: tenant_id
+          values: []
+      prod:
+        - dimension: tenant_id
+          values: []  # PR-B 加 czyz(5%) → PR-C 加 zqx(50%) → PR-D 翻 defaultValue: true(100%)
+    rollout: [5, 50, 100]
+    tags: [supply, prd11, projector, lifespan, tier1-adjacent]

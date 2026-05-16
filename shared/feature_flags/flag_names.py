@@ -219,6 +219,22 @@ class SupplyFlags:
     # AI智能补货计划（需要tx-brain支持）
     SMART_REORDER = "supply.intel.smart_reorder.enable"
 
+    # PRD-11 sub-B.2: IndexSplitProjector lifespan per-tenant gating
+    # (Phase 2 W12 灰度入口 / 2026-05-16 Tier 1 邻接第 36 例)
+    # 紧急停用走 env TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=false (优先级最高)
+    # 灰度路径：prod targeting_rules.tenant_id 5%→50%→100%
+    PRD11_INDEX_SPLIT_PROJECTOR = "supply.prd11.index_split_projector.enable"
+
+
+class AnalyticsFlags:
+    """经营分析域 Flag 名称。"""
+
+    # PRD-11 sub-C: SplitAttributionProjector lifespan per-tenant gating
+    # (Phase 2 W12 灰度入口 / 2026-05-16 Tier 1 邻接第 36 例)
+    # 紧急停用走 env TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR=false (优先级最高)
+    # 灰度路径：prod targeting_rules.tenant_id 5%→50%→100%
+    PRD11_SPLIT_ATTRIBUTION_PROJECTOR = "analytics.prd11.split_attribution_projector.enable"
+
 
 class KnowledgeFlags:
     """知识库域 Flag 名称。"""
