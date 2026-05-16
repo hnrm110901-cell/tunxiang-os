@@ -30,6 +30,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.utils.date_parsing import parse_year_month
 
 log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
@@ -116,16 +117,16 @@ async def get_payroll_summary(
     await _set_rls(db, tenant_id)
 
     # 将 YYYY-MM 转换为日期范围
-    try:
-        year, month_num = int(month[:4]), int(month[5:7])
-        period_start = date(year, month_num, 1)
-        # 月末计算
-        if month_num == 12:
-            period_end = date(year + 1, 1, 1)
-        else:
-            period_end = date(year, month_num + 1, 1)
-    except (ValueError, IndexError) as exc:
-        raise HTTPException(status_code=400, detail=f"month 格式错误，应为 YYYY-MM，收到: {month}") from exc
+    parsed = parse_year_month(month)
+    if parsed is None:
+        raise HTTPException(status_code=400, detail=f"month 格式错误，应为 YYYY-MM，收到: {month}")
+    year, month_num = parsed
+    period_start = date(year, month_num, 1)
+    # 月末计算
+    if month_num == 12:
+        period_end = date(year + 1, 1, 1)
+    else:
+        period_end = date(year, month_num + 1, 1)
 
     conditions = [
         "tenant_id = :tid::uuid",
@@ -214,15 +215,16 @@ async def list_payroll_records(
         conditions.append("status = :status")
         params["status"] = status
     if month:
-        try:
-            year, month_num = int(month[:4]), int(month[5:7])
+        parsed = parse_year_month(month)
+        if parsed is not None:
+            year, month_num = parsed
             period_start = date(year, month_num, 1)
             period_end = date(year, month_num + 1, 1) if month_num < 12 else date(year + 1, 1, 1)
             conditions.append("pay_period_start >= :ps AND pay_period_start < :pe")
             params["ps"] = period_start
             params["pe"] = period_end
-        except (ValueError, IndexError) as exc:
-            log.debug("payroll_month_filter_parse_failed", month=month, error=str(exc))
+        else:
+            log.debug("payroll_month_filter_parse_failed", month=month)
             # 忽略格式错误，不过滤月份
 
     where_clause = " AND ".join(conditions)
