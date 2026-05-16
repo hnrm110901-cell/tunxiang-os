@@ -1,3 +1,41 @@
+## 2026-05-16 W11 闭环 / W12 起手 (in-flight) · PRD-11 sub-B.2 IndexSplitProjector Tier 1 第 30 例 (Phase 2 W11 第六发 / W12 起手, 待 ship)
+
+### 完成状态
+
+- [x] **创始人 5/16 deep-interview D1-D4 全锁架构师推荐项** + explicit-ask 第 30 例开工授权
+- [x] **独立 worktree** `prd11-sub-b2` from origin/main (e97a1f93) + branch `feat/tx-supply-prd11-sub-b2-projector`
+- [x] **v437 migration** ingredient_transactions.source_event_id + uq UNIQUE 部分索引 + dlq_split_attribution_failed 表 + RLS 四联
+- [x] **entities.py** IngredientTransaction 加 source_event_id Mapped[uuid.UUID | None] (sub-B precedent §18 豁免, D2 ① 锁定)
+- [x] **auto_deduction.py** deduct_for_dish + deduct_for_order 加 source_event_id kwonly + per-row uuid5 派生 (event_id + order_item_id + dish_id + ingredient_id + line_idx)
+- [x] **IndexSplitProjector** services/tx-supply/src/projectors/index_split.py (handle() 在独立 SQLAlchemy SAVEPOINT 内调 deduct_for_order, IntegrityError dedup_skip / ValueError DLQ INSERT 路径分别捕获)
+- [x] **service-local registry** services/tx-supply/src/projectors/registry.py (env TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR gate 默认 OFF, start/stop helpers)
+- [x] **19 mock tier1 用例** services/tx-supply/src/tests/test_index_split_projector_tier1.py — Python 3.11 本机全绿 0.30s
+- [x] **2 真 PG dedup 用例** tests/concurrent/test_index_split_projector_dedup_pg.py (opt-in via INTEGRATION_PG_DSN, F2 P0 invariant 单 event 重放无重复扣料 + 多 event 互不影响)
+- [ ] **待: §19 reviewer multi-round → 0 P0/P1**
+- [ ] **待: push branch + gh pr create + CI 真门禁全绿**
+- [ ] **待: explicit-ask 创始人 admin-merge (Tier 1 第 30 例 final)**
+
+### 关键决策
+
+- **D1 (Projector 模式)**: A 方案 tx-supply 内 service-local daemon — **Why**: 隔离 mv_* "只读" 心智 (本 projector 是首次让 projector 触发业务侧写, 与 mv_inventory_bom 同进程共事务会让 log/checkpoint/rebuild 语义糊掉)
+- **D2 (F2 P0 幂等键)**: ingredient_transactions.source_event_id UNIQUE — **Why**: 与 events.event_id 强关联, 200 桌峰值重启高频时不加 dedup 重放即重复扣料毛利失控
+- **D3 (F4 死信)**: skip + dlq_split_attribution_failed 表 + sub-C 看板 — **Why**: 与 Phase 4 治理四件套对齐, retry 3 次停 projector 会让整事件流卡死 (单 rule 禁用阻所有 settle)
+- **D4 (Tier 级别)**: Tier 1 邻接 explicit-ask 第 30 例 — **Why**: projector 调 deduct_for_order 写 ingredients/ingredient_transactions 触 TIER1_SOURCE_PATTERNS, 与 PR #547 row-lock fix 同模式, 不属 carve-out 7 类
+
+### 下一步
+
+- §19 reviewer round-1 (code-reviewer opus B 独立眼光, 重点查 F2 dedup 正确性 + per-row uuid5 派生 + IntegrityError → SAVEPOINT rollback 行为 + RLS context 在 dlq INSERT 路径仍有效 + asyncpg conn vs SQLAlchemy session 双轨设计)
+- Push branch + gh pr create + 监控 CI 真门禁 (Tier 1 门禁判定 / Run Tier 1 supply / Fresh PG 19 alembics / Migration Chain Integrity / RLS 严格)
+- §19 round-N 0 P0/P1 + CI 全绿后 explicit-ask 创始人 final admin-merge
+
+### 已知风险
+
+- **F1**: ITEMS_SETTLED emit 后 settle 事务回滚 → projector 拿 stale event (Phase 1 范式 commit 后 emit, 风险窗口小, 真 fix 依赖 W7-W12 真 Outbox)
+- **F3 (P3 接受)**: dish.bom cost_fen 漂移 — split attribution 算错, 与 ORDER.PAID final_amount 不同账本
+- **激活滞后**: 本 PR ship 代码层 ready 但 main.py 未加 lifespan 钩子, projector 默认 OFF. Phase 2 W12 灰度激活单立 PR (env=true + 监控 cashier_items_settled_query_failed_total 看死信率)
+
+---
+
 ## 2026-05-15 W11 第五发 (in-flight) · PRD-11 sub-B OrderItem.share_count Tier 1 第 29 例 (Phase 2 W11, 待 ship)
 
 ### 完成状态

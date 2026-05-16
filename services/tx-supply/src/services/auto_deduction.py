@@ -18,6 +18,14 @@ PRD-11 sub-A（2026-05-15）：deduct_for_dish / deduct_for_order 增加 share_s
 扣料后 emit inventory.split_attributed event 携 cost 切分到 N share. BOM 物理消耗
 **不变** (1 dish 仍消耗 1 份 BOM, 只是 cost 分摊到多 share). caller (tx-trade) 当前
 未传 share_split (保 backward compat); 激活为 PR-B follow-up.
+
+PRD-11 sub-B.2（2026-05-16 / Tier 1 第 30 例）：deduct_for_dish / deduct_for_order 增加
+source_event_id 可选参数 — projector 路径必传, 由 IndexSplitProjector 消费
+ITEMS_SETTLED 调用. 内部派生 uuid5 per-row source_event_id (基于 event_id +
+order_item_id + dish_id + ingredient_id + line_idx). v437 UNIQUE
+(tenant_id, source_event_id) WHERE NOT NULL 让重放命中 → IntegrityError →
+projector savepoint rollback + 推进 checkpoint = 防 F2 重复扣料 P0.
+非 projector 路径不传, source_event_id 写 NULL, UNIQUE 不参与, backward compat.
 """
 
 from __future__ import annotations
@@ -105,6 +113,7 @@ async def deduct_for_dish(
     share_split: Optional[dict[str, Any]] = None,
     order_id_for_event: Optional[str] = None,
     order_item_id_for_event: Optional[str] = None,
+    source_event_id: Optional[uuid.UUID] = None,
 ) -> dict[str, Any]:
     """对单道菜执行 BOM 扣料
 
@@ -126,6 +135,12 @@ async def deduct_for_dish(
                      .apply_split 双层校验 (规则+spec) 再 resolve.
         order_id_for_event: PRD-11 — event payload order_id (caller PR-B 传)
         order_item_id_for_event: PRD-11 — event payload order_item_id (caller PR-B 传)
+        source_event_id: PRD-11 sub-B.2 — projector (IndexSplitProjector) 消费
+                         ITEMS_SETTLED 时传 event.event_id. 内部 uuid5 派生 per-row
+                         IngredientTransaction.source_event_id 让 v437 UNIQUE
+                         (tenant_id, source_event_id) WHERE NOT NULL 在重放时触
+                         IntegrityError, projector savepoint rollback 防 F2 重复扣料.
+                         None 默认 (非 projector 路径) 保 backward compat.
 
     Returns:
         {deducted: [...], missing_bom: bool, insufficient_stock: [...],
@@ -200,7 +215,7 @@ async def deduct_for_dish(
         sorted_bom_lines.append(line)
     sorted_bom_lines.sort(key=lambda x: str(x["ingredient_id"]))
 
-    for line in sorted_bom_lines:
+    for line_idx, line in enumerate(sorted_bom_lines):
         ing_id = line["ingredient_id"]
         consume_qty = line["quantity"] * quantity  # BOM用量 x 份数
         ing_uuid = uuid.UUID(ing_id)
@@ -244,6 +259,20 @@ async def deduct_for_dish(
         ingredient.status = _calc_status(new_qty, ingredient.min_quantity)
 
         # 创建消费流水
+        # PRD-11 sub-B.2: source_event_id 派生 — 当 caller (projector) 传 source_event_id 时
+        # 每行 BOM 派生确定性 uuid5 (基于 event_id + order_item_id + dish_id + ingredient_id
+        # + line_idx); 同 event 重放生成相同 UUID, v437 UNIQUE WHERE NOT NULL 触
+        # IntegrityError, projector savepoint rollback. 非 projector 路径 None → NULL 写入.
+        per_row_source_event_id: Optional[uuid.UUID] = None
+        if source_event_id is not None:
+            seed = (
+                f"{source_event_id}|"
+                f"{order_item_id_for_event or 'na'}|"
+                f"{dish_id}|"
+                f"{ingredient.id}|"
+                f"{line_idx}"
+            )
+            per_row_source_event_id = uuid.uuid5(source_event_id, seed)
         txn = IngredientTransaction(
             id=uuid.uuid4(),
             tenant_id=tenant_uuid,
@@ -257,6 +286,7 @@ async def deduct_for_dish(
             quantity_after=new_qty,
             performed_by="auto_deduction",
             notes=f"BOM扣料: dish={dish_id}, qty={quantity}",
+            source_event_id=per_row_source_event_id,
         )
         db.add(txn)
 
@@ -388,6 +418,7 @@ async def deduct_for_order(
     db: AsyncSession,
     *,
     dept_id: Optional[str] = None,
+    source_event_id: Optional[uuid.UUID] = None,
 ) -> dict[str, Any]:
     """订单完成时的批量扣料
 
@@ -402,6 +433,10 @@ async def deduct_for_order(
         db: 数据库会话
         dept_id: PRD-08 — 透传给 deduct_for_dish 用于 BOM 行白名单校验；
                  None 默认跳过校验（caller (tx-trade) 当前未传，激活为 follow-up）
+        source_event_id: PRD-11 sub-B.2 — IndexSplitProjector 消费 ITEMS_SETTLED 时
+                         传 event.event_id, 透传到每个 deduct_for_dish 派生 per-row
+                         IngredientTransaction.source_event_id (v437 UNIQUE F2 P0 防重放).
+                         None 默认 (非 projector 路径) 保 backward compat.
 
     Returns:
         {
@@ -487,6 +522,7 @@ async def deduct_for_order(
                 share_split=item_share_split,
                 order_id_for_event=order_id,
                 order_item_id_for_event=item_order_item_id,
+                source_event_id=source_event_id,
             )
 
             if result["missing_bom"]:
