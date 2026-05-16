@@ -37,7 +37,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { ReloadOutlined } from '@ant-design/icons';
 import { ModalForm, ProFormText, ProFormTextArea } from '@ant-design/pro-components';
 import dayjs from 'dayjs';
-import { txFetchData } from '../../api/client';
+import { TxApiError, txFetchData } from '../../api/client';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -134,10 +134,14 @@ export function SplitAttributionDLQPage() {
       await refresh();
       return true;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('404') || msg.toLowerCase().includes('not found')) {
+      // P1-1 修法：用 TxApiError.statusCode 区分 404 / 422 / 其他；
+      // 旧 msg.includes('404') 因 client.ts 把非 envelope 响应统一抛 message='API Error' 永不命中
+      if (e instanceof TxApiError && e.statusCode === 404) {
         message.error('该死信已被他人确认或不存在');
+      } else if (e instanceof TxApiError && e.statusCode === 422) {
+        message.error('输入校验失败：' + e.message);
       } else {
+        const msg = e instanceof Error ? e.message : String(e);
         message.error('确认失败：' + msg);
       }
       return false;
@@ -277,6 +281,13 @@ export function SplitAttributionDLQPage() {
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,
+            // P0 修法：backend list 响应未提供 page.total, antd 默认按 dataSource.length 推总页 → Next 灰掉。
+            // 用乐观推断: 满页假设至少还有 1 条; 不满页时 (page-1)*size + items.length 精确。
+            // TODO(follow-up): backend 加 page.total 字段后改为精确分页
+            total:
+              items.length >= PAGE_SIZE
+                ? page * PAGE_SIZE + 1
+                : (page - 1) * PAGE_SIZE + items.length,
             onChange: (p) => setPage(p),
             showSizeChanger: false,
           }}

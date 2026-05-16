@@ -99,6 +99,8 @@ interface OrderResponse {
   generated_at: string;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const fenToYuan = (fen: number): string => `¥${(fen / 100).toFixed(2)}`;
 const shortenId = (id: string | null): string => (id ? `${id.slice(0, 8)}…` : '-');
 const fmtTime = (iso: string | null): string => (iso ? dayjs(iso).format('YYYY-MM-DD HH:mm:ss') : '-');
@@ -140,14 +142,19 @@ export function CostAttributionDashboardPage() {
   }, [refreshSummary]);
 
   const handleQueryOrder = async () => {
-    if (!orderId.trim()) {
+    const trimmed = orderId.trim();
+    if (!trimmed) {
       message.warning('请输入订单 ID（UUID）');
+      return;
+    }
+    if (!UUID_RE.test(trimmed)) {
+      message.warning('订单 ID 格式不正确（需 UUID 格式，例 33333333-0001-0001-0001-333333333333）');
       return;
     }
     setOrderLoading(true);
     try {
       const data = await txFetchData<OrderResponse>(
-        `/api/v1/cost-attribution/orders/${encodeURIComponent(orderId.trim())}`,
+        `/api/v1/cost-attribution/orders/${encodeURIComponent(trimmed)}`,
       );
       setOrderResult(data);
       setOrderModalOpen(true);
@@ -159,15 +166,20 @@ export function CostAttributionDashboardPage() {
   };
 
   const handleQueryDish = async () => {
-    if (!dishId.trim()) {
+    const trimmed = dishId.trim();
+    if (!trimmed) {
       message.warning('请输入菜品 ID（UUID）');
+      return;
+    }
+    if (!UUID_RE.test(trimmed)) {
+      message.warning('菜品 ID 格式不正确（需 UUID 格式，例 22222222-0001-0001-0001-222222222222）');
       return;
     }
     setDishLoading(true);
     try {
       const params = new URLSearchParams({ from: fromStr, to: toStr });
       const data = await txFetchData<DishSummaryResponse>(
-        `/api/v1/cost-attribution/dishes/${encodeURIComponent(dishId.trim())}/summary?${params.toString()}`,
+        `/api/v1/cost-attribution/dishes/${encodeURIComponent(trimmed)}/summary?${params.toString()}`,
       );
       setDishResult(data);
     } catch (e) {
