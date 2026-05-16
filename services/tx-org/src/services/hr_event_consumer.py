@@ -20,6 +20,7 @@ from datetime import date
 from typing import Any, Optional
 
 import structlog
+from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
@@ -59,6 +60,9 @@ class HREventConsumer:
         """启动事件消费循环"""
         self.redis = Redis.from_url(self.redis_url, decode_responses=False)
         # 创建消费组（幂等）
+        # 收窄 except：仅吞 BUSYGROUP（幂等已存在场景）；其他 ResponseError 重抛 + warn；
+        # ConnectionError / TimeoutError / DNS 错不 catch，让 consumer 启动 fail-loud，
+        # 防 4h 断网恢复场景下 Redis 重连不稳被 silent 吞为"假启动成功"后 while 循环刷异常。
         try:
             await self.redis.xgroup_create(
                 self.STREAM_KEY,
@@ -66,14 +70,22 @@ class HREventConsumer:
                 id="0",
                 mkstream=True,
             )
-        except Exception as exc:  # noqa: BLE001 — 组已存在时 Redis 抛 BUSYGROUP
-            # BUSYGROUP 是正常的幂等启动场景, 留 debug 便于运维确认 group 已存在
-            log.debug(
-                "hr_event_consumer.xgroup_create_skipped",
-                stream=self.STREAM_KEY,
-                group=self.GROUP_NAME,
-                error=str(exc),
-            )
+        except redis_exceptions.ResponseError as exc:
+            if "BUSYGROUP" in str(exc):
+                log.debug(
+                    "hr_event_xgroup_already_exists",
+                    stream=self.STREAM_KEY,
+                    group=self.GROUP_NAME,
+                )
+            else:
+                log.warning(
+                    "hr_event_xgroup_create_failed",
+                    stream=self.STREAM_KEY,
+                    group=self.GROUP_NAME,
+                    error=str(exc),
+                    exc_info=True,
+                )
+                raise
         self.running = True
         log.info("hr_event_consumer_started", stream=self.STREAM_KEY, group=self.GROUP_NAME)
 
