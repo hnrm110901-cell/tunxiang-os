@@ -132,10 +132,15 @@ async def relay_loop(
             # 整批处理完 → 正常 sleep poll_interval
             await asyncio.sleep(config.poll_interval_ms / 1000)
 
-        except _PgConnectionError as exc:
+        except (_PgConnectionError, OSError, asyncio.TimeoutError) as exc:
+            # P1-6 round-1: 扩 tuple 覆盖 SQLSTATE 08 (PostgresConnectionError)
+            # + 网络层 (OSError ECONNREFUSED / TimeoutError asyncpg 0.29 端口不通真异常).
+            # _PgConnectionError 单独仅捕 SQLSTATE 08, OSError/TimeoutError fall-through
+            # 进 outermost except 致监控指错方向 (relay_loop_unexpected vs relay_pg_failure).
             logger.warning(
                 "relay_pg_unavailable",
                 error=str(exc),
+                error_type=type(exc).__name__,
                 consecutive_failures=consecutive_failures,
                 exc_info=True,
             )

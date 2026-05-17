@@ -108,13 +108,16 @@ async def test_shadow_mode_env_override_false(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_relay_handles_pg_unavailable_with_backoff():
-    """asyncpg PostgresConnectionError → backoff + counter inc + 不崩.
+async def test_relay_handles_postgres_connection_error_with_backoff():
+    """asyncpg PostgresConnectionError (SQLSTATE 08) → backoff + counter inc + 不崩.
 
     模拟 fetch_pending_batch raise PostgresConnectionError, 验证:
       1. relay_pg_failure_total inc 被调用 (counter 累计)
       2. asyncio.sleep 被调用 (backoff)
       3. 第二次 polling 仍跑 (recovery)
+
+    P1-6 round-1: rename from test_relay_handles_pg_unavailable_with_backoff
+    (更准确反映 SQLSTATE 08 PG 级语义, 区分网络层 OSError/TimeoutError).
     """
     # 注入一个真实可 raise 的 exception class (替换 _PgConnectionError sentinel)
     class FakePgConnectionError(Exception):
@@ -152,6 +155,94 @@ async def test_relay_handles_pg_unavailable_with_backoff():
     assert call_count["fetch"] >= 2, "PG 失败后必须再次 polling (recovery)"
     assert call_count["sleep"] >= 1, "backoff sleep 必须被调用"
     pg_failure_mock.inc.assert_called(), "relay_pg_failure_total.inc 必须被调用"
+
+
+@pytest.mark.asyncio
+async def test_relay_handles_oserror_with_backoff():
+    """PG 端口不通 (ECONNREFUSED) → OSError, relay backoff + counter inc + 不崩.
+
+    P1-6 round-1: 验证 except tuple 扩 OSError 后, 网络层故障也走 relay_pg_failure
+    分支 (而非 outermost generic except 致监控指错方向).
+    """
+    config = RelayConfig(shadow_mode=True, poll_interval_ms=10, batch_size=5)
+    shutdown_event = asyncio.Event()
+
+    call_count = {"fetch": 0, "sleep": 0}
+
+    async def fake_fetch(pool, batch_size):
+        call_count["fetch"] += 1
+        if call_count["fetch"] == 1:
+            # 模拟 asyncpg PG 端口不通: OSError("[Errno 111] Connection refused")
+            raise OSError("[Errno 111] Connection refused")
+        shutdown_event.set()
+        return []
+
+    original_sleep = asyncio.sleep
+
+    async def counting_sleep(seconds):
+        call_count["sleep"] += 1
+        await original_sleep(0)
+
+    pg_failure_mock = MagicMock()
+    unexpected_mock = MagicMock()
+
+    with patch.object(relay_worker, "fetch_pending_batch", side_effect=fake_fetch), patch.object(
+        relay_worker, "relay_pg_failure_total", pg_failure_mock
+    ), patch.object(
+        relay_worker, "relay_loop_unexpected_total", unexpected_mock
+    ), patch.object(
+        relay_worker.asyncio, "sleep", side_effect=counting_sleep
+    ):
+        await relay_loop(pool=MagicMock(), config=config, shutdown_event=shutdown_event)
+
+    assert call_count["fetch"] >= 2, "OSError 后必须再次 polling (recovery)"
+    assert call_count["sleep"] >= 1, "backoff sleep 必须被调用"
+    pg_failure_mock.inc.assert_called(), "relay_pg_failure_total.inc 必须被调用 (OSError 走 PG 分支)"
+    unexpected_mock.inc.assert_not_called(), "OSError 不应走 outermost relay_loop_unexpected 分支"
+
+
+@pytest.mark.asyncio
+async def test_relay_handles_timeout_error_with_backoff():
+    """PG 响应超时 → asyncio.TimeoutError, relay backoff + counter inc + 不崩.
+
+    P1-6 round-1: 验证 except tuple 扩 asyncio.TimeoutError 后, asyncpg 0.29
+    PG 端口超时真异常也走 relay_pg_failure 分支.
+    """
+    config = RelayConfig(shadow_mode=True, poll_interval_ms=10, batch_size=5)
+    shutdown_event = asyncio.Event()
+
+    call_count = {"fetch": 0, "sleep": 0}
+
+    async def fake_fetch(pool, batch_size):
+        call_count["fetch"] += 1
+        if call_count["fetch"] == 1:
+            # 模拟 asyncpg command_timeout 触发 asyncio.TimeoutError
+            raise asyncio.TimeoutError()
+        shutdown_event.set()
+        return []
+
+    original_sleep = asyncio.sleep
+
+    async def counting_sleep(seconds):
+        call_count["sleep"] += 1
+        await original_sleep(0)
+
+    pg_failure_mock = MagicMock()
+    unexpected_mock = MagicMock()
+
+    with patch.object(relay_worker, "fetch_pending_batch", side_effect=fake_fetch), patch.object(
+        relay_worker, "relay_pg_failure_total", pg_failure_mock
+    ), patch.object(
+        relay_worker, "relay_loop_unexpected_total", unexpected_mock
+    ), patch.object(
+        relay_worker.asyncio, "sleep", side_effect=counting_sleep
+    ):
+        await relay_loop(pool=MagicMock(), config=config, shutdown_event=shutdown_event)
+
+    assert call_count["fetch"] >= 2, "TimeoutError 后必须再次 polling (recovery)"
+    assert call_count["sleep"] >= 1, "backoff sleep 必须被调用"
+    pg_failure_mock.inc.assert_called(), "relay_pg_failure_total.inc 必须被调用 (TimeoutError 走 PG 分支)"
+    unexpected_mock.inc.assert_not_called(), "TimeoutError 不应走 outermost relay_loop_unexpected 分支"
 
 
 @pytest.mark.asyncio
