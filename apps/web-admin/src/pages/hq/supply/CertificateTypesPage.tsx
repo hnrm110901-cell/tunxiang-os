@@ -118,11 +118,11 @@ export function CertificateTypesPage() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const resp = await txFetchData<{ ok: boolean; data: ListResponse }>(
+      const data = await txFetchData<ListResponse>(
         `/api/v1/supply/cert-types?page=${page}&size=${pageSize}`
       );
-      setList(resp?.data?.items ?? []);
-      setTotal(resp?.data?.total ?? 0);
+      setList(data?.items ?? []);
+      setTotal(data?.total ?? 0);
     } catch (e) {
       message.warning('证件类型字典加载失败，已降级使用默认选项');
     } finally {
@@ -212,11 +212,11 @@ export function CertificateTypesPage() {
   const handleInitDefaults = async () => {
     setInitLoading(true);
     try {
-      const resp = await txFetchData<{
-        ok: boolean;
-        data: { created: number; skipped: number; total_defaults: number };
-      }>('/api/v1/supply/cert-types/initialize-defaults', { method: 'POST' });
-      const { created, skipped } = resp?.data ?? { created: 0, skipped: 0 };
+      const data = await txFetchData<{ created: number; skipped: number; total_defaults: number }>(
+        '/api/v1/supply/cert-types/initialize-defaults',
+        { method: 'POST' }
+      );
+      const { created, skipped } = data ?? { created: 0, skipped: 0 };
       message.success(
         `初始化完成：新建 ${created} 类，跳过 ${skipped} 类（已存在）`
       );
