@@ -1,0 +1,103 @@
+# ======================================================================
+# NetworkPolicy values override — S-02 cutover for api-gateway
+# ======================================================================
+#
+# 适用：infra/helm/api-gateway 这一个 chart
+#
+# gateway 与 tx-* 不同的地方：
+#   - INGRESS：必须允许公网 / K8s Ingress controller（公网入口）
+#   - EGRESS：允许所有 tx-* services + 公网（gateway 转发到所有下游）
+#
+# 用法：
+#   helm upgrade --install api-gateway infra/helm/api-gateway \
+#     -f infra/helm/api-gateway/values.yaml \
+#     -f infra/helm/_overrides/networkpolicy-s02-gateway.yaml
+# ======================================================================
+
+networkPolicy:
+  enabled: true
+
+  ingress:
+    # 1. K8s ingress-nginx controller（公网入口的反代）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+
+    # 2. monitoring namespace（Prometheus scrape /metrics）
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+
+    # 3. 微信/支付宝/拉卡拉等 webhook 回调
+    # ⚠️ 启用前 ops 必须把渠道方公网 IP 写入 from.ipBlock.cidr
+    # 当前留空 — Phase A 走外部 SLB → ingress-nginx → gateway
+    # 不直接暴露 gateway 给公网（依赖 SLB IP 白名单）
+
+    # 4. 同 namespace 其他 gateway pod（HA 多副本场景）
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: api-gateway
+
+  egress:
+    # 1. 所有 tunxiang-services namespace 内的 tx-* services
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-services
+      ports:
+        - protocol: TCP
+          # tx-* 服务端口范围
+          port: 8001
+          endPort: 8017
+
+    # 2. PostgreSQL（gateway 自己也写认证 / api_keys 等）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-data
+      ports:
+        - protocol: TCP
+          port: 5432
+
+    # 3. Redis（session / rate limit / api key cache）
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: tunxiang-data
+      ports:
+        - protocol: TCP
+          port: 6379
+
+    # 4. DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+
+    # 5. 公网 HTTPS（OAuth2 / SSO / SMS / 第三方 SDK）
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
