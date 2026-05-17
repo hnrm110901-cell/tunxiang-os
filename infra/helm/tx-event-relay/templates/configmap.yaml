@@ -1,0 +1,25 @@
+{{/*
+ConfigMap — 默认 disabled (W3 P0 #757 shadow 期间 env 已通过 values.env / secretRef 注入).
+启用后业务可在 deployment 中通过:
+  envFrom:
+    - configMapRef:
+        name: {{ include "tx-event-relay.fullname" . }}-extra
+来加载 key-value. 本 chart deployment.yaml 仅消费 .Values.env, 启用后需手动修改.
+
+values.yaml 期望字段:
+  configMap:
+    enabled: false
+    data: {}
+*/}}
+{{- if .Values.configMap.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-event-relay.fullname" . }}-extra
+  labels:
+    {{- include "tx-event-relay.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.configMap.data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}
