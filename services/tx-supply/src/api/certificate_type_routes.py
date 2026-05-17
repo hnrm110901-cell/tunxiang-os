@@ -176,6 +176,7 @@ async def put_cert_type(
             applicable_supplier_kinds=body.applicable_supplier_kinds,
             validity_period_days=body.validity_period_days,
             is_required=body.is_required,
+            fields_set=body.model_fields_set,
             db=db,
         )
     except ValueError as exc:

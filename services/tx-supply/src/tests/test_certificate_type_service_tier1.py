@@ -577,3 +577,74 @@ async def test_cert_alerter_unaffected_by_cert_types_table():
     )
     # 无过期证件 → 不阻断
     assert blocked is False
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# 8. round-1 fix 验证测试（P1-1 + P1-2）
+# ═════════════════════════════════════════════════════════════════════════════
+
+
+@pytest.mark.asyncio
+async def test_update_clears_validity_to_null():
+    """管理员将证件从"365 天"改为"长期有效"（validity_period_days=null）。
+
+    round-1 P1-1 fix：通过 fields_set 路径，允许将 validity_period_days 写入 NULL。
+    """
+    existing_row = _cert_type_row(validity_period_days=365)
+    null_updated_row = _cert_type_row(validity_period_days=None)
+    db, _, call_count, _ = _mk_db_update(get_row=existing_row, update_row=null_updated_row)
+
+    result = await update_certificate_type(
+        _CERT_TYPE_ID,
+        tenant_id=_TENANT_XUJI,
+        validity_period_days=None,
+        fields_set={"validity_period_days"},  # 客户端明确传入 null
+        db=db,
+    )
+    # DB 写入 NULL（长期有效），而非静默跳过
+    assert result["validity_period_days"] is None
+    # UPDATE 确实被执行（不是因为 None 而跳过）
+    assert call_count["update"] == 1
+
+
+@pytest.mark.asyncio
+async def test_initialize_defaults_idempotent_no_integrity_error():
+    """连续调用两次 initialize_defaults，第 2 次应全部 skipped，不 raise IntegrityError。
+
+    round-1 P1-2 fix：ON CONFLICT (tenant_id, name) WHERE is_deleted = FALSE DO NOTHING
+    显式指定 partial index target，保证幂等不抛异常。
+
+    本测试验证 service 层正确生成带 WHERE 子句的 ON CONFLICT SQL。
+    """
+    sql_log: list[str] = []
+    db = AsyncMock()
+    insert_idx: dict[str, int] = {"v": 0}
+    # 第 1 轮全部新建，第 2 轮全部跳过
+    rowcounts_round1 = [1, 1, 1, 1, 1]
+    rowcounts_round2 = [0, 0, 0, 0, 0]
+
+    async def execute_side_effect(query, params=None):
+        sql = str(query)
+        sql_log.append(sql)
+        if "set_config" in sql:
+            return _FakeResult(None)
+        if "INSERT INTO certificate_types" in sql and "ON CONFLICT" in sql:
+            # 验证 ON CONFLICT 包含 partial index target（WHERE is_deleted）
+            assert "WHERE is_deleted" in sql, (
+                "ON CONFLICT 必须包含 partial index predicate: WHERE is_deleted = FALSE"
+            )
+            rc = rowcounts_round1[insert_idx["v"] % 5] if insert_idx["v"] < 5 else rowcounts_round2[insert_idx["v"] % 5]
+            insert_idx["v"] += 1
+            return _FakeResult(None, rowcount=rc) if rc == 0 else _FakeResult({"id": "x"}, rowcount=rc)
+        return _FakeResult(None)
+
+    db.execute = AsyncMock(side_effect=execute_side_effect)
+
+    # 第 1 次调用
+    result1 = await initialize_defaults(tenant_id=_TENANT_XUJI, db=db)
+    assert result1["created"] == 5
+
+    # 第 2 次调用（幂等，不 raise）
+    result2 = await initialize_defaults(tenant_id=_TENANT_XUJI, db=db)
+    assert result2["skipped"] == 5
+    assert result2["created"] == 0

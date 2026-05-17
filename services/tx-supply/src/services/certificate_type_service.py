@@ -169,7 +169,7 @@ _INSERT_DEFAULT_SQL = """
         :applicable_supplier_kinds::jsonb, :validity_period_days,
         :is_required, FALSE, :now, :now
     )
-    ON CONFLICT DO NOTHING
+    ON CONFLICT (tenant_id, name) WHERE is_deleted = FALSE DO NOTHING
 """
 
 
@@ -272,9 +272,15 @@ async def update_certificate_type(
     applicable_supplier_kinds: Optional[list[str]] = None,
     validity_period_days: Optional[int] = None,
     is_required: Optional[bool] = None,
+    fields_set: Optional[set[str]] = None,
     db: _DBConn,
 ) -> dict:
-    """更新证件类型。not found raise ValueError("CERT_TYPE_NOT_FOUND") → HTTP 404。"""
+    """更新证件类型。not found raise ValueError("CERT_TYPE_NOT_FOUND") → HTTP 404。
+
+    fields_set: 客户端实际传入的字段集（来自 body.model_fields_set）。
+    当 fields_set 包含某字段时，即使值为 None 也写入 DB（支持将 validity_period_days 重置为 NULL）。
+    fields_set=None 时退回旧行为（`if x is not None` 判断），保持向后兼容。
+    """
     import json as _json
 
     await _set_tenant(db, tenant_id)
@@ -288,7 +294,14 @@ async def update_certificate_type(
     if existing is None:
         raise ValueError("CERT_TYPE_NOT_FOUND")
 
-    # 动态 UPDATE fragments（只更新传入的字段）
+    # 动态 UPDATE fragments
+    # 当 fields_set 存在时，按实际传入字段判断（允许 NULL 写入）；
+    # 否则退回 is not None 判断。
+    def _should_update(field: str, value) -> bool:
+        if fields_set is not None:
+            return field in fields_set
+        return value is not None
+
     set_parts: list[str] = ["updated_at = :now"]
     params: dict = {
         "id": _uuid_str(cert_type_id),
@@ -296,16 +309,16 @@ async def update_certificate_type(
         "now": _now(),
     }
 
-    if name is not None:
+    if _should_update("name", name):
         set_parts.append("name = :name")
         params["name"] = name
-    if applicable_supplier_kinds is not None:
+    if _should_update("applicable_supplier_kinds", applicable_supplier_kinds):
         set_parts.append("applicable_supplier_kinds = :applicable_supplier_kinds::jsonb")
         params["applicable_supplier_kinds"] = _json.dumps(applicable_supplier_kinds, ensure_ascii=False)
-    if validity_period_days is not None:
+    if _should_update("validity_period_days", validity_period_days):
         set_parts.append("validity_period_days = :validity_period_days")
         params["validity_period_days"] = validity_period_days
-    if is_required is not None:
+    if _should_update("is_required", is_required):
         set_parts.append("is_required = :is_required")
         params["is_required"] = is_required
 
