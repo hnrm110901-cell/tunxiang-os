@@ -5,7 +5,10 @@
   - account_code 是科目编码，如 "1001" 现金 / "6001" 主营业务成本
   - parent_code 自引用支持科目树（一级科目 / 二级明细）
   - allow_posting 区分末级科目（true，可入账）与汇总科目（false，不可入账）
-  - account_type 五分类：asset / liability / equity / revenue / expense（SAP 视角）
+  - account_type 七分类：asset / liability / equity / revenue / expense（SAP 视角）
+    + contra_asset / contra_revenue（备抵科目，round-1 §19 critic P1-4 修）
+    contra_asset 用于 accumulated_depreciation（累计折旧）/ bad_debt_provision（坏账准备）
+    contra_revenue 用于 sales_returns（销售退回）/ sales_discounts（销售折让）
   W3 P2 sub-issue 会 seed 标准科目数据（本 PR 不含 seed）。
 
 设计要点：
@@ -13,9 +16,11 @@
   - 自引用 parent_code：仅引用 account_code 字符串（同租户 RLS 保证隔离），
     不加 FK 约束（自引用 + tenant_id 组合 FK 在 alembic + asyncpg 测试场景复杂度高，
     业务层自行保证 parent_code 存在；W4 接入时配 service-level 校验）
+  - parent_code != account_code CHECK 防自闭环（round-1 §19 security P1-4 修部分）
   - UNIQUE CONSTRAINT (tenant_id, account_code) 而非 INDEX，让 v444 journal_line 可走
     composite FK (tenant_id, account_code) → chart_of_accounts (PG 要求 FK 目标必须是 UNIQUE 约束)
-  - RLS 四联（ENABLE + FORCE + POLICY + WITH CHECK），与 v440/v441 同模式
+  - RLS 四联（ENABLE + FORCE + POLICY + WITH CHECK）— v139 NULLIF::uuid 模式
+    （round-1 §19 critic P1-1 修：与 v441/v443/v444 对齐）
   - inspector-and-skip 幂等模式
 
 Migration 链：
@@ -60,7 +65,12 @@ def upgrade() -> None:
                 updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
                 is_deleted          BOOLEAN NOT NULL DEFAULT FALSE,
                 CONSTRAINT chk_coa_account_type
-                    CHECK (account_type IN ('asset', 'liability', 'equity', 'revenue', 'expense')),
+                    CHECK (account_type IN (
+                        'asset', 'liability', 'equity', 'revenue', 'expense',
+                        'contra_asset', 'contra_revenue'
+                    )),
+                CONSTRAINT chk_coa_no_self_parent
+                    CHECK (parent_code IS NULL OR parent_code != account_code),
                 CONSTRAINT uq_coa_tenant_account_code
                     UNIQUE (tenant_id, account_code)
             )
@@ -72,8 +82,8 @@ def upgrade() -> None:
             """
             CREATE POLICY chart_of_accounts_tenant_isolation
             ON chart_of_accounts
-            USING (tenant_id::text = current_setting('app.tenant_id', true))
-            WITH CHECK (tenant_id::text = current_setting('app.tenant_id', true))
+            USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
+            WITH CHECK (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)
             """
         )
         # 树形遍历主查询：按租户 + parent_code 查子科目（软删除过滤）
