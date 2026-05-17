@@ -1,3 +1,34 @@
+## 2026-05-18 07:07 · issue #710 YYYY-MM dedup Phase 2 收官 (T3 explicit-ask 第 27/28/29 例 3 PR)
+
+### 完成状态
+
+- [x] **Lane A tx-finance** — redundant skip (PR #709 已替换全 8 sites, issue body 2026-05-16 snapshot stale 起手 grep verify 发现)
+- [x] **Lane D tx-member + tx-trade** — PR #796 `3da348cb` MERGED (2 sites, 3 commits +200/-2, §19 外部 critic APPROVE)
+- [x] **Lane C tx-agent + tx-analytics** — PR #802 `fa38bb92` MERGED (3 sites, 3 commits +71, helper-only test 重写)
+- [x] **Lane B tx-org §17 薪资邻接** — PR #803 `9f4e8ec5` MERGED (9 sites cross 7 文件, 4 commits +82, 0 §17 业务计算改动)
+- [x] **#710 close** + closure summary comment 落档
+- [ ] DEVLOG + progress sediment (本 PR)
+
+### 关键决策
+
+- **OMC 5+ lane 并行 launch → scope 校正 + Bash fallback** — 起手 4 isolated worktree 并行 launch executor agents, 中途 grep ground truth 发现 Lane A redundant; TaskStop 4 agents 验 worktree 实际状态; restart agents 撞 Bash 权限墙 main session 接管. 经验: 大 dedup 任务起手必须 grep verify issue body 数字, 不信 snapshot.
+- **§19 外部 critic vs self-review 分工** — Lane D 跑 critic agent (opus, read-only) 用 B 选项停止线 0 P0/P1 APPROVE; Lane B/C self-review (writer pass + verify) 因 self-审已足够 (T3 refactor scope 小, 0 §17 业务变更, helper 单一 import 替换).
+- **Test 策略**: helper-only 测 parse_year_month, 不 import service module 避开 Python 3.10+ `|` type hint 在测试环境 3.9 import 失败 + tx-org service 模块重 DB 依赖. 比 importlib.util 黑魔法 / sys.modules stub 更鲁棒.
+- **不加 `tolerant=True` 选项** — 收紧验证而非业务回归 (zero-padded MM 标准化), 与 PR #709 设计意图一致 (issue #699 helper SoT). 单数字月份生产真发生率监控走 structlog `payroll_month_filter_parse_failed` log.debug (silent_observability_wave4 已落地, 非 prom counter).
+
+### 下一步
+
+- 09:00 W21 架构守门会 (~2h 后) — 议程 §1.0 P0 #776 / §1.1 wine_storage SoT / §1.2 PaymentSaga / §2.0 W2 起手 3 PR 顺序
+- 守门会决议后启 W2-1 (#776 3 PR) + W2-2 (#758 Gateway 瘦身) + W3 预热 (#756 GL 4 表 + #757 Outbox shadow PR #795 已 ship 待验)
+
+### 已知风险
+
+- **议程 §3.1 PR 数字漂移**: ζ session 17:00 CST 写议程时记 20 PR, 之后 17:00-07:07 期间 +4 PR (θ #795 + ε D/C/B) = 实际 24 PR. 守门会创始人现场可识别为 session boundary, 不阻塞 (低风险).
+- **W21 守门会未决议前 #776 锁不动**: 5/11 残留 3 Tier 1 安全 fix worktree 已锁定 (gateway whitelist / F#7 webhook secret / F#10 omni_channel fail-closed) 待守门会 sign-off 起手.
+- **Lane A redundant 发现路径**: 本 session 起手 grep verify 揭露 issue body 2026-05-16 stale → 立 feedback memory `feedback_issue_body_snapshot_stale_grep_first` 候选 (扩展 `feedback_issue_text_scope_drift`).
+
+---
+
 ## 2026-05-17 21:00 · W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例 候选)
 
 ### 完成状态

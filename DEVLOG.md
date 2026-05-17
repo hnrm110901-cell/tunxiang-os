@@ -1,3 +1,45 @@
+## 2026-05-18 早段 ε — issue #710 YYYY-MM dedup Phase 2 收官 (T3 explicit-ask 第 27/28/29 例 3 PR)
+
+### 今日完成 (本 session ε, 3 PR MERGED + 1 lane redundant skip + #710 close)
+
+- **OMC 5-lane 起手并行 → 中途 scope 校正**: 起 4 worktree (A/B/C/D) 并行 launch executor agents, 中途 grep ground truth 发现 **Lane A tx-finance 全 8 sites 已被 PR #709 替换** (issue #710 body 2026-05-16 snapshot stale, 5/16-5/17 期间 PR #709 sediment 走完); TaskStop 4 agents + verify worktrees 实际状态.
+- **Bash permission fallback → main session 接管**: restart agents 撞 Bash 权限墙 (isolation:worktree 不可继承到 restart prompt), main session fallback 接管 push + PR + tests 路径; Lane B/C 各起 1 commit (working tree changes) + 1 test commit, Lane D 99% 完整 critic 后直接 push.
+- **PR #796 Lane D** `3da348cb` MERGED — tx-member + tx-trade 2 sites (`points_engine.py:751 cross_store_settlement` + `chef_at_home.py:562 get_chef_schedule`), 3 commits +200/-2, **§19 外部 critic agent (opus, read-only) APPROVE 0 P0/P1**, 4 类测试 (合法/单数字/空/abc) 各 service 1 文件 78/112 行, **顺手修了 chef_at_home 原 IndexError 漏抓 bug** (split index out → 500 → 现归一化 ValueError → 404).
+- **PR #802 Lane C** `fa38bb92` MERGED — tx-agent + tx-analytics 3 sites (banquet_growth_agent.py:41 单 month 特殊 `_, month_num = parsed` + agent_kpi_routes.py:1044 HTTPException 400 + hq_brand_analytics_service.py:622 raise ValueError), 3 commits +71, **Test 策略重写**: 直接测 `parse_year_month` helper 不 import service module (banquet_growth_agent.py 含 Python 3.10+ `|` type hint, 测试环境 3.9 SyntaxError 时 import 失败; 前 agent 卡在 importlib.util 黑魔法, main session 简化为 helper-only 6 tests).
+- **PR #803 Lane B** `9f4e8ec5` MERGED — tx-org 9 sites cross 7 文件 §17 薪资邻接 (payslip._build_payslip + attendance_compliance + payroll_engine_v2 + payroll_service + royalty_calculator 2 sites + store_ops + transfer_cost), 4 commits +82, **0 §17 业务计算改动** (薪资数学公式 / count_work_days / 五险一金计算流程不动, 仅入口 parse 替换), §19 self-review round-1 clean.
+- **#710 close**: GitHub auto-close (PR body "Closes #710 partial" 触发) + closure summary comment 落档 (Phase 2 4 lane 收官 + 单数字月份监控 evidence 落 `payroll_routes.py:227 log.debug` structlog + helper 不加 `tolerant=True`).
+
+### 数据变化 (本 ε session)
+
+- 迁移版本: 无新 alembic (本 session 全 refactor)
+- 新增 API 模块: 0
+- 新增测试: **5 个 test 文件 12 tests local pass** (Lane D 2 文件 8 tests / Lane C 2 文件 6 tests / Lane B 1 文件 3 tests, Lane C/B helper-only 重写避开 Python 3.9 兼容 / DB 重依赖)
+- 新增 issue: 0 (Lane A close = #710 partial; #710 整体 close)
+- 关闭 issue: **1** (#710 - Phase 2 收官 + 单数字月份监控 evidence 归档)
+- silent_failure_count: 不变 (本 session 全 refactor 非 silent)
+- T3 explicit-ask: 25 (5/17 η session 末) → **30** (+5 实际: D #796 / C #802 / B #803 / + ζ session #784 (议程) + η session #786/#788 已计前 session 末, 此 session **+3** Lane D/C/B)
+- 累计 14 sites refactor cross 5 服务 (tx-member 1 + tx-trade 1 + tx-agent 2 + tx-analytics 1 + tx-org 7 文件 = 12 文件 14 sites)
+- main HEAD: `2fba69f3` (5/17 21:42 PR #794) → `9f4e8ec5` (5/18 07:07 PR #803) — 含 5/17 深夜 θ PR #795 + 5/18 早段 ε 3 PR = 4 PR 全 ship
+
+### 关键学习沉淀 (feedback memory 落盘候选)
+
+1. **`feedback_agent_isolation_worktree_bash_inheritance`** (待落盘) — Agent tool `isolation: "worktree"` 起的 worktree 内 agent 有 Bash 权限, 但 restart agent (引用同 worktree path) 不继承 Bash. 解决: restart 改为 main session fallback OR worktree 重起 isolation 但需 cherry-pick partial work.
+2. **`feedback_issue_body_snapshot_stale_grep_first`** (扩展 `feedback_issue_text_scope_drift`) — issue body 是创建时 snapshot, 跨 sprint 改动可能 refactor 部分 sites (#710 body 2026-05-16, Lane A 5/16-5/17 PR #709 partial 替换全 8); 起手必须 grep 验真 remaining sites, 不信 issue body 数字.
+3. **`feedback_helper_only_test_for_import_blocked_module`** — 当 service module import 因 type hint / DB 依赖 / namespace collision 在测试环境失败时, 替换为 helper-only test (直接 import shared utility + 测 helper 行为) 比 importlib.util 黑魔法 / sys.modules stub 更鲁棒.
+
+### 遗留问题
+
+- **W21 守门会 (5/18 09:00 CST)** — 距本 sediment ~2h, 议程 §3.1 数字 19→20→23 PR 漂移 (5/17 η 20 PR + 5/17 深夜 θ #795 + 5/18 早段 ε 3 PR = 24 PR, 议程 ζ session 写时是 17:00 CST 20 PR 不含晚段). 守门会前是否补 PR 刷议程数字? 建议: 守门会创始人现场看到议程数字小漂移自然知道是 session boundary, 无需 PR 阻塞.
+- **#710 Phase 2 收尾后剩余**: smart_scheduling_routes.py:399-400 是 HH:MM-HH:MM 时段不是 YYYY-MM, 超 scope 不收; points_mall.py:572 是 birthday YYYY-MM-DD 不是 YYYY-MM, 超 scope 不收. 真正 Phase 2 收尾完整.
+- **#776** 5/11 残留 3 Tier 1 安全 fix (gateway whitelist + F#7 webhook secret + F#10 omni_channel fail-closed) — 待 W21 守门会 sign-off 后 W2-1 ship P0.
+
+### 明日计划 (5/18 周一 后续)
+
+- 09:00 W21 架构守门会 — 议程 §1.0 #776 P0 优先级 / §1.1 wine_storage SoT / §1.2 PaymentSaga / §2.0 W2 起手 3 PR 顺序
+- 守门会决议后启 W2-1 (#776 3 PR) + W2-2 (#758 Gateway 瘦身) + W3 预热 (#756 GL 4 表 + #757 Outbox shadow #795 已 ship)
+
+---
+
 ## 2026-05-17 深夜 θ — W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例 候选)
 
 ### 今日完成 (本 session θ, 6 commits ship-ready 待 §19 reviewer)
