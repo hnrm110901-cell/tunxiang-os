@@ -30,6 +30,8 @@ from services.tx_org.src.services.payroll_engine import (
 )
 from services.tx_org.src.services.social_insurance import SocialInsuranceCalculator
 
+from shared.utils.date_parsing import parse_year_month
+
 
 class PayrollEngine:
     """薪资计算引擎
@@ -127,7 +129,10 @@ class PayrollEngine:
         Returns:
             PayrollRecord（草稿状态，包含完整计算明细）
         """
-        year, mon = int(payroll_month.split("-")[0]), int(payroll_month.split("-")[1])
+        parsed = parse_year_month(payroll_month)
+        if parsed is None:
+            raise ValueError(f"payroll_month must be YYYY-MM format, got: {payroll_month!r}")
+        year, mon = parsed
         if work_days_in_month is None:
             work_days_in_month = count_work_days(year, mon)
 
