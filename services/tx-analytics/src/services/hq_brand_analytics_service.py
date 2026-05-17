@@ -23,6 +23,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.utils.date_parsing import parse_year_month
+
 logger = structlog.get_logger(__name__)
 
 # ─── 内部常量 ────────────────────────────────────────────────────────────────
@@ -618,10 +620,10 @@ class HQBrandAnalyticsService:
               "stores": [{store_id, ...同字段...}]
             }
         """
-        try:
-            year, month = int(year_month[:4]), int(year_month[5:7])
-        except (ValueError, IndexError) as exc:
-            raise ValueError(f"year_month 格式错误，需为 YYYY-MM，实际值：{year_month!r}") from exc
+        parsed = parse_year_month(year_month)
+        if parsed is None:
+            raise ValueError(f"year_month must be YYYY-MM format, got: {year_month!r}")
+        year, month = parsed
 
         # 月份起止日期
         import calendar
