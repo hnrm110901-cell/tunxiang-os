@@ -7,6 +7,8 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.utils.date_parsing import parse_year_month
+
 logger = structlog.get_logger()
 
 MONTH_NAMES = {
@@ -38,7 +40,10 @@ class BanquetGrowthAgent:
         import json
 
         # 查询历史同月数据
-        month_num = int(target_month.split("-")[1])
+        parsed = parse_year_month(target_month)
+        if parsed is None:
+            raise ValueError(f"target_month must be YYYY-MM format, got: {target_month!r}")
+        _, month_num = parsed
         rows = await self.db.execute(
             text(
                 """

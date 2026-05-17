@@ -26,6 +26,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
+from shared.utils.date_parsing import parse_year_month
 
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/api/v1/agent-kpi", tags=["agent-kpi"])
@@ -1040,10 +1041,10 @@ async def get_roi_report(
     report_month = month or today.strftime("%Y-%m")
 
     # 解析月份边界
-    try:
-        year, mon = int(report_month[:4]), int(report_month[5:7])
-    except (ValueError, IndexError) as exc:
-        raise HTTPException(status_code=400, detail="month 格式错误，请使用 YYYY-MM") from exc
+    parsed = parse_year_month(report_month)
+    if parsed is None:
+        raise HTTPException(status_code=400, detail="month 格式错误，请使用 YYYY-MM")
+    year, mon = parsed
 
     import calendar as _cal
 
