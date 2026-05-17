@@ -33,6 +33,9 @@ env:
   RELAY_BATCH_SIZE: "100"
 
 # Secret 注入 DATABASE_URL / REDIS_URL (与 tx-trade 模式一致)
+# DATABASE_URL 必须指向 tx_event_relay 角色 (BYPASSRLS), 不可复用 txos_service DSN
+# — 见 infra/db/create_relay_role.sql (W3 #757 round-1 P1-1 修复).
+# 复用 txos_service 会因 RLS 静默返空致事件永久丢失.
 secretRef:
   name: tx-event-relay-secret
 
