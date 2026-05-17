@@ -1,0 +1,41 @@
+name: Weekly Service Health Check
+
+on:
+  schedule:
+    # Every Monday 01:00 UTC (Asia/Shanghai 09:00)
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  health-scan:
+    name: Run code-fact-scan and generate service health report
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # needed for commits_30d count
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run code-fact-scan
+        run: |
+          bash scripts/weekly-health-check.sh
+
+      - name: Run CLAUDE.md drift check
+        run: |
+          python scripts/clauded-md-drift-check.py || true
+
+      - name: Upload health reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: service-health-report-${{ github.run_id }}
+          path: |
+            docs/service-health/*.md
+          if-no-files-found: warn
+          retention-days: 90

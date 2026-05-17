@@ -1,0 +1,48 @@
+name: CLAUDE.md Drift Check
+
+on:
+  pull_request:
+    paths:
+      - "CLAUDE.md"
+      - "services/**/main.py"
+      - "shared/db-migrations/versions/**.py"
+  schedule:
+    # Every Monday 01:00 UTC (Asia/Shanghai 09:00)
+    - cron: "0 1 * * 1"
+  workflow_dispatch:
+
+jobs:
+  drift-check:
+    name: Check CLAUDE.md vs. on-disk reality
+    runs-on: ubuntu-latest
+    # Start fail-open (continue-on-error: true) until baseline is established.
+    # Tighten to fail-closed after first green week (remove continue-on-error).
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run drift check
+        id: drift
+        run: |
+          python scripts/clauded-md-drift-check.py | tee /tmp/drift-report.json
+          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Upload drift report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: claudemd-drift-report
+          path: docs/service-health/drift-*.md
+          if-no-files-found: warn
+
+      - name: Hard verify — fail if drift exceeded (informational until baseline)
+        if: steps.drift.outcome == 'failure'
+        run: |
+          echo "::warning::CLAUDE.md drift exceeded 10% threshold. Update CLAUDE.md to reflect on-disk reality."
+          cat /tmp/drift-report.json
