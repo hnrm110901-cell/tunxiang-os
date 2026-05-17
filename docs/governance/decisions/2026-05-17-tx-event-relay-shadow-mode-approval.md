@@ -49,6 +49,18 @@ CLAUDE.md §26 服务冻结令 (frozen_until: 2026-06-12) 范围内, `tx-event-r
 - W5 follow-up: refund/recharge 接入 outbox (issue #768)
 - W11 follow-up: 全 Tier 1 路径切真投递 + 30d GC cron (issue #767)
 
+### delivered_event_id 引用完整性策略 (round-1 P1-5 纠错)
+
+**delivered_event_id 永远是 informational pointer**, 不是 FK — events 表 PK 是
+`(event_id, occurred_at)` 复合 (per `shared/db-migrations/versions/v147_unified_event_store.py`),
+PG 16 分区表 composite FK 结构上不可行 (即使加 `(tenant_id, delivered_event_id) →
+events (tenant_id, event_id)` 也因 events 唯一约束必须含 occurred_at 而建不上).
+
+由 W4 follow-up (issue #760) 在**应用层**做引用完整性:
+- INSERT events 成功后, 同事务内才允许 UPDATE outbox.delivered_event_id (with returned event_id)
+- `chk_outbox_delivered_consistency` CHECK 兜底防 partial state (delivered=true 必有 delivered_at)
+- W11 切真路径前 (issue #767) 评估是否补 polling-time `EXISTS` check 而非 FK
+
 ---
 
 ## §4 与服务冻结令 (CLAUDE.md §26) 关系

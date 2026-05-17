@@ -23,8 +23,14 @@
     GC 周期足以避免无限增长 (vs v147 events 表 PARTITION BY RANGE 永存语义不同).
   - 不加 FK to events 表: outbox 是 write-buffer (业务事务同写) / events 是
     read-model (投递成功后才填), 写入时 events 表里 stream_id 对应 event 还不存在;
-    delivered_event_id 字段为 NULL → events.event_id 回填, 设计 A 下仅作回查不作
-    约束. W4 follow-up issue 评估是否补 composite FK (本 PR 不引入).
+    delivered_event_id 字段为 NULL → events.event_id 回填.
+  - delivered_event_id 是 informational pointer (round-1 P1-5 纠错, 不是 FK):
+    events 表 PK 是 (event_id, occurred_at) 复合, PG 16 分区表 composite FK
+    结构上不可行 (即使写 (tenant_id, delivered_event_id) → events (tenant_id,
+    event_id) 也因 events 唯一约束必须含 occurred_at 而建不上).
+    W4 follow-up (issue #760) 在应用层保证引用完整性: INSERT events 成功后才
+    UPDATE outbox.delivered_event_id, chk_outbox_delivered_consistency CHECK
+    兜底防 partial state.
   - RLS 四联 (ENABLE + FORCE + POLICY + WITH CHECK), NULLIF::UUID 模式严格对齐
     v147 events 标准 (不用 ::text 弱比对, #756 round-1 P1-1 教训).
   - inspector-and-skip 幂等模式 (与 v444 / v445 一致).
