@@ -327,6 +327,23 @@ services:
     labels:
       tunxiang.env: "${TUNXIANG_ENV:-dev}"
 
+  # ── tx-event-relay 真 Outbox shadow worker (W3 issue #757) ──
+  tx-event-relay:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-event-relay/requirements.txt &&
+             uvicorn services.tx_event_relay.src.main:app --host 0.0.0.0 --port 8020 --reload"
+    ports:
+      - "8020:8020"
+    environment:
+      TX_AUTH_ENABLED: "false"
+      LOG_LEVEL: DEBUG
+      RELAY_SHADOW_MODE: "true"
+    volumes:
+      - ../../services/tx-event-relay:/app/services/tx-event-relay
+      - ../../shared:/app/shared
+
   # ── 边缘同步引擎（profile=edge 才启动）────────────────────
   sync-engine:
     build:
