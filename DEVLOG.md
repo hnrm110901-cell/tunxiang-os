@@ -1,3 +1,45 @@
+## 2026-05-17 深夜 θ — W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例 候选)
+
+### 今日完成 (本 session θ, 6 commits ship-ready 待 §19 reviewer)
+
+- [shared/db-migrations] **v446_create_trade_event_outbox** 新建 — 战略 plan §4 举措 3 真 Outbox 骨架. 单表 + 2 CHECK (attempts_nonneg / delivered_consistency) + 3 partial index (pending polling / tenant+stream 回放 / tenant 积压监控) + RLS 四联 (ENABLE + FORCE + POLICY + WITH CHECK, NULLIF::UUID 严格对齐 v147). inspector-and-skip 幂等模式 (与 v444/v445 一致). 不加 FK to events 表 (write-buffer vs read-model 时序倒置, W4 follow-up 评估). 非分区表 (shadow 期间 0 行, W11 切真路径 + 30d GC 保表健康度).
+- [services/tx-event-relay] **新服务** (greenfield, 端口 8020) — Dockerfile (USER 10001 与 Helm 对齐) + requirements.txt (5 deps 最小化: fastapi/uvicorn/asyncpg/structlog/prometheus_client) + conftest.py (注册 services.tx_event_relay 命名空间, 参照 tx-finance 模板) + src/ 5 模块 (main / relay_worker / outbox_repo / metrics / __init__) + 15 unit tests (8 shadow_tier1 + 7 outbox_repo). asyncpg pool min=1 max=3 自建 (per memory `feedback_projector_asyncpg_pool_model.md`). prometheus_client + asyncpg fail-open import 兜底 (per memory `feedback_tier1_ci_minimal_deps_trap.md`). shadow_mode 默认 true (env unset, Q1 防误开真投递). shadow_mode=False 抛 NotImplementedError 设防 silent shadow break.
+- [infra/helm/tx-event-relay] **新 chart 11 文件** (复用 tx-trade 模板 adapt) — Chart.yaml / values.yaml + 9 templates. Q4 决议 T3 default off: PDB / NetworkPolicy / ConfigMap 全 disabled, 单实例 replicaCount=1, autoscaling.enabled=false. 安全上下文 runAsUser=10001 / drop ALL capabilities / 禁权限提升.
+- [infra/compose/base.yml] **tx-event-relay service block** :8020 注册 — env: RELAY_SHADOW_MODE/RELAY_POLL_INTERVAL_MS/RELAY_BATCH_SIZE; depends_on postgres+redis; healthcheck curl /health 30s/3retries.
+- [docs/infra/port-allocation-2026-05.md] 加 8020 = tx-event-relay 行 (W3 #757 新分配, 8000-8019 全占 verify).
+- [docs/governance/decisions/2026-05-17-tx-event-relay-shadow-mode-approval.md] 守门会决议归档 — 引战略 plan §4 + CLAUDE.md §26 服务冻结令 planned_additions; 创始人 explicit-ask 4 问决议 (Q1=A / Q2=8020 / Q3=30d / Q4=T3); Tier 1 邻接 explicit-ask 累计第 38 例.
+
+### 数据变化 (本 θ session)
+
+- 迁移版本: v445 → **v446_create_trade_event_outbox** (+1)
+- 新增服务: **1** (tx-event-relay, 端口 8020)
+- 新增 Helm chart: **1** (11 文件)
+- 新增 API endpoint: 2 (/health + /metrics, 都在 tx-event-relay)
+- 新增测试: **15** (8 test_relay_worker_shadow_tier1.py + 7 test_outbox_repo.py, **15/15 pytest pass**)
+- 创始人 explicit-ask 4 问决议: 4/4 落档
+- 6 commits ship-ready 待 §19 round-1
+
+### 强红线 (本 PR 0 改动)
+
+- `shared/events/src/emitter.py` (Tier 1 邻接 §17 红线邻路径)
+- `services/tx-trade/cashier_engine.py` / `order_service.py` / `payment_saga_service.py` (§17/G10 双红线)
+- `services/tx-trade/invoice.py` / `services/tx-supply/inventory_io.py` (§17 红线)
+- verify: `git diff origin/main` 上述 7 文件 输出空
+
+### 明日计划
+
+- §19 三 reviewer 并行 round-1 (code-reviewer sonnet / security-reviewer / critic opus)
+- round-1 fix + round-2 verify 无回归
+- Tier 1 邻接 5 项 explicit-ask 前置全 pass → admin-merge ship
+
+### 后续 follow-up (本 PR ship 后立)
+
+- W4 issue #760: settle_order 业务路径写 outbox (本 PR 严禁触)
+- W5 issue #768: refund/recharge 接入 outbox
+- W11 issue #767: 全 Tier 1 路径切真投递 (RELAY_SHADOW_MODE=false) + 30d GC cron + Helm Tier T3→T2/T1 升级
+
+---
+
 ## 2026-05-17 (周日 ε ζ η 三 session 全天 — 14 PR ship + 3 issue 立 + W21 议程更新 + silent -69%)
 
 ### 今日完成 (14 PR ship 时间线, verified `gh pr list --search "merged:>=2026-05-17"`)
