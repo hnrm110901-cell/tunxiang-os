@@ -120,3 +120,29 @@ async def count_pending(pool: Any) -> int:
     async with pool.acquire() as conn:
         row = await conn.fetchrow(_PENDING_COUNT_SQL)
     return int(row["cnt"]) if row else 0
+
+
+# shadow 模式 touch SQL (P1-4 round-1 修复)
+# 只更新 last_attempt_at, 不动 delivered / delivery_attempts / last_error
+# 让监控知道行被 shadow 处理过, W4 接入后避免无限重处理 500ms/轮成监控盲点.
+_SHADOW_TOUCH_SQL = """
+    UPDATE trade_event_outbox
+    SET last_attempt_at = NOW()
+    WHERE id = $1
+"""
+
+
+async def bump_last_attempt_at(pool: Any, outbox_id: Any) -> None:
+    """shadow 模式更新 last_attempt_at 让监控知道行被处理过.
+
+    不改 delivered / delivery_attempts / last_error 语义, 严格符合 shadow 强红线
+    (0 业务副作用 per plan §7.1). 仅供监控区分"卡死"vs"shadow 已 ack".
+
+    Args:
+        pool: asyncpg.Pool.
+        outbox_id: outbox row id (UUID).
+    """
+    if pool is None:
+        return
+    async with pool.acquire() as conn:
+        await conn.execute(_SHADOW_TOUCH_SQL, outbox_id)

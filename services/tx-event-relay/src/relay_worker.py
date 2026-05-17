@@ -36,7 +36,7 @@ from .metrics import (
     relay_loop_unexpected_total,
     relay_pg_failure_total,
 )
-from .outbox_repo import fetch_pending_batch
+from .outbox_repo import bump_last_attempt_at, fetch_pending_batch
 
 logger = structlog.get_logger(__name__)
 
@@ -120,6 +120,9 @@ async def relay_loop(
                     )
                     outbox_delivery_total.labels(result="shadow_dry_run").inc()
                     relay_delivery_lag_seconds.observe(_lag_seconds(row.get("created_at")))
+                    # P1-4 round-1: 更新 last_attempt_at 让监控知道行被 shadow 处理过
+                    # (不改 delivered / delivery_attempts 语义, 0 业务副作用)
+                    await bump_last_attempt_at(pool, row["id"])
                     continue
                 # W11 follow-up issue #767: 真投递路径 (本 PR 严禁实现)
                 raise NotImplementedError(

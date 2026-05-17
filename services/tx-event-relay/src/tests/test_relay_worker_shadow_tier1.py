@@ -61,12 +61,13 @@ async def test_shadow_does_not_write_events():
       1. 5 次都走 shadow log + continue
       2. 0 次 raise NotImplementedError (真投递路径未触)
       3. shutdown_event 让 loop 退出, 整个循环不崩
+      4. P1-4 round-1: bump_last_attempt_at 每 row 调用一次 (5 次)
     """
     config = RelayConfig(shadow_mode=True, poll_interval_ms=10, batch_size=5)
     shutdown_event = asyncio.Event()
     sample_rows = [_sample_outbox_row() for _ in range(5)]
 
-    call_count = {"fetch": 0}
+    call_count = {"fetch": 0, "bump": 0}
 
     async def fake_fetch(pool, batch_size):
         call_count["fetch"] += 1
@@ -76,11 +77,18 @@ async def test_shadow_does_not_write_events():
         shutdown_event.set()
         return []
 
-    with patch.object(relay_worker, "fetch_pending_batch", side_effect=fake_fetch):
+    async def fake_bump(pool, outbox_id):
+        call_count["bump"] += 1
+
+    with patch.object(relay_worker, "fetch_pending_batch", side_effect=fake_fetch), patch.object(
+        relay_worker, "bump_last_attempt_at", side_effect=fake_bump
+    ):
         # NotImplementedError 不应抛 (shadow_mode=True 不进真投递分支)
         await relay_loop(pool=MagicMock(), config=config, shutdown_event=shutdown_event)
 
     assert call_count["fetch"] >= 1, "fetch 必须被调用至少一次"
+    # P1-4 round-1: bump_last_attempt_at 每 row 调用 → 5 rows = 5 次 bump
+    assert call_count["bump"] == 5, f"bump_last_attempt_at 必须每 row 调用 (5 rows = 5 calls), 实际 {call_count['bump']}"
     # 5 rows 全走 shadow 分支 → loop 完整执行 1 轮 + shutdown 触发退出
 
 
