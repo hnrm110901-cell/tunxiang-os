@@ -8,6 +8,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.tx_supply.src.services.supplier_portal_service import SupplierPortalService
@@ -152,11 +154,8 @@ class TestSupplierManagement:
 
     def test_get_supplier_not_found(self):
         svc = SupplierPortalService()
-        try:
+        with pytest.raises(ValueError):
             svc.get_supplier_profile("nonexistent")
-            assert False
-        except ValueError:
-            pass
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -225,11 +224,8 @@ class TestAutoBidding:
 
     def test_accept_invalid_rfq(self):
         svc = SupplierPortalService()
-        try:
+        with pytest.raises(ValueError):
             svc.accept_quote("nonexistent", "sup1")
-            assert False
-        except ValueError:
-            pass
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -285,11 +281,8 @@ class TestContractManagement:
 
     def test_create_contract_invalid_supplier(self):
         svc = SupplierPortalService()
-        try:
+        with pytest.raises(ValueError):
             svc.create_contract("fake", [], "2026-01-01", "2026-12-31", "", "", {})
-            assert False
-        except ValueError:
-            pass
 
     def test_check_contract_expiry(self):
         svc, s1, _, _ = _make_service_with_suppliers()
@@ -438,11 +431,8 @@ class TestSupplierScoring:
 
     def test_calculate_score_not_found(self):
         svc = SupplierPortalService()
-        try:
+        with pytest.raises(ValueError):
             svc.calculate_supplier_score("nonexistent")
-            assert False
-        except ValueError:
-            pass
 
     def test_supplier_ranking(self):
         svc, s1, _, s3 = _make_service_with_suppliers()

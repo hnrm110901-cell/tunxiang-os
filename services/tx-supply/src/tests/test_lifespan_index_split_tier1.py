@@ -16,7 +16,7 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -91,10 +91,8 @@ async def _test_lifespan():
                         error=str(exc),
                         exc_info=True,
                     )
-                try:
+                with suppress(asyncio.TimeoutError):
                     await asyncio.wait_for(stop_event.wait(), timeout=refresh_sec)
-                except asyncio.TimeoutError:
-                    pass
 
         refresh_task = asyncio.create_task(_refresh_loop(), name="index_split_tenant_refresh")
     try:
@@ -106,10 +104,8 @@ async def _test_lifespan():
                 await asyncio.wait_for(asyncio.shield(refresh_task), timeout=5.0)
             except asyncio.TimeoutError:
                 refresh_task.cancel()
-                try:
+                with suppress(asyncio.CancelledError):
                     await refresh_task
-                except asyncio.CancelledError:
-                    pass
         # §19 round-1 P1-1 mirror: use stop_all_index_split_projectors() not started_tenants
         await _stop_all()
 

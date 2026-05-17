@@ -3,6 +3,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.tx_supply.src.services.traceability import (
@@ -173,11 +175,8 @@ class TestFullTraceBackward:
         assert customer_nodes[0]["customer_id"] == CUSTOMER_ID
 
     def test_tenant_id_required(self):
-        try:
+        with pytest.raises(ValueError):
             full_trace_backward(ORDER_ID, DISH_ID, "")
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
 
 
 class TestGetTraceTimeline:
