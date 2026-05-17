@@ -1,0 +1,118 @@
+# tx-event-relay — 真 Outbox relay worker (shadow mode)
+# W3 P0 issue #757 — shadow 期间单实例足够 (表预期 0 行), W11 follow-up #767 切真路径
+# 评估升 Tier (创始人 Q4 决议 T3 default off)
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-event-relay
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8020
+  targetPort: 8020
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # Q1 决议: shadow_mode=true 期间 relay 不投递 events, 仅 log + metrics
+  RELAY_SHADOW_MODE: "true"
+  # polling cadence (ms); 500ms 表空时 0 IO 开销
+  RELAY_POLL_INTERVAL_MS: "500"
+  # 单批最大 rows
+  RELAY_BATCH_SIZE: "100"
+
+# Secret 注入 DATABASE_URL / REDIS_URL (与 tx-trade 模式一致)
+# DATABASE_URL 必须指向 tx_event_relay 角色 (BYPASSRLS), 不可复用 txos_service DSN
+# — 见 infra/db/create_relay_role.sql (W3 #757 round-1 P1-1 修复).
+# 复用 txos_service 会因 RLS 静默返空致事件永久丢失.
+secretRef:
+  name: tx-event-relay-secret
+
+# shadow 单实例无需 HPA
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8020
+  initialDelaySeconds: 20
+  periodSeconds: 30
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8020
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# shadow 单实例 — 无需 pod anti-affinity
+podAntiAffinity:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+# Q4 决议: PodDisruptionBudget T3 default off — shadow 期间 0 业务影响,
+# W11 切真路径 follow-up issue 评估升 T2 maxU=1 (W3 round-0 不引入)
+pdb:
+  enabled: false
+  minAvailable: ""
+  maxUnavailable: ""
+
+# NetworkPolicy default off — shadow 期间不接入业务路径
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# ConfigMap default off — env 已通过 values.env / secretRef 注入
+configMap:
+  enabled: false
+  data: {}
+
+# F#2 安全上下文 (CSO 2026-05-11 整改与 tx-trade 一致)
+# Dockerfile 已设 USER 10001 (services/tx-event-relay/Dockerfile)
+podSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+containerSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL

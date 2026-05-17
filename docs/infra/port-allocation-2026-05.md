@@ -27,6 +27,7 @@
 | tx-devforge | 8017 | 沿用 | DevForge 内部研发平台 |
 | **mcp-server** | **8018** | **P0.5 修复** | **原 8014 与 tx-civic 宪法冲突 → 改 8018** |
 | **tx-predict** | **8019** | **P0.5 修复** | **原 8013 与 tunxiang-api 冲突 → 改 8019** |
+| **tx-event-relay** | **8020** | **W3 #757 新分配** | **真 Outbox shadow relay worker (创始人 Q2 决议; 8000-8019 全占, 取 next sequential)** |
 
 **端口冲突修复对照**：
 

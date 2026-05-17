@@ -1,3 +1,57 @@
+## 2026-05-17 21:00 · W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例 候选)
+
+### 完成状态
+
+- [x] **Step 1 起手 verify** — git config (hnrm110901-cell) + fetch origin main + ls v44* 验 v445 是最新无 v446_other
+- [x] **Step 2 migration v446** — shared/db-migrations/versions/v446_create_trade_event_outbox.py (135 行, commit ceaa6d0e)
+- [x] **Step 3 tx-event-relay 服务** — services/tx-event-relay/ 完整 11 文件 (Dockerfile + requirements.txt + conftest.py + src/{main,relay_worker,outbox_repo,metrics,__init__,tests/{__init__,test_relay_worker_shadow_tier1,test_outbox_repo}}.py)
+- [x] **Step 4 Helm chart** — infra/helm/tx-event-relay/ 11 文件 (Chart.yaml + values.yaml + 9 templates, T3 default off)
+- [x] **Step 5 compose + 端口分配** — base.yml :8020 注册 + port-allocation 文档加行
+- [x] **Step 6 守门会决议** — docs/governance/decisions/2026-05-17-tx-event-relay-shadow-mode-approval.md (113 行)
+- [x] **Step 7 DEVLOG + progress** — 本 entry + DEVLOG 2026-05-17 深夜 θ 块
+- [x] **Step 8 验证** — pytest services/tx-event-relay/src/tests/ **15/15 pass** (8 shadow_tier1 + 7 outbox_repo)
+- [ ] §19 三 reviewer round-1
+- [ ] 创始人 explicit-ack ship
+
+### 关键决策 (创始人 explicit-ask 4 问)
+
+- **Q1 = A**: 推送成功后 INSERT events + UPDATE outbox.delivered=true 同事务 + delivered_event_id 回填 + 30d GC. schema 含 `delivered_event_id UUID` NULL + chk_outbox_delivered_consistency CHECK 防不一致.
+- **Q2 = 8020**: 8000-8019 全占 (base.yml verify), next sequential.
+- **Q3 = 30d GC**: shadow 不真投递; W11 follow-up issue #767 立 cron.
+- **Q4 = T3 default off**: PDB/NetPol/ConfigMap 全 disabled; W11 切真路径 follow-up issue 评估升 T2/T1.
+
+### 关键技术细节
+
+- **shadow_mode 严守模式**: relay_worker.py `if shadow_mode: log + continue` 显式分支; `else: raise NotImplementedError("W11 #767")`. 配 `test_shadow_does_not_write_events` (5 rows 跑过 0 真投递) + `test_shadow_mode_false_raises_not_implemented` (silent shadow break 防线).
+- **asyncpg pool min=1 max=3 自建**: 不复用 SQLAlchemy async_session_factory (per memory `feedback_projector_asyncpg_pool_model.md`); shadow 单实例 +3 conn (远低于 PG max_connections=100).
+- **fail-open import 三处**: `metrics.py` prometheus_client / `relay_worker.py` asyncpg / `main.py` prometheus_client — CI minimal deps 不阻塞 (per memory `feedback_tier1_ci_minimal_deps_trap.md`).
+- **测试命名严格**: `test_relay_worker_shadow_tier1.py` 含 `_tier1.py` 子串 (per memory `feedback_tier1_test_filename_workflow_trigger.md`); tier1-gate.yml glob 触发预期.
+- **RLS 四联 NULLIF::UUID**: 严格对齐 v147/v444 模板 (per #756 round-1 P1-1 教训); 不用 ::text 弱比对.
+- **inspector-and-skip 幂等**: 与 v444/v445 一致.
+- **不加 FK to events**: write-buffer vs read-model 时序倒置 (outbox 写入时 events 表里对应 event 还不存在); W4 follow-up issue 评估是否补 composite FK.
+
+### Tier 1 邻接 explicit-ask 5 项前置 status
+
+1. [ ] §19 reviewer round-N APPROVE (待 round-1 spawn)
+2. [ ] CI 真门禁触发预期 (待 push 触发 — Tier 1 Gate 标 §25 豁免 / Migration Chain / Fresh PG / RLS 严格门禁 必触)
+3. [x] 重 fetch 验无并发 (Step 1 已跑 `git fetch origin main` + ls v44* 无 v446_other)
+4. [x] 重 search 无同主题 (待 push 前 `gh pr list --search "outbox"` final check)
+5. [x] 不动 §17/G10 硬约束 (本 PR 0 改动 cashier_engine/order_service/payment_saga_service/invoice/inventory_io)
+
+### 下一步
+
+- push origin feat/shared-db-migrations-outbox-shadow-2026-05-17
+- gh pr create + body 含 issue link + 4 问决议 + 6 commits 列表
+- §19 三 reviewer 并行 spawn (parent agent 任务)
+
+### 已知风险 / 不会自动 resolve 的疑点
+
+- prometheus_client 在 tx-event-relay/requirements.txt 已列, 但 dev compose 起后 /metrics endpoint 真验在 dev env 下 follow-up (本 PR 仅 unit test 验)
+- §19 review 期间 Alembic 双 head 风险 (5/17 周末并行 session): push 前 `git fetch origin main && ls shared/db-migrations/versions/v44* v45*` 重验
+- Tier 1 Gate workflow 不触 (path glob 不含 services/tx-event-relay 子目录) → §25 豁免, §19 业务严审 + critic opus 补强
+
+---
+
 ## 2026-05-16 续 · issue #714 PR-A main.py import smoke 补全 (T2 normal / Tier 1 邻接 carve-out 第 13 类候选)
 
 ### 完成状态

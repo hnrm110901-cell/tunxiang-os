@@ -1,0 +1,23 @@
+{{/*
+PodDisruptionBudget — W3 P0 #757 创始人 Q4 决议: T3 default off.
+shadow 期间 0 业务影响, 单实例; W11 切真路径 follow-up issue #767 评估升 T2 maxU=1.
+values.yaml 默认 pdb.enabled=false. 启用时通过 .Values.pdb.minAvailable /
+.Values.pdb.maxUnavailable (互斥, 模板优先 minAvailable).
+*/}}
+{{- if .Values.pdb.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "tx-event-relay.fullname" . }}
+  labels:
+    {{- include "tx-event-relay.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.minAvailable }}
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  {{- else if .Values.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tx-event-relay.selectorLabels" . | nindent 6 }}
+{{- end }}
