@@ -317,11 +317,13 @@ class SyncEngine:
             params["since"] = since
 
         try:
+            from .hmac_signer import build_sync_headers
+
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.get(
                     f"{self._cloud_api_url}/api/v1/sync/{table}",
                     params=params,
-                    headers={"X-Tenant-ID": tenant_id},
+                    headers=build_sync_headers(tenant_id),
                 )
                 resp.raise_for_status()
                 body = resp.json()
@@ -441,11 +443,13 @@ class SyncEngine:
             return False
 
         try:
+            from .hmac_signer import build_sync_headers
+
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.post(
                     f"{self._cloud_api_url}/api/v1/sync/bulk-upsert",
                     json={"table": table, "records": records},
-                    headers={"X-Tenant-ID": tenant_id},
+                    headers=build_sync_headers(tenant_id),
                 )
                 resp.raise_for_status()
                 body = resp.json()

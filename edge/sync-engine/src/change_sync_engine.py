@@ -782,13 +782,15 @@ class ChangeSyncEngine:
 
     async def _push_batch(self, batch: List[ChangeRecord]) -> SyncResult:
         """推送单批变更，返回云端响应解析结果"""
+        from .hmac_signer import build_sync_headers
+
         result = SyncResult()
         try:
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.post(
                     f"{self._cloud_api_url}/api/v1/sync/ingest",
                     json={"changes": [c.to_dict() for c in batch]},
-                    headers={"X-Tenant-ID": self._tenant_id},
+                    headers=build_sync_headers(self._tenant_id),
                 )
                 resp.raise_for_status()
                 body = resp.json()
@@ -896,11 +898,13 @@ class ChangeSyncEngine:
                 "size": CLOUD_PAGE_SIZE,
             }
             try:
+                from .hmac_signer import build_sync_headers
+
                 async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                     resp = await client.get(
                         f"{self._cloud_api_url}/api/v1/sync/changes",
                         params=params,
-                        headers={"X-Tenant-ID": self._tenant_id},
+                        headers=build_sync_headers(self._tenant_id),
                     )
                     resp.raise_for_status()
                     body = resp.json()

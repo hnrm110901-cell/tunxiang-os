@@ -387,6 +387,8 @@ class OfflineSyncService:
             token = SyncToken(last_seen_ts=token.last_seen_ts, last_seen_seq=since_seq)
 
         try:
+            from .hmac_signer import build_sync_headers
+
             async with httpx.AsyncClient(timeout=HTTP_TIMEOUT) as client:
                 resp = await client.get(
                     f"{self._cloud_api_url}/api/v1/sync/pull",
@@ -395,7 +397,7 @@ class OfflineSyncService:
                         "since_seq": token.last_seen_seq,
                         "since_ts": token.last_seen_ts.isoformat(),
                     },
-                    headers={"X-Tenant-ID": tid},
+                    headers=build_sync_headers(tid),
                 )
                 resp.raise_for_status()
                 body = resp.json()
