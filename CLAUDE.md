@@ -152,7 +152,7 @@ tunxiang-os/
     api-types/                  # 跨服务 API 类型定义（TypeScript）
   infra/
     compose/                    # Docker Compose（P0.5 收敛后唯一权威源）
-      base.yml                  #   16 服务公共定义（image/build/端口/env/network）
+      base.yml                  #   20 服务公共定义（image/build/端口/env/network）
       envs/                     #   环境 override（叠加 base 使用）
         dev.yml                 #     开发环境（端口暴露 + 热重载 + Vite Dev）
         staging.yml             #     预发（镜像构建 + auth=on + 资源减半）
@@ -790,3 +790,108 @@ DEV 环境功能验证
 | 收银员操作 | 无需技术培训即可使用 | 现场用户测试 |
 
 **这 5 个数字是屯象OS的真实交付标准，不是代码跑通。**
+
+---
+
+## 二十三、12 周战略路线图概要（2026-05-12 plan）
+
+> 完整 plan SoT：`/Users/lichun/Desktop/屯象OS餐饮行业知识库/屯象OS 架构与代码升级优化战略开发计划2026-05-12.md`（1634 行）
+> 本节仅一句话总览，细节以 plan 文件为准。
+
+双轨制：**DEMO 轨（60%，W1-W8）** 驱动徐记海鲜验收 + **FOUNDATION 轨（40%，W1-W12）** 奠定技术基础。
+
+| 周次 | DEMO 轨核心交付 | FOUNDATION 轨核心交付 |
+|------|----------------|----------------------|
+| W1 (5/13-5/19) | 修 tx-trade payment_event_consumer / tx-agent 14 try-except ImportError / gateway CORS 顺序 / 删 order_service 空壳 create_order | CLAUDE.md sync (本 PR #754) / 服务冻结令 hook (#755) / 治理目录 + drift-check (#761) |
+| W2 (5/20-5/26) | tx-trade 路由分类盘点 / Tier 1 测试补全 + checklist | 删 3 国际版服务 (已完成) / Gateway 瘦身抽 tx-sync-worker (#758) / 架构守门会 v1 |
+| W3 (5/27-6/02) | DEMO 路径白名单冻结 / 代码事实扫描 v2 | GL 4 表 migration v418-v421 (#756) / 真 Outbox + tx-event-relay shadow (#757) / 科目-业态映射 seed |
+| W4 (6/03-6/09) | 品智 POS 同步稳定性 / 离线 4h 回放测试 | 第一笔 GL 通账 settle_order (#760) / ActionRegistry + AgentRun outcome (#759) |
+| W5 (6/10-6/16) | 徐记海鲜 DEMO 第一次内部跑通 / Tier 1 测试集 100% | GL 接入 refund/recharge (#768) / 真 Outbox 切换 settle_order |
+| W6 (6/17-6/23) | DEMO 二次跑通 (5 店 / 3 业态 / 1000 桌位) / 监控面板 | Outcome Projector + 三条硬约束 PolicyEngine (#763) / 服务健康度评分 v1 |
+| W7 (6/24-6/30) | DEMO 第三次跑通 / 23 套系统替换流程 | GL 中期 review (差异 < 0.01%) / Agent Eval Suite v1 (#769) |
+| W8 (7/1-7/7) | **徐记海鲜正式 DEMO 验收**: Tier 1 全绿 / P99<200ms / 支付>99.9% / 断网4h无丢失 / 收银员无培训可用 | Foundation 静默, 不打扰 Demo |
+| W9 (7/8-7/14) | DEMO 复盘 + 反馈分流 | 服务收敛 Phase 2 (#762, 20→18) / GL 接入剩余 5 业态 (#764) / Posting Period 锁账 (#765) |
+| W10 (7/15-7/21) | (W9 复盘 follow-up) | tx-ontology 独立服务 + 四件套 API + Time Travel (#766) / 服务收敛 Phase 3 (#770) |
+| W11 (7/22-7/28) | (W12 验收准备) | Agent Eval Suite v2 + Confidence Calibration (#772) / Tier 1 路径全切新内核 / 服务收敛 Phase 4 (#771) |
+| W12 (7/29-8/4) | (W12 收官) | 12 周成果验收 + Foundation v2 路线图 + 治理体系正式上线 (#767) |
+
+**当前节点：W1 末段（2026-05-17）**，5/15 batch ship 3 PR (#659/#661/#662)，187 silent failure baseline 已暴露（15/20 服务超阈值）；5/17 立 20 起手 issue (#753-#772) 覆盖 plan 全 12 周 backlog。
+
+---
+
+## 二十四、六大举措现状（截至 2026-05-17）
+
+> 战略 plan §6 六大举措，每项当前进度一句话 + 关键 issue 指针。
+
+| 举措 | 终态目标 | 当前进度 | 关键 issue |
+|------|----------|----------|------------|
+| **服务收敛** | 24→17 服务 | 已收敛至 20（-4：删 3 国际版 + tunxiang-api decom）；剩余 -3 在 W9-W11（tx-forge+tx-devforge / tx-predict→tx-brain / tx-intel→tx-analytics / tx-civic 改回路由模块） | #762 (W9 Phase 2) / #770 (W10 Phase 3) / #771 (W11 Phase 4) |
+| **GL 内核** | 8 业态 × 7 事件双分录, settle 失败三表都不写 | 0%, 4 表 migration W3 起手 | #756 (W3 4 表) / #760 (W4 settle) / #768 (W5 refund/recharge) / #764 (W9 5 业态) / #765 (W9 Posting Period) |
+| **真 Outbox** | trade_event_outbox + tx-event-relay shadow → 全 Tier 1 切换 | 0%, 现行 emit_event fire-and-forget; W3 起手 shadow, W11 全切 | #757 (W3 shadow) / #767 (W11 切换) |
+| **Ontology Layer** | tx-ontology 独立服务 (端口 8019) + ObjectType/ActionType/Policy/Lineage API + Time Travel | shared/ontology/ 仅 ORM models; ActionRegistry 子包 W4 起手 | #759 (W4 Phase A) / #763 (W6 Phase B) / #766 (W10 Phase C-E) |
+| **Agent 数据飞轮** | 3 P0 Agent outcome loop + Eval Suite v2 200 cases + Confidence Calibration | AgentRun 无 outcome 字段, W4 起手 schema 升级 | #759 (W4 Phase A) / #763 (W6 Outcome Projector) / #769 (W7 Eval v1) / #772 (W11 Eval v2 + Calibration) |
+| **治理四件套** | 每周事实扫描 + 每两周守门会 + 每月健康度评分 + 每季度专家 review | 部分: 本 PR (#754) CLAUDE.md sync / scripts/code-fact-scan.py PR #659 ship; 治理目录 + drift-check + GHA cron #761 待 ship; service-freeze hook #755 待 ship | #761 (元基础设施) / #754 / #755 / #767 (W12 正式上线) |
+
+---
+
+## 二十五、Tier 1 邻接 explicit-ask 机制
+
+> 与 §17 业务路径分级互补。§17 定义什么是 Tier 1；本节定义 Tier 1 **邻接工作**（T2/T3 改动涉及 Tier 1 路径边界）如何执行。
+
+### 5 项前置稳定模式（缺任一项 → STOP + 告知 reviewer）
+
+1. **§19 reviewer APPROVE** — 独立审查 agent 已完成 round-N，0 P0/P1 未解决
+2. **CI 真门禁触发预期** — Tier 1 CI gate 已触发（非 UNSTABLE/CONFLICTING 状态）；若 path glob 不触发需标注"T3 docs-only，CI 未触发，§25 豁免"
+3. **重 fetch 验无并发** — `git fetch origin main && git log origin/main -n 5` 确认无同主题并发 PR（per feedback_concurrent_pr_race.md）
+4. **重 search 无同主题** — `gh pr list --search "同主题关键词" --state open` 输出 0 结果
+5. **不动 §17/G10 硬约束** — cashier_engine / order_service / payment_saga / invoice / inventory_io 零改动；G10 供应链线严禁碰 cashier_engine/order_service
+
+### 与 §17 的关系
+
+- §17 列出 **Tier 1 零容忍清单**（订单状态机 / 支付 Saga / RLS / POS 写入等）→ 不可越过
+- §25 描述 **围绕 Tier 1 的操作纪律**（前置检查 / 独立 worktree / explicit-ask 记录）→ 如何安全操作
+
+### 累计实战记录
+
+截至 2026-05-17，项目已累计 **Tier 1 explicit-ask 第 37 例**（含供应链 Phase 1-2 共 35 例 + W1 新增 2 例）。详见 memory `project_tunxiang_supply_phase2_w7w12.md`。
+
+---
+
+## 二十六、服务冻结令
+
+> 防止架构漂移的运营机制。战略 plan §6 治理四件套之一。
+
+### 冻结范围（frozen_until: 2026-06-12 = W8 验收后）
+
+**禁止**在未经架构守门会决议的情况下：
+- 新增 `services/` 子目录（即新建微服务）
+- 删除现有微服务目录
+- 修改微服务间同步 RPC 接口契约（HTTP / Event schema）
+- 修改 `shared/ontology/` 实体定义（独立冻结，需创始人确认）
+
+**不受冻结**（可自由执行）：
+- 服务内部实现（路由、SQL、测试）
+- `shared/events/`、`shared/adapters/`、`shared/hardware/` 改动
+- `infra/`、`apps/`、`docs/`、`scripts/` 改动
+- 战略路线图已列明的合并计划（tx-intel → tx-analytics 等，W9 执行时需架构守门会 sign-off）
+
+### 策略文件引用
+
+- `.omc/policy/service-freeze.yml` — 机器可读冻结策略（issue #755 ship 后生效）
+- `scripts/git-hooks/service-freeze-check.sh` — 本地 pre-commit hook（issue #755 ship 后）
+- `.github/workflows/service-freeze-check.yml` — CI 真门禁层补强（issue #755 ship 后）
+- `docs/governance/decisions/` — 架构守门会决议归档（issue #761 ship 后建立）
+- `scripts/clauded-md-drift-check.py` — CLAUDE.md drift > 10% 报警 hook（issue #761 ship 后）
+- 架构守门会例外申请流程：在 GitHub Discussion 标注 `arch-decision` 标签，等待创始人 72h 内决议；批准后加入 `.omc/policy/service-freeze.yml` `planned_additions` 列表
+
+### planned_additions 例外（战略 plan 明示新服务，走守门会决议批准）
+
+- `tx-ontology`（W10 / issue #766 抽 Ontology Layer 独立服务，端口 8019）
+- `tx-sync-worker`（W2 / issue #758 Gateway 瘦身抽出）
+- `tx-event-relay`（W3 / issue #757 真 Outbox relay worker）
+
+### 当前状态
+
+Issue #755（service-freeze.yml ship）**尚未合入**，本节为策略预声明；冻结实质从创始人 LGTM #755 起正式生效。
+
+---
