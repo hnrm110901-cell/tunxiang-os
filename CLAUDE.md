@@ -133,7 +133,7 @@ tunxiang-os/
     sync-engine/                # Python — 本地PG ↔ 云端PG 增量同步（300秒/轮）
   shared/
     ontology/                   # Ontology 实体定义（Pydantic models）
-    db-migrations/              # Alembic 迁移（5/15 实测 v417；v229→v417 = 188 版本累积）
+    db-migrations/              # Alembic 迁移（5/17 实测 v438；v229→v438 = 209 版本累积）
       # v147: 统一事件存储表（events + projector_checkpoints）
       # v148: 8个物化视图（mv_discount_health/mv_channel_margin/mv_inventory_bom
       #        mv_member_clv/mv_store_pnl/mv_daily_settlement/mv_safety_compliance/mv_energy_efficiency）
