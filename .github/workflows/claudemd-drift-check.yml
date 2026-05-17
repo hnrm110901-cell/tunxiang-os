@@ -30,8 +30,10 @@ jobs:
       - name: Run drift check
         id: drift
         run: |
+          # P1 fix (reviewer round-1): set -o pipefail + ${PIPESTATUS[0]} 修 $? 是 tee 退出码永远 0 的 bug
+          set -o pipefail
           python scripts/clauded-md-drift-check.py | tee /tmp/drift-report.json
-          echo "exit_code=$?" >> "$GITHUB_OUTPUT"
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Upload drift report
         if: always()
