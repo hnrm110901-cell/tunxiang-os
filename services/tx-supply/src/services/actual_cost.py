@@ -13,6 +13,8 @@ from typing import Optional
 
 import structlog
 
+from ..metrics import record_silent_fallback
+
 log = structlog.get_logger()
 
 
@@ -229,6 +231,16 @@ def _get_latest_purchase_price(
         row = result.scalar_one_or_none()
         return row if row else None
     except (ImportError, AttributeError):
+        # T2 邻接 (毛利辅助): graceful fail-open 返 None (caller 走 _get_ledger_price
+        # 或台账估算 fallback), 但补 warn + counter 让 db handle 异常可被运维定位.
+        # silent failure 治理 issue #663 Wave 1 sub-A, plan §2 表 #8.
+        log.warning(
+            "actual_cost_last_purchase_dep_failed",
+            ingredient_id=str(ingredient_id),
+            tenant_id=str(tenant_id),
+            exc_info=True,
+        )
+        record_silent_fallback("actual_cost.last_purchase")
         return None
 
 
@@ -258,6 +270,16 @@ def _get_ledger_price(
         row = result.scalar_one_or_none()
         return row if row else None
     except (ImportError, AttributeError):
+        # T2 邻接 (毛利辅助): graceful fail-open 返 None (caller 已无下一级 fallback,
+        # 但 actual_cost 仅辅助决策不阻塞 Tier 1), 必须落 warn + counter.
+        # silent failure 治理 issue #663 Wave 1 sub-A, plan §2 表 #9.
+        log.warning(
+            "actual_cost_ledger_price_dep_failed",
+            ingredient_id=str(ingredient_id),
+            tenant_id=str(tenant_id),
+            exc_info=True,
+        )
+        record_silent_fallback("actual_cost.ledger_price")
         return None
 
 

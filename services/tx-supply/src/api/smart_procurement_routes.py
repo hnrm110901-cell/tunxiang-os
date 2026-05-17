@@ -25,6 +25,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 
+from ..metrics import record_silent_fallback
+
 logger = structlog.get_logger(__name__)
 
 router = APIRouter(
@@ -232,7 +234,15 @@ async def _get_best_supplier(
                 "unit_price_fen": int(r.unit_price_fen or 0),
             }
     except SQLAlchemyError:
-        pass
+        # Tier 1 邻接 (供应商推荐 → 触毛利): infra 异常 fail-open 返回 None,
+        # 但必须落日志 + 指标 (silent failure 治理 issue #663 Wave 1 sub-A).
+        logger.warning(
+            "supplier_history_lookup_failed",
+            ingredient_id=str(ingredient_id),
+            tenant_id=tenant_id,
+            exc_info=True,
+        )
+        record_silent_fallback("smart_procurement.supplier_history")
     return None
 
 

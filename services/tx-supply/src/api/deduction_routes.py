@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
+import structlog
 from fastapi import APIRouter, Depends, Header, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import text
@@ -38,6 +39,8 @@ from ..services.stocktake_service import (
     record_count,
 )
 from ..services.waste_attribution import analyze_waste, get_top_waste_items
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/supply", tags=["deduction-stocktake-waste"])
 
@@ -245,8 +248,15 @@ async def finalize_stocktake_route(
                     created_by=x_user_id or x_tenant_id,
                 )
             except CaseValidationError:
-                # 盘点未完成或不存在等业务校验失败；不打断主流程
-                pass
+                # 盘点未完成或不存在等业务校验失败；fail-open 不打断主流程,
+                # 但必须落日志供运维侧定位 (silent failure 治理 issue #663 Wave 1 sub-A,
+                # Tier 1 邻接 — 库存盘亏审计路径).
+                logger.warning(
+                    "auto_create_loss_case_failed",
+                    stocktake_id=stocktake_id,
+                    tenant_id=x_tenant_id,
+                    exc_info=True,
+                )
 
         asyncio.create_task(_try_auto_create())
         return {"ok": True, "data": data}

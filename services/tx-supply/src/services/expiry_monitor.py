@@ -18,6 +18,8 @@ from shared.events import SupplyEventType, UniversalPublisher
 from shared.ontology.src.entities import Ingredient, IngredientTransaction
 from shared.ontology.src.enums import TransactionType
 
+from ..metrics import record_silent_fallback
+
 logger = structlog.get_logger()
 
 
@@ -43,6 +45,16 @@ def _parse_notes_expiry(notes: Optional[str]) -> Optional[date]:
         expiry_str = data.get("expiry_date")
         return date.fromisoformat(expiry_str) if expiry_str else None
     except (json.JSONDecodeError, TypeError, ValueError):
+        # Tier 1 邻接 (食安硬约束): 效期解析失败 graceful fail-open 返 None
+        # (该批次将不参与临期监控, 但不阻塞主流程), 必须落 warn + counter,
+        # 让运维侧能定位 notes schema 漂移 / 数据脏污染等 root cause.
+        # silent failure 治理 issue #663 Wave 1 sub-A, plan §2 表 #6.
+        logger.warning(
+            "expiry_notes_parse_failed",
+            notes_preview=notes[:200],
+            exc_info=True,
+        )
+        record_silent_fallback("expiry_monitor.parse_notes")
         return None
 
 
