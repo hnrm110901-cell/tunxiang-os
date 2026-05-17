@@ -120,7 +120,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
                 try:
                     await asyncio.wait_for(stop_event.wait(), timeout=refresh_sec)
                 except asyncio.TimeoutError:
-                    pass
+                    logger.debug("index_split_refresh_tick")
 
         refresh_sec_val = float(os.getenv("TX_SUPPLY_INDEX_SPLIT_TENANT_REFRESH_SEC", "300"))
         refresh_task = asyncio.create_task(_refresh_loop(), name="index_split_tenant_refresh")
@@ -140,7 +140,7 @@ async def lifespan(app: FastAPI):  # noqa: ARG001
                 try:
                     await refresh_task
                 except asyncio.CancelledError:
-                    pass
+                    logger.debug("index_split_refresh_task_cancelled")
         # §19 round-1 P1-1: 以 _PROJECTOR_TASKS 真实状态为准, 而非 started_tenants 闭包.
         # refresh loop 中途被 cancel 时, started_tenants 可能漏掉新 started 的 task,
         # 走 stop_all_index_split_projectors() 兜底遍历真实 dict 防孤儿 task.

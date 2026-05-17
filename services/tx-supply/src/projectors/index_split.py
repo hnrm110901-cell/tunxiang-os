@@ -42,6 +42,8 @@ from shared.events.src.event_types import OrderEventType
 from shared.events.src.projector import ProjectorBase
 from shared.ontology.src.database import async_session_factory
 
+from ..metrics import record_silent_fallback
+
 log = structlog.get_logger(__name__)
 
 # v437 UNIQUE constraint 名 (constraint name 来自 migration 的 CREATE UNIQUE INDEX 语句)
@@ -295,5 +297,11 @@ def _safe_uuid(val: Optional[Any]) -> Optional[uuid.UUID]:
         return val
     try:
         return uuid.UUID(str(val))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        log.warning(
+            "index_split_event_parse_malformed_uuid",
+            raw_value=str(val)[:200],
+            error=str(exc),
+        )
+        record_silent_fallback("index_split.event_parse")
         return None
