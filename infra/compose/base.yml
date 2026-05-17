@@ -32,6 +32,9 @@
 #     ⚠️ tx-predict   :8019 ← 原 8013 与 tunxiang-api 冲突 → 改 8019（空闲口）
 #     ⚠️ mcp-server   :8018 ← 原 8014 与 tx-civic 宪法冲突 → 改 8018（空闲口）
 #                              tx-civic 是 CLAUDE.md 宪法规定的 8014，不可让
+#
+#   W3 #757 新分配：
+#     ⊕ tx-event-relay :8020 ← 真 Outbox shadow relay worker（创始人 Q2 决议）
 #     ⓘ tx-forge    :8013 ← 容器内端口与 tunxiang-api/tx-predict 同号但分属不同
 #                              Docker container，同一 network 内通过服务名 DNS
 #                              解析（http://tx-forge:8013 vs http://tunxiang-api:8013），
@@ -460,6 +463,35 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+
+  # ── Event Relay 真 Outbox shadow worker :8020 ─────────────
+  # W3 P0 issue #757 — 战略 plan §4 举措 3 (创始人 Q2 决议)
+  # shadow 期间不接业务路径, polling trade_event_outbox (v446) log + metrics
+  # W11 follow-up issue #767 切真路径 (RELAY_SHADOW_MODE=false)
+  tx-event-relay:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-event-relay/Dockerfile
+    environment:
+      <<: *common-env
+      # Q1 决议: shadow_mode=true 默认开启
+      RELAY_SHADOW_MODE: ${RELAY_SHADOW_MODE:-true}
+      # polling cadence (ms); 500ms 表空时 0 IO 开销
+      RELAY_POLL_INTERVAL_MS: ${RELAY_POLL_INTERVAL_MS:-500}
+      # 单批最大 rows
+      RELAY_BATCH_SIZE: ${RELAY_BATCH_SIZE:-100}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8020/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
 volumes:
   pg_data:
