@@ -161,7 +161,7 @@ async def stop_split_attribution_projector(tenant_id: UUID | str) -> None:
         try:
             await task
         except asyncio.CancelledError:
-            pass
+            log.debug("split_attribution_projector_task_cancelled", tenant_id=tenant_str)
     _PROJECTOR_TASKS.pop(tenant_str, None)
     log.info("split_attribution_projector_stopped", tenant_id=tenant_str)
 

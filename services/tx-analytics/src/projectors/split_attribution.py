@@ -173,5 +173,15 @@ def _safe_uuid(val: Any) -> uuid.UUID | None:
         return val
     try:
         return uuid.UUID(str(val))
-    except (ValueError, TypeError):
+    except (ValueError, TypeError) as exc:
+        # 畸形 UUID payload (PRD-11 sub-C event 字段 source_doc_id /
+        # source_doc_line_id 偶有非 UUID 字符串). 沿用 tx-supply
+        # IndexSplitProjector _safe_uuid 同模式 (PR #752 sub-D):
+        # 保留 return None 让 caller 落 NULL 不阻塞 projector 推进,
+        # warn level 给运维可观测.
+        log.warning(
+            "split_attribution_safe_uuid_invalid",
+            raw_value=str(val)[:40],
+            error=str(exc),
+        )
         return None

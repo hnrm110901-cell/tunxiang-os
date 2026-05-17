@@ -26,6 +26,7 @@ import pathlib
 import sys
 import types
 import uuid
+from contextlib import suppress
 
 # ─── 注入假模块（路由顶层 import 所需）──────────────────────────────────────
 
@@ -104,11 +105,9 @@ _trend_scanner_mod = types.ModuleType("services.trend_scanner")
 _trend_scanner_mod.TrendScannerService = _TrendScannerService
 sys.modules["services.tx_intel.src.services.trend_scanner"] = _trend_scanner_mod
 
-# pydantic（路由用到 BaseModel / Field）
-try:
+# pydantic（路由用到 BaseModel / Field）— 缺包时跳过, 路由真测会在 import 时 fail
+with suppress(ImportError):
     import pydantic  # noqa: F401
-except ImportError:
-    pass
 
 # ─── 加载被测路由 ────────────────────────────────────────────────────────────
 
