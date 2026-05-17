@@ -14,6 +14,8 @@ from typing import Optional
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.utils.date_parsing import parse_year_month
+
 logger = structlog.get_logger()
 
 # ─── 内存存储（MVP阶段，后续迁移到 PostgreSQL） ───
@@ -559,7 +561,10 @@ async def get_chef_schedule(
     month_entries = [s for s in schedule if s["date"].startswith(month)]
 
     # 生成该月所有日期的可用状态
-    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
+    parsed = parse_year_month(month)
+    if parsed is None:
+        raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+    year, mon = parsed
     if mon == 12:
         next_month_first = datetime(year + 1, 1, 1)
     else:

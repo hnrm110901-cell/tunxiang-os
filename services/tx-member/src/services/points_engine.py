@@ -15,6 +15,8 @@ import structlog
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.utils.date_parsing import parse_year_month
+
 logger = structlog.get_logger(__name__)
 
 
@@ -748,7 +750,10 @@ async def cross_store_settlement(
 
     start_date = f"{month}-01"
     # 计算月末
-    year, mon = int(month[:4]), int(month[5:7])
+    parsed = parse_year_month(month)
+    if parsed is None:
+        raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+    year, mon = parsed
     if mon == 12:
         end_date = f"{year + 1}-01-01"
     else:
