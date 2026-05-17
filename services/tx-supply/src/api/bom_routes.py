@@ -1,6 +1,6 @@
 """BOM 管理 API — 菜品配方与成本计算
 
-端点：
+端点（组装型）：
   GET  /api/v1/supply/boms                              — 查询BOM列表（含明细行）
   POST /api/v1/supply/boms                              — 创建BOM（含明细行批量创建）
   PUT  /api/v1/supply/boms/{bom_id}                     — 更新BOM
@@ -8,6 +8,13 @@
   POST /api/v1/supply/boms/{bom_id}/calculate-cost      — 重新计算BOM成本
   GET  /api/v1/supply/boms/{bom_id}/cost-breakdown      — 成本分解（占比）
   POST /api/v1/supply/dishes/{dish_id}/consume-stock    — 按BOM消耗库存
+
+端点（分解型 BOM — PRD-09）：
+  POST /api/v1/supply/boms/disassembly                  — 创建分解型 BOM
+  GET  /api/v1/supply/boms/disassembly                  — 列表（assembly_type='disassembly'）
+  GET  /api/v1/supply/boms/disassembly/{bom_id}         — 详情
+  POST /api/v1/supply/boms/disassembly/{bom_id}/calculate — 计算分解产出（dry-run）
+  PUT  /api/v1/supply/boms/disassembly/{bom_id}         — 更新分解型 BOM
 
 统一响应格式: {"ok": bool, "data": {}, "error": {}}
 """
@@ -27,6 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.database import get_db
 from shared.security.src.error_handler import safe_http_exception
+from ..services.disassembly_service import disassemble_ingredient
 
 log = structlog.get_logger(__name__)
 
@@ -824,3 +832,426 @@ async def consume_stock_by_bom(
         await db.rollback()
         log.error("consume_stock_by_bom.db_error", error=str(exc))
         raise HTTPException(status_code=500, detail="库存扣减失败")
+
+
+# ─── 分解型 BOM 模型 (PRD-09) ─────────────────────────────────────────────────
+
+
+class DisassemblyItemIn(BaseModel):
+    ingredient_name: str = Field(..., min_length=1, max_length=100)
+    ingredient_code: Optional[str] = Field(None, max_length=50)
+    quantity: Decimal = Field(..., gt=Decimal("0"), description="产出量（分解后该组件的量）")
+    unit: str = Field(..., max_length=20, description="kg/g/L/个")
+
+
+class DisassemblyBomCreate(BaseModel):
+    dish_id: str = Field(..., description="整件菜品/食材的UUID")
+    yield_qty: Decimal = Field(..., gt=Decimal("0"), description="整件投入量（如 10.0 kg 整鱼）")
+    yield_unit: str = Field(..., max_length=20, description="整件单位（kg/g/条/箱）")
+    notes: Optional[str] = Field(None, max_length=500, description="备注（如：海鲜分切标准 2026Q1）")
+    items: List[DisassemblyItemIn] = Field(..., min_length=1, description="产出明细行，至少一行")
+
+
+class DisassemblyBomUpdate(BaseModel):
+    yield_qty: Optional[Decimal] = Field(None, gt=Decimal("0"))
+    yield_unit: Optional[str] = Field(None, max_length=20)
+    notes: Optional[str] = Field(None, max_length=500)
+    items: Optional[List[DisassemblyItemIn]] = None
+
+
+class DisassemblyCalculateIn(BaseModel):
+    input_qty: float = Field(..., gt=0, description="投入整件数量（dry-run 计算）")
+
+
+# ─── POST /boms/disassembly ───────────────────────────────────────────────────
+
+
+@router.post("/boms/disassembly", status_code=201)
+async def create_disassembly_bom(
+    body: DisassemblyBomCreate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """创建分解型 BOM（整件→零件）。
+
+    强制写 assembly_type='disassembly'，is_active=false（避免 cashier 误用）。
+    校验：sum(items[].quantity) <= yield_qty，否则 422。
+    """
+    try:
+        await _set_tenant(db, x_tenant_id)
+
+        # 校验：产出组件总量不超过整件量
+        total_component_qty = sum(float(it.quantity) for it in body.items)
+        if total_component_qty > float(body.yield_qty) + 1e-9:
+            raise ValueError(
+                f"产出组件总量 {total_component_qty} 超过整件产出量 {body.yield_qty}，"
+                "请检查各组件数量"
+            )
+
+        # 插入 dish_boms（assembly_type='disassembly', is_active=false）
+        bom_row = await db.execute(
+            text(
+                """
+                INSERT INTO dish_boms
+                  (tenant_id, dish_id, version, total_cost_fen,
+                   yield_qty, yield_unit, is_active, notes, assembly_type)
+                VALUES
+                  (:tid, :dish_id, 1, 0,
+                   :yield_qty, :yield_unit, false, :notes, 'disassembly')
+                RETURNING id
+            """
+            ),
+            {
+                "tid": x_tenant_id,
+                "dish_id": body.dish_id,
+                "yield_qty": str(body.yield_qty),
+                "yield_unit": body.yield_unit,
+                "notes": body.notes,
+            },
+        )
+        bom_id = str(bom_row.scalar())
+
+        # 批量插入 dish_bom_items（loss_rate=0，产出语义）
+        for idx, item in enumerate(body.items):
+            await db.execute(
+                text(
+                    """
+                    INSERT INTO dish_bom_items
+                      (tenant_id, bom_id, ingredient_name, ingredient_code,
+                       quantity, unit, unit_cost_fen, total_cost_fen,
+                       loss_rate, is_semi_product, sort_order)
+                    VALUES
+                      (:tid, :bom_id, :ingredient_name, :ingredient_code,
+                       :quantity, :unit, 0, 0,
+                       0, false, :sort_order)
+                """
+                ),
+                {
+                    "tid": x_tenant_id,
+                    "bom_id": bom_id,
+                    "ingredient_name": item.ingredient_name,
+                    "ingredient_code": item.ingredient_code,
+                    "quantity": str(item.quantity),
+                    "unit": item.unit,
+                    "sort_order": idx,
+                },
+            )
+
+        await db.commit()
+        log.info("disassembly_bom.created", bom_id=bom_id, tenant_id=x_tenant_id)
+
+        bom_data = await _fetch_disassembly_bom(db, bom_id, x_tenant_id)
+        return {"ok": True, "data": bom_data}
+
+    except ValueError as exc:
+        await db.rollback()
+        raise safe_http_exception(422, "参数校验失败", exc) from exc
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        log.error("create_disassembly_bom.db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="数据库写入失败")
+
+
+# ─── GET /boms/disassembly ────────────────────────────────────────────────────
+
+
+@router.get("/boms/disassembly")
+async def list_disassembly_boms(
+    dish_id: Optional[str] = Query(None, description="按菜品ID过滤"),
+    page: int = Query(1, ge=1),
+    size: int = Query(20, ge=1, le=100),
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """查询分解型 BOM 列表（assembly_type='disassembly'）。"""
+    try:
+        await _set_tenant(db, x_tenant_id)
+
+        conditions = [
+            "b.tenant_id = :tid",
+            "b.is_deleted = false",
+            "b.assembly_type = 'disassembly'",
+        ]
+        params: dict = {"tid": x_tenant_id, "offset": (page - 1) * size, "limit": size}
+
+        if dish_id:
+            conditions.append("b.dish_id = :dish_id")
+            params["dish_id"] = dish_id
+
+        where = " AND ".join(conditions)
+
+        count_row = await db.execute(
+            text(f"SELECT COUNT(*) FROM dish_boms b WHERE {where}"),
+            params,
+        )
+        total = count_row.scalar() or 0
+
+        rows = await db.execute(
+            text(
+                f"""
+                SELECT id FROM dish_boms b
+                WHERE {where}
+                ORDER BY b.created_at DESC
+                LIMIT :limit OFFSET :offset
+            """
+            ),
+            params,
+        )
+        bom_ids = [str(r[0]) for r in rows.fetchall()]
+
+        items = []
+        for bid in bom_ids:
+            bom_data = await _fetch_disassembly_bom(db, bid, x_tenant_id)
+            if bom_data:
+                items.append(bom_data)
+
+        return {"ok": True, "data": {"items": items, "total": total, "page": page, "size": size}}
+    except SQLAlchemyError as exc:
+        log.error("list_disassembly_boms.db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="数据库查询失败")
+
+
+# ─── GET /boms/disassembly/{bom_id} ──────────────────────────────────────────
+
+
+@router.get("/boms/disassembly/{bom_id}")
+async def get_disassembly_bom(
+    bom_id: str,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """查询单个分解型 BOM 详情。"""
+    try:
+        await _set_tenant(db, x_tenant_id)
+        bom_data = await _fetch_disassembly_bom(db, bom_id, x_tenant_id)
+        if not bom_data:
+            raise HTTPException(status_code=404, detail="分解型 BOM 不存在")
+        return {"ok": True, "data": bom_data}
+    except HTTPException:
+        raise
+    except SQLAlchemyError as exc:
+        log.error("get_disassembly_bom.db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="查询失败")
+
+
+# ─── POST /boms/disassembly/{bom_id}/calculate ───────────────────────────────
+
+
+@router.post("/boms/disassembly/{bom_id}/calculate")
+async def calculate_disassembly(
+    bom_id: str,
+    body: DisassemblyCalculateIn,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """计算分解产出（dry-run）。给定投入量，按比例返回各组件产出量。不写库存、不写 DB。"""
+    try:
+        await _set_tenant(db, x_tenant_id)
+        result = await disassemble_ingredient(
+            bom_id=bom_id,
+            input_qty=body.input_qty,
+            tenant_id=x_tenant_id,
+            db=db,
+        )
+        return {
+            "ok": True,
+            "data": {
+                "bom_id": result.bom_id,
+                "input_qty": result.input_qty,
+                "yield_qty": result.yield_qty,
+                "outputs": [
+                    {
+                        "ingredient_name": o.ingredient_name,
+                        "ingredient_code": o.ingredient_code,
+                        "output_qty": o.output_qty,
+                        "unit": o.unit,
+                    }
+                    for o in result.outputs
+                ],
+            },
+        }
+    except ValueError as exc:
+        raise safe_http_exception(400, "计算失败", exc) from exc
+    except SQLAlchemyError as exc:
+        log.error("calculate_disassembly.db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="查询失败")
+
+
+# ─── PUT /boms/disassembly/{bom_id} ──────────────────────────────────────────
+
+
+@router.put("/boms/disassembly/{bom_id}")
+async def update_disassembly_bom(
+    bom_id: str,
+    body: DisassemblyBomUpdate,
+    x_tenant_id: str = Header(..., alias="X-Tenant-ID"),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """更新分解型 BOM。若传入 items，则校验总量并全量替换明细行。"""
+    try:
+        await _set_tenant(db, x_tenant_id)
+
+        # 验证 BOM 存在且类型正确
+        existing = await db.execute(
+            text(
+                """
+                SELECT id, yield_qty, assembly_type FROM dish_boms
+                WHERE id = :bom_id AND tenant_id = :tid
+                  AND is_deleted = false AND assembly_type = 'disassembly'
+            """
+            ),
+            {"bom_id": bom_id, "tid": x_tenant_id},
+        )
+        row = existing.mappings().first()
+        if not row:
+            raise HTTPException(status_code=404, detail="分解型 BOM 不存在")
+
+        effective_yield_qty = float(body.yield_qty or row["yield_qty"])
+
+        # 若传入 items，校验总量后替换
+        if body.items is not None:
+            total_component_qty = sum(float(it.quantity) for it in body.items)
+            if total_component_qty > effective_yield_qty + 1e-9:
+                raise ValueError(
+                    f"产出组件总量 {total_component_qty} 超过整件产出量 {effective_yield_qty}"
+                )
+
+            await db.execute(
+                text("DELETE FROM dish_bom_items WHERE bom_id = :bom_id AND tenant_id = :tid"),
+                {"bom_id": bom_id, "tid": x_tenant_id},
+            )
+            for idx, item in enumerate(body.items):
+                await db.execute(
+                    text(
+                        """
+                        INSERT INTO dish_bom_items
+                          (tenant_id, bom_id, ingredient_name, ingredient_code,
+                           quantity, unit, unit_cost_fen, total_cost_fen,
+                           loss_rate, is_semi_product, sort_order)
+                        VALUES
+                          (:tid, :bom_id, :ingredient_name, :ingredient_code,
+                           :quantity, :unit, 0, 0,
+                           0, false, :sort_order)
+                    """
+                    ),
+                    {
+                        "tid": x_tenant_id,
+                        "bom_id": bom_id,
+                        "ingredient_name": item.ingredient_name,
+                        "ingredient_code": item.ingredient_code,
+                        "quantity": str(item.quantity),
+                        "unit": item.unit,
+                        "sort_order": idx,
+                    },
+                )
+
+        # 更新主表字段
+        set_clauses = []
+        update_params: dict = {"bom_id": bom_id, "tid": x_tenant_id}
+
+        if body.yield_qty is not None:
+            set_clauses.append("yield_qty = :yield_qty")
+            update_params["yield_qty"] = str(body.yield_qty)
+        if body.yield_unit is not None:
+            set_clauses.append("yield_unit = :yield_unit")
+            update_params["yield_unit"] = body.yield_unit
+        if body.notes is not None:
+            set_clauses.append("notes = :notes")
+            update_params["notes"] = body.notes
+
+        if set_clauses:
+            await db.execute(
+                text(
+                    f"""
+                    UPDATE dish_boms
+                    SET {", ".join(set_clauses)}
+                    WHERE id = :bom_id AND tenant_id = :tid
+                """
+                ),
+                update_params,
+            )
+
+        await db.commit()
+        log.info("disassembly_bom.updated", bom_id=bom_id, tenant_id=x_tenant_id)
+
+        bom_data = await _fetch_disassembly_bom(db, bom_id, x_tenant_id)
+        return {"ok": True, "data": bom_data}
+
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        await db.rollback()
+        raise safe_http_exception(422, "参数校验失败", exc) from exc
+    except SQLAlchemyError as exc:
+        await db.rollback()
+        log.error("update_disassembly_bom.db_error", error=str(exc))
+        raise HTTPException(status_code=500, detail="数据库更新失败")
+
+
+# ─── 分解型 BOM 内部工具 ───────────────────────────────────────────────────────
+
+
+async def _fetch_disassembly_bom(
+    db: AsyncSession,
+    bom_id: str,
+    tenant_id: str,
+) -> Optional[dict]:
+    """查询分解型 BOM 主表 + 明细行，未找到返回 None。"""
+    bom_row = await db.execute(
+        text(
+            """
+            SELECT id, tenant_id, dish_id, version, total_cost_fen,
+                   yield_qty, yield_unit, is_active, notes, assembly_type,
+                   created_at, updated_at, is_deleted
+            FROM dish_boms
+            WHERE id = :bom_id
+              AND tenant_id = :tid
+              AND is_deleted = false
+              AND assembly_type = 'disassembly'
+        """
+        ),
+        {"bom_id": bom_id, "tid": tenant_id},
+    )
+    bom = bom_row.mappings().first()
+    if not bom:
+        return None
+
+    items_row = await db.execute(
+        text(
+            """
+            SELECT id, bom_id, ingredient_name, ingredient_code,
+                   quantity, unit, sort_order,
+                   created_at, updated_at
+            FROM dish_bom_items
+            WHERE bom_id = :bom_id
+              AND tenant_id = :tid
+            ORDER BY sort_order, created_at
+        """
+        ),
+        {"bom_id": bom_id, "tid": tenant_id},
+    )
+    items = [dict(r) for r in items_row.mappings().all()]
+
+    result = dict(bom)
+    result["items"] = items
+
+    # 转换非 JSON 可序列化类型
+    for k, v in result.items():
+        if hasattr(v, "isoformat"):
+            result[k] = v.isoformat()
+        elif isinstance(v, Decimal):
+            result[k] = str(v)
+    for item in items:
+        for k, v in item.items():
+            if hasattr(v, "isoformat"):
+                item[k] = v.isoformat()
+            elif isinstance(v, Decimal):
+                item[k] = str(v)
+        if item.get("id"):
+            item["id"] = str(item["id"])
+        if item.get("bom_id"):
+            item["bom_id"] = str(item["bom_id"])
+    for k in ("id", "tenant_id", "dish_id"):
+        if result.get(k):
+            result[k] = str(result[k])
+    return result
