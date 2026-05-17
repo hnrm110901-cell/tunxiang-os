@@ -1,3 +1,88 @@
+## 2026-05-17 (周日 ε ζ η 三 session 全天 — 14 PR ship + 3 issue 立 + W21 议程更新 + silent -69%)
+
+### 今日完成 (14 PR ship 时间线, verified `gh pr list --search "merged:>=2026-05-17"`)
+
+#### 早段 (04:20-09:07Z = 12:20-17:07 CST) — 10 PR ship by 早段 sessions
+- 04:20Z **#742** `[Tier1] fix(tx-supply): silent failure Wave 1 sub-A — 9 业务 site (issue #663)` (T1 邻接, explicit-ask 第 37 例 carve-out)
+- 04:31Z **#747** `[T3] fix(tx-supply): test_disabled_by_default mock _ff_is_enabled false (issue #746)`
+- 04:39Z **#749** `[T3] test(tx-analytics): mock _ff_is_enabled in projector tests — PR #734 sibling regressions (Closes #748)`
+- 04:54Z **#741** `[T2] feat(test-infra): main.py import smoke 补全 PR #351 漏的 5 服务 + 二次设计 (issue #714)`
+- 05:03Z **#751** `[T3] test(tx-supply): silent failure Wave 1 sub-C — 10 test site → pytest.raises / suppress (Closes #744)`
+- 05:52Z **#752** `[T3] fix(tx-supply): silent failure Wave 1 sub-D — 1 projector 真修 + 3 graceful doc + 2 metrics 批准 + 1 Ruff (Closes #745)`
+- 08:09Z **#775** `[T3] docs(claude-md): sync v229→v438 + 14→20 services + §23-§26 strategic chapters (Closes #754)`
+- 08:10Z **#774** `[T3 governance] feat: docs/governance/ + docs/service-health/ + drift-check + weekly cron (Closes #761)`
+- 08:11Z **#773** `[T3 governance] feat: service-freeze hook .omc/policy + git/CI 拦截 (Closes #755)`
+- 09:07Z **#781** `[Tier1-adjacent] feat(tx-supply,web-admin): PRD-12 资质证件类型字典 + UI (Phase 1 演示闸, Phase 2 接入 follow-up)`
+
+#### ε session (16:18-17:00 CST 周末 worktree cleanup, 0 PR ship 仅 cleanup + 立 3 issue)
+- worktree audit 第一轮: 56 → 26 (-30 safe remove, PR MERGED + clean)
+- worktree audit 第二轮深查 暴露 3 issue:
+  - **#776** `[Tier1] 5/11 残留 3 个 Tier 1 安全 fix 复活 ship` — gateway whitelist + F#7 webhook secret + F#10 omni_channel fail-closed (全 P0 prod-impact)
+  - **#782** `[Triage] 5/13-5/15 残留 4 worktree 含 unmerged round-N commits` (后 η Lane B closed)
+  - **#783** `[Tier3 治理] W20.md baseline regen + 修 weekly-cron 路径 bug` (后 η Lane A closed)
+- 关键 lesson: worktree cleanup 必须 3 步 audit (dirty + PR + is-ancestor) — feedback memory `feedback_worktree_audit_three_step` 落盘
+- 3 worktree 锁定不可删 (待 #776 ship): `gateway-pay-callback-whitelist-2026-05-11` + `tx-trade-omni-channel-fail-closed-2026-05-11` + `tx-trade-webhook-secret-fail-closed-2026-05-11`
+
+#### ζ session (17:00-18:00 CST W21 议程更新, 1 PR ship)
+- 09:37Z **#784** `[T3 governance] docs(w21-agenda): 5/17 ε session 更新 — §1.0 P0 #776 + §3.1 19→20 + §3.2 W20 regen + §4 W22 主题重排`
+- W20.md regen at HEAD `bcdaee96` — silent_failure_count 192 → **68** (-65%)
+- 7 项议程 patch: §1.0 新加 P0 #776 / §1.3 G10 7 PR 进展 / §2.0 W2 起手优先级 / §3.1 服务数 19→20 修正 / §3.2 W20 真实数据 / §4 W22 主题重排 / §5 informational
+- §19 reviewer round-1 抓 1 P1 (G10 列 6 PR 但声 7 — 漏 #698 sub-B.2 lifespan 接入) → round-2 APPROVE
+- T3 explicit-ask 第 23 例 / docs carve-out 第 13 例
+
+#### η session (17:42-21:30 CST OMC 团队 A→B→C→D→E 顺序执行, 2 PR ship + 1 issue 关 + 1 SHA-pin issue 立)
+- user 17:42 校正 "周末 IDLE 假设错" — feedback memory `feedback_user_works_weekends` 落盘 (7 天工作制, 周末与工作日同等 ship 标准, 不要列"破 IDLE"虚假约束)
+- **Lane A** 10:00Z **#786** `[T3 governance] fix(weekly-cron): switch to code-fact-scan.py + auto-PR docs regen (#783)` — T3 第 24 例 / docs carve-out 第 14 例 / 关闭 #783
+- **Lane B** 18:10 CST Issue **#782** CLOSED — 4 worktree triage 全可弃 (squash merge 吸收 round-N verified, 0 真遗失). 关键 verify: wine_storage_routes.py L571/L578/L673/L680/L777 FOR UPDATE 行锁全在 main / cert UI round-2 / import smoke 补 / conftest abandoned
+- **Lane C** 13:08Z **#788** `[T3] silent failures Wave 5 — 12 sites cross-4-svc cleanup (-66%) (#663)` — T3 第 25 例 / mega PR cross-svc 模式 (Wave 4 PR-4 #697 镜像). AST scan 12 → 4 残留 (4 全 whitelist + test fixture 不动)
+- **Lane D** 22:00 CST Issue **#789** 立 `[T3 governance] SHA-pin GitHub Actions 统一加固 (PR #786 reviewer 提的 non-blocking follow-up)`
+- **Lane E** 本 entry (DEVLOG + progress 5/17 update, T3 docs carve-out 第 15 例)
+
+#### 并发 session ship (η 期间)
+- 13:17Z **#787** `feat(shared/db-migrations): #756 GL 内核 5 表 (posting_period/chart_of_accounts/journal_entry/journal_line/cost_center_dictionary) v441-v445 + 38 tests [Tier1邻接]` — W3 GL 内核 **提前 10 天启动** (战略 plan 5/27 → 实际 5/17), scope 扩 4→5 表 (加 cost_center_dictionary)
+
+### 数据变化
+
+- **迁移版本**: v438 (5/15) → v440 (并发 W2 sub-A) → **v445** (PR #787 GL 5 表 v441-v445) — +7 versions
+- **新增 API 模块**: 0 (本日全 cleanup + 议程 + Wave 5 observability + DEVLOG/progress + 1 并发 GL migration 骨架)
+- **新增测试**: ~52 个 (#741 5 服务 main import smoke wrapper + 1 helper twin / #751 10 silent → pytest.raises / Wave 5 4 服务 test_silent_observability_wave5.py 14 个 / PR #787 38 GL tests)
+- **新增 issue**: **4** (#776 P0 / #782 ✅ closed / #783 ✅ closed / #789 SHA-pin)
+- **关闭 issue**: **5** (#783 / #782 / #754 / #755 / #761 + 多 #744-#748 sub)
+- **silent_failure_count**: 192 (5/15 W20) → 68 (5/17 18:30 PR #784 W20 regen) → **60** (5/17 21:08 PR #788 Wave 5) = **-69% 累计**
+- **T3 explicit-ask 累计**: 22 (5/17 早) → **25** (+ ζ #784 + η #786 + η #788)
+- **worktree 总数**: 56 → **25** (-31 净, 含 OMC 2 sandbox 自动管 + η 期 2 新 ship worktree)
+- **main HEAD**: `bb4552e3` (5/15 baseline) → `1dfb7fba` (5/16 早) → ... → **`435d98eb`** (5/17 21:17 PR #787) = **14 PR**
+
+### 关键学习沉淀 (4 个 feedback memory 本日落盘)
+
+1. **`feedback_worktree_audit_three_step`** — worktree cleanup 3 步 audit (dirty + PR + is-ancestor) + `is-ancestor=NO` 严禁 blind remove; ε 实战 暴露 #776 5/11 残留 P0 fix
+2. **`feedback_user_works_weekends`** — user 7 天工作制, 不要假设"周末 IDLE"是 default; "破 IDLE 一次 vs 严格 IDLE" trade-off 框架本身错误, 取消该措辞
+3. **(议程级数据精度)** — §19 reviewer 不放过"数字 = 列表" 一致性 (ζ session round-1 抓: 声 7 PR 但列 6 个号), 任何议程/报告类 docs PR 必查 "数字"↔"列表"对齐 (待沉淀 feedback memory)
+4. **(squash merge vs fully unshipped 区分)** — η Lane B 实战: 同样 worktree audit `is-ancestor=NO` 命中, 但 PR 状态决定后续 — PR MERGED 即 squash 已吸收 round-N 弃 worktree; PR 不存在/CLOSED 即 unshipped 需 ship; **3 步 audit 后必须加第 4 步: PR merge mode + main grep verify**
+
+### 遗留问题
+
+- **#776** 5/11 残留 3 Tier 1 安全 fix (gateway whitelist + F#7 + F#10) — 待 W21 守门会 5/18 09:00 sign-off 后 W2-1 ship (P0 prod-impact 优先级, 顺序 PR-B/C 兜底 → PR-A 开闸)
+- **#689** tx-agent 3 sites §17 三条硬约束 — 待 #776 ship 后排期单 Tier 1 PR
+- **#663** silent failure 治理 sprint umbrella — 60 残留 = 53 G10 撞车 (tx-trade, 待 G10 W11 解禁) + 3 tx-agent 拆 #689 + 4 whitelist; 业务 silent 已基本清零, **不主动 close 等 G10 + #689 完工**
+- **#710** YYYY-MM 解析 Phase 2 dedup (20+ 解析点) — T3 refactor, W22+ 4-5 分批 PR
+- **#789** SHA-pin follow-up — peter-evans/create-pull-request@v6 + actions/checkout@v4 等全仓 floating tag 未 SHA-pin, dependabot 自动管理候选 (W22+ 排期)
+- **#737** Phase 0 sampler 跑 → Phase 1 真测量, W22+ 拍板决策矩阵
+
+### 明日计划 (5/18 周一)
+
+- **09:00 W21 守门会** — 议程已 PR #784 更新, 议程 §1.0 / §2.0 创始人决议:
+  - §1.0 #776 优先级 (建议 A: W2 起手 P0)
+  - §1.1/§1.2 wine_storage SoT + PaymentSaga (#535 #537)
+  - §1.3 PR-D/E 排期 (待 G10 W11 解禁)
+  - §2.0 W2 起手 3 PR 顺序 #776 vs #758 vs #756/#757 (后者 #787 已并发 ship 5 表骨架, W3 真 GL 通账 settle_order 可加速)
+- 守门会决议后启动 W2:
+  - **W2-1 #776** PR-B (F#7 webhook secret) + PR-C (F#10 omni_channel) 兜底先 ship → PR-A (gateway whitelist) 最后开闸
+  - **W2-2 #758** Gateway 瘦身抽 tx-sync-worker (依赖 #774 守门会基建 + planned_additions 例外申请)
+  - **W3 提前 (因 #787 已 ship GL 骨架)**: #756 已 partial done (5 表 v441-v445), #757 真 Outbox shadow + #759 ActionRegistry + #760 settle_order 通账 加速到 W2-3 候选
+
+---
+
 ## 2026-05-16 续 — issue #714 PR-A main.py import smoke 补全 (T2 normal / Tier 1 邻接 carve-out 第 13 类候选)
 
 ### 关键发现 — 前置 audit (做完 18 个文件后才发现, 应用 `feedback_issue_text_scope_drift.md` 教训重新缩 scope)

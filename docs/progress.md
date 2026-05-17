@@ -5271,3 +5271,77 @@ TestV264MigrationFileStructure（结构契约,防漂移）
 - **dirty working tree**：本 session 多次 git checkout 累积 5+ stash，主 worktree 残留 tx-trade/order_service.py / pnpm-workspace.yaml / 等多处 dirty file（来自先前 worktree 操作或 sub-agents 残留），未污染本 session commit 但需要后续清理（git stash list 可见）
 
 ---
+
+## 2026-05-17 16:18 (ε session worktree cleanup)
+
+### 完成状态
+- [x] worktree audit 第一轮: 56 → 26 (-30 safe remove, PR MERGED + clean)
+- [x] worktree audit 第二轮: 暴露 5/11 残留 3 Tier 1 安全 fix → 立 #776 [Tier1] gateway whitelist + F#7 + F#10
+- [x] 暴露 5/13-5/15 4 worktree round-N → 立 #782 [Triage]
+- [x] feedback `feedback_worktree_audit_three_step` 落盘 (dirty + PR + is-ancestor 3 步必查)
+
+### 关键决策
+- worktree audit 必须 3 步 (dirty + PR + is-ancestor), 不可只看 dirty (`is-ancestor=NO` 是 unshipped work 唯一防线)
+- #776 暴露 = cleanup 副产出价值 (handoff 推"5min 任意时间"任务实暴 6 天前遗失 P0)
+- 3 worktree 严禁删 (待 #776 PR-A/B/C ship 后): gateway-pay-callback-whitelist / tx-trade-omni-channel-fail-closed / tx-trade-webhook-secret-fail-closed
+
+### 下一步
+- ζ session: W21 议程更新 ship 守门会前 (议程 §3.1 数字 19 错应 20 / §3.2 数字 stale / §1.0 缺 #776 P0)
+
+### 已知风险
+- 3 worktree 锁定不可删, 直到 #776 PR-A/B/C ship
+- 议程 5/15 落稿 stale, 创始人 09:00 看错数字风险
+
+---
+
+## 2026-05-17 17:30 (ζ session W21 议程更新 PR #784)
+
+### 完成状态
+- [x] PR #784 MERGED `476a383d` 9:37Z — W21 议程 7 项 patch + W20.md regen
+- [x] silent baseline 数据真实化: 192 → 68 (-65%)
+- [x] 议程 §1.0 P0 #776 加入 (创始人 09:00 看到决议依据)
+- [x] §1.3 G10 7 PR 进展更新 / §2.0 W2 起手优先级 / §3.1 服务数 20 修正 / §4 W22 主题重排
+
+### 关键决策
+- §19 reviewer round-1 抓 1 P1 (G10 列 6 PR 声 7 漏 #698) — 数字↔列表严审; round-2 APPROVE 0 P0/P1
+- T3 docs carve-out 第 13 例 admin-merge, 5 项前置全过 (§19 / CI / fetch / search / 0 §17 G10)
+- 选 "破 IDLE" 框架议论上 ship (后被 user 校正"周末工作不停", 框架本身错误)
+
+### 下一步
+- η session: OMC 团队 A→B→C 顺序执行 + Lane D/E follow-up
+
+### 已知风险
+- 5/11 残留 fix 等待 W21 sign-off 才 ship (P0 prod-impact 已 6 天)
+- Wave 4 已全完但 §4 旧 W22 主题"Wave 4 启动"错位 — 已重写
+
+---
+
+## 2026-05-17 21:30 (η session OMC 团队 A→B→C 完成 + D/E follow-up)
+
+### 完成状态
+- [x] **Lane A** PR #786 MERGED `20c0ba7b` 10:00Z — weekly cron 路径 bug fix (1 file +61/-1, 切换 code-fact-scan.py + auto-PR action), 关闭 #783
+- [x] **Lane B** Issue #782 CLOSED 18:10 CST — 4/4 worktree triage 全可弃 (squash 吸收 round-N verified), 4 worktree cleanup
+- [x] **Lane C** PR #788 MERGED `d9686af7` 13:08Z — Wave 5 silent 12 sites cross-4-svc cleanup (-66%); silent 68 → 60
+- [x] **Lane D** Issue #789 立 — SHA-pin GitHub Actions follow-up (peter-evans + actions/checkout 等全仓 floating tag)
+- [x] **Lane E** 本 commit — DEVLOG.md + docs/progress.md 5/17 当日更新 (T3 docs carve-out 第 15 例)
+- [x] feedback `feedback_user_works_weekends` 落盘 (user 17:42 校正"周末 IDLE 框架错")
+- [x] 并发 session ship: #787 GL 内核 5 表 v441-v445 (W3 提前 10 天启动, scope 扩 4→5 表)
+
+### 关键决策
+- OMC 团队 A→B→C 顺序执行 ~3h 完成 3 lane + ~30min D + E (全 single-round APPROVE 0 P0/P1)
+- squash merge vs fully unshipped 模式区分 (#782 vs #776) — 3 步 audit 后必须加第 4 步: PR merge mode + main grep verify
+- user 校正 "周末 IDLE 框架" → 取消"破 IDLE"等措辞, 周末与工作日同等 ship 决策标准
+- executor agent 主张必 verify (Lane B research / Lane C diff scope / Lane A reviewer ⚠️ 备注)
+
+### 下一步
+- 5/18 09:00 W21 守门会
+- 守门会决议后启动 W2: #776 PR-B/C/A (P0) + #758 (T2 Gateway 瘦身) + W3 真 GL 通账 (因 #787 已 ship 5 表骨架可加速)
+- W22+ backlog: #689 (Tier 1) / #710 (T3 dedup Phase 2) / #789 (SHA-pin) / #737 (Phase 1 测量)
+
+### 已知风险
+- session 累计 5 PR ship (#784/#786/#788 + Lane E 本 PR + 并发 #787) + 4 issue (#776/#782 closed/#783 closed/#789) + 议程更新 + 多 cleanup, context fatigue 接近 `feedback_proactive_session_split` 警线
+- 3 worktree 仍锁 (#776 待 ship), W2-1 第一周必启动
+- #787 W3 GL 5 表骨架 scope 扩 (加 cost_center_dictionary), 战略 plan 原 4 表 partial done — 创始人确认是否 scope 扩本身 OK
+- SHA-pin follow-up (#789) 实际 ship 待 W22+, peter-evans@v6 当前周末 cron 有 supply chain 攻击向量风险但概率低
+
+---
