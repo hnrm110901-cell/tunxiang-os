@@ -47,6 +47,7 @@ from .api.market_survey_routes import (
 )
 from .api.share_split_routes import router as share_split_router
 from .api.doc_number_routes import router as doc_number_router
+from .api.certificate_type_routes import router as certificate_type_router
 from .api.delivery_route_routes import router as delivery_route_router
 from .api.dept_issue_routes import router as dept_issue_router
 from .api.distribution_routes import router as distribution_router
@@ -228,6 +229,7 @@ app.include_router(requisition_template_router)  # 申购模板 (PRD-07 / Phase 
 app.include_router(dept_whitelist_router)  # 部门用料白名单 (PRD-08 / Phase 2 W11 / T2 + Tier 1 邻接)
 app.include_router(share_split_router)  # POS 销售分成转入库 (PRD-11 sub-A / Phase 2 W11 / T2 + Tier 1 邻接)
 app.include_router(market_survey_router)  # 市场调研双轨 (PRD-13 sub-A / Phase 2 W11 / T2 normal)
+app.include_router(certificate_type_router)  # 资质证件类型字典 (PRD-12 / Phase 3 W13 / Tier 1 邻接)
 app.include_router(market_survey_ingredients_router)  # ingredient autocomplete (PRD-13 sub-B / Phase 2 W11 / T2 normal)
 app.include_router(mobile_supply_router)  # 移动端供应链：扫码采购/收货/盘点（模块3.3）
 app.include_router(transfer_ext_router)  # 调拨扩展：execute 端点

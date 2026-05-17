@@ -227,7 +227,10 @@ _TIER1_TEXT_SQLVAR_BASELINES: dict[str, int] = {
     # PR-PRD-05 (delivery_window_service.list_delivery_windows) 加 1 — 同 PR-01C/PR #633/PRD-06 模式
     # 同一处 text(f"... WHERE {where_sql}") 触发，only_active / supplier_id / store_id 条件由
     # 硬编码字面量 + 参数占位组成，无用户输入注入面。
-    "services/tx-supply/src": 11,
+    # PR #781 (PRD-12 / certificate_type_service.update_certificate_type) 加 1 — text(update_sql)
+    # 动态构建 UPDATE 支持 fields_set 模式 (允许 set NULL)，set_parts 仅含硬编码列名字面量
+    # ("name = :name" 等)，值全部用 :param 绑定，无用户输入注入面 (round-2 code-reviewer verified)。
+    "services/tx-supply/src": 12,
 }
 
 

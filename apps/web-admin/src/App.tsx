@@ -80,6 +80,7 @@ import { SplitAttributionDLQPage } from './pages/supply/SplitAttributionDLQPage'
 import { MarketSurveysPage } from './pages/supply/MarketSurveysPage';  // PRD-13 sub-A/B 市场调研双轨 / Phase 2 W11 / T2 normal
 import { BanquetTemplatePage } from './pages/hq/trade/BanquetTemplatePage';
 import { SupplierPortalPage } from './pages/hq/supply/SupplierPortalPage';
+import { CertificateTypesPage } from './pages/hq/supply/CertificateTypesPage';  // PRD-12 资质证件类型字典 / Phase 3 W13 / Tier 1 邻接
 import { ReviewManagePage } from './pages/ops/ReviewManagePage';
 import { SettlementMonitorPage } from './pages/ops/SettlementMonitorPage';
 import { StoreManagePage } from './pages/store/StoreManagePage';
@@ -324,6 +325,7 @@ function AppContent() {
           <Route path="/store/food-court" element={<FoodCourtManagePage />} />  {/* TC-P2-12 智慧商街档口管理 */}
           <Route path="/hq/trade/banquet-templates" element={<BanquetTemplatePage />} />
           <Route path="/hq/supply/suppliers" element={<SupplierPortalPage />} />
+          <Route path="/hq/supply/cert-types" element={<CertificateTypesPage />} />  {/* PRD-12 资质证件类型字典 */}
           <Route path="/agent/dashboard" element={<AgentDashboardPage />} />
           <Route path="/agent/chief" element={<ChiefAgentPage />} />
           {/* ─── 模块4.4: Agent KPI绑定仪表盘 ─── */}
