@@ -1,4 +1,4 @@
-"""v439 — certificate_types 字典表（PRD-12 资质证件类型字典 / Phase 3 W13 / Tier 1 邻接）
+"""v440 — certificate_types 字典表（PRD-12 资质证件类型字典 / Phase 3 W13 / Tier 1 邻接）
 
 业务背景：
   PRD-01 supplier_certificates.cert_type 是 VARCHAR(48) 自由文本，缺乏统一字典管控。
@@ -17,10 +17,11 @@
   - inspector-and-skip 模式（与 v421+ 一致，idempotent 防 dry-run 重跑）
 
 Migration 链：
-  v438_cost_attribution_summary → v439_certificate_types (本 PR)
-  v440 预留给 PRD-16（Lane B.2，尚未启动）
+  v438_cost_attribution_summary → v440_certificate_types (本 PR)
+  Lane A PRD-17 sub-A 并行也 chain v438 → double head，由 merge revision PR 收敛。
+  v441 预留给 PRD-16（Lane B.2，尚未启动）
 
-Revision ID: v439_certificate_types
+Revision ID: v440_certificate_types
 Revises: v438_cost_attribution_summary
 Create Date: 2026-05-17
 """
@@ -29,7 +30,7 @@ from typing import Sequence, Union
 import sqlalchemy as sa
 from alembic import op
 
-revision: str = "v439_certificate_types"
+revision: str = "v440_certificate_types"
 down_revision: Union[str, Sequence[str], None] = "v438_cost_attribution_summary"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
