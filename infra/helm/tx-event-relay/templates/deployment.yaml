@@ -21,6 +21,9 @@ spec:
       annotations:
         {{- toYaml .Values.podAnnotations | nindent 8 }}
     spec:
+      serviceAccountName: {{ include "tx-event-relay.serviceAccountName" . }}
+      # relay 不调 K8s API → automountServiceAccountToken=false 防 token 误挂
+      automountServiceAccountToken: false
       {{- if .Values.podAntiAffinity.enabled }}
       affinity:
         podAntiAffinity:
