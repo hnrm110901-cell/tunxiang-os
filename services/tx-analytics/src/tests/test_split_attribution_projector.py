@@ -281,11 +281,16 @@ class TestEventTypeRegistration:
 class TestProjectorRegistry:
     @pytest.mark.asyncio
     async def test_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """env 未设 + SDK 评估 OFF → start 静默 return, 不创建 task."""
         from services.tx_analytics.src.projectors import registry
 
         monkeypatch.delenv(
             "TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR", raising=False
         )
+        # PR #734 改 is_enabled() 加入 feature_flags SDK 路径后, env 未设 → 走 SDK;
+        # CI 默认 TUNXIANG_ENV/TX_ENV 未设 → SDK env fallback "dev" → environments.dev=true
+        # → flag ON → task 创建. Mock SDK 还原"默认 disabled"语义 (与 tx-supply 同 fix).
+        monkeypatch.setattr(registry, "_ff_is_enabled", lambda *_a, **_k: False)
         registry._PROJECTOR_TASKS.clear()
         await registry.start_split_attribution_projector(_TENANT_XUJI)
         assert _TENANT_XUJI not in registry._PROJECTOR_TASKS
@@ -302,6 +307,7 @@ class TestProjectorRegistry:
     async def test_is_enabled_env_variants(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """env 显式 truthy/falsy → _env_override; "" → 走 SDK fallback (PR #734 后新语义)."""
         from services.tx_analytics.src.projectors import registry
 
         for v in ("true", "TRUE", "1", "yes", "on"):
@@ -309,11 +315,17 @@ class TestProjectorRegistry:
                 "TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR", v
             )
             assert registry.is_enabled() is True
-        for v in ("false", "0", "no", "off", ""):
+        for v in ("false", "0", "no", "off"):
             monkeypatch.setenv(
                 "TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR", v
             )
             assert registry.is_enabled() is False
+        # 空字符串 "" 不在 _env_override 显式列表 → 返 None → 走 SDK fallback.
+        # CI 默认 TUNXIANG_ENV/TX_ENV 未设 → SDK env="dev" → environments.dev=true → True.
+        # Mock SDK OFF 还原 "" 在 _env_override 的预期 falsy 语义 (与 test_disabled_by_default 同 fix).
+        monkeypatch.setattr(registry, "_ff_is_enabled", lambda *_a, **_k: False)
+        monkeypatch.setenv("TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR", "")
+        assert registry.is_enabled() is False
 
     @pytest.mark.asyncio
     async def test_stop_all_empties_tasks_dict(self) -> None:
