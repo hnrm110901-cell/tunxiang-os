@@ -1,4 +1,4 @@
-## 2026-05-17 21:00 · W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例)
+## 2026-05-17 21:00 · W3 #757 真 Outbox shadow round-0 (Tier 1 邻接 explicit-ask 第 38 例 候选)
 
 ### 完成状态
 
@@ -8,8 +8,8 @@
 - [x] **Step 4 Helm chart** — infra/helm/tx-event-relay/ 11 文件 (Chart.yaml + values.yaml + 9 templates, T3 default off)
 - [x] **Step 5 compose + 端口分配** — base.yml :8020 注册 + port-allocation 文档加行
 - [x] **Step 6 守门会决议** — docs/governance/decisions/2026-05-17-tx-event-relay-shadow-mode-approval.md (113 行)
-- [x] **Step 7 DEVLOG + progress** — 本 entry + DEVLOG 2026-05-17 块
-- [x] **Step 8 验证** — pytest services/tx-event-relay/src/tests/ 15/15 pass (8 shadow_tier1 + 7 outbox_repo)
+- [x] **Step 7 DEVLOG + progress** — 本 entry + DEVLOG 2026-05-17 深夜 θ 块
+- [x] **Step 8 验证** — pytest services/tx-event-relay/src/tests/ **15/15 pass** (8 shadow_tier1 + 7 outbox_repo)
 - [ ] §19 三 reviewer round-1
 - [ ] 创始人 explicit-ack ship
 
