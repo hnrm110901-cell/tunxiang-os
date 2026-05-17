@@ -3,6 +3,8 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from services.tx_supply.src.services.distribution import (
@@ -135,11 +137,8 @@ class TestCreateDistributionPlan:
             assert "store_orders" in str(e)
 
     def test_create_plan_tenant_required(self):
-        try:
+        with pytest.raises(ValueError):
             create_distribution_plan(WAREHOUSE_ID, [{"store_id": "s1", "items": []}], "")
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
 
     def test_plan_items_status_pending(self):
         plan = _create_test_plan()
@@ -178,11 +177,8 @@ class TestOptimizeRoute:
         assert result["estimated_duration_min"] > 0
 
     def test_optimize_invalid_plan(self):
-        try:
+        with pytest.raises(ValueError):
             optimize_route("nonexistent-plan", TENANT)
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
 
 
 class TestDispatchDelivery:
@@ -221,11 +217,8 @@ class TestDispatchDelivery:
 
     def test_dispatch_tenant_isolation(self):
         plan = _create_test_plan()
-        try:
+        with pytest.raises(ValueError):
             dispatch_delivery(plan["plan_id"], "driver-001", "other-tenant")
-            assert False, "应该抛出 ValueError"
-        except ValueError:
-            pass
 
 
 class TestConfirmDelivery:
