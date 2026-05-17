@@ -116,7 +116,7 @@ def test_site3_smart_procurement_warn_and_counter():
 def test_site4_auto_procurement_supplier_score_no_broad_except():
     """site 4 (§13 零容忍): supplier_score except 必须收窄, 0 bare `except Exception`."""
     src = _read("services/auto_procurement.py")
-    # 原 silent: `except Exception:  # noqa: BLE001\n                    pass`
+    # 原 silent: `except Exception` 后跟 `pass` (历史 "noqa BLE001" 标注模式)
     assert not re.search(
         r"try:.*?except Exception:.*?pass",
         src,

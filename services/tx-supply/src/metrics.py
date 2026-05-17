@@ -14,6 +14,14 @@ issue #592（PR #586 §19 round-2 follow-up）:
   - record fn 必须 fail-open（counter.inc() 内部 prometheus_client 保证不 raise，
     但外层 try/except 仍兜一层防 wheel 损坏 / 注册表损坏极端场景，与 issue #580
     graceful degradation 契约一致）
+
+经批准的 fail-open silent 模式 (silent_failure 治理 scope 外):
+  - record_doc_number_fallback() 内 `except Exception: pass` — PR #586 §19 round-2
+    批准 (issue #592 / feedback_graceful_degradation_pattern.md)
+  - record_silent_fallback() 内 `except Exception: pass` — PR #742 §19 round-1
+    批准 (issue #663 sub-A, 镜像 record_doc_number_fallback 同模式)
+  二者均为"metrics 写入兜底防注册表损坏"白名单，不计入 silent_failure_count 治理 scope
+  (与"业务路径 silent"不同 — 此为 Tier 1 保护层 fail-open 契约)
 """
 
 from __future__ import annotations
@@ -98,14 +106,16 @@ def record_doc_number_fallback(service: str, doc_type: str) -> None:
 #
 # 4 个 (b)/(c) site (Plan §2 表 #3/#6/#7/#8/#9) 共用此 counter，以 `site` label
 # 区分 callsite — 与 doc_number 用 (service, doc_type) 双 label 同模式，
-# cardinality 封闭：5 个固定 site 字符串。
+# cardinality 封闭：6 个固定 site 字符串（sub-A 5 + sub-D 1）。
 #
-# Site 枚举（plan §2 表）:
+# Site 枚举（plan §2 表 + sub-D 扩展）:
 #   smart_procurement.supplier_history  — 供应商最近供货查询 (Tier 1 邻接, 触毛利)
 #   expiry_monitor.parse_notes          — 批次效期解析 (Tier 1 邻接, 食安)
 #   theoretical_cost.get_current_bom    — BOM 查询 (毛利辅助)
 #   actual_cost.last_purchase           — 实际采购价查询 (毛利辅助)
 #   actual_cost.ledger_price            — 台账价查询 (毛利辅助)
+#   index_split.event_parse             — IndexSplitProjector _safe_uuid 畸形 UUID
+#                                          (sub-D / issue #745, DLQ 行 ID NULL 落库)
 silent_fallback_total: Final[Counter] = Counter(
     "tx_supply_silent_fallback_total",
     "tx-supply 业务 silent fallback 落 None 次数 (issue #663 Wave 1 sub-A)",
@@ -123,7 +133,8 @@ def record_silent_fallback(site: str) -> None:
     Args:
         site: callsite 标识（plan §2 site 枚举 — smart_procurement.supplier_history /
               expiry_monitor.parse_notes / theoretical_cost.get_current_bom /
-              actual_cost.last_purchase / actual_cost.ledger_price）
+              actual_cost.last_purchase / actual_cost.ledger_price /
+              index_split.event_parse [sub-D / issue #745]）
     """
     try:
         silent_fallback_total.labels(site=site).inc()
