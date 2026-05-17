@@ -46,6 +46,7 @@ import {
   Spin,
   Switch,
   Table,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -57,6 +58,7 @@ import {
   PieChartOutlined,
   PlusOutlined,
   SaveOutlined,
+  ScissorOutlined,
   SearchOutlined,
 } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
@@ -126,6 +128,33 @@ interface CostBreakdownItem {
   percentage: number;
 }
 
+// ─── 分解型 BOM 类型 (PRD-09) ────────────────────────────────────────────────
+
+interface DisassemblyItem {
+  _key: string;
+  ingredient_name: string;
+  ingredient_code: string;
+  quantity: number;
+  unit: string;
+}
+
+interface DisassemblyBom {
+  id: string;
+  dish_id: string;
+  yield_qty: string;
+  yield_unit: string;
+  notes?: string;
+  assembly_type: 'disassembly';
+  items: DisassemblyItem[];
+}
+
+interface DisassemblyOutput {
+  ingredient_name: string;
+  ingredient_code: string | null;
+  output_qty: number;
+  unit: string;
+}
+
 // ─── 工具函数 ─────────────────────────────────────────────────────────────────
 
 /** @deprecated Use formatPrice from @tx-ds/utils */
@@ -169,6 +198,19 @@ const BomEditorPage: React.FC = () => {
   const [newVersionModal, setNewVersionModal] = useState(false);
   const [newVersionForm] = Form.useForm();
 
+  // ── 分解型 BOM 独立 state (PRD-09) ──
+  const [disassemblyBom, setDisassemblyBom] = useState<DisassemblyBom | null>(null);
+  const [disassemblyItems, setDisassemblyItems] = useState<DisassemblyItem[]>([]);
+  const [disassemblyYieldQty, setDisassemblyYieldQty] = useState<number>(10);
+  const [disassemblyYieldUnit, setDisassemblyYieldUnit] = useState<string>('kg');
+  const [disassemblyNotes, setDisassemblyNotes] = useState<string>('');
+  const [disassemblySaving, setDisassemblySaving] = useState(false);
+  const [disassemblyLoading, setDisassemblyLoading] = useState(false);
+  const [disassemblyPreviewQty, setDisassemblyPreviewQty] = useState<number>(1);
+  const [disassemblyOutputs, setDisassemblyOutputs] = useState<DisassemblyOutput[]>([]);
+  const [disassemblyPreviewing, setDisassemblyPreviewing] = useState(false);
+  const [disassemblyForm] = Form.useForm();
+
   // ── 初始加载菜品列表 ──
   const loadDishes = useCallback(async (search: string) => {
     setDishLoading(true);
@@ -210,6 +252,36 @@ const BomEditorPage: React.FC = () => {
     searchTimer.current = setTimeout(() => loadDishes(v), 400);
   };
 
+  // ── 加载分解型 BOM（选中菜品时同步加载）──
+  const loadDisassemblyBom = useCallback(async (dish: Dish) => {
+    setDisassemblyLoading(true);
+    try {
+      const data = await txFetchData<{ items: DisassemblyBom[]; total: number }>(
+        `/api/v1/supply/boms/disassembly?dish_id=${encodeURIComponent(dish.id)}`
+      );
+      const list = data.items || [];
+      if (list.length > 0) {
+        const bom = list[0];
+        setDisassemblyBom(bom);
+        setDisassemblyYieldQty(parseFloat(bom.yield_qty) || 10);
+        setDisassemblyYieldUnit(bom.yield_unit);
+        setDisassemblyNotes(bom.notes || '');
+        setDisassemblyItems(
+          (bom.items || []).map((it: DisassemblyItem) => ({ ...it, _key: genKey() }))
+        );
+      } else {
+        setDisassemblyBom(null);
+        setDisassemblyItems([]);
+        setDisassemblyOutputs([]);
+      }
+    } catch {
+      setDisassemblyBom(null);
+      setDisassemblyItems([]);
+    } finally {
+      setDisassemblyLoading(false);
+    }
+  }, []);
+
   // ── 选中菜品 → 加载BOM ──
   const handleSelectDish = useCallback(async (dish: Dish) => {
     setSelectedDish(dish);
@@ -244,7 +316,9 @@ const BomEditorPage: React.FC = () => {
     } finally {
       setBomLoading(false);
     }
-  }, []);
+    // 同步加载分解型 BOM（独立 state，不影响 assembly Tab）
+    loadDisassemblyBom(dish);
+  }, [loadDisassemblyBom]);
 
   // ── 切换历史版本 ──
   const handleSwitchVersion = (bom: Bom) => {
@@ -297,6 +371,92 @@ const BomEditorPage: React.FC = () => {
         return updated;
       })
     );
+  };
+
+  // ── 分解型：添加产出行 ──
+  const handleDisassemblyAddItem = () => {
+    const newItem: DisassemblyItem = {
+      _key: genKey(),
+      ingredient_name: '',
+      ingredient_code: '',
+      quantity: 1,
+      unit: 'kg',
+    };
+    setDisassemblyItems(prev => [...prev, newItem]);
+  };
+
+  // ── 分解型：删除产出行 ──
+  const handleDisassemblyDeleteItem = (key: string) => {
+    setDisassemblyItems(prev => prev.filter(it => it._key !== key));
+  };
+
+  // ── 分解型：更新产出行字段 ──
+  const handleDisassemblyItemChange = (key: string, field: keyof DisassemblyItem, value: unknown) => {
+    setDisassemblyItems(prev =>
+      prev.map(it => (it._key !== key ? it : { ...it, [field]: value } as DisassemblyItem))
+    );
+  };
+
+  // ── 分解型：保存 BOM ──
+  const handleDisassemblySave = async () => {
+    if (!selectedDish) return;
+    setDisassemblySaving(true);
+    try {
+      const payload = {
+        dish_id: selectedDish.id,
+        yield_qty: String(disassemblyYieldQty),
+        yield_unit: disassemblyYieldUnit,
+        notes: disassemblyNotes || undefined,
+        items: disassemblyItems.map(({ _key: _k, ...rest }) => rest),
+      };
+      if (disassemblyBom) {
+        await txFetchData(`/api/v1/supply/boms/disassembly/${disassemblyBom.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            yield_qty: String(disassemblyYieldQty),
+            yield_unit: disassemblyYieldUnit,
+            notes: disassemblyNotes || undefined,
+            items: disassemblyItems.map(({ _key: _k, ...rest }) => rest),
+          }),
+        });
+        message.success('分解型 BOM 已保存');
+      } else {
+        await txFetchData('/api/v1/supply/boms/disassembly', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        message.success('分解型 BOM 已创建');
+      }
+      loadDisassemblyBom(selectedDish);
+      setDisassemblyOutputs([]);
+    } catch (err) {
+      message.error(`保存失败：${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setDisassemblySaving(false);
+    }
+  };
+
+  // ── 分解型：实时预览（dry-run calculate）──
+  const handleDisassemblyPreview = async () => {
+    if (!disassemblyBom) {
+      message.warning('请先保存分解型 BOM 后再预览产出');
+      return;
+    }
+    setDisassemblyPreviewing(true);
+    try {
+      const data = await txFetchData<{ outputs: DisassemblyOutput[] }>(
+        `/api/v1/supply/boms/disassembly/${disassemblyBom.id}/calculate`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ input_qty: disassemblyPreviewQty }),
+        }
+      );
+      setDisassemblyOutputs(data.outputs || []);
+    } catch (err) {
+      message.error(`预览失败：${err instanceof Error ? err.message : '未知错误'}`);
+    } finally {
+      setDisassemblyPreviewing(false);
+    }
   };
 
   // ── 汇总成本 ──
@@ -576,6 +736,86 @@ const BomEditorPage: React.FC = () => {
     },
   ];
 
+  // ── 分解型产出明细列 ──
+  const disassemblyItemColumns: ColumnsType<DisassemblyItem> = [
+    {
+      title: '产出编码',
+      dataIndex: 'ingredient_code',
+      width: 110,
+      render: (v: string, record) => (
+        <Input
+          size="small"
+          value={v}
+          placeholder="编码（可选）"
+          onChange={e => handleDisassemblyItemChange(record._key, 'ingredient_code', e.target.value)}
+          style={{ borderColor: TX_BORDER }}
+        />
+      ),
+    },
+    {
+      title: '产出名称',
+      dataIndex: 'ingredient_name',
+      width: 160,
+      render: (v: string, record) => (
+        <Input
+          size="small"
+          value={v}
+          placeholder="如：鱼柳、鱼骨"
+          onChange={e => handleDisassemblyItemChange(record._key, 'ingredient_name', e.target.value)}
+          style={{ borderColor: TX_BORDER }}
+        />
+      ),
+    },
+    {
+      title: '产出量',
+      dataIndex: 'quantity',
+      width: 100,
+      render: (v: number, record) => (
+        <InputNumber
+          size="small"
+          value={v}
+          min={0.001}
+          precision={3}
+          style={{ width: '100%' }}
+          onChange={val => handleDisassemblyItemChange(record._key, 'quantity', val ?? 0)}
+        />
+      ),
+    },
+    {
+      title: '单位',
+      dataIndex: 'unit',
+      width: 80,
+      render: (v: string, record) => (
+        <Select
+          size="small"
+          value={v}
+          style={{ width: '100%' }}
+          onChange={val => handleDisassemblyItemChange(record._key, 'unit', val)}
+        >
+          {['kg', 'g', '条', '片', '个', '升', '毫升'].map(u => (
+            <Option key={u} value={u}>{u}</Option>
+          ))}
+        </Select>
+      ),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      width: 60,
+      render: (_: unknown, record) => (
+        <Popconfirm
+          title="确认删除该行？"
+          onConfirm={() => handleDisassemblyDeleteItem(record._key)}
+          okText="删除"
+          cancelText="取消"
+          okButtonProps={{ danger: true }}
+        >
+          <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+        </Popconfirm>
+      ),
+    },
+  ];
+
   // ── BOM版本历史列 ──
   const historyColumns: ColumnsType<Bom> = [
     {
@@ -733,8 +973,22 @@ const BomEditorPage: React.FC = () => {
               />
             </div>
           ) : (
+            <Tabs
+              defaultActiveKey="assembly"
+              size="large"
+              style={{ background: '#fff', borderRadius: 8, padding: '0 16px' }}
+              items={[
+                {
+                  key: 'assembly',
+                  label: (
+                    <Space>
+                      <span>组装型 BOM</span>
+                      <Tag color="blue" style={{ margin: 0 }}>配方</Tag>
+                    </Space>
+                  ),
+                  children: (
             <Spin spinning={bomLoading}>
-              <Space direction="vertical" style={{ width: '100%' }} size={16}>
+              <Space direction="vertical" style={{ width: '100%', paddingTop: 16 }} size={16}>
 
                 {/* 顶部信息行 */}
                 <Card
@@ -1000,6 +1254,235 @@ const BomEditorPage: React.FC = () => {
 
               </Space>
             </Spin>
+                  ),
+                },
+                {
+                  key: 'disassembly',
+                  label: (
+                    <Space>
+                      <ScissorOutlined />
+                      <span>分解型 BOM</span>
+                      <Tag color="orange" style={{ margin: 0 }}>整件拆零</Tag>
+                    </Space>
+                  ),
+                  children: (
+                    <Spin spinning={disassemblyLoading}>
+                      <Space direction="vertical" style={{ width: '100%', paddingTop: 16 }} size={16}>
+
+                        {/* 分解型：投入整件配置 */}
+                        <Card
+                          bodyStyle={{ padding: '16px 20px' }}
+                          style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        >
+                          <Row align="middle" gutter={[16, 12]}>
+                            <Col flex="auto">
+                              <Space align="center" wrap>
+                                <Title level={4} style={{ margin: 0, color: TX_NAVY }}>
+                                  {selectedDish.name}
+                                </Title>
+                                <Tag color="orange">分解型</Tag>
+                                {disassemblyBom && (
+                                  <Tag color="default">已保存</Tag>
+                                )}
+                              </Space>
+                            </Col>
+                          </Row>
+                          <Divider style={{ margin: '12px 0' }} />
+                          <Row gutter={[16, 8]} align="middle">
+                            <Col>
+                              <Space>
+                                <Text type="secondary">整件投入量：</Text>
+                                <InputNumber
+                                  size="small"
+                                  value={disassemblyYieldQty}
+                                  min={0.001}
+                                  precision={3}
+                                  onChange={val => setDisassemblyYieldQty(val ?? 10)}
+                                  style={{ width: 90 }}
+                                />
+                                <Select
+                                  size="small"
+                                  value={disassemblyYieldUnit}
+                                  onChange={setDisassemblyYieldUnit}
+                                  style={{ width: 70 }}
+                                >
+                                  {['kg', 'g', '条', '箱', '个', '升'].map(u => (
+                                    <Option key={u} value={u}>{u}</Option>
+                                  ))}
+                                </Select>
+                              </Space>
+                            </Col>
+                            <Col flex="auto">
+                              <Space>
+                                <Text type="secondary">备注：</Text>
+                                <Input
+                                  size="small"
+                                  value={disassemblyNotes}
+                                  placeholder="如：海鲜分切标准 2026Q1"
+                                  maxLength={200}
+                                  onChange={e => setDisassemblyNotes(e.target.value)}
+                                  style={{ width: 280, borderColor: TX_BORDER }}
+                                />
+                              </Space>
+                            </Col>
+                          </Row>
+                        </Card>
+
+                        {/* 分解型：产出明细表 */}
+                        <Card
+                          title={
+                            <Space>
+                              <span style={{ color: TX_NAVY, fontWeight: 600 }}>产出明细</span>
+                              <Tag>{disassemblyItems.length} 行</Tag>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                总量：{disassemblyItems.reduce((s, it) => s + it.quantity, 0).toFixed(3)} {disassemblyYieldUnit}
+                              </Text>
+                            </Space>
+                          }
+                          extra={
+                            <Button
+                              type="dashed"
+                              size="small"
+                              icon={<PlusOutlined />}
+                              onClick={handleDisassemblyAddItem}
+                              style={{ borderColor: TX_PRIMARY, color: TX_PRIMARY }}
+                            >
+                              添加产出行
+                            </Button>
+                          }
+                          bodyStyle={{ padding: 0 }}
+                          style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        >
+                          <Table<DisassemblyItem>
+                            columns={disassemblyItemColumns}
+                            dataSource={disassemblyItems}
+                            rowKey="_key"
+                            pagination={false}
+                            size="small"
+                            scroll={{ x: 560 }}
+                            locale={{
+                              emptyText: (
+                                <Empty
+                                  description="暂无产出行，点击「添加产出行」开始"
+                                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                />
+                              ),
+                            }}
+                            footer={() => (
+                              <Button
+                                type="dashed"
+                                block
+                                icon={<PlusOutlined />}
+                                onClick={handleDisassemblyAddItem}
+                                style={{ borderColor: TX_BORDER, color: TX_TEXT_SECONDARY }}
+                              >
+                                添加产出行
+                              </Button>
+                            )}
+                          />
+                        </Card>
+
+                        {/* 分解型：底部操作栏 */}
+                        <Card
+                          bodyStyle={{ padding: '16px 20px' }}
+                          style={{ background: TX_NAVY, boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        >
+                          <Row align="middle" gutter={[24, 12]}>
+                            <Col flex="auto" />
+                            <Col>
+                              <Space>
+                                <Button
+                                  type="primary"
+                                  icon={<SaveOutlined />}
+                                  loading={disassemblySaving}
+                                  onClick={handleDisassemblySave}
+                                >
+                                  {disassemblyBom ? '更新分解型 BOM' : '保存分解型 BOM'}
+                                </Button>
+                              </Space>
+                            </Col>
+                          </Row>
+                        </Card>
+
+                        {/* 分解型：实时预览面板 */}
+                        <Card
+                          title={
+                            <Space>
+                              <CalculatorOutlined style={{ color: TX_INFO }} />
+                              <span style={{ fontWeight: 600, color: TX_NAVY }}>分解产出预览</span>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                输入投入量，计算各组件产出（dry-run）
+                              </Text>
+                            </Space>
+                          }
+                          style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}
+                        >
+                          <Space direction="vertical" style={{ width: '100%' }} size={12}>
+                            <Space>
+                              <Text>投入量：</Text>
+                              <InputNumber
+                                value={disassemblyPreviewQty}
+                                min={0.001}
+                                precision={3}
+                                onChange={val => setDisassemblyPreviewQty(val ?? 1)}
+                                style={{ width: 100 }}
+                              />
+                              <Text>{disassemblyYieldUnit}</Text>
+                              <Button
+                                type="default"
+                                icon={<CalculatorOutlined />}
+                                loading={disassemblyPreviewing}
+                                onClick={handleDisassemblyPreview}
+                                disabled={!disassemblyBom}
+                                style={{ borderColor: TX_INFO, color: TX_INFO }}
+                              >
+                                计算产出
+                              </Button>
+                              {!disassemblyBom && (
+                                <Text type="secondary" style={{ fontSize: 12 }}>
+                                  （请先保存 BOM）
+                                </Text>
+                              )}
+                            </Space>
+                            {disassemblyOutputs.length > 0 && (
+                              <div style={{
+                                background: TX_BG_SECONDARY,
+                                borderRadius: 6,
+                                padding: '12px 16px',
+                                border: `1px solid ${TX_BORDER}`,
+                              }}>
+                                <Space direction="vertical" style={{ width: '100%' }} size={6}>
+                                  {disassemblyOutputs.map((o, idx) => (
+                                    <Row key={idx} gutter={8} align="middle">
+                                      <Col span={10}>
+                                        <Text style={{ fontWeight: 500 }}>
+                                          {o.ingredient_name}
+                                        </Text>
+                                        {o.ingredient_code && (
+                                          <Text type="secondary" style={{ fontSize: 12, marginLeft: 6 }}>
+                                            ({o.ingredient_code})
+                                          </Text>
+                                        )}
+                                      </Col>
+                                      <Col span={8}>
+                                        <Text style={{ color: TX_SUCCESS, fontWeight: 600, fontSize: 16 }}>
+                                          {o.output_qty.toFixed(3)} {o.unit}
+                                        </Text>
+                                      </Col>
+                                    </Row>
+                                  ))}
+                                </Space>
+                              </div>
+                            )}
+                          </Space>
+                        </Card>
+
+                      </Space>
+                    </Spin>
+                  ),
+                },
+              ]}
+            />
           )}
         </div>
       </div>
