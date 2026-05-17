@@ -42,7 +42,7 @@
 
 ## 3) Acceptance Criteria (testable)
 
-1. `python3 scripts/code-fact-scan.py` tx-supply silent_failure_count **17 → 8** (业务 9 个修, 8 tests 留 sub-C)
+1. `python3 scripts/code-fact-scan.py` tx-supply silent_failure_count **24 → 16** (本 PR 修 9 业务 site; 剩 16 = 10 tests + 4 graceful asyncio + 1 projector 真修法 + 2 metrics 批准 fail-open 模式; sub-C/D follow-up tracks). **真实 baseline + 5/17 §19 自查二次校正**: (1) W20 5/15 报 18, origin/main eda578a7 实测 24 (PR #698/#718/#734 ship 时 introduce 8 silent: main.py:122/142 lifespan asyncio.* + **metrics.py:88 + :130** 两个 fail-open 守护层 + projectors/index_split.py:298 + projectors/registry.py:156 + tests/test_lifespan_index_split_tier1.py:96/111). (2) 5/17 §19 自查发现 executor 漏抓 metrics.py:130 (本 PR commit 1 新建 metrics.py 自身的 `record_silent_fallback` fn 也含同模式 fail-open, 与 :88 `record_doc_number_fallback` 镜像). (3) metrics.py:88/130 **都是 PR #586 §19 round-2 / issue #592 批准 fail-open 模式** (`# noqa: BLE001` + comment "prometheus_client 内部已保证不 raise, 此处兜底防注册表损坏极端场景") — CLAUDE.md §10 broad except 禁止允许"最外层兜底", metrics 写入失败不能阻塞 Tier 1 业务是更强的硬约束, 故 sub-D 标记"批准模式不修". 本 PR 不扩 scope (user 5/17 sign-off 9 site), 余 6 新业务/基础 site 留 sub-D
 2. `auto_procurement.py:414` 不再 `except Exception` (§13 broad except 零容忍)
 3. 4 个 (b)/(c) site (#3, #6, #7, #8, #9) 真 emit `tx_supply_silent_fallback_total{site=...}` Prometheus counter — 每 site mock raise + assert `_metric_value(counter, {"site": ...}) == 1`
 4. 4 个 (b) site (#2, #3, #4, #6) 真 emit structlog warn 含 `exc_info` — 测试 capture log records + assert `event` 字段 + `exception` 字段非空
@@ -80,7 +80,7 @@ commit 10: test(tx-supply): test_silent_failure_supply_governance_tier1.py — 1
 ## 6) Verification Steps
 
 1. **本地**: `pytest services/tx-supply/src/tests/test_silent_failure_supply_governance_tier1.py -v` → 12/12 全绿
-2. **AST 验证**: `python3 -c "import ast; ..."` (即本 plan §3 acceptance #1) → silent_failure_count == 8
+2. **AST 验证**: `python3 scripts/code-fact-scan.py | jq '.["tx-supply"].silent_failure_count'` → `16` (本 PR 修 9 后剩余, 与 §3 #1 一致; 其中 2 个 metrics fail-open 批准模式不计修)
 3. **broad except 验证**: `rg -n "except Exception:\s*$|except Exception:\s*pass$" services/tx-supply/src --type py` → 0 命中
 4. **Prom counter 验证**: 跑测试时打开 `prometheus_client` registry, 4 site 各 inc 1
 5. **CI verify**: PR 创建后 watch `Tier 1 门禁判定` / `Run Tier 1 supply 16 services` / `源改动配对` / `Fresh PG 18 alembics` 4 真门禁
@@ -94,7 +94,13 @@ commit 10: test(tx-supply): test_silent_failure_supply_governance_tier1.py — 1
 
 ## 8) Follow-up Issues
 
-- **TBD #N**: silent failure Wave 1 sub-C — tx-supply tests/ 8 个 `except ValueError: pass` → `pytest.raises(ValueError)` 改造 [T3]
+- **sub-C TBD #N**: silent failure Wave 1 sub-C — tx-supply tests/ **10 个** (8 old + 2 new test_lifespan_index_split_tier1.py) silent → `pytest.raises(...)` / `contextlib.suppress` (asyncio.CancelledError 不能用 pytest.raises 直接) 改造 [T3]
+- **sub-D TBD #N**: silent failure Wave 1 sub-D — tx-supply 6 新业务/基础 site (PR #698/#718/#734 + 本 PR commit 1 引入, W20 baseline 之后):
+  - `main.py:122` + `:142` (lifespan `asyncio.TimeoutError` + `CancelledError`) — 大概率合法 graceful shutdown, document not-a-fix or 加 debug log [T3]
+  - `metrics.py:88` (`record_doc_number_fallback` 内 `except Exception: pass`) — **批准 fail-open 模式** (`# noqa: BLE001` + comment), source PR #586 §19 round-2 / issue #592, **sub-D 标"不修, 文档化"** [T3]
+  - `metrics.py:130` (`record_silent_fallback` 内 `except Exception: pass`) — **同 :88 镜像 fail-open 模式**, 本 PR commit 1 新建, 同 sub-D 标"不修, 文档化" [T3]
+  - `projectors/index_split.py:298` (`except (ValueError, TypeError): return None`) — projector 异常 swallow, 需 structlog.warn + 决定 Prom counter [Tier 1 邻接 if projector 是 PRD-11 主路径]
+  - `projectors/registry.py:156` (`asyncio.CancelledError`) — registry shutdown, 大概率合法 graceful [T3]
 - (后续 Wave 1 sub-B tx-trade 53 + Wave 2/3 按 issue #663 路线推)
 
 ## 9) Explicit-ask Sign-off Question
