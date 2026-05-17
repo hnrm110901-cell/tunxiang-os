@@ -498,10 +498,21 @@ class TestProjectorRegistry:
 
     @pytest.mark.asyncio
     async def test_disabled_by_default(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """env 未设 → start 静默 return, 不创建 task."""
+        """env 未设 + SDK 默认 false → start 静默 return, 不创建 task.
+
+        is_enabled() 行为: env override > SDK 评估 > False fallback (registry.py:82-93).
+        本 test 验证 env unset + SDK false 下不启 daemon (即"全 OFF"语义).
+
+        为何需 mock SDK: flags/supply/supply_flags.yaml 配 environments.test=true
+        (sub-B.2 灰度需要 test 环境默认 ON, PR #734 设计意图). 单元测试需独立
+        验证 disabled 语义, 显式 mock SDK 返 False 避免 yaml 环境配置渗漏.
+
+        SDK true 行为由 PR #698 lifespan integration test 覆盖.
+        """
         from services.tx_supply.src.projectors import registry
 
         monkeypatch.delenv("TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR", raising=False)
+        monkeypatch.setattr(registry, "_ff_is_enabled", lambda *a, **kw: False)
         # 清理潜在残留
         registry._PROJECTOR_TASKS.clear()
         await registry.start_index_split_projector(_TENANT_XUJI)
