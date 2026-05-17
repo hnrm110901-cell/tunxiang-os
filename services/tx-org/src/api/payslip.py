@@ -83,7 +83,10 @@ class GeneratePayslipsReq(BaseModel):
 
 def _build_payslip(employee: dict, month: str) -> dict:
     """根据员工数据和薪资引擎计算生成单条工资条。"""
-    year, mon = int(month.split("-")[0]), int(month.split("-")[1])
+    parsed = parse_year_month(month)
+    if parsed is None:
+        raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+    year, mon = parsed
     work_days = count_work_days(year, mon)
 
     base_fen = employee.get("base_salary_fen", 0)

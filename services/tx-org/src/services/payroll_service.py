@@ -28,6 +28,8 @@ from services.tx_org.src.services.payroll_engine import (
     derive_hourly_rate,
 )
 
+from shared.utils.date_parsing import parse_year_month
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #  五险一金费率 — 长沙 2026
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -445,8 +447,10 @@ class PayrollService:
         if not config:
             return {"ok": False, "error": f"Employee {employee_id} not found"}
 
-        year = int(month.split("-")[0])
-        mon = int(month.split("-")[1])
+        parsed = parse_year_month(month)
+        if parsed is None:
+            raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+        year, mon = parsed
         work_days_in_month = count_work_days(year, mon)
 
         base_salary = config["base_salary_fen"]

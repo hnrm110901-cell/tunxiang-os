@@ -21,6 +21,8 @@ from services.tx_org.src.services.store_transfer_service import (
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from shared.utils.date_parsing import parse_year_month
+
 log = structlog.get_logger(__name__)
 
 
@@ -283,7 +285,10 @@ class TransferCostEngine:
         # 1. 查询该员工该月所有有效借调单
         month_start = f"{month}-01"
         # 计算月末
-        year, mon = int(month[:4]), int(month[5:7])
+        parsed = parse_year_month(month)
+        if parsed is None:
+            raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+        year, mon = parsed
         if mon == 12:
             next_month_start = f"{year + 1}-01-01"
         else:

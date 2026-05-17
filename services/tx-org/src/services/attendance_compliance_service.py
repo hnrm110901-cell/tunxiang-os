@@ -14,6 +14,7 @@ from sqlalchemy.exc import OperationalError, ProgrammingError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.ontology.src.entities import Employee, Store
+from shared.utils.date_parsing import parse_year_month
 
 logger = structlog.get_logger(__name__)
 
@@ -1015,7 +1016,10 @@ class AttendanceComplianceLogService:
         await _set_tenant(self._db, self._tenant_id)
         month_filter = month or date.today().strftime("%Y-%m")
         start_date = f"{month_filter}-01"
-        y, m_num = int(month_filter[:4]), int(month_filter[5:7])
+        parsed = parse_year_month(month_filter)
+        if parsed is None:
+            raise ValueError(f"month must be YYYY-MM format, got: {month_filter!r}")
+        y, m_num = parsed
         if m_num == 12:
             end_date_str = f"{y + 1}-01-01"
         else:

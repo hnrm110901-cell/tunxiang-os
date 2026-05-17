@@ -24,6 +24,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from shared.events import OrgEventType, UniversalPublisher
+from shared.utils.date_parsing import parse_year_month
 
 from .gap_filling_service import (
     create_fill_schedule,
@@ -1005,7 +1006,10 @@ async def get_labor_metrics(
     """
     await _set_tenant(db, tenant_id)
 
-    year_int, month_int = int(month[:4]), int(month[5:7])
+    parsed = parse_year_month(month)
+    if parsed is None:
+        raise ValueError(f"month must be YYYY-MM format, got: {month!r}")
+    year_int, month_int = parsed
     month_start = date(year_int, month_int, 1)
     if month_int == 12:
         month_end = date(year_int + 1, 1, 1) - timedelta(days=1)

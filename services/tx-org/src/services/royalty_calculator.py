@@ -25,6 +25,7 @@ import structlog
 
 from shared.events.src.emitter import emit_event
 from shared.events.src.event_types import FranchiseEventType
+from shared.utils.date_parsing import parse_year_month
 
 from ..models.franchise import (
     Franchisee,
@@ -265,7 +266,10 @@ class RoyaltyCalculator:
         log = logger.bind(tenant_id=str(tenant_id), bill_month=bill_month)
         log.info("franchise.generate_monthly_bills.start")
 
-        year, month = int(bill_month[:4]), int(bill_month[5:7])
+        parsed = parse_year_month(bill_month)
+        if parsed is None:
+            raise ValueError(f"bill_month must be YYYY-MM format, got: {bill_month!r}")
+        year, month = parsed
         period_start = date(year, month, 1)
         period_end = date(year, month, calendar.monthrange(year, month)[1])
 
@@ -706,7 +710,10 @@ class RoyaltyCalculator:
     @staticmethod
     def _calc_due_date(bill_month: str) -> date:
         """计算账单到期日（次月 15 日）。"""
-        year, month = int(bill_month[:4]), int(bill_month[5:7])
+        parsed = parse_year_month(bill_month)
+        if parsed is None:
+            raise ValueError(f"bill_month must be YYYY-MM format, got: {bill_month!r}")
+        year, month = parsed
         if month == 12:
             return date(year + 1, 1, 15)
         return date(year, month + 1, 15)
