@@ -318,7 +318,7 @@ def test_backoff_seconds_exponential_cap():
 def test_lag_seconds_handles_none_and_naive():
     """_lag_seconds 兜底处理 None + naive datetime."""
     assert _lag_seconds(None) == 0.0
-    # naive datetime → 当 UTC 处理
-    past = datetime.now(timezone.utc).replace(tzinfo=None)
+    # naive datetime (直接 utcnow, 无 timezone.replace 反模式)
+    past = datetime(2026, 5, 17, 0, 0, 0)
     lag = _lag_seconds(past)
     assert lag >= 0.0
