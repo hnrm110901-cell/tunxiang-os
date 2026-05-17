@@ -1,0 +1,23 @@
+name: Service Freeze Check
+# 战略 plan §3 W1 治理 + §5 取舍清单第 1 项 + §6 自动化 hook
+# issue #755
+on:
+  pull_request:
+    paths:
+      - 'services/**'
+      - '.omc/policy/service-freeze.yml'
+  workflow_dispatch: {}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Service Freeze Check
+        env:
+          GITHUB_BASE_REF: ${{ github.base_ref }}
+        run: |
+          bash scripts/git-hooks/service-freeze-check.sh
