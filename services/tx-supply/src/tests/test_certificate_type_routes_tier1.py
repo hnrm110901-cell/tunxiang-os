@@ -70,7 +70,9 @@ def _make_client():
         app.dependency_overrides[_get_db] = _fake_db
         app.include_router(router)
         return TestClient(app, raise_server_exceptions=False)
-    except Exception:
+    except ImportError:
+        # FastAPI/router 在 Tier 1 minimal-deps CI 缺包时跳过整文件
+        # (per feedback_tier1_ci_minimal_deps_trap.md), 不掩盖业务 bug.
         return None
 
 

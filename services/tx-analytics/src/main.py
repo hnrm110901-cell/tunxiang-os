@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 try:
                     await asyncio.wait_for(stop_event.wait(), timeout=refresh_sec)
                 except asyncio.TimeoutError:
-                    pass
+                    logger.debug("split_attribution_refresh_tick")
 
         refresh_sec_val = float(
             os.getenv("TX_ANALYTICS_SPLIT_ATTRIBUTION_TENANT_REFRESH_SEC", "300")
@@ -159,7 +159,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 try:
                     await refresh_task
                 except asyncio.CancelledError:
-                    pass
+                    logger.debug("split_attribution_refresh_task_cancelled")
         # §19 round-1 P1-1 mirror (sub-B.2 PR #698 教训): 以 _PROJECTOR_TASKS 真实
         # 状态为准, 而非 started_tenants 闭包. refresh loop 中途 cancel 时, started_tenants
         # 可能漏掉新 started 的 task, 走 stop_all_split_attribution_projectors() 兜底.

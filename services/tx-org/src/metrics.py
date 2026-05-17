@@ -13,6 +13,14 @@ issue #703（PR #695 §19 round-2 follow-up #5）:
   - record fn 必须 fail-open (counter.inc() 内部 prometheus_client 保证不
     raise, 但外层 try/except 仍兜一层防 wheel 损坏 / 注册表损坏极端场景,
     与 tx-supply metrics.py / issue #580 graceful degradation 契约一致)
+
+经批准的 fail-open silent 模式 (silent_failure 治理 scope 外):
+  - record_attendance_location_parse_failed() 内 `except Exception: pass` —
+    PR #695 §19 round-2 批准 (issue #703, 镜像 tx-supply record_doc_number_fallback
+    + record_silent_fallback 同模式)
+  本 site 为"metrics 写入兜底防注册表损坏"白名单, 不计入 silent_failure_count 治理 scope
+  (与"业务路径 silent"不同 — 此为合规扫描保护层 fail-open 契约,
+  与 tx-supply metrics.py 完全镜像)
 """
 
 from __future__ import annotations
