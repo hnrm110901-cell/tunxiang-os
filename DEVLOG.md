@@ -9,7 +9,7 @@
 - 04:54Z **#741** `[T2] feat(test-infra): main.py import smoke 补全 PR #351 漏的 5 服务 + 二次设计 (issue #714)`
 - 05:03Z **#751** `[T3] test(tx-supply): silent failure Wave 1 sub-C — 10 test site → pytest.raises / suppress (Closes #744)`
 - 05:52Z **#752** `[T3] fix(tx-supply): silent failure Wave 1 sub-D — 1 projector 真修 + 3 graceful doc + 2 metrics 批准 + 1 Ruff (Closes #745)`
-- 08:09Z **#775** `[T3] docs(claude-md): sync v229→v438 + 14→20 services + §23-§26 strategic chapters (Closes #754)`
+- 08:09Z **#775** `[T3] docs(claude-md): sync v229→v417 + 14→20 services + §23-§26 strategic chapters (Closes #754)`
 - 08:10Z **#774** `[T3 governance] feat: docs/governance/ + docs/service-health/ + drift-check + weekly cron (Closes #761)`
 - 08:11Z **#773** `[T3 governance] feat: service-freeze hook .omc/policy + git/CI 拦截 (Closes #755)`
 - 09:07Z **#781** `[Tier1-adjacent] feat(tx-supply,web-admin): PRD-12 资质证件类型字典 + UI (Phase 1 演示闸, Phase 2 接入 follow-up)`
