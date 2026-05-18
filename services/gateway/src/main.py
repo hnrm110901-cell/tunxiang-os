@@ -4,8 +4,6 @@ import asyncio
 import os
 
 import structlog
-from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -19,7 +17,6 @@ from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰�
 from .api.migration_routes import router as migration_router
 from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
-from .apscheduler_metrics import apscheduler_job_listener
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
 from .group_ops_routes import router as group_ops_router
@@ -33,7 +30,6 @@ from .middleware.domain_authz_middleware import DomainAuthzMiddleware
 from .personalization_middleware import PersonalizationMiddleware
 from .proxy import router as proxy_router
 from .response import ok
-from .sync_scheduler import create_sync_scheduler
 from .sync_scheduler import sync_router as sync_health_router
 from .wecom_bot_routes import router as wecom_bot_router
 from .wecom_group_routes import router as wecom_group_router
@@ -73,104 +69,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# ── APScheduler 定时任务 ──────────────────────────────────────────
-# Phase C.1 (#820) — Counter + listener 实体在 services/gateway/src/apscheduler_metrics.py
-# 暴露在 main.py 命名空间方便老代码 import (无回归)
-
-_scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
-
-
-async def _run_daily_sop() -> None:
-    """每天 9:00 扫描所有租户的 active 群，执行 daily SOP
-
-    注意：此函数从数据库获取所有活跃租户列表后逐个执行。
-    实际部署时需注入数据库会话，此处为集成占位符。
-    """
-    log = logger.bind(task="wecom_group_daily_sop")
-    log.info("wecom_group_daily_sop_job_start")
-
-    try:
-        from sqlalchemy import distinct, select
-
-        from .database import get_async_session  # type: ignore[import]
-        from .models.wecom_group import WecomGroupConfig
-        from .wecom_group_service import WecomGroupService
-
-        service = WecomGroupService()
-
-        async for db in get_async_session():
-            # 获取所有有 active 群配置的租户
-            stmt = select(distinct(WecomGroupConfig.tenant_id)).where(WecomGroupConfig.status == "active")
-            result = await db.execute(stmt)
-            tenant_ids = result.scalars().all()
-
-            for tenant_id in tenant_ids:
-                try:
-                    sop_result = await service.scan_and_execute_daily_sop(tenant_id, db)
-                    log.info(
-                        "wecom_group_daily_sop_tenant_done",
-                        tenant_id=str(tenant_id),
-                        result=sop_result,
-                    )
-                except Exception as exc:  # noqa: BLE001 — 单租户失败不阻塞其他租户
-                    log.error(
-                        "wecom_group_daily_sop_tenant_error",
-                        tenant_id=str(tenant_id),
-                        error=str(exc),
-                        exc_info=True,
-                    )
-    except ImportError:
-        log.warning("wecom_group_daily_sop_db_not_configured")
-    except Exception as exc:  # noqa: BLE001 — 最外层兜底，定时任务不能崩溃
-        log.error("wecom_group_daily_sop_job_error", error=str(exc), exc_info=True)
-
-
-@app.on_event("startup")
-async def _startup() -> None:
-    _scheduler.add_job(
-        lambda: asyncio.create_task(_run_daily_sop()),
-        "cron",
-        hour=9,
-        minute=0,
-        id="wecom_group_daily_sop",
-        replace_existing=True,
-    )
-
-    # 品智POS 三商户数据同步调度（czyz/zqx/sgc）
-    _sync_scheduler = create_sync_scheduler()
-    for job in _sync_scheduler.get_jobs():
-        _scheduler.add_job(
-            job.func,
-            trigger=job.trigger,
-            id=job.id,
-            replace_existing=True,
-            misfire_grace_time=getattr(job, "misfire_grace_time", None),
-        )
-
-    # Phase C.1 (#820) — APScheduler EVENT 监听挂入 Prometheus Counter (start 前 add)
-    _scheduler.add_listener(
-        apscheduler_job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR
-    )
-
-    _scheduler.start()
-    logger.info(
-        "gateway_scheduler_started",
-        jobs=[
-            "wecom_group_daily_sop @ 09:00 Asia/Shanghai",
-            "daily_dishes_sync @ 02:00 Asia/Shanghai",
-            "daily_master_data_sync @ 03:00 Asia/Shanghai",
-            "hourly_orders_incremental_sync",
-            "quarter_members_incremental_sync",
-        ],
-    )
-
-
-@app.on_event("shutdown")
-async def _shutdown() -> None:
-    _scheduler.shutdown(wait=False)
-    logger.info("gateway_scheduler_stopped")
-
 
 # 认证 API（必须在 proxy 之前注册，否则被通配路由拦截）
 app.include_router(auth_router)
