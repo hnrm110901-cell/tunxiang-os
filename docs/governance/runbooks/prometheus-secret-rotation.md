@@ -13,8 +13,8 @@
 
 本 Secret 用于 `/metrics` 端点 Bearer Token 鉴权 (`MetricsAuthMiddleware`, `shared/middleware`)。
 
-- 未启用 (`prometheus.metricsToken.enabled: false`): backend pod 不注入该 env，`/metrics` 按 `PROMETHEUS_AUTH_ENFORCE` 值决定行为（默认 `false` = 放行）。  
-- 启用后 (`enabled: true`): pod 注入 `PROMETHEUS_BEARER_TOKEN`，Secret **必须**在 helm upgrade 前已存在，否则 `CreateContainerConfigError`，pod 不启动。
+- 未启用 (`prometheus.metricsToken.enabled: false`, chart 默认): chart 自动注入 `PROMETHEUS_AUTH_ENFORCE=false`, `/metrics` 放行 (避开 `metrics_auth.py:185` 真实默认 `true` + 缺 token → 启动 raise 路径)。**注**: `metrics_auth.py` 模块默认 `PROMETHEUS_AUTH_ENFORCE=true`, chart 必须显式 set "false" 才能让默认 disabled 路径 pod 起来。
+- 启用后 (`enabled: true`): pod 注入 `PROMETHEUS_BEARER_TOKEN` + `PROMETHEUS_AUTH_ENFORCE=true` + `ENVIRONMENT=prod` (完整契约对齐 PR #826 round-2 critic P1-2 ship 的 prod fail-loud gate)。Secret **必须**在 helm upgrade 前已存在，否则 `CreateContainerConfigError`，pod 不启动。
 
 ---
 
@@ -152,7 +152,7 @@ POD=$(kubectl -n $NAMESPACE get pods -l app.kubernetes.io/name=$CHART \
 kubectl -n $NAMESPACE exec $POD -- env | grep PROMETHEUS_BEARER_TOKEN || echo "env not found (expected)"
 
 # Secret 保留不删（Prometheus 仍可读 credentials_file，backend 不读 = 安全降级）
-# MetricsAuthMiddleware 在 PROMETHEUS_AUTH_ENFORCE=false（默认）时放行所有请求
+# MetricsAuthMiddleware 在 PROMETHEUS_AUTH_ENFORCE=false (chart 默认 disabled 路径自动 set) 时放行所有请求
 ```
 
 ---

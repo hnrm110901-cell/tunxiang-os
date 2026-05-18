@@ -69,6 +69,13 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.prometheus.metricsToken.secretName }}
                   key: {{ .Values.prometheus.metricsToken.secretKey }}
+            - name: PROMETHEUS_AUTH_ENFORCE
+              value: "true"
+            - name: ENVIRONMENT
+              value: prod
+            {{- else }}
+            - name: PROMETHEUS_AUTH_ENFORCE
+              value: "false"
             {{- end }}
           envFrom:
             - secretRef:
