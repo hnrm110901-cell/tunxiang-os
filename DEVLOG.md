@@ -1,3 +1,45 @@
+## 2026-05-18 — Gateway 瘦身 抽 tx-sync-worker Phase 1 (W2 P1 #758, 4/4 explicit-ask A)
+
+### 今日完成
+
+- [services/tx-sync-worker] 新服务 11 文件 (Dockerfile / requirements / conftest / src/{__init__,main,scheduler,metrics}.py + jobs/{__init__,pinzhi_sync,wecom_sop}.py + tests/{__init__,test_scheduler_shadow,test_wecom_sop_shadow}.py)
+- [services/tx-sync-worker] 端口 8021, FastAPI + APScheduler 5 jobs (4 pinzhi + 1 wecom @ Asia/Shanghai)
+- [services/tx-sync-worker] Phase 1 RUN_MODE=dry_run 默认 (env unset = dry_run), cron fire 仅 log + metric 不调 adapter
+- [services/tx-sync-worker] 业务函数 0 diff copy from gateway/src/sync_scheduler.py:128-577 + gateway/src/main.py:73-115
+- [infra/helm/tx-sync-worker] 11 文件 (Chart + values + 9 templates), Q4 决议 T2 maxU=1 PDB enabled
+- [infra/compose] base.yml + envs/dev.yml 注册 tx-sync-worker :8021 (复用 svc-defaults anchors)
+- [docs/governance/decisions] 2026-05-18-tx-sync-worker-shadow-approval.md 守门会决议落盘 (4/4 = A)
+- [docs/infra/port-allocation-2026-05.md] 加 8021 行
+- [tests] 18 cases PASS (scheduler 注册 / cron 时间 / dry_run gate / 5 jobs metric / wecom dry_run)
+
+### 数据变化
+
+- 迁移版本：v438 → v438 (本 PR 0 schema 改动)
+- 新增微服务：1 (tx-sync-worker, planned_additions 第 3 项落地)
+- 新增 API 模块：1 (services/tx-sync-worker 完整)
+- 新增测试：18 cases (T2 标准, 不带 _tier1.py 后缀)
+- 服务总数: 20 → 21 (Phase 1 临时态; W12 终态 17 — 战略 plan §23)
+
+### 关键决策 (4/4 = A)
+
+- Q1 Job 命名 → A: 保持原 5 id 不动 (与 gateway dashboard 100% 一致)
+- Q2 sync_router 是否迁 → A: Phase 2 follow-up 迁
+- Q3 cron 时间 → A: 完全复制 + dry_run=true 默认 (Phase 2 翻 live 同时关 gateway)
+- Q4 Helm Tier → A: T2 maxU=1 PDB enabled (Phase 2 切单轨后直接顶 §17 Tier 2)
+
+### 遗留问题 (Phase 2 follow-up)
+
+- [W4 P1] 关 gateway scheduler 切换 tx-sync-worker 单轨 (独立 issue, 2 人日)
+  - 翻 RUN_MODE=live + 删 gateway main.py 70-156 + 评估迁 sync_router
+- wecom_group_service.py 跨服务 import (P2): Phase 2 拆 shared/wecom/
+
+### 明日计划
+
+- §19 三 reviewer round-1 (code / security / critic) → admin-merge ship
+- 立 Phase 2 follow-up issue
+
+---
+
 ## 2026-05-18 早段 ε — issue #710 YYYY-MM dedup Phase 2 收官 (T3 explicit-ask 第 27/28/29 例 3 PR)
 
 ### 今日完成 (本 session ε, 3 PR MERGED + 1 lane redundant skip + #710 close)

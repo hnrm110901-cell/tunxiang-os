@@ -1,3 +1,38 @@
+## 2026-05-18 · Gateway 瘦身 抽 tx-sync-worker Phase 1 (W2 P1 #758, 4/4 explicit-ask A)
+
+### 完成状态
+
+- [x] **services/tx-sync-worker/** 新服务 11 文件 (Dockerfile + requirements + conftest + src 8 + tests 3)
+- [x] **infra/helm/tx-sync-worker/** 11 文件 (Chart + values + 9 templates), T2 maxU=1 PDB enabled
+- [x] **infra/compose** base.yml + envs/dev.yml 注册 :8021 (复用 svc-defaults anchors)
+- [x] **docs/governance/decisions** 2026-05-18-tx-sync-worker-shadow-approval.md (4/4 = A)
+- [x] **docs/infra/port-allocation-2026-05.md** 加 8021 行
+- [x] **18 测试 cases PASS** (scheduler 注册 + cron 时间 + dry_run gate + 5 jobs metric)
+- [ ] Phase 2 follow-up issue 立 (关 gateway scheduler 切单轨 2 人日)
+
+### 关键决策
+
+- **创始人 4/4 explicit-ask A 推荐** (Q1 保持原 id / Q2 Phase 2 迁 sync_router / Q3 完全复制 cron + dry_run=true / Q4 T2 maxU=1)
+- **Phase 1 dry_run 默认强红线**: env unset = dry_run, "live" 才走真路径 (严格小写比较)
+- **业务函数 0 diff copy** from gateway/src/sync_scheduler.py:128-577 + main.py:73-115 (Phase 1 双轨严守 gateway 0 改动)
+- **Q4 T2 maxU=1 一开始就顶**: 避免 Phase 2 切单轨再改 PR
+- **跨服务 import 暂保留** (services.gateway.src.wecom_group_service): Dockerfile COPY services/gateway/, Phase 2 follow-up 拆 shared/wecom/
+
+### 下一步
+
+- §19 三 reviewer round-1 (code / security / critic) → admin-merge ship
+- 立 Phase 2 follow-up issue: `[W4 P1] 关 gateway scheduler 切换 tx-sync-worker 单轨`
+
+### 已知风险
+
+- **P0 dry_run 误关** → dup pinzhi API 调用: 缓解 env unset hardcode + Helm 显式注释 + monitoring alert + Phase 2 issue 标题 explicit "先关 gateway 再翻 dry_run"
+- **P1 timezone drift**: Dockerfile `ENV TZ=Asia/Shanghai` + APScheduler 显式 timezone + test 验证
+- **P2 跨服务 import**: Phase 2 follow-up 拆 shared/wecom/, 不阻塞 Phase 1 ship
+- **任何数字 self-regrep 已过**: 端口 8021 / Helm 11 文件 / 测试 18 cases / 5 jobs 全 verify (per plan §0)
+- **§17/G10 红线 audit 0 改动**: cashier_engine / order_service / payment_saga / invoice / inventory_io / emitter / projector / pg_event_store 全 untouched
+
+---
+
 ## 2026-05-18 07:07 · issue #710 YYYY-MM dedup Phase 2 收官 (T3 explicit-ask 第 27/28/29 例 3 PR)
 
 ### 完成状态
