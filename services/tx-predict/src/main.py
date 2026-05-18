@@ -1,4 +1,4 @@
-"""tx-predict — 预测引擎微服务 (port 8013)
+"""tx-predict — 预测引擎微服务 (port 8019)
 
 屯象OS V6.0 核心模块，对标 Toast IQ / Fourth iQ 需求预测能力。
 
@@ -25,7 +25,7 @@ from .api.weather_routes import router as weather_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("tx_predict_started", port=8013)
+    logger.info("tx_predict_started", port=8019)
     yield
     logger.info("tx_predict_stopped")
 
