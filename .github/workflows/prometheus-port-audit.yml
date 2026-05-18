@@ -45,6 +45,12 @@ jobs:
       - name: Install pyyaml
         run: pip install pyyaml==6.0.1
 
+      - name: Create mock secret for promtool credentials check (#838)
+        run: |
+          sudo mkdir -p /etc/prometheus/secrets
+          echo 'dummy-token-for-ci-validation-only' | sudo tee /etc/prometheus/secrets/tx-metrics-token > /dev/null
+          sudo chmod 600 /etc/prometheus/secrets/tx-metrics-token
+
       - name: promtool check config
         run: promtool check config infra/monitoring/prometheus/prometheus.yml
 
