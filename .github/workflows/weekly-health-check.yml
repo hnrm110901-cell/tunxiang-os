@@ -55,7 +55,7 @@ jobs:
         # regen lands on main after human review. Direct push to main is
         # avoided — PR keeps review-gate intact.
         if: always()
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           branch: docs/auto-weekly-health-${{ github.run_id }}
           base: main
