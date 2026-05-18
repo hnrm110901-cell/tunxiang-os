@@ -9,19 +9,19 @@ rule_files:
   - /etc/prometheus/rules/*.yml
 
 # ─── issue #825 metrics 鉴权 (W3 D2 P1) ──────────────────────────────────
-# 全 12+ 服务 /metrics 端点已挂 (本 PR scope) / 计划挂 MetricsAuthMiddleware:
-#   - Bearer token (X-Prometheus-Token header) → timing-safe hmac.compare_digest
+# MetricsAuthMiddleware (shared/middleware/src/metrics_auth.py) 提供 /metrics 多层鉴权:
+#   - Bearer token (Authorization: Bearer header) → timing-safe hmac.compare_digest
 #   - IP allowlist (CIDR) → 内网段默认 + k8s pod CIDR
+#   - XFF spoof 防御 (round-2): 默认拒 X-Forwarded-For, 仅 PROMETHEUS_TRUST_XFF=true
+#     + direct IP ∈ PROMETHEUS_TRUSTED_PROXIES 时才信
 # Prometheus pod 启动时挂 Secret tx-metrics-token 到 /etc/prometheus/secrets/
 # (Helm chart 部署改造 follow-up issue).
 #
 # 当前 ready: gateway + tx-event-relay + tx-trade (本 PR scope, authorization 已加)
-# follow-up: 其他 9+ 服务 — 见 issue #825 follow-up (其他 9 服务挂 MetricsAuthMiddleware)
+# follow-up: 其他 11 服务 — 见 #825 round-2 立的 follow-up issue
+# (D2 决策矩阵分母覆盖率 7% → 100% 依赖此 follow-up)
 #
-# ⚠️ MetricsAuthMiddleware 接受两种 header (二选一):
-#   - X-Prometheus-Token (专用, 优先级高)
-#   - Authorization: Bearer (Prometheus 原生 `authorization: type: Bearer` 自动发送)
-# 本 yml 用 Prometheus 原生 Bearer 配置, 等同 Authorization: Bearer header.
+# 本 yml 用 Prometheus 原生 `authorization: type: Bearer` 配置, 自动发 Authorization 头.
 # 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
 
 scrape_configs:
