@@ -43,6 +43,16 @@ env:
   # 紧急停用走此 env="false" (优先级最高，绕过 SDK)。
   # dev/demo helm 环境如需翻 ON 用 `helm --set env.TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR=true`。
   TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "false"
+  # #737 Phase A DB pool baseline env (W3 起手 G10 邻接) — Phase A 默认值与 ship 前等价
+  # 后续 Phase B 真测量发现热点服务 > 60% (decision matrix warn) 时翻起,
+  # 走 helm --set env.DATABASE_POOL_SIZE=40 + rolling restart.
+  # 详 docs/governance/decisions/2026-05-19-db-pool-baseline-runbook.md
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_POOL_OVERFLOW: "30"
+  ASYNCPG_POOL_MAX: "3"
+  # cert_alerter daemon 独立 SQLAlchemy engine, 与 DATABASE_POOL_* 不共用 scope
+  CERT_ALERTER_POOL_SIZE: "5"
+  CERT_ALERTER_POOL_OVERFLOW: "10"
 
 # Secret中存放的敏感环境变量（由外部Secret Manager注入）
 secretRef:
