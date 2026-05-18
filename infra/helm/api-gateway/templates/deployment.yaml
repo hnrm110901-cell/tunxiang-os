@@ -63,6 +63,13 @@ spec:
             - name: {{ $key }}
               value: {{ $val | quote }}
             {{- end }}
+            {{- if .Values.prometheus.metricsToken.enabled }}
+            - name: {{ .Values.prometheus.metricsToken.envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.prometheus.metricsToken.secretName }}
+                  key: {{ .Values.prometheus.metricsToken.secretKey }}
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.secretRef.name }}
