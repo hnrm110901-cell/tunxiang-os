@@ -38,3 +38,7 @@ export PROMETHEUS_BEARER_TOKEN="${TOKEN}"
 
 echo "PROMETHEUS_BEARER_TOKEN generated and exported (length=${TOKEN_LEN})"
 echo "Token file: ${TOKEN_FILE} (chmod 600, gitignored)"
+echo ""
+echo "⚠️  TOKEN ROTATED — 已运行的 backend svc 仍跑旧 token, 必须 restart 才生效:"
+echo "    docker compose -f infra/compose/base.yml -f infra/compose/envs/dev.yml \\"
+echo "      restart gateway tx-trade tx-event-relay prometheus"

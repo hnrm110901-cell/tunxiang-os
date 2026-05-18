@@ -401,6 +401,7 @@ services:
   # 接受 Prometheus 的 Bearer token 鉴权 (PROMETHEUS_AUTH_ENFORCE=true, 与 prod 对齐).
   prometheus:
     image: prom/prometheus:v2.55.0
+    restart: unless-stopped
     ports:
       - "9090:9090"
     volumes:
@@ -412,9 +413,12 @@ services:
     labels:
       tunxiang.env: "${TUNXIANG_ENV:-dev}"
     depends_on:
-      - gateway
-      - tx-trade
-      - tx-event-relay
+      gateway:
+        condition: service_healthy
+      tx-trade:
+        condition: service_healthy
+      tx-event-relay:
+        condition: service_healthy
 
 volumes:
   web_admin_node_modules:
