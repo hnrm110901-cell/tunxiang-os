@@ -104,11 +104,11 @@ async def insert(
         OutboxInsertError: INSERT 失败 (PG / RLS / RETURNING 空 / 任何 SQLAlchemyError),
             caller 应整事务 rollback.
     """
-    # 1. 设 RLS (idempotent within transaction, local=true 仅本事务)
-    await db.execute(_SET_TENANT_SQL, {"tid": str(tenant_id)})
-
-    # 2. INSERT + RETURNING id
     try:
+        # 1. 设 RLS (idempotent within transaction, local=true 仅本事务)
+        await db.execute(_SET_TENANT_SQL, {"tid": str(tenant_id)})
+
+        # 2. INSERT + RETURNING id
         result = await db.execute(
             _INSERT_OUTBOX_SQL,
             {
@@ -126,6 +126,13 @@ async def insert(
         row = result.fetchone()
         if row is None:
             # 理论上 INSERT ... RETURNING 必返回一行; 兜底防 driver 异常.
+            logger.warning(
+                "outbox_insert_returned_no_row",
+                tenant_id=str(tenant_id),
+                event_type=event_type,
+                stream_id=stream_id,
+                source_service=source_service,
+            )
             raise OutboxInsertError(
                 f"INSERT trade_event_outbox returned no row for stream_id={stream_id}"
             )

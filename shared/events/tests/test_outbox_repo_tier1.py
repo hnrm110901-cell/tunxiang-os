@@ -159,5 +159,33 @@ async def test_insert_passes_optional_fields_as_none() -> None:
     assert params["store_id"] is None
     assert params["causation_id"] is None
     assert params["correlation_id"] is None
-    # metadata 不传 → 默认 {} → json.dumps('{}')
+    # metadata 不传 → 默认 {} → json.dumps({})
     assert params["metadata"] == json.dumps({})
+
+
+@pytest.mark.asyncio
+async def test_insert_raises_outbox_error_on_set_config_failure() -> None:
+    """set_config 抛 SQLAlchemyError 时, 也 wrap 为 OutboxInsertError (P1-1).
+
+    验证 set_config 已在 try 块内: session 污染 (InFailedSqlTransactionError)
+    等 SQLAlchemyError 不再裸穿透到 caller, 统一 wrap 为 OutboxInsertError.
+    """
+    db = AsyncMock()
+    original_exc = SQLAlchemyError("RLS set_config failed: connection drop")
+    # 第 1 次 execute (set_config) 就抛
+    db.execute = AsyncMock(side_effect=original_exc)
+
+    with pytest.raises(OutboxInsertError) as exc_info:
+        await outbox_insert(
+            db=db,
+            tenant_id=uuid4(),
+            event_type="order.paid",
+            stream_id="ORD-001",
+            payload={"amount": 100},
+            source_service="tx-trade",
+        )
+
+    assert exc_info.value.__cause__ is original_exc, (
+        "set_config 异常应通过 __cause__ chain 暴露给 caller"
+    )
+    assert "outbox INSERT failed" in str(exc_info.value)
