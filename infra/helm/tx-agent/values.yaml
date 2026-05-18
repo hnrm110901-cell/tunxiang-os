@@ -110,6 +110,7 @@ prometheus:
     secretName: tx-metrics-token
     secretKey: token
     envName: PROMETHEUS_BEARER_TOKEN
+    environment: prod         # round-2 P1-2: 参数化, staging cluster 可 override 为 "staging"
 
 # F#2 安全上下文（CSO 2026-05-11 整改 — Helm 层兜底）
 # pod 级：UID/GID 10001，禁 root；fsGroup 自动 chown 挂载卷

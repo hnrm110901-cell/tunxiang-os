@@ -72,10 +72,12 @@ spec:
             - name: PROMETHEUS_AUTH_ENFORCE
               value: "true"
             - name: ENVIRONMENT
-              value: prod
+              value: {{ .Values.prometheus.metricsToken.environment | default "prod" }}
             {{- else }}
             - name: PROMETHEUS_AUTH_ENFORCE
               value: "false"
+            - name: ENVIRONMENT
+              value: dev
             {{- end }}
           envFrom:
             - secretRef:
