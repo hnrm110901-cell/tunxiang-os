@@ -145,10 +145,39 @@ def test_is_dry_run_with_whitespace(monkeypatch):
 
 
 # ── 4 个 pinzhi job dry_run 路径 ─────────────────────────────────────────────
+#
+# P0-2 hotfix #815: _record_dry_run 现写 sync_logs status='dry_run' (对账主轨).
+# 测试用 _get_tenant_id raise 触发 graceful skip path (避真 DB 依赖).
+
+
+@pytest.fixture
+def _no_tenant_ids(monkeypatch):
+    """删 CZYZ/ZQX/SGC_TENANT_ID 触发 _get_tenant_id ValueError, _record_dry_run
+    graceful skip sync_logs 写入 (metric 仍正常 inc).
+
+    同时 stub shared.ontology.src.database (避 shared/ontology/src/__init__.py
+    entities.py PEP 604 union type 触 TypeError, 与本测试关注的 dry_run 路径
+    'no adapter call' 无关).
+    """
+    import sys
+    import types
+
+    for env in ["CZYZ_TENANT_ID", "ZQX_TENANT_ID", "SGC_TENANT_ID"]:
+        monkeypatch.delenv(env, raising=False)
+
+    fake_db_mod = types.ModuleType("shared.ontology.src.database")
+
+    # stub factory; 不会被调到因 _get_tenant_id 先 raise ValueError graceful skip
+    def _unreachable():
+        raise AssertionError("dry_run sync_logs 写入应在 _get_tenant_id 阶段 graceful skip")
+
+    fake_db_mod.async_session_factory = _unreachable
+    monkeypatch.setitem(sys.modules, "shared.ontology.src.database", fake_db_mod)
+    yield
 
 
 @pytest.mark.asyncio
-async def test_dishes_sync_dry_run_no_adapter_call():
+async def test_dishes_sync_dry_run_no_adapter_call(_no_tenant_ids):
     """dishes job dry_run 模式: 0 调 PinzhiAdapterFactory, 仅 log + metric."""
     # env unset = dry_run true
     with patch.object(
@@ -160,7 +189,7 @@ async def test_dishes_sync_dry_run_no_adapter_call():
 
 
 @pytest.mark.asyncio
-async def test_master_data_sync_dry_run_no_adapter_call():
+async def test_master_data_sync_dry_run_no_adapter_call(_no_tenant_ids):
     """master_data job dry_run 模式: 0 调 _sync_tables / _sync_employees."""
     with patch.object(pinzhi_sync, "_sync_tables_for_merchant") as mock_tables, patch.object(
         pinzhi_sync, "_sync_employees_for_merchant"
@@ -171,7 +200,7 @@ async def test_master_data_sync_dry_run_no_adapter_call():
 
 
 @pytest.mark.asyncio
-async def test_orders_incremental_sync_dry_run_no_adapter_call():
+async def test_orders_incremental_sync_dry_run_no_adapter_call(_no_tenant_ids):
     """orders incremental job dry_run 模式: 0 调 adapter."""
     with patch.object(
         pinzhi_sync, "_sync_orders_incremental_for_merchant"
@@ -181,7 +210,7 @@ async def test_orders_incremental_sync_dry_run_no_adapter_call():
 
 
 @pytest.mark.asyncio
-async def test_members_incremental_sync_dry_run_no_adapter_call():
+async def test_members_incremental_sync_dry_run_no_adapter_call(_no_tenant_ids):
     """members incremental job dry_run 模式: 0 调 adapter."""
     with patch.object(
         pinzhi_sync, "_sync_members_incremental_for_merchant"
@@ -194,7 +223,7 @@ async def test_members_incremental_sync_dry_run_no_adapter_call():
 
 
 @pytest.mark.asyncio
-async def test_dry_run_records_metric():
+async def test_dry_run_records_metric(_no_tenant_ids):
     """dry_run 路径 inc sync_executions_total{status=dry_run}."""
     from services.tx_sync_worker.src import metrics as m
 
