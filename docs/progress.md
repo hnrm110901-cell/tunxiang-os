@@ -26,6 +26,40 @@
 
 ---
 
+## 2026-05-18 16:11 CST · W3 D2 P2 metrics auth 三 lane 收官 (Lane A #845 ship, Tier 1 邻接 explicit-ask 第 43→45 例)
+
+### 完成状态
+
+- [x] **W3 D2 P2 metrics auth 三 lane 闭环** — Lane B #843 (Helm Secret) / Lane C #840 (dev e2e) / Lane A #845 (12 svc mount)
+- [x] **Tier 1 邻接 explicit-ask 累计第 45 例** (#845)
+- [x] **3 follow-up issue 立** — #847 tx-pay SPLIT / #848 13 chart Helm Secret deploy-blocking / #849 5 svc auth coverage
+- [x] **6 feedback memory 落盘** — shadow mode 对账 / critic 第三视角增补 / promtool CI / docker compose v2 path / round-2 critic-only / scope creep
+- [x] **5/18 全天 ship 16 PR** (verified) — 早段 W2 收官+#776 P0 复活 5 / 中段 W3 D 起手 5 / 中段后 #820 治理 3 / 末段 W3 D2 P2 三 lane 3
+- [ ] **#848 deploy-blocking** 待 close — prod 推前 MUST CLOSE 防 CrashLoopBackOff
+
+### 关键决策
+
+- **W3 D2 P2 三 lane 模式** — A (mount) 拆 B (Helm Secret) + C (dev e2e verify); B/C 先 ship 让 A 走 admin-merge carve-out, C 真跑期暴露 docker compose v2 path P0 (round-1 三 reviewer 全漏抓, e2e 真跑暴露)
+- **PR #845 round-1 critic SPLIT tx-pay** — tx-pay 是 Tier 1 资金路径 (CLAUDE.md §17), 第一次公开 /metrics 不可 bundled side effect; SPLIT 后 admin-merge 5/5 pass
+- **round-2 critic-only re-verify 节约 67%** — round-1 code+security APPROVE / critic REQUEST_CHANGES 时, round-2 仅 spawn critic re-verify P0/P1 fix; 例外: 引入新 chart/svc/dep 必须重 spawn 三 reviewer
+- **smoke test grep-verify 模式** — Tier 1 CI 最小依赖集下真 import 不可靠, 用 `pathlib.Path.read_text() + assert literal in content` 验证 mount 字符串存在 (per feedback_helper_only_test_for_import_blocked_module + feedback_tx_supply_main_import_ci_smoke_gap)
+
+### 下一步
+
+- **#847 tx-pay SPLIT PR** (独立 §19 security 重审 Instrumentator label cardinality / 第三方 vendor 名称 / NetPol)
+- **#848 13 chart Helm Secret block** (prod 推前 MUST CLOSE, 拆 13 chart values.yaml + templates/deployment.yaml 加 PROMETHEUS_BEARER_TOKEN env)
+- **#849 5 svc /metrics auth 覆盖** (tx-brain/tx-intel/tx-forge/tx-predict/tx-sync-worker 信息泄漏 follow-up)
+- W3 D3 Prep-2 (Prometheus scrape 系统性 audit 2 chart 子集) 或 G10 供应链并发线
+
+### 已知风险
+
+- **prod deploy CrashLoopBackOff** — PR #845 ship 后 13 svc 部署到 prod 时, 若 ENVIRONMENT=production + PROMETHEUS_AUTH_ENFORCE=true (默认) + 无 PROMETHEUS_BEARER_TOKEN → pod 启动 raise; **#848 必须 prod 推前 close**, 否则 13 pod 全 crash-loop
+- **dev compose 12 svc enforce=false 默认** — dev.yml 12 svc 加 `PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"`, dev 默认不 raise; staging/prod 必须 override 为 true + 配真 token
+- **5 svc /metrics 裸露** — #849 解决前 tx-brain/tx-intel/tx-forge/tx-predict/tx-sync-worker 公开 /metrics 在内网/集群任何 pod 可裸读 (含 internal endpoint 枚举)
+- **tx-pay /metrics 仍未挂** — 现行 origin/main tx-pay 0 Instrumentator, #847 ship 前 tx-pay 不公开 /metrics (decision matrix 分母 13/14 = 92.86%, #847 ship 后 14/14)
+
+---
+
 ## 2026-05-18 10:15 · #776 P0 PR-A F gateway whitelist + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
 
 ### 本 PR 状态
