@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 from .api.config_health_routes import router as config_health_router
 from .api.demo_healthcheck_routes import router as demo_healthcheck_router  # Week 3 演示巡检
 from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰度配置下发
@@ -49,8 +51,10 @@ app = FastAPI(
 Instrumentator().instrument(app).expose(app)
 
 # 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
-# 目标入站链：CORS → Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → 路由
+# 目标入站链：CORS → MetricsAuth → Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → 路由
 # CORSMiddleware 必须最后 add（最外层），OPTIONS preflight 在此直接 204 返回，不进认证链。
+# MetricsAuthMiddleware 紧靠 CORS 内侧 (issue #825): /metrics 走 Bearer + IP allowlist;
+# AuthMiddleware AUTH_EXEMPT_PREFIXES 已加 "/metrics" 双保险, 即便 MetricsAuth 绕过也不会 401.
 app.add_middleware(PersonalizationMiddleware)
 app.add_middleware(TenantMiddleware)
 app.add_middleware(DomainAuthzMiddleware)  # 域级授权 + MFA（必须在 Auth 内侧，认证完成后执行）
@@ -58,6 +62,7 @@ app.add_middleware(AuthMiddleware)
 app.add_middleware(ApiKeyMiddleware)  # ApiKey 必须外于 Auth（先处理 X-API-Key 再进入 JWT 校验）
 app.add_middleware(RequestLogMiddleware)
 app.add_middleware(AuditMiddleware)
+app.add_middleware(MetricsAuthMiddleware)  # /metrics Bearer + IP allowlist (issue #825)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),

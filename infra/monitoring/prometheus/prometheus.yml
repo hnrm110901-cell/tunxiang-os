@@ -8,17 +8,39 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.yml
 
+# ─── issue #825 metrics 鉴权 (W3 D2 P1) ──────────────────────────────────
+# MetricsAuthMiddleware (shared/middleware/src/metrics_auth.py) 提供 /metrics 多层鉴权:
+#   - Bearer token (Authorization: Bearer header) → timing-safe hmac.compare_digest
+#   - IP allowlist (CIDR) → 内网段默认 + k8s pod CIDR
+#   - XFF spoof 防御 (round-2): 默认拒 X-Forwarded-For, 仅 PROMETHEUS_TRUST_XFF=true
+#     + direct IP ∈ PROMETHEUS_TRUSTED_PROXIES 时才信
+# Prometheus pod 启动时挂 Secret tx-metrics-token 到 /etc/prometheus/secrets/
+# (Helm chart 部署改造 follow-up issue).
+#
+# 当前 ready: gateway + tx-event-relay + tx-trade (本 PR scope, authorization 已加)
+# follow-up: 其他 11 服务 — 见 #825 round-2 立的 follow-up issue
+# (D2 决策矩阵分母覆盖率 7% → 100% 依赖此 follow-up)
+#
+# 本 yml 用 Prometheus 原生 `authorization: type: Bearer` 配置, 自动发 Authorization 头.
+# 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
+
 scrape_configs:
-  # 屯象OS 后端服务 metrics
+  # 屯象OS 后端服务 metrics — 本 PR ready (3 svc, /metrics 已挂 MetricsAuthMiddleware)
   - job_name: 'tunxiang-gateway'
     static_configs:
       - targets: ['gateway:8000']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-trade'
     static_configs:
       - targets: ['tx-trade:8001']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-member'
     static_configs:
@@ -78,10 +100,14 @@ scrape_configs:
   # tx-event-relay — 真 Outbox relay worker (P0-4 hotfix #805 三 audit)
   # ⚠️ 历史 stale port 漂移 (gateway/tx-trade/... 部分 :8000-8012 不与 CLAUDE.md §5
   # 真实端口对齐) 留 #809 系统性 audit, 本 hotfix 仅补 tx-sync-worker / tx-event-relay
+  # /metrics 已挂 MetricsAuthMiddleware (issue #825, 本 PR scope)
   - job_name: 'tunxiang-tx-event-relay'
     static_configs:
       - targets: ['tx-event-relay:8020']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   # tx-sync-worker — 品智POS 同步 + 企微 daily SOP daemon (P0-4 hotfix #805)
   - job_name: 'tunxiang-tx-sync-worker'

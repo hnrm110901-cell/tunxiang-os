@@ -29,11 +29,14 @@ except ImportError:
 
 
 # 免认证白名单路径前缀
+# /metrics 由 MetricsAuthMiddleware 接管鉴权 (Bearer + IP allowlist, issue #825);
+# AuthMiddleware 不再 401, 双保险 (MetricsAuth 在外层先拦, AUTH_EXEMPT 是 backstop).
 AUTH_EXEMPT_PREFIXES: tuple[str, ...] = (
     "/health",
     "/docs",
     "/openapi.json",
     "/redoc",
+    "/metrics",                     # issue #825: MetricsAuthMiddleware 接管 (Bearer + IP allowlist)
     "/api/v1/auth/login",
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",

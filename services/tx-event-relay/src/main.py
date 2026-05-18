@@ -136,6 +136,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #825 W3 D2 决策矩阵分母)
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
+
+app.add_middleware(MetricsAuthMiddleware)
+
 
 @app.get("/health")
 async def health() -> dict[str, Any]:
