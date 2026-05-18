@@ -406,7 +406,7 @@ services:
       - "9090:9090"
     volumes:
       - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./tx-metrics-token:/etc/prometheus/secrets/tx-metrics-token:ro
+      - ./envs/tx-metrics-token:/etc/prometheus/secrets/tx-metrics-token:ro
       - ../monitoring/prometheus/rules:/etc/prometheus/rules:ro
     networks:
       - txos-net
