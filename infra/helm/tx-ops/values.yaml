@@ -103,6 +103,17 @@ configMap:
   enabled: false
   data: {}
 
+# Prometheus Bearer Token Secret 挂载（默认关, prod 启用需 Founder sign-off + Secret 已 kubectl create）
+# 启用前置: kubectl -n <ns> create secret generic tx-metrics-token --from-literal=token=<token>
+# 详见 docs/governance/runbooks/prometheus-secret-rotation.md
+prometheus:
+  metricsToken:
+    enabled: false          # 默认关, 向后兼容; prod enabled=true 需 Secret 真存在
+    secretName: tx-metrics-token
+    secretKey: token
+    envName: PROMETHEUS_BEARER_TOKEN
+    environment: prod         # round-2 P1-2: 参数化, staging cluster 可 override 为 "staging"
+
 # F#2 安全上下文（CSO 2026-05-11 整改 — Helm 层兜底）
 # pod 级：UID/GID 10001，禁 root；fsGroup 自动 chown 挂载卷
 # container 级：禁权限提升 + drop ALL cap（PSA restricted 基线）
