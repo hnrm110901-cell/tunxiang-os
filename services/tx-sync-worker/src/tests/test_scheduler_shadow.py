@@ -20,10 +20,8 @@ from services.tx_sync_worker.src.jobs import pinzhi_sync
 
 def _safe_shutdown(scheduler) -> None:
     """shutdown scheduler 即便未 start (apscheduler 未 start raises SchedulerNotRunningError)."""
-    try:
-        _safe_shutdown(scheduler)
-    except Exception:  # noqa: BLE001 — test cleanup, 已知 SchedulerNotRunningError
-        pass
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
 
 
 @pytest.fixture(autouse=True)
@@ -208,3 +206,30 @@ async def test_dry_run_records_metric():
     await pinzhi_sync._run_dishes_sync()
     after = m.sync_executions_total.labels(job="daily_dishes_sync", status="dry_run")._value.get()
     assert after == before + 1
+
+
+# ── _safe_shutdown 真停 (round-2 P1-1 regression) ────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_safe_shutdown_truly_stops_running_scheduler():
+    """_safe_shutdown 必须真停 running scheduler (round-1 BUG: 无限递归被 except 吞).
+
+    Round-1 _safe_shutdown body 调自己致 RecursionError → scheduler.running 仍 True;
+    Round-2 fix 改为 if scheduler.running: scheduler.shutdown(wait=False); 本测试 verify.
+
+    Note: AsyncIOScheduler._shutdown 被 @run_in_event_loop 装饰, shutdown(wait=False) 异步派
+    任务后我们让出 event loop 一次, 让 _shutdown 真正运行后再 assert.
+    """
+    import asyncio
+
+    from services.tx_sync_worker.src.scheduler import create_sync_scheduler
+
+    scheduler = create_sync_scheduler()
+    scheduler.start()  # 进入 running 状态
+    assert scheduler.running is True
+
+    _safe_shutdown(scheduler)
+    # 让 _shutdown task (@run_in_event_loop) 跑完
+    await asyncio.sleep(0)
+    assert scheduler.running is False
