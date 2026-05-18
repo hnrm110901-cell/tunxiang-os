@@ -1,0 +1,222 @@
+{
+  "__inputs": [],
+  "__requires": [
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "10.2.0" },
+    { "type": "datasource", "id": "postgres", "name": "PostgreSQL", "version": "1.0.0" }
+  ],
+  "annotations": { "list": [] },
+  "description": "tx-sync-worker sync_logs 7d 对账面板 — W4 cutover (5/25-6/1) Phase 1 dry_run 一周观察期可视化. 数据源 PostgreSQL sync_logs 表; status='success' (gateway 真路径) vs status='dry_run' (sync-worker Phase 1) 双边对账, delta_pct ≤ 10% 为通过. 配套 SQL runbook: docs/governance/runbooks/tx-sync-worker-reconciliation.sql; 父 issue #806 / hotfix PR #819. RLS 策略: Grafana 数据源使用持 BYPASSRLS 的 ops role 跨租户汇总展示 (与 wecom_sop.py:79-82 跨租户初始 SELECT 同语义, FU-7 prod role verify 前置); per-merchant 钻取需 ops 在 SQL runbook 跑 `SET LOCAL app.tenant_id = '<uuid>';` 切租户.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    {
+      "title": "SQL Runbook (5 queries)",
+      "url": "https://github.com/hnrm110901-cell/tunxiang-os/blob/main/docs/governance/runbooks/tx-sync-worker-reconciliation.sql",
+      "type": "link",
+      "icon": "doc",
+      "tooltip": "完整 SQL 主对账 / 趋势 / records 差异 / wecom 例外 / 告警阈值 5 query"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "title": "7d 全局对账总览 (success vs dry_run vs delta_pct)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 0 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }] }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "全局 delta_pct (%)" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 10 }] } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COUNT(*) FILTER (WHERE status = 'success') AS \"success 行数\",\n  COUNT(*) FILTER (WHERE status = 'dry_run') AS \"dry_run 行数\",\n  ROUND(\n    (ABS(\n      COUNT(*) FILTER (WHERE status = 'success')::numeric\n      - COUNT(*) FILTER (WHERE status = 'dry_run')::numeric\n    ) / NULLIF(COUNT(*) FILTER (WHERE status = 'dry_run'), 0)) * 100,\n    2\n  ) AS \"全局 delta_pct (%)\",\n  COUNT(DISTINCT merchant_code) AS \"涉及 merchant 数\"\nFROM sync_logs\nWHERE started_at >= NOW() - INTERVAL '7 days';"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "per (merchant, sync_type) 7d 对账明细 (success / dry_run / delta_pct)",
+      "type": "table",
+      "description": "对账主轨 (Query 1). delta_pct > 10% 红色高亮; NULL 行 = dry_run_count=0 (真路径正常时灰色). ORDER BY delta_pct DESC NULLS LAST 突出异常.",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 6 },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto" } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "delta_pct (%)" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.cellOptions", "value": { "type": "color-background" } },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 10 }] } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  DATE(started_at AT TIME ZONE 'Asia/Shanghai') AS day,\n  merchant_code,\n  sync_type,\n  COUNT(*) FILTER (WHERE status = 'success') AS success_count,\n  COUNT(*) FILTER (WHERE status = 'dry_run') AS dry_run_count,\n  ROUND(\n    (ABS(\n      COUNT(*) FILTER (WHERE status = 'success')::numeric\n      - COUNT(*) FILTER (WHERE status = 'dry_run')::numeric\n    ) / NULLIF(COUNT(*) FILTER (WHERE status = 'dry_run'), 0)) * 100,\n    2\n  ) AS \"delta_pct (%)\"\nFROM sync_logs\nWHERE started_at >= NOW() - INTERVAL '7 days'\nGROUP BY 1, 2, 3\nORDER BY 1 DESC, \"delta_pct (%)\" DESC NULLS LAST;"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "delta_pct 7d 趋势 (per merchant 着色)",
+      "type": "timeseries",
+      "description": "日级 delta_pct 走势; >10% 阈线红色; 持续 ≥ 2 天高位 → cutover gate 阻塞 (Query 5 同等阈值).",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 18 },
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "lineWidth": 2, "drawStyle": "line", "fillOpacity": 10 },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 10 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  DATE(started_at AT TIME ZONE 'Asia/Shanghai')::timestamptz AS time,\n  merchant_code AS metric,\n  ROUND(\n    AVG(\n      ABS(\n        (CASE WHEN status = 'success' THEN 1 ELSE 0 END)::numeric\n        - (CASE WHEN status = 'dry_run' THEN 1 ELSE 0 END)::numeric\n      )\n    ) * 100,\n    2\n  ) AS value\nFROM sync_logs\nWHERE started_at >= NOW() - INTERVAL '7 days'\nGROUP BY 1, 2\nORDER BY 1 ASC;"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "records_synced 真路径 vs dry_run 比较 (per merchant)",
+      "type": "barchart",
+      "description": "Query 3 配套. 真路径 avg/max records (有量级); dry_run rows 期望全 0 (反向 sanity). 任何 dry_run_rows > 0 → P0-2 实现回归.",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 18 },
+      "options": {
+        "barWidth": 0.5,
+        "groupWidth": 0.7,
+        "legend": { "calcs": [], "displayMode": "table", "placement": "bottom" },
+        "orientation": "auto",
+        "xTickLabelRotation": -30
+      },
+      "fieldConfig": {
+        "defaults": { "unit": "short", "custom": { "lineWidth": 1 } },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  merchant_code || ' / ' || sync_type AS \"组合\",\n  ROUND(AVG(records_synced) FILTER (WHERE status = 'success'), 1) AS success_avg_records,\n  COALESCE(SUM(records_synced) FILTER (WHERE status = 'dry_run'), 0) AS dry_run_rows\nFROM sync_logs\nWHERE started_at >= NOW() - INTERVAL '7 days'\nGROUP BY merchant_code, sync_type\nORDER BY success_avg_records DESC NULLS LAST\nLIMIT 30;"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "告警: delta_pct > 10% 持续 ≥ 2 天的异常组合 (Query 5)",
+      "type": "table",
+      "description": "cutover gate 阻塞表 — 0 行 = 通过 W4 cutover; ≥ 1 行 = 立 follow-up issue 调查后 Phase 2 PR-A 延后 ship. 任何行红底高亮.",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "options": {
+        "showHeader": true,
+        "footer": { "show": false }
+      },
+      "fieldConfig": {
+        "defaults": { "custom": { "align": "auto", "cellOptions": { "type": "color-background-solid" } } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "anomaly_days" },
+            "properties": [
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }, { "color": "red", "value": 2 }] } }
+            ]
+          },
+          {
+            "matcher": { "id": "byName", "options": "max_delta_pct" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "thresholds", "value": { "mode": "absolute", "steps": [{ "color": "yellow", "value": null }, { "color": "red", "value": 10 }] } }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "WITH daily_delta AS (\n  SELECT\n    DATE(started_at AT TIME ZONE 'Asia/Shanghai') AS day,\n    merchant_code,\n    sync_type,\n    (ABS(\n      COUNT(*) FILTER (WHERE status = 'success')::numeric\n      - COUNT(*) FILTER (WHERE status = 'dry_run')::numeric\n    ) / NULLIF(COUNT(*) FILTER (WHERE status = 'dry_run'), 0)) * 100 AS delta_pct\n  FROM sync_logs\n  WHERE started_at >= NOW() - INTERVAL '7 days'\n  GROUP BY 1, 2, 3\n)\nSELECT\n  merchant_code,\n  sync_type,\n  COUNT(*) FILTER (WHERE delta_pct > 10.0) AS anomaly_days,\n  ROUND(MAX(delta_pct)::numeric, 2) AS max_delta_pct\nFROM daily_delta\nWHERE delta_pct IS NOT NULL\nGROUP BY merchant_code, sync_type\nHAVING COUNT(*) FILTER (WHERE delta_pct > 10.0) >= 2\nORDER BY anomaly_days DESC, max_delta_pct DESC;"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "wecom_sop 例外行 sanity (期望全 0, Query 4)",
+      "type": "stat",
+      "description": "wecom_sop 单 job 不入 sync_logs (per #806 DOD FU-8). 此 panel 期望永远 0; 任何非 0 = wecom 误调 _write_sync_log 回归 bug. wecom 真对账走 Prometheus tx_sync_worker_executions_total{job=\"wecom_group_daily_sop\"}.",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 36 },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "horizontal",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\n  COALESCE(COUNT(*), 0) AS \"wecom 误写行数 (期望 0)\"\nFROM sync_logs\nWHERE started_at >= NOW() - INTERVAL '7 days'\n  AND (sync_type LIKE 'wecom%' OR sync_type LIKE '%sop%');"
+        }
+      ]
+    }
+  ],
+  "refresh": "5m",
+  "schemaVersion": 38,
+  "tags": ["tunxiang", "tx-sync-worker", "reconciliation", "w4-cutover"],
+  "time": { "from": "now-7d", "to": "now" },
+  "timepicker": {},
+  "timezone": "Asia/Shanghai",
+  "title": "tx-sync-worker sync_logs 7d 对账",
+  "uid": "tx-sync-worker-reconciliation-v1",
+  "version": 1
+}
