@@ -176,6 +176,11 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #829, parent #825 W3 D2 决策矩阵分母)
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
+
+app.add_middleware(MetricsAuthMiddleware)
+
 app.include_router(emp_router)
 app.include_router(schedule_router)
 app.include_router(role_router)
