@@ -5,7 +5,10 @@ gateway AuthMiddleware 拦 /metrics 401 → Prometheus scrape 永远 fail → W3
 分母拿不到数据 → 不能 evaluate W11 #767 真投递切换决策.
 
 多层防御 (per issue 验收标准):
-  1. Bearer token (`X-Prometheus-Token` header) — timing-safe `hmac.compare_digest`
+  1. Bearer token — timing-safe `hmac.compare_digest`. 接受两种 header:
+       a) `X-Prometheus-Token` (专用, 避免与业务 JWT 混淆)
+       b) `Authorization: Bearer <token>` (Prometheus 原生 `authorization: type: Bearer` 用)
+     两个 header 同时存在时 X-Prometheus-Token 优先.
   2. IP allowlist (CIDR) — `ipaddress.ip_network` 标准库
   3. AuthMiddleware exempt /metrics (gateway main.py 已加 prefix)
 
@@ -182,7 +185,13 @@ class MetricsAuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         # 3b. Bearer token check (timing-safe compare)
+        # 接受两种 header: 优先 X-Prometheus-Token (专用避免与业务 JWT 混淆);
+        # backstop Authorization: Bearer (Prometheus 原生 `authorization: type: Bearer` 用此).
         token_header = request.headers.get("X-Prometheus-Token", "").strip()
+        if not token_header:
+            auth = request.headers.get("Authorization", "").strip()
+            if auth.startswith("Bearer "):
+                token_header = auth[7:].strip()
         if not token_header:
             logger.warning(
                 "metrics_auth_missing_token",
@@ -190,7 +199,9 @@ class MetricsAuthMiddleware(BaseHTTPMiddleware):
                 client_ip=_get_client_ip(request),
             )
             return _error_response(
-                401, "METRICS_AUTH_REQUIRED", "X-Prometheus-Token header required"
+                401,
+                "METRICS_AUTH_REQUIRED",
+                "X-Prometheus-Token or Authorization: Bearer header required",
             )
         if not hmac.compare_digest(token_header, self._token):
             logger.warning(
@@ -199,7 +210,7 @@ class MetricsAuthMiddleware(BaseHTTPMiddleware):
                 client_ip=_get_client_ip(request),
             )
             return _error_response(
-                401, "METRICS_AUTH_INVALID_TOKEN", "Invalid X-Prometheus-Token"
+                401, "METRICS_AUTH_INVALID_TOKEN", "Invalid metrics auth token"
             )
 
         # 3c. IP allowlist check

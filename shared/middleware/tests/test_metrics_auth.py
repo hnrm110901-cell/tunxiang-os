@@ -236,6 +236,71 @@ class TestTimingSafeCompare:
         assert resp.json()["error"]["code"] == "METRICS_AUTH_INVALID_TOKEN"
 
 
+class TestAuthorizationBearer:
+    """Prometheus 原生 `authorization: type: Bearer` 发 Authorization: Bearer header."""
+
+    def test_authorization_bearer_header_accepted(
+        self, app_with_metrics_auth: FastAPI
+    ) -> None:
+        app_with_metrics_auth.add_middleware(
+            MetricsAuthMiddleware,
+            bearer_token="prom-secret-token",
+            allowlist_cidr=("10.0.0.0/8",),
+            enforce=True,
+        )
+        client = TestClient(app_with_metrics_auth)
+        resp = client.get(
+            "/metrics",
+            headers={
+                "Authorization": "Bearer prom-secret-token",
+                "X-Forwarded-For": "10.1.2.3",
+            },
+        )
+        assert resp.status_code == 200
+
+    def test_x_prometheus_token_priority_over_authorization(
+        self, app_with_metrics_auth: FastAPI
+    ) -> None:
+        """X-Prometheus-Token 优先; Authorization 错也无所谓."""
+        app_with_metrics_auth.add_middleware(
+            MetricsAuthMiddleware,
+            bearer_token="correct-token",
+            allowlist_cidr=("10.0.0.0/8",),
+            enforce=True,
+        )
+        client = TestClient(app_with_metrics_auth)
+        resp = client.get(
+            "/metrics",
+            headers={
+                "X-Prometheus-Token": "correct-token",
+                "Authorization": "Bearer wrong-token",
+                "X-Forwarded-For": "10.1.2.3",
+            },
+        )
+        assert resp.status_code == 200
+
+    def test_authorization_non_bearer_scheme_rejected(
+        self, app_with_metrics_auth: FastAPI
+    ) -> None:
+        """Authorization: Basic xyz 不解析 → 视为 missing token → 401."""
+        app_with_metrics_auth.add_middleware(
+            MetricsAuthMiddleware,
+            bearer_token="correct-token",
+            allowlist_cidr=("10.0.0.0/8",),
+            enforce=True,
+        )
+        client = TestClient(app_with_metrics_auth)
+        resp = client.get(
+            "/metrics",
+            headers={
+                "Authorization": "Basic dXNlcjpwYXNz",
+                "X-Forwarded-For": "10.1.2.3",
+            },
+        )
+        assert resp.status_code == 401
+        assert resp.json()["error"]["code"] == "METRICS_AUTH_REQUIRED"
+
+
 class TestMetricsSubpath:
     """子路径 /metrics/foo 也受保护 (Instrumentator 默认仅 /metrics, 但防御性覆盖)."""
 

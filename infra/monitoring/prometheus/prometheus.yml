@@ -18,10 +18,11 @@ rule_files:
 # 当前 ready: gateway + tx-event-relay + tx-trade (本 PR scope, authorization 已加)
 # follow-up: 其他 9+ 服务 — 见 issue #825 follow-up (其他 9 服务挂 MetricsAuthMiddleware)
 #
-# ⚠️ 本 PR MetricsAuthMiddleware 用专用 X-Prometheus-Token header,
-# 不复用 Authorization: Bearer (避免与 AuthMiddleware JWT 路径混淆).
-# Prometheus 需用 http_headers 配置 (而非 `authorization: type: Bearer`).
-# 当前 `authorization:` 仅占位, 实际生效需 Helm chart secret 挂载 + Prometheus 配置统一切换.
+# ⚠️ MetricsAuthMiddleware 接受两种 header (二选一):
+#   - X-Prometheus-Token (专用, 优先级高)
+#   - Authorization: Bearer (Prometheus 原生 `authorization: type: Bearer` 自动发送)
+# 本 yml 用 Prometheus 原生 Bearer 配置, 等同 Authorization: Bearer header.
+# 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
 
 scrape_configs:
   # 屯象OS 后端服务 metrics — 本 PR ready (3 svc, /metrics 已挂 MetricsAuthMiddleware)
