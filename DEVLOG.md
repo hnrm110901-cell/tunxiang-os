@@ -1,3 +1,25 @@
+## 2026-05-19 · #806 Step 1 — gateway scheduler removal (W3, T2 邻接)
+
+### 今日完成 (本 session, A3 #806 Step 1 round-1 + round-2)
+- **A3 #806 Step 1** (T2 邻接, 战略 plan W4 cutover pre-req): `feat/806-step1-gateway-scheduler-removal-2026-05-19` 分支 3 commit
+  - **Commit 1** (`a8821556`): `services/gateway/src/main.py` 255 → 153 lines (-102) — 删 apscheduler/AsyncIOScheduler imports + `_scheduler = AsyncIOScheduler(...)` block + apscheduler_metrics listener; 保留 `sync_router as sync_health_router` + `app.include_router(sync_health_router)` (Q2 决议)
+  - **Commit 2** (`b6d110fc`, round-2 code): 删残留 imports (asyncio + structlog + logger) + 删 apscheduler_metrics.py 模块 + 4 tests + sync_scheduler.py 加 DO NOT CALL banner (5 处)
+  - **Commit 3** (round-2 docs, 本 commit): DEVLOG/progress prepend + PR body draft 落 `.omc/state/sessions/2026-05-19-806-step1/pr-body.md`
+- **§19 round-1**: 0 P0 / 6 P1 / 5 P2 (code 0/1/2 / security 0/0/3 / critic 0/5/4); 4 P1 round-2 修, 1 P1 (apscheduler dep K-P1-2) 推 Step 2, 1 P1 (sync_scheduler.py full split K-P1-3) 用 banner 兜底
+- **Pre-tag 逃生 anchor**: `pre-scheduler-removal-v1.0` (49837a14, 已 push origin)
+- **Reconciliation window 真相 disclosure (本 session 决议)**: Phase 1 dry_run start 5/18 + Step 1 ship 5/19 = ~24-48h dual-data window (vs spec 7-day). 接受偏离, Step 2 PR (5/20+) reconciliation gate 同 PR 改用 row-count threshold (每 cell ≥3 success + ≥3 dry_run) 而非 drift % 单标准.
+
+### 红线 0 touch
+- §17: cashier_engine / order_service / payment_saga / wine_storage / invoice_service / emitter / pinzhi_pos / aoqiwei / meituan 0 match
+- Step 1/2 边界: tx-sync-worker / infra/helm/tx-sync-worker / infra/compose/envs/{dev,gray,prod}.yml RUN_MODE 0 touch
+
+### 下一步
+- 等 §19 critic round-2 re-verify (critic-only per memory `feedback_round2_critic_only_pattern.md`)
+- user explicit-ask: push branch + 开 PR + admin-merge (Tier 1 邻接 第 44 或 45 例)
+- Step 2 PR (5/20+, RUN_MODE=live 翻 + sync_scheduler.py cron half 删 + apscheduler dep 删 + reconciliation 真测量) — 本 PR ship 后立 follow-up issue
+
+---
+
 ## 2026-05-19 W3 起手 — Prometheus 系统性审计 (#820) 4 Phase 单 PR 闭环
 
 ### 今日完成 (本 session, 1 PR + 4 Phase 收官 #820)
