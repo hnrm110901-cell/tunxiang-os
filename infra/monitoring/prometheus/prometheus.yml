@@ -161,11 +161,13 @@ scrape_configs:
       type: Bearer
       credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
-  # tx-pay /metrics authorization 单独 SPLIT 到 #847 (Tier 1 资金路径, §19 security 重审)
   - job_name: 'tunxiang-tx-pay'
     static_configs:
       - targets: ['tx-pay:8016']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-devforge'
     static_configs:
