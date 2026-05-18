@@ -1,3 +1,32 @@
+## 2026-05-18 10:15 · #776 P0 PR-A F gateway whitelist + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
+
+### 本 PR 状态
+
+- 本 PR: G3 PR-A F `fix/gateway-pay-callback-whitelist` rebase + ship — **#776 P0 收官 (sub-3 / 3)**
+- [x] G1 PR-B F#7 (#814) — MERGED 09:49 CST (booking webhook handler fail-closed)
+- [x] G2 PR-C F#10 (#817) — MERGED 10:03 CST (omni_channel handler fail-closed)
+- [x] G3 PR-A F (本 PR) — gateway whitelist 开放
+
+### 安全链全闭合
+
+- Gateway 层: 3 prefix 白名单 (本 PR)
+- Handler 层: 空 secret fail-closed (G1+G2)
+- 缺一不可: handler 必须先就位 → gateway 再放白名单 (顺序约束已严格执行)
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 39 → **40** (#776 3 例 38/39/40)
+- #776 P0 全闭合
+- 5/11 残留 ship-debt 清零
+
+### 下一步
+
+- #776 issue CLOSE (G3 merge 后)
+- worktree cleanup: 3 个 `~/.tunxiang-p0-worktrees/*-2026-05-11` 可安全删除
+- session 收尾或转其他工作
+
+---
+
 ## 2026-05-18 10:00 · #776 P0 PR-C F#10 omni_channel fail-closed (Tier 1 邻接 explicit-ask 第 39 例)
 
 ### 本 PR 状态

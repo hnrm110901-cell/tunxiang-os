@@ -38,6 +38,10 @@ AUTH_EXEMPT_PREFIXES: tuple[str, ...] = (
     "/api/v1/auth/register",
     "/api/v1/auth/refresh",
     "/api/v1/wecom/callback",
+    "/api/v1/pay/callback",         # tx-pay: 微信/支付宝/拉卡拉/收钱吧 支付回调，签名验证 by tx-pay channels
+    "/api/v1/webhook",              # tx-trade: 美团/饿了么/抖音外卖 webhook，签名验证 by tx-trade webhook_routes
+    "/api/v1/booking/webhook",      # tx-trade: 美团/点评/微信预订 webhook，签名验证 by tx-trade booking_webhook_routes
+    # 注意: /api/v1/booking 下的非 webhook 子路径（如 /mock/* /ws/*）仍走 JWT 鉴权
 )
 
 # 免认证白名单路径（精确匹配）
