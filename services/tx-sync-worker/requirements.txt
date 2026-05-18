@@ -1,0 +1,10 @@
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+asyncpg>=0.29.0
+sqlalchemy[asyncio]>=2.0.0
+apscheduler>=3.10.0
+httpx>=0.25.0
+structlog>=23.1.0
+prometheus-client>=0.19.0
+python-multipart>=0.0.6
+pytz>=2023.3
