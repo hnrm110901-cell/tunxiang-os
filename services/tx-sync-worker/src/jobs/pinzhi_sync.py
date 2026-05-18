@@ -421,8 +421,34 @@ async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> 
 # ── dry_run helper (Phase 1 模式) ────────────────────────────────────────────
 
 
-def _record_dry_run(job_id: str, duration_s: float) -> None:
-    """dry_run 模式: 记 metric + log, 不调 pinzhi adapter / 不写 sync_logs."""
+async def _record_dry_run(
+    job_id: str,
+    duration_s: float,
+    *,
+    merchants: list[str] | None = None,
+    sync_types: list[str] | None = None,
+    started_at: datetime | None = None,
+) -> None:
+    """dry_run 模式 (Phase 1): metric + log + sync_logs status='dry_run' 双轨度量.
+
+    P0-2 hotfix (#805 三 audit): 原方案"不写 sync_logs"致对账主轨依赖
+    apscheduler_jobs_executed_total 凭空 metric (gateway 0 add_listener 桥接).
+    改为 dry_run 路径也写 sync_logs 但 status='dry_run', 与真路径 status='success'
+    区分. 对账主轨改 SQL: 同 (day, merchant_code, sync_type) 组的 success count
+    (gateway 真路径) vs dry_run count (sync-worker) 差异 ≤ 10%.
+
+    Args:
+      job_id: APScheduler job id (与 metric label `job` 一致, 用 Prometheus 视图)
+      duration_s: cron fire 耗时 (秒)
+      merchants: 该 job 覆盖的商户 code 列表 (写 sync_logs N 行 N=len(merchants)*N_types)
+      sync_types: 该 job 覆盖的 sync_type 列表 (per merchant 一行)
+      started_at: cron fire 起始时刻 (sync_logs.started_at, UTC)
+
+    sync_logs 写入语义:
+      - 1 cron fire × N merchants × M sync_types = N*M 行 (与 gateway 真路径同形)
+      - records_synced=0, error_msg=NULL, status='dry_run'
+      - RLS via set_config('app.tenant_id') 每商户独立 session
+    """
     sync_executions_total.labels(job=job_id, status="dry_run").inc()
     sync_last_run_timestamp_seconds.labels(job=job_id).set(time.time())
     sync_duration_seconds.labels(job=job_id).observe(duration_s)
@@ -433,6 +459,51 @@ def _record_dry_run(job_id: str, duration_s: float) -> None:
         duration_s=duration_s,
     )
 
+    # Phase 1 P0-2 hotfix: 写 sync_logs 表 status='dry_run' (对账主轨)
+    if merchants is None or sync_types is None or started_at is None:
+        # 无 merchants 信息时退化为 metric-only (向后兼容; 不阻塞 cron)
+        return
+
+    try:
+        from shared.ontology.src.database import async_session_factory
+    except ImportError:
+        logger.warning("dry_run_sync_logs_skip_no_db", job=job_id)
+        return
+
+    for merchant_code in merchants:
+        try:
+            tenant_id = _get_tenant_id(merchant_code)
+        except (KeyError, ValueError) as exc:
+            logger.warning(
+                "dry_run_sync_logs_skip_no_tenant",
+                merchant_code=merchant_code,
+                error=str(exc),
+            )
+            continue
+
+        for sync_type in sync_types:
+            try:
+                async with async_session_factory() as db:
+                    await _write_sync_log(
+                        db,
+                        tenant_id,
+                        merchant_code,
+                        sync_type,
+                        "dry_run",  # 对账区分: 真路径 'success' vs Phase 1 'dry_run'
+                        0,  # records_synced
+                        None,  # error_msg
+                        started_at,
+                    )
+            except (ValueError, RuntimeError, OSError) as exc:
+                # sync_logs 写入失败不阻塞 dry_run cron (与 _write_sync_log 同语义)
+                logger.warning(
+                    "dry_run_sync_logs_write_failed",
+                    job=job_id,
+                    merchant_code=merchant_code,
+                    sync_type=sync_type,
+                    error=str(exc),
+                )
+
 
 # ── 调度任务入口 ─────────────────────────────────────────────────────────────
 
@@ -441,10 +512,17 @@ async def _run_dishes_sync() -> None:
     """每日 02:00 — 全量拉取三商户菜品（并行）。"""
     log = logger.bind(job="daily_dishes_sync")
     fire_start = time.monotonic()
+    started_at = datetime.now(timezone.utc)
     log.info("daily_dishes_sync_started", dry_run=_is_dry_run())
 
     if _is_dry_run():
-        _record_dry_run("daily_dishes_sync", time.monotonic() - fire_start)
+        await _record_dry_run(
+            "daily_dishes_sync",
+            time.monotonic() - fire_start,
+            merchants=MERCHANTS,
+            sync_types=["dishes"],
+            started_at=started_at,
+        )
         return
 
     from shared.ontology.src.database import async_session_factory
@@ -489,10 +567,17 @@ async def _run_master_data_sync() -> None:
     """每日 03:00 — 全量拉取三商户员工 + 桌台基础资料（并行）。"""
     log = logger.bind(job="daily_master_data_sync")
     fire_start = time.monotonic()
+    started_at = datetime.now(timezone.utc)
     log.info("daily_master_data_sync_started", dry_run=_is_dry_run())
 
     if _is_dry_run():
-        _record_dry_run("daily_master_data_sync", time.monotonic() - fire_start)
+        await _record_dry_run(
+            "daily_master_data_sync",
+            time.monotonic() - fire_start,
+            merchants=MERCHANTS,
+            sync_types=["tables", "employees"],
+            started_at=started_at,
+        )
         return
 
     from shared.ontology.src.database import async_session_factory
@@ -556,10 +641,17 @@ async def _run_orders_incremental_sync() -> None:
     """每小时 — 增量拉取三商户当日订单（并行）。"""
     log = logger.bind(job="hourly_orders_incremental_sync")
     fire_start = time.monotonic()
+    started_at = datetime.now(timezone.utc)
     log.info("hourly_orders_incremental_sync_started", dry_run=_is_dry_run())
 
     if _is_dry_run():
-        _record_dry_run("hourly_orders_incremental_sync", time.monotonic() - fire_start)
+        await _record_dry_run(
+            "hourly_orders_incremental_sync",
+            time.monotonic() - fire_start,
+            merchants=MERCHANTS,
+            sync_types=["orders_incremental"],
+            started_at=started_at,
+        )
         return
 
     from shared.ontology.src.database import async_session_factory
@@ -605,10 +697,17 @@ async def _run_members_incremental_sync() -> None:
     """每15分钟 — 增量拉取三商户会员变更（并行）。"""
     log = logger.bind(job="quarter_members_incremental_sync")
     fire_start = time.monotonic()
+    started_at = datetime.now(timezone.utc)
     log.info("quarter_members_incremental_sync_started", dry_run=_is_dry_run())
 
     if _is_dry_run():
-        _record_dry_run("quarter_members_incremental_sync", time.monotonic() - fire_start)
+        await _record_dry_run(
+            "quarter_members_incremental_sync",
+            time.monotonic() - fire_start,
+            merchants=MERCHANTS,
+            sync_types=["members_incremental"],
+            started_at=started_at,
+        )
         return
 
     from shared.ontology.src.database import async_session_factory

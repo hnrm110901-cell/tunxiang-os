@@ -3,12 +3,12 @@
 **业务函数 0 diff** copy from services/gateway/src/main.py:73-115 _run_daily_sop.
 Phase 1 双轨并行, gateway 仍跑; Phase 2 follow-up 关 gateway 切单轨.
 
-跨服务 import (per plan §7.6):
-  - services.gateway.src.wecom_group_service
-  - services.gateway.src.models.wecom_group
-  - services.gateway.src.database
+跨服务 import (per plan §7.6, P0-3 hotfix #815):
+  - services.gateway.src.wecom_group_service (拆 shared/wecom/ 留 FU #806 DOD)
+  - services.gateway.src.models.wecom_group   (同上)
+  - shared.ontology.src.database.async_session_factory  ← P0-3 修正
+    (原写法 services.gateway.src.database.get_async_session 不存在)
   Dockerfile COPY services/gateway/ → /app/services/gateway/, PYTHONPATH=/app 解析.
-  Phase 2 follow-up issue 评估拆 shared/wecom/ 子包.
 
 **dry_run 模式 (Q3 决议 A)**:
   RUN_MODE=dry_run (env unset 默认 true) → cron fire 时只 log + metric, 不调 WecomGroupService
@@ -61,40 +61,53 @@ async def _run_daily_sop() -> None:
         return
 
     try:
-        from sqlalchemy import distinct, select
+        from sqlalchemy import distinct, select, text
 
-        from services.gateway.src.database import get_async_session  # type: ignore[import]
-        from services.gateway.src.models.wecom_group import WecomGroupConfig
-        from services.gateway.src.wecom_group_service import WecomGroupService
+        # 真 helper 路径 (P0-3 hotfix #815): gateway/src/database.py 不存在,
+        # gateway 实际用 shared/ontology/src/database.py:async_session_factory.
+        # WecomGroupConfig / WecomGroupService 跨服务 import 留 Phase 2 拆 shared/wecom/ (FU #806 DOD).
+        from shared.ontology.src.database import async_session_factory
+
+        from services.gateway.src.models.wecom_group import WecomGroupConfig  # type: ignore[import]
+        from services.gateway.src.wecom_group_service import WecomGroupService  # type: ignore[import]
 
         service = WecomGroupService()
 
-        async for db in get_async_session():
-            # 获取所有有 active 群配置的租户
+        # Step 1 — 跨租户聚合 SELECT (RLS BYPASS 视角): 需 BYPASSRLS role 或
+        # RLS policy USING true. 此处 session 不 set_config('app.tenant_id'),
+        # 由 DB role 配置允许跨租户读 wecom_group_config (与 gateway scheduler 同语义).
+        async with async_session_factory() as db:
             stmt = select(distinct(WecomGroupConfig.tenant_id)).where(WecomGroupConfig.status == "active")
             result = await db.execute(stmt)
-            tenant_ids = result.scalars().all()
+            tenant_ids = list(result.scalars().all())
 
-            for tenant_id in tenant_ids:
-                try:
-                    sop_result = await service.scan_and_execute_daily_sop(tenant_id, db)
+        # Step 2 — 每租户独立 session + set_config 强 RLS 隔离 (per CLAUDE.md §6/§13).
+        for tenant_id in tenant_ids:
+            try:
+                async with async_session_factory() as tenant_db:
+                    await tenant_db.execute(
+                        text("SELECT set_config('app.tenant_id', :tid, true)"),
+                        {"tid": str(tenant_id)},
+                    )
+                    sop_result = await service.scan_and_execute_daily_sop(tenant_id, tenant_db)
                     log.info(
                         "wecom_group_daily_sop_tenant_done",
                         tenant_id=str(tenant_id),
                         result=sop_result,
                     )
-                except Exception as exc:  # noqa: BLE001 — 单租户失败不阻塞其他租户
-                    log.error(
-                        "wecom_group_daily_sop_tenant_error",
-                        tenant_id=str(tenant_id),
-                        error=str(exc),
-                        exc_info=True,
-                    )
+            except (ValueError, RuntimeError, OSError) as exc:
+                # 单租户失败不阻塞其他租户 (与 pinzhi_sync.py 同 narrow 异常清单).
+                log.error(
+                    "wecom_group_daily_sop_tenant_error",
+                    tenant_id=str(tenant_id),
+                    error=str(exc),
+                    exc_info=True,
+                )
         sync_executions_total.labels(job="wecom_group_daily_sop", status="success").inc()
     except ImportError:
         log.warning("wecom_group_daily_sop_db_not_configured")
         sync_executions_total.labels(job="wecom_group_daily_sop", status="error").inc()
-    except Exception as exc:  # noqa: BLE001 — 最外层兜底，定时任务不能崩溃
+    except (ValueError, RuntimeError, OSError) as exc:
         log.error("wecom_group_daily_sop_job_error", error=str(exc), exc_info=True)
         sync_executions_total.labels(job="wecom_group_daily_sop", status="error").inc()
     finally:

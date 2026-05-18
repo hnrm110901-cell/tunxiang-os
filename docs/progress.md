@@ -98,7 +98,7 @@
 
 ### 已知风险
 
-- **P0 dry_run 误关** → dup pinzhi API 调用: 缓解 env unset hardcode + Helm 显式注释 + monitoring alert + Phase 2 issue 标题 explicit "先关 gateway 再翻 dry_run"
+- **P0 dry_run 误关** → dup pinzhi API 调用: 缓解 env unset hardcode + Helm 显式注释 + monitoring alert + Phase 2 issue 标题 explicit "先关 gateway 再翻 RUN_MODE=live"
 - **P1 timezone drift**: Dockerfile `ENV TZ=Asia/Shanghai` + APScheduler 显式 timezone + test 验证
 - **P2 跨服务 import**: Phase 2 follow-up 拆 shared/wecom/, 不阻塞 Phase 1 ship
 - **任何数字 self-regrep 已过**: 端口 8021 / Helm 11 文件 / 测试 18 cases / 5 jobs 全 verify (per plan §0)
