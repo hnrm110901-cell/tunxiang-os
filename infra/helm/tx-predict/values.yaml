@@ -71,7 +71,11 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
-podAnnotations: {}
+podAnnotations:
+  prometheus.io/scrape: "true"
+  # CLAUDE.md §5 authoritative port = 8019 (Dockerfile bug uses 8013, conflicts with tx-forge; #820-P follow-up)
+  prometheus.io/port: "8019"
+  prometheus.io/path: "/metrics"
 
 nodeSelector: {}
 
