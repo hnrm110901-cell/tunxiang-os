@@ -110,22 +110,37 @@ adapter / WecomGroupService, 不写 sync_logs, 仅 log + Prometheus metric.
 | 4 | 5 jobs 业务函数与 gateway 0 业务 line diff | `diff services/gateway/src/sync_scheduler.py:128-577 services/tx-sync-worker/src/jobs/pinzhi_sync.py` → 仅 import path / metric / dry_run gate / module logger 改, 业务 0 diff |
 | 5 | 单元测试全 PASS (19 cases) | `pytest services/tx-sync-worker/src/tests/ -v` |
 
-### Phase 1 观察期对账信号 (round-2 reviewer P1-3 修正)
+### Phase 1 观察期对账信号 (hotfix #815 P0-2 重设计)
 
-⚠️ **dry_run 路径 `pinzhi_sync.py:_record_dry_run` 显式不写 sync_logs 表** (仅 log + Prometheus metric), Phase 1 一周观察期 sync_logs 表只有 gateway 真路径行, tx-sync-worker 0 行 — **对账信号必须基于 Prometheus query, 不基于 sync_logs 表 join**:
+⚠️ **dry_run 路径 `pinzhi_sync.py:_record_dry_run` 写 sync_logs 表 status='dry_run'** (与真路径 status='success' 区分), Phase 1 一周观察期 sync_logs 表双方都有行 — **对账主轨基于 SQL 双边 join, Prometheus 仅监控不对账**.
 
+**原因 (P0-2 hotfix)**: 原方案 PromQL `apscheduler_jobs_executed_total{service="gateway"}` 是**凭空 metric** — gateway/src/main.py 用 `prometheus_fastapi_instrumentator.Instrumentator` 只 export HTTP request metrics, APScheduler 0 add_listener(EVENT_JOB_EXECUTED) 桥接 prometheus_client; 任何对账依赖此 metric 永远查不到数据.
+
+**对账主轨 (SQL, hotfix #815 后)**:
+
+```sql
+SELECT
+  date_trunc('day', started_at) AS day,
+  merchant_code,
+  sync_type,
+  status,
+  count(*) AS fire_count
+FROM sync_logs
+WHERE started_at >= NOW() - INTERVAL '7 days'
+GROUP BY 1, 2, 3, 4
+ORDER BY 1 DESC, 2, 3;
 ```
-对账查询 (PromQL, 1 天滚动窗):
-  rate(tx_sync_worker_job_executions_total{status="dry_run"}[1d])
-  vs
-  rate(apscheduler_jobs_executed_total{service="gateway"}[1d])
 
-通过标准:
-  5 jobs × 7 days = 35 (job, day) 槽位, 每槽 fire 数差异 < 10%
-  (±5 min drift 允许, gateway @ Asia/Shanghai 02:00 vs tx-sync-worker @ Asia/Shanghai 02:00)
-```
+**通过标准**:
+- 同 (day, merchant_code, sync_type) 组, status='success' (gateway 真路径) count vs status='dry_run' (sync-worker) count 差异 ≤ 10% (允许 5min cron drift + 网络重试)
+- 4 pinzhi jobs × 3 merchants (czyz/zqx/sgc) × 5+ sync_types × 7 days = ~30 (day, merchant, type) 组合, 任一组 differ > 10% → 调查
 
-不污染 sync_logs 表的设计意图: Phase 1 dry_run 仅 observability, 不为切换准备数据; Phase 2 翻 live 后 tx-sync-worker 直接写 sync_logs (真路径), 此时 sync_logs join 才有意义.
+**Prometheus 辅助监控 (不对账)**:
+- `tx_sync_worker_executions_total{job, status}` — sync-worker dry_run / success / error / failed 计数
+- `tx_sync_worker_dry_run_active` — gauge, 1=on / 0=off, 用 alert
+- gateway APScheduler 监控延后补 (今后 add_listener 桥接, follow-up #809)
+
+**wecom_sop dry_run 特殊**: 单 job 0 merchant_code 维度 — 留 Prometheus metric-only, 不入 sync_logs 对账主轨.
 
 ---
 
@@ -163,10 +178,11 @@ adapter / WecomGroupService, 不写 sync_logs, 仅 log + Prometheus metric.
 - 翻 live 先 → 5 cron jobs 双跑 (gateway + sync-worker) → 数据 dup, pinzhi API 429 (P0)
 - 关 gateway 先 → 24h 间隔窗 dry_run 仍跑, 5 jobs 失效几小时 (可接受)
 
-**对账验收** (PR-A merge 后 1 周观察, 不污染 sync_logs 表 — Phase 1 dry_run 路径设计):
-- Prometheus query: `rate(tx_sync_worker_job_executions_total{status="dry_run"}[1d])` vs `rate(apscheduler_jobs_executed_total{service="gateway"}[1d])`
-- 5 jobs × 7 days = 35 (job, day) 槽位, 每槽差异 < 10% (±5 min drift)
-- Phase 1 测试集 (19 cases) 全绿
+**对账验收** (PR-A merge 后 1 周观察, SQL 双边 join — hotfix #815 P0-2 重设计):
+- SQL 主轨: `SELECT date_trunc('day', started_at), merchant_code, sync_type, status, count(*) FROM sync_logs WHERE started_at >= NOW() - INTERVAL '7 days' GROUP BY 1,2,3,4`
+- 通过标准: 同 (day, merchant_code, sync_type) 组的 success count (gateway) vs dry_run count (sync-worker) 差异 ≤ 10% (允许 5min cron drift)
+- Prometheus 辅助监控: `tx_sync_worker_executions_total{job, status}` (仅监控不对账)
+- Phase 1 测试集 (20 cases, hotfix +1 P0-3 case) 全绿
 - PR-B 切单轨当晚 02:00 daily_dishes_sync fire 真路径成功
 
 **Phase 2 后续 follow-up** (issue #806 DOD 第 3-4 项):
