@@ -70,7 +70,10 @@ readinessProbe:
 podAntiAffinity:
   enabled: false
 
-podAnnotations: {}
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8008"
+  prometheus.io/path: "/metrics"
 nodeSelector: {}
 tolerations: []
 

@@ -1,3 +1,31 @@
+## 2026-05-19 · #820 W3 起手 — Prometheus 系统性审计 4 Phase 单 PR 闭环 (Tier 1 邻接 explicit-ask 第 41 例)
+
+### 本 PR 状态
+
+- 本 PR: `feat/prometheus-systematic-audit-2026-05-19` (T2 治理, 单 PR Phase A→B→C→D)
+- Phase A: 20 helm chart podAnnotations 三件套补齐 (mcp-server/web-admin skip)
+- Phase B: prometheus.yml 8 mismatch 修 + 6 missing 补 + 历史 #809 闭合
+- Phase C.1: gateway APScheduler EVENT_JOB_EXECUTED listener + Counter + 4 单测
+- Phase C.2: 全 service instrumentator audit (N=22, Q4=B-conditional 决议)
+- Phase C.3: shared/observability/setup_metrics helper + gateway 试点 + 3 单测
+- Phase D: CI workflow prometheus-port-audit.yml + scripts/ci/check_prometheus_ports.py + 6 单测
+
+### Follow-up Issue
+- #820-I: 21 service 渐进迁移 setup_metrics (含 §17 Tier 1 走 §19 reviewer)
+- #820-P: tx-predict Dockerfile 8013 → 8019 (与 tx-forge 冲突修复)
+
+### §17/G10 红线 0 改动
+- 未触 cashier_engine / order_service / payment_saga / wine_storage / invoice_service / *_rls.sql / lww_register / tx-agent 三条硬约束
+- 0 §17 Tier 1 service main.py 被改 (tx-trade/tx-finance/tx-supply 等留 #820-I)
+
+### 验证
+- 10 测试 pass (gateway 4 + scripts/ci 6) + 3 skip (CI-only, prometheus_fastapi_instrumentator 装齐后跑)
+- ruff: 修改文件全绿
+- yaml: 24 jobs 解析 OK (21 backend + 3 infra)
+- check_prometheus_ports.py 真 repo 跑 exit 0 (tx-predict 已知 bug 标记不阻塞)
+
+---
+
 ## 2026-05-18 10:15 · #776 P0 PR-A F gateway whitelist + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
 
 ### 本 PR 状态

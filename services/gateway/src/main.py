@@ -4,10 +4,12 @@ import asyncio
 import os
 
 import structlog
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
+
+from shared.observability import setup_metrics
 
 from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
 
@@ -17,6 +19,7 @@ from .api.flags_routes import router as flags_router  # Follow-up PR B — 灰�
 from .api.migration_routes import router as migration_router
 from .api.onboarding_routes import router as onboarding_router
 from .api.open_api_routes import router as open_api_router
+from .apscheduler_metrics import apscheduler_job_listener
 from .auth import router as auth_router
 from .gdpr_routes import router as gdpr_router
 from .group_ops_routes import router as group_ops_router
@@ -48,7 +51,8 @@ app = FastAPI(
     description="AI-Native Restaurant Chain Operating System",
 )
 
-Instrumentator().instrument(app).expose(app)
+# Phase C.3 (#820) — 统一 metrics 入口, 22 service 渐进迁移 (follow-up #820-I)
+setup_metrics(app, service_name="gateway")
 
 # 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
 # 目标入站链：CORS → MetricsAuth → Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → 路由
@@ -71,6 +75,8 @@ app.add_middleware(
 )
 
 # ── APScheduler 定时任务 ──────────────────────────────────────────
+# Phase C.1 (#820) — Counter + listener 实体在 services/gateway/src/apscheduler_metrics.py
+# 暴露在 main.py 命名空间方便老代码 import (无回归)
 
 _scheduler = AsyncIOScheduler(timezone="Asia/Shanghai")
 
@@ -141,6 +147,11 @@ async def _startup() -> None:
             replace_existing=True,
             misfire_grace_time=getattr(job, "misfire_grace_time", None),
         )
+
+    # Phase C.1 (#820) — APScheduler EVENT 监听挂入 Prometheus Counter (start 前 add)
+    _scheduler.add_listener(
+        apscheduler_job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR
+    )
 
     _scheduler.start()
     logger.info(

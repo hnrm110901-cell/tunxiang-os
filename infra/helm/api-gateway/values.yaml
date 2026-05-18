@@ -93,7 +93,10 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
-podAnnotations: {}
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
 
 nodeSelector: {}
 

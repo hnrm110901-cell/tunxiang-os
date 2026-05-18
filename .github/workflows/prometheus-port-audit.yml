@@ -1,0 +1,61 @@
+name: Prometheus Port Drift Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - infra/monitoring/prometheus/prometheus.yml
+      - services/*/Dockerfile
+      - CLAUDE.md
+      - scripts/ci/check_prometheus_ports.py
+      - .github/workflows/prometheus-port-audit.yml
+  pull_request:
+    paths:
+      - infra/monitoring/prometheus/prometheus.yml
+      - services/*/Dockerfile
+      - scripts/ci/check_prometheus_ports.py
+      - .github/workflows/prometheus-port-audit.yml
+  schedule:
+    - cron: '0 3 * * 1'  # weekly Monday 03:00 UTC (Asia/Shanghai 11:00) — defensive
+  workflow_dispatch:
+
+jobs:
+  port-drift-check:
+    name: Cross-check prometheus.yml ports vs Dockerfile + CLAUDE.md §5
+    runs-on: ubuntu-latest
+    # Drift-tolerant 模式 (per feedback_drift_tolerant_workflow.md):
+    # 新 gate, baseline 未建, fail-open 一周稳定后改 fail-closed (remove continue-on-error).
+    # Ratchet: see #837 (#820-R) — 1 week baseline (until 2026-05-26), then remove continue-on-error
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install promtool
+        run: |
+          # promtool 用于 yaml syntax + structural validate (不需要全 prometheus 部署)
+          wget -q https://github.com/prometheus/prometheus/releases/download/v2.45.0/prometheus-2.45.0.linux-amd64.tar.gz
+          tar xzf prometheus-2.45.0.linux-amd64.tar.gz
+          sudo mv prometheus-2.45.0.linux-amd64/promtool /usr/local/bin/
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install pyyaml
+        run: pip install pyyaml==6.0.1
+
+      - name: promtool check config
+        run: promtool check config infra/monitoring/prometheus/prometheus.yml
+
+      - name: Cross-check prometheus.yml ports vs Dockerfile --port
+        id: cross-check
+        run: |
+          set -o pipefail
+          python scripts/ci/check_prometheus_ports.py | tee /tmp/port-audit.txt
+
+      - name: Hard verify (informational until baseline)
+        if: steps.cross-check.outcome == 'failure'
+        run: |
+          echo "::warning::Prometheus port drift detected. See /tmp/port-audit.txt"
+          cat /tmp/port-audit.txt

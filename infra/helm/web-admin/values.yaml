@@ -65,6 +65,8 @@ readinessProbe:
 podAntiAffinity:
   enabled: true
 
+# web-admin: nginx-only frontend (静态资源), no /metrics endpoint
+# Kept empty intentionally — Prometheus scrape would 404.
 podAnnotations: {}
 nodeSelector: {}
 tolerations: []

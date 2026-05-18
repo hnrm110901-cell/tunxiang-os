@@ -1,3 +1,52 @@
+## 2026-05-19 W3 起手 — Prometheus 系统性审计 (#820) 4 Phase 单 PR 闭环
+
+### 今日完成 (本 session, 1 PR + 4 Phase 收官 #820)
+
+- **#820 W3 治理四件套起手 #1**: `feat/prometheus-systematic-audit-2026-05-19` 分支单 PR 闭环 (Phase A → B → C → D)
+- **Phase A — 20 helm chart podAnnotations 三件套补齐**:
+  - api-gateway:8000 / tx-trade:8001 / tx-menu:8002 / tx-member:8003 / tx-growth:8004 / tx-ops:8005 / tx-supply:8006 / tx-finance:8007 / tx-agent:8008 / tx-analytics:8009 / tx-brain:8010 / tx-intel:8011 / tx-org:8012 / tx-forge:8013 / tx-civic:8014 / tx-expense:8015 / tx-pay:8016 / tx-devforge:8017 / tx-predict:8019 / tx-event-relay:8020 (端口 source = CLAUDE.md §5 authoritative)
+  - mcp-server (stdio MCP 无 HTTP /metrics) + web-admin (nginx-only) 加注释 skip
+  - tx-sync-worker 已配 (PR #819) skip
+- **Phase B — prometheus.yml 系统性修正**:
+  - 修 8 mismatch port (tx-member/growth/org/finance/analytics/menu/supply/brain 与 Dockerfile 错位)
+  - 补 6 missing entry (tx-forge/civic/expense/pay/devforge/predict)
+  - 文件顶部加 doc block authoritative source + CI 防漂移 reference
+  - 历史 #809 系统性 audit 闭合
+- **Phase C.1 — gateway APScheduler 监控盲区修复**:
+  - 抽 services/gateway/src/apscheduler_metrics.py 独立 module (Counter + listener)
+  - main.py add_listener (EVENT_JOB_EXECUTED | EVENT_JOB_ERROR) 桥接 5 个 scheduled job 到 Prometheus
+  - 4 单测 (helper-only 模式 0.05s pass, 含 schema 防漂移)
+  - 修复 tx-sync-worker/src/jobs/pinzhi_sync.py:435 历史评论遗留盲区 (czyz/zqx/sgc daily sync + wecom_group_daily_sop 现在真有 Counter)
+- **Phase C.2 — 全 service instrumentator audit**:
+  - §0 grep 确认 20 service Instrumentator + 2 service raw prometheus_client = 22 service /metrics endpoint 已就位 (远超阈值 N >= 3)
+  - Q4 决议 = B-conditional 路径 = 建 helper
+- **Phase C.3 — shared/observability/setup_metrics helper + gateway 试点**:
+  - 强制 service_name 必传 (未来加 const label 时无需改 caller)
+  - excluded_handlers=["/metrics"] + include_in_schema=False
+  - 3 单测 (本地 skip 因 prometheus_fastapi_instrumentator 未装, CI 装齐运行)
+  - gateway main.py 试点迁移 (Instrumentator().instrument(app).expose(app) → setup_metrics(app, "gateway"))
+  - 21 service 渐进迁移留 #820-I follow-up (含 §17 Tier 1 走 reviewer)
+- **Phase D — CI 防漂移**:
+  - .github/workflows/prometheus-port-audit.yml (PR + push main + weekly Monday + workflow_dispatch)
+  - scripts/ci/check_prometheus_ports.py + 6 单测 (parse Dockerfile / parse prometheus.yml / KNOWN_DOCKERFILE_BUGS register / end-to-end real-repo)
+  - tx-predict #820-P known bug register (Dockerfile EXPOSE 8013 与 tx-forge 冲突, prom 用 CLAUDE.md §5 8019)
+  - continue-on-error: true (drift-tolerant 第 13+ 例, baseline 一周后改 fail-closed)
+
+### Follow-up Issue
+- **#820-I**: 21 service 渐进迁移 setup_metrics helper (含 §17 Tier 1 走 §19 reviewer)
+- **#820-P**: tx-predict Dockerfile EXPOSE 8013 → 8019 (与 tx-forge 冲突修复)
+
+### §17/G10 红线 0 改动 attestation
+- 未触 cashier_engine / order_service / payment_saga / wine_storage / invoice_service / pinzhi_pos / aoqiwei / meituan adapters / *_rls.sql / lww_register / tx-agent 三条硬约束
+- gateway main.py 改的是 Instrumentator 调用 + APScheduler listener 装配 (基础设施层), 业务路由未碰
+- 0 §17 Tier 1 service 的 main.py 被改 (tx-trade/tx-finance/tx-supply 等留 #820-I 渐进)
+
+### W3 起手 Tier 1 邻接 explicit-ask 累计第 41 例
+- 类型: T2 治理 + 边界跨 Tier 1 邻接 (gateway main.py listener 装配是基础设施层但属 Tier 1 服务)
+- carve-out admin-merge 候选: 暂待 §19 reviewer round-1 0 P0/P1 + user explicit-ask 后定
+
+---
+
 ## 2026-05-18 早段 θ — #776 P0 复活 ship PR-A F gateway 第三方回调白名单 + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
 
 ### 今日完成 (本 session θ, 1 PR + #776 P0 全闭合)

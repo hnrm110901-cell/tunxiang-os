@@ -72,6 +72,8 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
+# mcp-server: stdio MCP protocol server (no HTTP /metrics endpoint, no Dockerfile)
+# Kept empty intentionally — Prometheus scrape would 404. Revisit if MCP gets HTTP transport.
 podAnnotations: {}
 
 nodeSelector: {}
