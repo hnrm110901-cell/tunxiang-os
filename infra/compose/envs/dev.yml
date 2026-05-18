@@ -67,6 +67,9 @@ services:
              uvicorn services.tx-menu.src.main:app --host 0.0.0.0 --port 8002 --reload"
     ports:
       - "8002:8002"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-menu:/app/services/tx-menu
       - ../../shared:/app/shared
@@ -79,6 +82,9 @@ services:
              uvicorn services.tx-member.src.main:app --host 0.0.0.0 --port 8003 --reload"
     ports:
       - "8003:8003"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-member:/app/services/tx-member
       - ../../shared:/app/shared
@@ -91,6 +97,9 @@ services:
              uvicorn services.tx-growth.src.main:app --host 0.0.0.0 --port 8004 --reload"
     ports:
       - "8004:8004"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-growth:/app/services/tx-growth
       - ../../shared:/app/shared
@@ -103,6 +112,9 @@ services:
              uvicorn services.tx-ops.src.main:app --host 0.0.0.0 --port 8005 --reload"
     ports:
       - "8005:8005"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-ops:/app/services/tx-ops
       - ../../shared:/app/shared
@@ -117,6 +129,8 @@ services:
       - "8006:8006"
     environment:
       TX_SUPPLY_ENABLE_INDEX_SPLIT_PROJECTOR: "true"
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-supply:/app/services/tx-supply
       - ../../shared:/app/shared
@@ -129,6 +143,9 @@ services:
              uvicorn services.tx-finance.src.main:app --host 0.0.0.0 --port 8007 --reload"
     ports:
       - "8007:8007"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-finance:/app/services/tx-finance
       - ../../shared:/app/shared
@@ -141,6 +158,9 @@ services:
              uvicorn services.tx-agent.src.main:app --host 0.0.0.0 --port 8008 --reload"
     ports:
       - "8008:8008"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-agent:/app/services/tx-agent
       - ../../shared:/app/shared
@@ -155,6 +175,8 @@ services:
       - "8009:8009"
     environment:
       TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "true"
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-analytics:/app/services/tx-analytics
       - ../../shared:/app/shared
@@ -191,6 +213,9 @@ services:
              uvicorn services.tx-org.src.main:app --host 0.0.0.0 --port 8012 --reload"
     ports:
       - "8012:8012"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-org:/app/services/tx-org
       - ../../shared:/app/shared
@@ -215,6 +240,9 @@ services:
              uvicorn services.tx-civic.src.main:app --host 0.0.0.0 --port 8014 --reload"
     ports:
       - "8014:8014"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-civic:/app/services/tx-civic
       - ../../shared:/app/shared
@@ -227,6 +255,9 @@ services:
              uvicorn services.tx-expense.src.main:app --host 0.0.0.0 --port 8015 --reload"
     ports:
       - "8015:8015"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-expense:/app/services/tx-expense
       - ../../shared:/app/shared
@@ -254,6 +285,8 @@ services:
       - "8017:8017"
     environment:
       DEVFORGE_LOG_LEVEL: DEBUG
+      PROMETHEUS_AUTH_ENFORCE: "${PROMETHEUS_AUTH_ENFORCE:-false}"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN:-}"
     volumes:
       - ../../services/tx-devforge:/app/services/tx_devforge
       - ../../shared:/app/shared

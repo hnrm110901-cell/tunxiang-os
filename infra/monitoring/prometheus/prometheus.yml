@@ -29,8 +29,14 @@ rule_files:
 # Prometheus pod 启动时挂 Secret tx-metrics-token 到 /etc/prometheus/secrets/
 # (Helm chart 部署改造 follow-up issue).
 #
-# 当前 ready (authorization 已加): 全部 emit_event 14 svc — 决策矩阵分母覆盖率 100% (issue #829 ship)
-# (gateway + tx-trade + tx-event-relay = PR #826; 其余 13 svc = PR #829)
+# 当前 ready (authorization 已加): emit_event 14 svc 中 13/14 = 92.86%
+#   - PR #826: gateway + tx-trade + tx-event-relay (3 svc, tx-trade ∈ emit_event)
+#   - PR #829 (post-SPLIT, 本 PR): 12 svc (tx-menu / tx-member / tx-growth / tx-ops /
+#     tx-supply / tx-finance / tx-agent / tx-analytics / tx-org / tx-civic /
+#     tx-expense / tx-devforge)
+#   - tx-pay 单独 SPLIT 到 #847 (Tier 1 资金路径, §19 security 重审)
+#   - 5 个 non-emit_event svc (tx-brain/tx-intel/tx-forge/tx-predict/tx-sync-worker)
+#     auth coverage 见 #849 follow-up
 #
 # 本 yml 用 Prometheus 原生 `authorization: type: Bearer` 配置, 自动发 Authorization 头.
 # 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
@@ -155,13 +161,11 @@ scrape_configs:
       type: Bearer
       credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
+  # tx-pay /metrics authorization 单独 SPLIT 到 #847 (Tier 1 资金路径, §19 security 重审)
   - job_name: 'tunxiang-tx-pay'
     static_configs:
       - targets: ['tx-pay:8016']
     metrics_path: '/metrics'
-    authorization:
-      type: Bearer
-      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-devforge'
     static_configs:

@@ -80,16 +80,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Prometheus
-from prometheus_fastapi_instrumentator import Instrumentator  # noqa: E402
-
-Instrumentator().instrument(app).expose(app)
-
-# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #829, parent #825 W3 D2 决策矩阵分母)
-from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
-
-app.add_middleware(MetricsAuthMiddleware)
-
 # CORS
 app.add_middleware(
     CORSMiddleware,
