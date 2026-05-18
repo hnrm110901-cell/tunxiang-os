@@ -1,0 +1,25 @@
+{{/*
+ConfigMap — 默认 disabled (W2 P1 #758 Phase 1 env 已通过 values.env / secretRef 注入).
+启用后业务可在 deployment 中通过:
+  envFrom:
+    - configMapRef:
+        name: {{ include "tx-sync-worker.fullname" . }}-extra
+来加载 key-value. 本 chart deployment.yaml 仅消费 .Values.env, 启用后需手动修改.
+
+values.yaml 期望字段:
+  configMap:
+    enabled: false
+    data: {}
+*/}}
+{{- if .Values.configMap.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tx-sync-worker.fullname" . }}-extra
+  labels:
+    {{- include "tx-sync-worker.labels" . | nindent 4 }}
+data:
+  {{- range $k, $v := .Values.configMap.data }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+{{- end }}

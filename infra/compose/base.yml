@@ -35,6 +35,9 @@
 #
 #   W3 #757 新分配：
 #     ⊕ tx-event-relay :8020 ← 真 Outbox shadow relay worker（创始人 Q2 决议）
+#
+#   W2 #758 新分配：
+#     ⊕ tx-sync-worker :8021 ← 品智POS 同步 + 企微 daily SOP daemon（Phase 1 dry_run 默认）
 #     ⓘ tx-forge    :8013 ← 容器内端口与 tunxiang-api/tx-predict 同号但分属不同
 #                              Docker container，同一 network 内通过服务名 DNS
 #                              解析（http://tx-forge:8013 vs http://tunxiang-api:8013），
@@ -488,6 +491,38 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8020/health',timeout=3).status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── Sync Worker 品智POS 同步 + 企微 daily SOP daemon :8021 ────
+  # W2 P1 issue #758 — 战略 plan §23 W2 / §24 举措 #1 服务收敛 Phase 1
+  # Phase 1 双轨并行: gateway scheduler 仍跑 5 jobs, tx-sync-worker dry_run 验证一周
+  # Phase 2 follow-up issue 翻 RUN_MODE=live 同时关 gateway scheduler 切单轨
+  # Q4 决议: T2 maxU=1 PDB enabled, replicaCount=1 永久 (cron 不能 scale)
+  tx-sync-worker:
+    <<: *svc-defaults
+    build:
+      <<: *build-defaults
+      dockerfile: services/tx-sync-worker/Dockerfile
+    environment:
+      <<: *common-env
+      # Q3 决议: dry_run 默认开启 (env unset 也是 dry_run)
+      # ⚠️ Phase 2 翻 "live" 前必须先关 gateway scheduler (plan §7.1 P0 风险)
+      RUN_MODE: ${RUN_MODE:-dry_run}
+      # 同步时区 (与 gateway sync_scheduler.py:595 一致)
+      SYNC_TIMEZONE: ${SYNC_TIMEZONE:-Asia/Shanghai}
+      CZYZ_TENANT_ID: ${CZYZ_TENANT_ID:-}
+      ZQX_TENANT_ID: ${ZQX_TENANT_ID:-}
+      SGC_TENANT_ID: ${SGC_TENANT_ID:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8021/health',timeout=3).status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3

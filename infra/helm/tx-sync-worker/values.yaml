@@ -1,0 +1,124 @@
+# tx-sync-worker — 品智POS 同步 + 企微 daily SOP daemon (Phase 1 dry_run)
+# W2 P1 issue #758 — Phase 1 dry_run 默认, Phase 2 follow-up 翻 RUN_MODE=live 同时关 gateway scheduler
+# Q4 决议 A: T2 maxU=1 PDB enabled — Phase 2 切单轨后 tx-sync-worker 是唯一同步入口
+#
+# ⚠️ 永久 replicaCount=1 (cron daemon 不能多副本 fire 同 job 重复, 双 pod 致 dup task firing)
+# ⚠️ autoscaling.enabled=false 永久 (cron 不能 HPA scale)
+
+replicaCount: 1
+
+image:
+  repository: tunxiang/tx-sync-worker
+  pullPolicy: IfNotPresent
+  tag: latest
+
+service:
+  type: ClusterIP
+  port: 8021
+  targetPort: 8021
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+env:
+  TUNXIANG_ENV: prod
+  LOG_LEVEL: info
+  # Q3 决议: dry_run 默认开启 (env unset 也是 dry_run)
+  # ⚠️ Phase 2 follow-up issue 翻 "live" 前**必须先关 gateway scheduler**,
+  # 否则两 daemon 同时 fire 同一 cron → 品智 POS API rate-limit + sync_logs 双倍写入 (P0 风险)
+  RUN_MODE: "dry_run"
+  # 同步时区 (与 gateway sync_scheduler.py:595 一致, plan §7.2 timezone drift 缓解)
+  SYNC_TIMEZONE: "Asia/Shanghai"
+  # 容器时区显式声明 (与 compose common-env / Dockerfile ENV TZ 一致, round-1 reviewer P2-3)
+  # ⚠️ 不可省 — 仅靠 Dockerfile 兜底, 若运维通过 envFrom secretRef 注入同名 TZ 会覆盖
+  TZ: "Asia/Shanghai"
+
+# Secret 注入 DATABASE_URL / REDIS_URL / CZYZ_TENANT_ID / ZQX_TENANT_ID / SGC_TENANT_ID
+# (与 gateway 模式一致)
+secretRef:
+  name: tx-sync-worker-secret
+
+# cron daemon 单实例 — 严禁 HPA scale (双 pod 会 fire 两次同 cron, 重复同步)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8021
+  initialDelaySeconds: 20
+  periodSeconds: 30
+  failureThreshold: 3
+  timeoutSeconds: 5
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8021
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  failureThreshold: 3
+  timeoutSeconds: 3
+
+# 单实例 — 无需 pod anti-affinity
+podAntiAffinity:
+  enabled: false
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+podAnnotations: {}
+
+nodeSelector: {}
+
+tolerations: []
+
+# Q4 决议 A: T2 maxU=1 PDB enabled — Phase 2 切单轨后 tx-sync-worker 是唯一同步入口,
+# K8s 蓝绿部署期间剪掉单 pod 致 cron miss (品智 POS 当日订单丢失风险)
+# Phase 1 dry_run 期间 PDB 实际不触发 (无 disruption + dry_run 0 业务影响)
+pdb:
+  enabled: true
+  minAvailable: ""
+  maxUnavailable: 1
+
+# NetworkPolicy default off — Phase 1 dry_run 不接业务路径 (仅 /health /metrics 出方向)
+# Phase 2 follow-up 切单轨后评估 ingress lock down
+networkPolicy:
+  enabled: false
+  ingress: []
+  egress: []
+
+# ConfigMap default off — env 已通过 values.env / secretRef 注入
+configMap:
+  enabled: false
+  data: {}
+
+# F#2 安全上下文 (与 tx-event-relay / tx-trade 一致, CSO 2026-05-11 整改)
+# Dockerfile 已设 USER 10001 (services/tx-sync-worker/Dockerfile)
+podSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+
+containerSecurityContext:
+  enabled: true
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL

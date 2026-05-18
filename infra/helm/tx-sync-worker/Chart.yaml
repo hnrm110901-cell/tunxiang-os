@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tx-sync-worker
+description: 屯象OS 品智POS 同步 + 企微 daily SOP daemon (W2 #758, Phase 1 dry_run 默认)
+type: application
+version: 1.0.0
+appVersion: "latest"

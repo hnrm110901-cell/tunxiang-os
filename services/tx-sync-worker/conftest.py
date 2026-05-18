@@ -1,0 +1,48 @@
+"""conftest.py — tx-sync-worker 本地测试路径配置 (仿 tx-event-relay)
+
+容器路径: /app/services/tx_sync_worker/src/  PYTHONPATH=/app
+本地路径: services/tx-sync-worker/src/       (目录名含 dash)
+
+策略 (参照 services/tx-event-relay/conftest.py):
+  1. ROOT 入 path → shared.events / shared.adapters 等跨服务包
+  2. SRC 入 path  → 支持裸 import
+  3. 注册 services.tx_sync_worker / .src / 子包 → 支持
+     `from services.tx_sync_worker.src.xxx import ...` 全路径写法 (容器和本地一致)
+"""
+
+import os
+import sys
+import types
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SVC_DIR = os.path.dirname(__file__)  # services/tx-sync-worker/
+SRC_DIR = os.path.join(SVC_DIR, "src")  # services/tx-sync-worker/src/
+
+# 1. ROOT + SRC 入 path
+for p in [ROOT, SRC_DIR]:
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+
+# 2. 注册命名空间包 (不动顶级 services, 避免冲突)
+def _ensure_ns(name: str, path: str) -> None:
+    if name not in sys.modules:
+        mod = types.ModuleType(name)
+        mod.__path__ = [path]  # type: ignore[assignment]
+        mod.__package__ = name
+        sys.modules[name] = mod
+    elif not hasattr(sys.modules[name], "__path__"):
+        mod = types.ModuleType(name)
+        mod.__path__ = [path]
+        mod.__package__ = name
+        sys.modules[name] = mod
+
+
+_ensure_ns("services.tx_sync_worker", SVC_DIR)
+_ensure_ns("services.tx_sync_worker.src", SRC_DIR)
+_ensure_ns("services.tx_sync_worker.src.jobs", os.path.join(SRC_DIR, "jobs"))
+
+for _sub in ("tests",):
+    _sub_path = os.path.join(SRC_DIR, _sub)
+    if os.path.isdir(_sub_path):
+        _ensure_ns(f"services.tx_sync_worker.src.{_sub}", _sub_path)

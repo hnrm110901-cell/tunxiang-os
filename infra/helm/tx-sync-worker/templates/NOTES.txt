@@ -1,0 +1,32 @@
+1. 服务名: tx-sync-worker
+   Helm Release: {{ .Release.Name }}
+   Namespace:    {{ .Release.Namespace }}
+   Tier:         T2 maxU=1 PDB enabled (W2 P1 #758, Q4 决议 A; cron daemon 单实例永久)
+
+2. 版本:
+   Chart  : {{ .Chart.Name }}-{{ .Chart.Version }}
+   AppVer : {{ .Chart.AppVersion }}
+   Image  : {{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+
+3. 端口（容器内 / Service）:
+   service.port       = {{ .Values.service.port }}
+   service.targetPort = {{ .Values.service.targetPort }}
+
+4. 模式（dry_run vs live）:
+   RUN_MODE = {{ index .Values.env "RUN_MODE" | default "dry_run" }}
+   dry_run (默认): cron fire 时仅 log + metric, 0 调 pinzhi adapter / WecomGroupService (W2 验收)
+   live:  Phase 2 follow-up 翻; ⚠️ 翻 live **必须先**关 gateway scheduler 防 dup task firing
+
+5. 注册 5 jobs (与 gateway scheduler 完全一致 Asia/Shanghai):
+   daily_dishes_sync                  @ cron h=2 m=0
+   daily_master_data_sync             @ cron h=3 m=0
+   hourly_orders_incremental_sync     @ interval hours=1
+   quarter_members_incremental_sync   @ interval minutes=15
+   wecom_group_daily_sop              @ cron h=9 m=0
+
+6. 端口转发到本机（开发联调用）:
+   kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "tx-sync-worker.fullname" . }} 8021:{{ .Values.service.port }}
+
+7. 健康检查 + Prometheus metrics:
+   curl -fsSL http://127.0.0.1:8021/health
+   curl -fsSL http://127.0.0.1:8021/metrics
