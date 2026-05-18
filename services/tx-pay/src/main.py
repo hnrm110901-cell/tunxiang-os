@@ -88,17 +88,19 @@ app = FastAPI(
 # 首次公开 /metrics 必须配 MetricsAuthMiddleware Bearer + IP allowlist (issue #825 / #847)。
 setup_metrics(app, service_name="tx-pay")
 
-# CORS
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #825 / #847);
+# tx-pay 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 严重信息泄漏.
+# 紧靠 CORS 内侧 (与 gateway 试点对齐); CORS OPTIONS preflight 在最外层
+# 直接 204 返回, 不进 metrics 鉴权链. Starlette LIFO: 最后 add = 最外层.
+app.add_middleware(MetricsAuthMiddleware)
+
+# CORS — 最后 add = 最外层 (preflight 不进 metrics 鉴权链)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #825 / #847);
-# tx-pay 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 严重信息泄漏.
-app.add_middleware(MetricsAuthMiddleware)
 
 # 路由注册
 from .api.admin_routes import router as admin_router
