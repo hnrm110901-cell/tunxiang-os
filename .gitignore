@@ -106,3 +106,7 @@ DerivedData/
 shared/ontology/src/__pycache__/
 
 .claude/agent-memory/
+
+# Dev Prometheus bearer token (issue #831) — never commit real token
+# only commit tx-metrics-token.example
+infra/compose/envs/tx-metrics-token

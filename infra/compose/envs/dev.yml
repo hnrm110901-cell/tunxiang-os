@@ -36,6 +36,8 @@ services:
       TX_AUTH_ENABLED: "false"
       TX_RATE_LIMIT_ENABLED: "false"
       LOG_LEVEL: DEBUG
+      PROMETHEUS_AUTH_ENFORCE: "true"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN}"
     volumes:
       - ../../services/gateway:/app/services/gateway
       - ../../shared:/app/shared
@@ -51,6 +53,8 @@ services:
     environment:
       TX_AUTH_ENABLED: "false"
       LOG_LEVEL: DEBUG
+      PROMETHEUS_AUTH_ENFORCE: "true"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN}"
     volumes:
       - ../../services/tx-trade:/app/services/tx-trade
       - ../../shared:/app/shared
@@ -340,6 +344,8 @@ services:
       TX_AUTH_ENABLED: "false"
       LOG_LEVEL: DEBUG
       RELAY_SHADOW_MODE: "true"
+      PROMETHEUS_AUTH_ENFORCE: "true"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN}"
     volumes:
       - ../../services/tx-event-relay:/app/services/tx-event-relay
       - ../../shared:/app/shared
@@ -384,6 +390,35 @@ services:
       - txos-net
     labels:
       tunxiang.env: "${TUNXIANG_ENV:-dev}"
+
+  # ── Prometheus scrape (dev e2e verify, issue #831) ─────────
+  # volume 路径说明 (相对 infra/compose/envs/):
+  #   ../monitoring/prometheus/prometheus.yml  → infra/monitoring/prometheus/prometheus.yml
+  #   ./tx-metrics-token                       → infra/compose/envs/tx-metrics-token (gitignored)
+  #   ../monitoring/prometheus/rules           → infra/monitoring/prometheus/rules/
+  # token 文件由 scripts/dev/setup-prometheus-token.sh 首次生成 (chmod 600).
+  # 三 backend svc (gateway/tx-trade/tx-event-relay) 通过 PROMETHEUS_BEARER_TOKEN env
+  # 接受 Prometheus 的 Bearer token 鉴权 (PROMETHEUS_AUTH_ENFORCE=true, 与 prod 对齐).
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./envs/tx-metrics-token:/etc/prometheus/secrets/tx-metrics-token:ro
+      - ../monitoring/prometheus/rules:/etc/prometheus/rules:ro
+    networks:
+      - txos-net
+    labels:
+      tunxiang.env: "${TUNXIANG_ENV:-dev}"
+    depends_on:
+      gateway:
+        condition: service_healthy
+      tx-trade:
+        condition: service_healthy
+      tx-event-relay:
+        condition: service_healthy
 
 volumes:
   web_admin_node_modules:
