@@ -24,6 +24,7 @@ from services.tx_growth.src.services.roi_attribution import ROIAttributionServic
 from services.tx_growth.src.workers.journey_executor import JourneyEventListener, JourneyExecutor
 
 from shared.events.event_publisher import MemberEventPublisher
+from shared.observability import setup_metrics
 from shared.ontology.src.database import async_session_factory, init_db
 
 logger = structlog.get_logger(__name__)
@@ -931,9 +932,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="TunxiangOS tx-growth", version="3.0.0", lifespan=lifespan)
 
-from prometheus_fastapi_instrumentator import Instrumentator
-
-Instrumentator().instrument(app).expose(app)
+# Phase C.3 (#820) — 统一 metrics 入口, 22 service 渐进迁移 (follow-up #833)
+setup_metrics(app, service_name="tx-growth")
 
 # /metrics 端点 Bearer + IP allowlist 鉴权 (issue #829, parent #825 W3 D2 决策矩阵分母)
 from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
