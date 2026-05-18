@@ -70,6 +70,20 @@ spec:
             - name: {{ $key }}
               value: {{ $val | quote }}
             {{- end }}
+            {{- if .Values.prometheus.metricsToken.enabled }}
+            - name: {{ .Values.prometheus.metricsToken.envName }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.prometheus.metricsToken.secretName }}
+                  key: {{ .Values.prometheus.metricsToken.secretKey }}
+            - name: PROMETHEUS_AUTH_ENFORCE
+              value: "true"
+            - name: ENVIRONMENT
+              value: prod
+            {{- else }}
+            - name: PROMETHEUS_AUTH_ENFORCE
+              value: "false"
+            {{- end }}
           envFrom:
             - secretRef:
                 name: {{ .Values.secretRef.name }}

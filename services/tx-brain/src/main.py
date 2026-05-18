@@ -100,9 +100,15 @@ app = FastAPI(
 from prometheus_client import Counter, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 llm_requests_total = Counter("llm_api_requests_total", "Total LLM API requests", ["model", "status"])
 llm_request_duration = Histogram("llm_request_duration_seconds", "LLM API request duration")
 Instrumentator().instrument(app).expose(app)
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #849);
+# tx-brain 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 信息泄漏.
+app.add_middleware(MetricsAuthMiddleware)
 
 # CORS
 app.add_middleware(

@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 logger = structlog.get_logger(__name__)
 
 from .api.ai_ops_routes import router as ai_ops_router
@@ -42,6 +44,10 @@ app = FastAPI(
 )
 
 Instrumentator().instrument(app).expose(app)
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #849);
+# tx-forge 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 信息泄漏.
+app.add_middleware(MetricsAuthMiddleware)
 
 app.add_middleware(
     CORSMiddleware,

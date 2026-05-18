@@ -39,7 +39,13 @@ app = FastAPI(
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 Instrumentator().instrument(app).expose(app)
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #849);
+# tx-predict 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 信息泄漏.
+app.add_middleware(MetricsAuthMiddleware)
 
 app.include_router(traffic_router)
 app.include_router(demand_router)
