@@ -1,0 +1,3 @@
+# Prometheus dev bearer token placeholder.
+# Run: source scripts/dev/setup-prometheus-token.sh
+# This file is committed; the real token file (tx-metrics-token) is gitignored.
