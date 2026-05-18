@@ -50,7 +50,7 @@ from .event_base import TxEvent
 from .pg_event_store import PgEventStore
 from .publisher import EventPublisher
 
-# W3 D2 PR-1 (战略 plan §6 真 Outbox 决策矩阵分母): tx_emit_event_total Counter
+# W3 D2 PR-1 (战略 plan §6 真 Outbox 决策矩阵分母): tx_events_emit_total Counter
 # 当前 emit_event 是 fire-and-forget (PG 写入失败静默 swallow), 无任何观测点;
 # Phase 1 一周 shadow + 决策矩阵需要"发起总数"作分母与 outbox_relay_published_total
 # 比对失败率, 不加 Counter 则 W11 切换决策无数据基础 (#757 + #767 依赖).
@@ -76,25 +76,31 @@ except ImportError:  # pragma: no cover — CI Tier 1 fallback
 
 logger = structlog.get_logger(__name__)
 
-# emit_event 发起计数 (Phase 1 决策矩阵分母).
+# emit_event 发起计数 (Phase 1 决策矩阵分母 + 成功率观测).
+# 命名对齐 tx_event_relay_* family (round-1 critic P1-1 rename: tx_emit_event_total → tx_events_emit_total).
 # 标签策略:
 #   - tenant_id_short: sha256(tenant_id)[:8] 防 cardinality 爆 (active tenant <100,
 #     hash space 2^32, 实际基数受 active tenant 数约束); 不暴露原 UUID 给 metrics
 #   - event_type:      点分字符串 (如 "order.paid"), 业务可控基数 (~50)
-#   - source_service:  来源服务名 (如 "tx-trade"), 基数 ≤ 20
-# 总 cardinality ≈ 100 * 50 * 20 = 100k 上限, Prometheus 单 metric 推荐 < 1M.
-tx_emit_event_total = Counter(
-    "tx_emit_event_total",
-    "Total business events emitted via emit_event() (Phase 1 真 Outbox shadow 决策矩阵分母).",
-    ["tenant_id_short", "event_type", "source_service"],
+#   - source_service:  来源服务名 (如 "tx-trade"), 基数 ≤ 16 (W12 战略收敛终态 17 含 gateway)
+#   - result:          "success" | "exception" (round-1 critic P0-2: 决策矩阵分子/分母
+#                       对称, 失败率 = outbox_relay_published / sum(emit{result="success"}))
+# 总 cardinality ≈ 100 * 50 * 16 * 2 = 160k 上限, Prometheus 单 metric 推荐 < 1M.
+tx_events_emit_total = Counter(
+    "tx_events_emit_total",
+    "Total business events emitted via emit_event(), by emit result (Phase 1 真 Outbox shadow 决策矩阵分母).",
+    ["tenant_id_short", "event_type", "source_service", "result"],
 )
 
 
-def _tenant_id_short(tenant_id: UUID | str) -> str:
+def _tenant_id_short(tenant_id: UUID | str | None) -> str:
     """计算 tenant_id 的稳定短哈希 (sha256 前 8 hex).
 
     同 tenant_id 多次调用结果一致, 防 Prometheus label cardinality 爆.
+    tenant_id 为 None 时返回固定 "unknown_" (8 char), 避免 None 进 hash 函数 raise.
     """
+    if tenant_id is None:
+        return "unknown_"
     return hashlib.sha256(str(tenant_id).encode()).hexdigest()[:8]
 
 # 模块级 Redis 发布器单例（复用连接）
@@ -143,47 +149,86 @@ async def emit_event(
         if hasattr(event_type, "value")
         else str(event_type)
     )
+    tenant_short = _tenant_id_short(tenant_id)
 
-    # ── 发起计数 (W3 D2 PR-1 决策矩阵分母, 算"发起"不算"成功") ──
-    # 在 Redis / PG 写入前 .inc(), 即使后续写入静默失败也计入分母,
-    # tx-event-relay shadow 用 outbox_relay_published_total 作分子算失败率.
-    # NoOp stub 路径不抛, 真 Counter 路径走 lock-free atomic add (Prometheus 内置).
-    tx_emit_event_total.labels(
-        tenant_id_short=_tenant_id_short(tenant_id),
-        event_type=event_type_str,
-        source_service=source_service,
-    ).inc()
+    # ── 外层 try/except 包整个 emit_event 写入路径 ──
+    # round-1 critic P0-1+P0-2: 区分 success/exception 两条 result label 路径;
+    # PG/Redis 任一异常 → result="exception" + return None (保 emit_event fail-open
+    # docstring 契约, 旁路写入不抛, 不影响主业务).
+    try:
+        # ── Redis Stream 写入（实时推送，投影器实时触发）──
+        redis_task = asyncio.create_task(
+            _publish_to_redis(
+                event_type_str=event_type_str,
+                tenant_id=tenant_id,
+                stream_id=stream_id,
+                payload=payload,
+                store_id=store_id,
+                source_service=source_service,
+                metadata=metadata or {},
+            )
+        )
 
-    # ── Redis Stream 写入（实时推送，投影器实时触发）──
-    redis_task = asyncio.create_task(
-        _publish_to_redis(
-            event_type_str=event_type_str,
+        # ── PG events 表写入（持久化，回溯/审计用）──
+        event_id = await PgEventStore.append(
+            event_type=event_type_str,
             tenant_id=tenant_id,
             stream_id=stream_id,
             payload=payload,
             store_id=store_id,
             source_service=source_service,
-            metadata=metadata or {},
+            metadata=metadata,
+            causation_id=causation_id,
+            correlation_id=correlation_id,
         )
-    )
 
-    # ── PG events 表写入（持久化，回溯/审计用）──
-    event_id = await PgEventStore.append(
-        event_type=event_type_str,
-        tenant_id=tenant_id,
-        stream_id=stream_id,
-        payload=payload,
-        store_id=store_id,
-        source_service=source_service,
-        metadata=metadata,
-        causation_id=causation_id,
-        correlation_id=correlation_id,
-    )
+        # Redis 任务在后台完成，不等待
+        redis_task.add_done_callback(_log_redis_result)
 
-    # Redis 任务在后台完成，不等待
-    redis_task.add_done_callback(_log_redis_result)
+        # ── success 路径: PG write 后 inc(result="success") ──
+        # 内层 try/except 包 .inc() (round-1 critic P0-1): prometheus_client
+        # registry corruption / label cardinality 爆等极少 raise 不可破 emit_event
+        # fail-open 契约, 仅 logger.warning 不传播.
+        try:
+            tx_events_emit_total.labels(
+                tenant_id_short=tenant_short,
+                event_type=event_type_str,
+                source_service=source_service,
+                result="success",
+            ).inc()
+        except Exception as counter_exc:  # noqa: BLE001 — metric 路径必须 fail-open
+            logger.warning(
+                "emit_counter_inc_failed",
+                result="success",
+                error=str(counter_exc),
+                exc_info=True,
+            )
 
-    return event_id
+        return event_id
+    except Exception as exc:  # noqa: BLE001 — emit_event 契约: 写入失败不抛
+        # ── exception 路径: PG/Redis 写入失败 → inc(result="exception") + return None ──
+        try:
+            tx_events_emit_total.labels(
+                tenant_id_short=tenant_short,
+                event_type=event_type_str,
+                source_service=source_service,
+                result="exception",
+            ).inc()
+        except Exception as counter_exc:  # noqa: BLE001
+            logger.warning(
+                "emit_counter_inc_failed",
+                result="exception",
+                error=str(counter_exc),
+                exc_info=True,
+            )
+        logger.warning(
+            "emit_event_failed",
+            event_type=event_type_str,
+            tenant_id=str(tenant_id),
+            error=str(exc),
+            exc_info=True,
+        )
+        return None
 
 
 async def _publish_to_redis(
