@@ -77,6 +77,14 @@ x-env: &common-env
   PYTHONUNBUFFERED: "1"
   TZ: Asia/Shanghai
   TX_ENV: ${TX_ENV:-base}
+  # #737 Phase A DB pool baseline (W3 起手) — default 与 Python 源 ship 前等价
+  # 走 .env / docker compose --env-file 注入覆盖, 默认值不动 (regression-safe).
+  # 详 docs/governance/decisions/2026-05-19-db-pool-baseline-runbook.md
+  DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-20}
+  DATABASE_POOL_OVERFLOW: ${DATABASE_POOL_OVERFLOW:-30}
+  ASYNCPG_POOL_MAX: ${ASYNCPG_POOL_MAX:-3}
+  CERT_ALERTER_POOL_SIZE: ${CERT_ALERTER_POOL_SIZE:-5}
+  CERT_ALERTER_POOL_OVERFLOW: ${CERT_ALERTER_POOL_OVERFLOW:-10}
 
 services:
   # ── 基础设施 ─────────────────────────────────────────────
