@@ -90,7 +90,11 @@ class ProjectorBase(ABC):
         import asyncpg  # type: ignore[import-untyped]
 
         self._running = True
-        self._pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=3)
+        self._pool = await asyncpg.create_pool(
+            DATABASE_URL,
+            min_size=1,
+            max_size=int(os.getenv("ASYNCPG_POOL_MAX", "3")),
+        )
 
         logger.info(
             "projector_started",
@@ -150,7 +154,11 @@ class ProjectorBase(ABC):
         """
         import asyncpg  # type: ignore[import-untyped]
 
-        pool = await asyncpg.create_pool(DATABASE_URL, min_size=1, max_size=2)
+        pool = await asyncpg.create_pool(
+            DATABASE_URL,
+            min_size=1,
+            max_size=int(os.getenv("ASYNCPG_POOL_MAX", "3")),
+        )
         total = 0
 
         try:
