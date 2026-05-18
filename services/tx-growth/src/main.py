@@ -15,8 +15,6 @@ import structlog
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from pydantic import BaseModel
-
-from shared.observability import setup_metrics
 from services.tx_growth.src.services.audience_segmentation import AudienceSegmentationService
 from services.tx_growth.src.services.brand_strategy import BrandStrategyService
 from services.tx_growth.src.services.journey_orchestrator import JourneyOrchestratorService
@@ -26,6 +24,7 @@ from services.tx_growth.src.services.roi_attribution import ROIAttributionServic
 from services.tx_growth.src.workers.journey_executor import JourneyEventListener, JourneyExecutor
 
 from shared.events.event_publisher import MemberEventPublisher
+from shared.observability import setup_metrics
 from shared.ontology.src.database import async_session_factory, init_db
 
 logger = structlog.get_logger(__name__)

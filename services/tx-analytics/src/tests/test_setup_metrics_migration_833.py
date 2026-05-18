@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import pathlib
 
-
 MAIN_PY = pathlib.Path(__file__).parents[1] / "main.py"
 
 
