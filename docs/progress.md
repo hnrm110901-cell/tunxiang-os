@@ -1,3 +1,22 @@
+## 2026-05-19 · #806 Step 1 — gateway scheduler removal (T2 邻接, 第 44 或 45 例)
+
+### 本 PR 状态
+- branch: `feat/806-step1-gateway-scheduler-removal-2026-05-19`
+- commits: a8821556 (round-1) + b6d110fc (round-2 code) + HEAD (round-2 docs)
+- §19 round-2 critic-only re-verify: 待
+- push + PR + admin-merge: 待 user explicit-ask
+
+### 关键决策
+- K-P1-2 DEFERRED: apscheduler dep 保留至 Step 2 PR (sync_scheduler.py 仍 module-level import 依赖)
+- K-P1-3 Option B: 用 DO NOT CALL banner 兜底 (full split Step 2 PR scope)
+- Reconciliation window 偏离: 24-48h 实际 vs 7-day spec; 接受偏离; Step 2 改 row-count threshold
+
+### 下一步
+- §19 critic round-2 re-verify (critic-only)
+- user explicit-ask push + PR + admin-merge
+
+---
+
 ## 2026-05-19 · #820 W3 起手 — Prometheus 系统性审计 4 Phase 单 PR 闭环 (Tier 1 邻接 explicit-ask 第 41 例)
 
 ### 本 PR 状态
