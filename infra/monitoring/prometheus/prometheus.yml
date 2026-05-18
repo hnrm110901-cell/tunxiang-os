@@ -8,6 +8,18 @@ global:
 rule_files:
   - /etc/prometheus/rules/*.yml
 
+# 屯象OS 后端服务 metrics
+#
+# 端口表 authoritative source: CLAUDE.md §5 (lines 107-127)
+# CI 漂移防御: .github/workflows/prometheus-port-audit.yml + scripts/ci/check_prometheus_ports.py
+#
+# 历史漂移 (#809) 已由 PR #820 Phase B 系统性修正; 8 mismatch port 改对 + 6 missing 补齐。
+# 例外:
+#   - mcp-server (8018): stdio MCP protocol, 无 HTTP /metrics endpoint, 不 scrape
+#   - tx-predict (8019): Dockerfile EXPOSE 8013 与 tx-forge 冲突, prometheus 以 CLAUDE.md
+#     §5 8019 为准; Dockerfile bug 留 #820-P follow-up
+#   - web-admin: nginx-only frontend, 无 /metrics
+#
 # ─── issue #825 metrics 鉴权 (W3 D2 P1) ──────────────────────────────────
 # MetricsAuthMiddleware (shared/middleware/src/metrics_auth.py) 提供 /metrics 多层鉴权:
 #   - Bearer token (Authorization: Bearer header) → timing-safe hmac.compare_digest
@@ -17,15 +29,14 @@ rule_files:
 # Prometheus pod 启动时挂 Secret tx-metrics-token 到 /etc/prometheus/secrets/
 # (Helm chart 部署改造 follow-up issue).
 #
-# 当前 ready: gateway + tx-event-relay + tx-trade (本 PR scope, authorization 已加)
-# follow-up: 其他 11 服务 — 见 #825 round-2 立的 follow-up issue
-# (D2 决策矩阵分母覆盖率 7% → 100% 依赖此 follow-up)
+# 当前 ready (authorization 已加): gateway + tx-trade + tx-event-relay
+# follow-up: 其他服务渐进迁移 — 见 #825 round-2 立的 follow-up issue
+# (D2 决策矩阵分母覆盖率依赖此 follow-up)
 #
 # 本 yml 用 Prometheus 原生 `authorization: type: Bearer` 配置, 自动发 Authorization 头.
 # 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
 
 scrape_configs:
-  # 屯象OS 后端服务 metrics — 本 PR ready (3 svc, /metrics 已挂 MetricsAuthMiddleware)
   - job_name: 'tunxiang-gateway'
     static_configs:
       - targets: ['gateway:8000']
@@ -42,19 +53,19 @@ scrape_configs:
       type: Bearer
       credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
+  - job_name: 'tunxiang-tx-menu'
+    static_configs:
+      - targets: ['tx-menu:8002']
+    metrics_path: '/metrics'
+
   - job_name: 'tunxiang-tx-member'
     static_configs:
-      - targets: ['tx-member:8002']
+      - targets: ['tx-member:8003']
     metrics_path: '/metrics'
 
   - job_name: 'tunxiang-tx-growth'
     static_configs:
-      - targets: ['tx-growth:8003']
-    metrics_path: '/metrics'
-
-  - job_name: 'tunxiang-tx-org'
-    static_configs:
-      - targets: ['tx-org:8004']
+      - targets: ['tx-growth:8004']
     metrics_path: '/metrics'
 
   - job_name: 'tunxiang-tx-ops'
@@ -62,14 +73,14 @@ scrape_configs:
       - targets: ['tx-ops:8005']
     metrics_path: '/metrics'
 
-  - job_name: 'tunxiang-tx-finance'
+  - job_name: 'tunxiang-tx-supply'
     static_configs:
-      - targets: ['tx-finance:8006']
+      - targets: ['tx-supply:8006']
     metrics_path: '/metrics'
 
-  - job_name: 'tunxiang-tx-analytics'
+  - job_name: 'tunxiang-tx-finance'
     static_configs:
-      - targets: ['tx-analytics:8007']
+      - targets: ['tx-finance:8007']
     metrics_path: '/metrics'
 
   - job_name: 'tunxiang-tx-agent'
@@ -77,14 +88,14 @@ scrape_configs:
       - targets: ['tx-agent:8008']
     metrics_path: '/metrics'
 
-  - job_name: 'tunxiang-tx-menu'
+  - job_name: 'tunxiang-tx-analytics'
     static_configs:
-      - targets: ['tx-menu:8009']
+      - targets: ['tx-analytics:8009']
     metrics_path: '/metrics'
 
-  - job_name: 'tunxiang-tx-supply'
+  - job_name: 'tunxiang-tx-brain'
     static_configs:
-      - targets: ['tx-supply:8010']
+      - targets: ['tx-brain:8010']
     metrics_path: '/metrics'
 
   - job_name: 'tunxiang-tx-intel'
@@ -92,15 +103,43 @@ scrape_configs:
       - targets: ['tx-intel:8011']
     metrics_path: '/metrics'
 
-  - job_name: 'tunxiang-tx-brain'
+  - job_name: 'tunxiang-tx-org'
     static_configs:
-      - targets: ['tx-brain:8012']
+      - targets: ['tx-org:8012']
     metrics_path: '/metrics'
 
-  # tx-event-relay — 真 Outbox relay worker (P0-4 hotfix #805 三 audit)
-  # ⚠️ 历史 stale port 漂移 (gateway/tx-trade/... 部分 :8000-8012 不与 CLAUDE.md §5
-  # 真实端口对齐) 留 #809 系统性 audit, 本 hotfix 仅补 tx-sync-worker / tx-event-relay
-  # /metrics 已挂 MetricsAuthMiddleware (issue #825, 本 PR scope)
+  - job_name: 'tunxiang-tx-forge'
+    static_configs:
+      - targets: ['tx-forge:8013']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-civic'
+    static_configs:
+      - targets: ['tx-civic:8014']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-expense'
+    static_configs:
+      - targets: ['tx-expense:8015']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-pay'
+    static_configs:
+      - targets: ['tx-pay:8016']
+    metrics_path: '/metrics'
+
+  - job_name: 'tunxiang-tx-devforge'
+    static_configs:
+      - targets: ['tx-devforge:8017']
+    metrics_path: '/metrics'
+
+  # tx-predict: CLAUDE.md §5 标的 8019 (Dockerfile EXPOSE 8013 bug 留 #820-P follow-up)
+  - job_name: 'tunxiang-tx-predict'
+    static_configs:
+      - targets: ['tx-predict:8019']
+    metrics_path: '/metrics'
+
+  # tx-event-relay — 真 Outbox relay worker (P0-4 hotfix #805) + /metrics 已挂 MetricsAuthMiddleware (#825)
   - job_name: 'tunxiang-tx-event-relay'
     static_configs:
       - targets: ['tx-event-relay:8020']
