@@ -77,7 +77,13 @@ serviceAccount:
   create: true
   name: ""
   annotations: {}
-podAnnotations: {}
+
+# Prometheus scrape annotation (P0-4 hotfix #805 三 audit, #809 系统性 audit 留 follow-up)
+# 必须有 — 否则 Phase 1 dry_run 一周观察期 0 metric 被 Prometheus 收集, 监控盲区
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8021"
+  prometheus.io/path: "/metrics"
 
 nodeSelector: {}
 

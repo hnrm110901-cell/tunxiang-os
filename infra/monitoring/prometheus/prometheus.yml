@@ -75,6 +75,20 @@ scrape_configs:
       - targets: ['tx-brain:8012']
     metrics_path: '/metrics'
 
+  # tx-event-relay — 真 Outbox relay worker (P0-4 hotfix #805 三 audit)
+  # ⚠️ 历史 stale port 漂移 (gateway/tx-trade/... 部分 :8000-8012 不与 CLAUDE.md §5
+  # 真实端口对齐) 留 #809 系统性 audit, 本 hotfix 仅补 tx-sync-worker / tx-event-relay
+  - job_name: 'tunxiang-tx-event-relay'
+    static_configs:
+      - targets: ['tx-event-relay:8020']
+    metrics_path: '/metrics'
+
+  # tx-sync-worker — 品智POS 同步 + 企微 daily SOP daemon (P0-4 hotfix #805)
+  - job_name: 'tunxiang-tx-sync-worker'
+    static_configs:
+      - targets: ['tx-sync-worker:8021']
+    metrics_path: '/metrics'
+
   # Redis metrics
   - job_name: 'redis'
     static_configs:
