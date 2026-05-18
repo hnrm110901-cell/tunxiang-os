@@ -1,3 +1,24 @@
+## 2026-05-18 10:00 · #776 P0 PR-C F#10 omni_channel fail-closed (Tier 1 邻接 explicit-ask 第 39 例)
+
+### 本 PR 状态
+
+- 本 PR: G2 PR-C F#10 `fix/tx-trade-omni-channel-fail-closed` rebase + ship
+- [x] G1 PR-B F#7 (#814) — MERGED 09:49 CST (commit c7eadb6c)
+- [ ] G3 PR-A F gateway whitelist — G2 merge 后 (#776 sub-3, handler 层 fail-closed 全就位)
+
+### 关键决策
+
+- 串行 ship 严格执行: G1 → G2 → G3, 不并发 (DEVLOG/progress prepend race + 安全顺序约束)
+- F#10 dev/test 兼容性: 同 G1 env-gate 模式 (仅 prod env 严格 raise)
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 38 → **39**
+- #776 sub-2 / 3 闭合
+- 距 W8 徐记海鲜 DEMO 验收: D-44 天
+
+---
+
 ## 2026-05-18 08:30 · #776 P0 PR-B F#7 webhook secret fail-closed (Tier 1 邻接 explicit-ask 第 38 例)
 
 ### 本 PR 状态

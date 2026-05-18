@@ -37,13 +37,17 @@ from ..services.unified_order_hub import list_unified_orders
 logger = structlog.get_logger()
 router = APIRouter(prefix="/omni", tags=["omni-channel"])
 
-# ─── 签名验证 secret（从环境变量读取，不硬编码） ────────────────────────────────
+# ─── 签名验证 secret（lazy 从环境变量读取，每次调用都读 — 不缓存） ──────────────
+# 历史: 曾用 module-level _PLATFORM_SECRETS dict 在 import 时一次性求值（F#10 衍生 bug）,
+#       导致 prod 改 env 需重启服务 + 测试无法 patch env。改为函数 lazy lookup 后:
+#   - prod 运维改 env 即时生效（无需重启进程外的 module reload）
+#   - 测试 patch.dict(os.environ, ...) 立即生效
 
-_PLATFORM_SECRETS: dict[str, str] = {
-    "meituan": os.environ.get("MEITUAN_WEBHOOK_SECRET", ""),
-    "eleme": os.environ.get("ELEME_WEBHOOK_SECRET", ""),
-    "douyin": os.environ.get("DOUYIN_WEBHOOK_SECRET", ""),
-}
+
+def _get_platform_secret(platform: str) -> str:
+    """Lazy 读取平台 webhook secret (每次调用都从 env 读, 不缓存)."""
+    env_key = f"{platform.upper()}_WEBHOOK_SECRET"
+    return os.environ.get(env_key, "")
 
 
 def _get_tenant_id(request: Request) -> str:
@@ -54,28 +58,19 @@ def _get_tenant_id(request: Request) -> str:
 
 
 def _verify_meituan_signature(body: bytes, signature: str, secret: str) -> bool:
-    """美团签名验证：MD5(body + secret)"""
-    if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="meituan")
-        return True  # 无secret时放行（开发模式），生产应返回False
+    """美团签名验证：MD5(body + secret). 调用方负责确保 secret 非空."""
     expected = hashlib.md5(body + secret.encode()).hexdigest().lower()
     return hmac.compare_digest(expected, signature.lower())
 
 
 def _verify_eleme_signature(body: bytes, signature: str, secret: str) -> bool:
-    """饿了么签名验证：HMAC-SHA256"""
-    if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="eleme")
-        return True
+    """饿了么签名验证：HMAC-SHA256. 调用方负责确保 secret 非空."""
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.lower())
 
 
 def _verify_douyin_signature(body: bytes, signature: str, secret: str) -> bool:
-    """抖音签名验证：HMAC-SHA256"""
-    if not secret:
-        logger.warning("omni_channel.webhook.no_secret", platform="douyin")
-        return True
+    """抖音签名验证：HMAC-SHA256. 调用方负责确保 secret 非空."""
     expected = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature.lower())
 
@@ -86,15 +81,49 @@ _SIGNATURE_VERIFIERS = {
     "douyin": _verify_douyin_signature,
 }
 
+# Startup-time sanity check (F#11 reviewer follow-up):
+# PLATFORMS 与 _SIGNATURE_VERIFIERS 必须严格同步 — 加新 platform 时必须同时注册 verifier，
+# 否则 _verify_platform_signature 会走 `return False` 静默回 401，secret check 已通过但
+# 验签被悄然绕过。用 if-raise 而非 assert，避免 -O 优化模式被剥离。
+_missing_verifiers = set(OmniChannelService.PLATFORMS) - set(_SIGNATURE_VERIFIERS.keys())
+if _missing_verifiers:
+    raise RuntimeError(
+        f"omni_channel: PLATFORMS 与 _SIGNATURE_VERIFIERS 不同步 — 缺 verifier 注册: "
+        f"{sorted(_missing_verifiers)} (PLATFORMS={OmniChannelService.PLATFORMS}, "
+        f"verifiers={sorted(_SIGNATURE_VERIFIERS.keys())})"
+    )
+
 
 def _verify_platform_signature(platform: str, body: bytes, request: Request) -> bool:
-    """统一签名验证入口"""
-    secret = _PLATFORM_SECRETS.get(platform, "")
+    """统一签名验证入口 (fail-closed, F#10).
+
+    - {PLATFORM}_WEBHOOK_SECRET 未配置 → raise HTTPException(503)
+      error.code={PLATFORM}_WEBHOOK_SECRET_NOT_CONFIGURED + Retry-After: 300
+      (与 booking_webhook_routes F#7 fail-closed 一致, 防第三方 storm)
+    - 签名 header 缺失或验签失败 → return False (endpoint 处理为 401)
+    """
+    secret = _get_platform_secret(platform)
+    if not secret:
+        logger.error(
+            "omni_channel.webhook.secret_not_configured",
+            platform=platform,
+            reason=f"{platform.upper()}_WEBHOOK_SECRET not set — fail-closed (deployment misconfiguration)",
+        )
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "ok": False,
+                "data": None,
+                "error": {"code": f"{platform.upper()}_WEBHOOK_SECRET_NOT_CONFIGURED"},
+            },
+            headers={"Retry-After": "300"},
+        )
+
     verifier = _SIGNATURE_VERIFIERS.get(platform)
     if verifier is None:
         return False
 
-    # 各平台签名header名称
+    # 各平台签名 header 名称
     sig_header_map = {
         "meituan": "X-Meituan-Signature",
         "eleme": "X-Eleme-Signature",
@@ -103,7 +132,7 @@ def _verify_platform_signature(platform: str, body: bytes, request: Request) -> 
     signature = request.headers.get(sig_header_map.get(platform, "X-Signature"), "")
     if not signature:
         logger.warning("omni_channel.webhook.missing_signature", platform=platform)
-        return not secret  # 无secret时允许无签名请求（开发模式）
+        return False  # fail-closed: 缺签名 → 拒绝 (原 `return not secret` fail-open 已删)
 
     return verifier(body, signature, secret)
 
@@ -144,7 +173,16 @@ async def webhook_receive_order(
     # 签名验证
     if not _verify_platform_signature(platform, body, request):
         log.warning("omni_channel.webhook.signature_invalid")
-        raise HTTPException(status_code=401, detail="签名验证失败")
+        # F#12 reviewer follow-up: detail 改 dict format 与 503 fail-closed 一致
+        # (旧版 detail="签名验证失败" 字符串与 503 dict 格式不一致, API 消费者需 type-check)
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "ok": False,
+                "data": None,
+                "error": {"code": "INVALID_SIGNATURE"},
+            },
+        )
 
     try:
         payload = json.loads(body)
