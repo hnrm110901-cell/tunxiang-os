@@ -11,12 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 logger = structlog.get_logger()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://tunxiang:changeme_dev@localhost/tunxiang_os")
-engine = create_async_engine(DATABASE_URL, echo=False, pool_size=10, max_overflow=20)
+engine = create_async_engine(DATABASE_URL, echo=False, pool_size=10, max_overflow=20)  # noqa: dead — #738 独立 PR 处理
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    pool_size=20,
-    max_overflow=30,
+    pool_size=int(os.getenv("DATABASE_POOL_SIZE", "20")),
+    max_overflow=int(os.getenv("DATABASE_POOL_OVERFLOW", "30")),
     pool_pre_ping=True,
     pool_recycle=300,
 )

@@ -1,3 +1,39 @@
+## 2026-05-19 A5 #737 helm DSN pool baseline Phase A 基础设施 (W3 G10 邻接)
+
+### 今日完成 (本 session, 1 PR Phase A 基础设施)
+
+- **A5 #737 Phase A** (W3 G10 邻接, Tier 1 邻接 explicit-ask 第 NN 例): `feat/db-pool-baseline-737-2026-05-19` 分支 8 commit
+  - **Commit 1**: §0 verify summary 落盘 (verify-summary.md) — 修正 brief 路径偏差 (database.py 多 src/ 一层) + projector 2 调用点 (run+rebuild) + compose envs 5 文件 (brief 漏 demo.yml)
+  - **Commit 2**: `scripts/ops/db_pool_baseline.py` CLI (~280 行) + 7 helper-only test — pg_stat_activity 测量, JSON/Markdown 渲染, 三级阈值化退码 (60%/80%/infra-fail)
+  - **Commit 3**: `shared/ontology/src/database.py` SQLAlchemy 加 `DATABASE_POOL_SIZE` + `DATABASE_POOL_OVERFLOW` env (Q3=A dead engine line 14 不动)
+  - **Commit 4**: `shared/events/src/projector.py` 2 调用点 (line 93 run + line 153 rebuild) 统一 `ASYNCPG_POOL_MAX` env (统一为 3, rebuild 从 2 微调到 3 — §0 verify 发现 brief 漏)
+  - **Commit 5**: `services/tx-supply/src/workers/cert_expiry_alerter.py` 加 `CERT_ALERTER_POOL_*` env (独立 SQLAlchemy engine 非 asyncpg, Q1=B 独立命名)
+  - **Commit 6**: `infra/helm/tx-supply/values.yaml` 5 env + `infra/helm/tx-analytics/values.yaml` 3 env (无 cert_alerter)
+  - **Commit 7**: `infra/compose/base.yml` x-env: &common-env anchor 5 env (`${VAR:-default}` pattern, PyYAML 验 merge 入 gateway service ok)
+  - **Commit 8a**: 10 静态层 source-grep test (`scripts/ops/tests/test_pool_env_static.py`) — Python 3.9 本机也能跑 (per memory `feedback_helper_only_test_for_import_blocked_module` — shared/events/__init__.py eager-import event_base.py 用 @dataclass(slots=True) 3.10+ 特性)
+  - **Commit 8b**: 治理 runbook + DEVLOG/progress prepend (本 commit)
+- **决策**: 4 Q user gate (B/A/A/A) — env scope 3 拆 / default 不动 / dead engine 不顺手 / Prometheus 留 Phase B; G10 邻接严守 (cashier_engine/order_service/payment_saga/wine_storage/invoice/emitter/adapter 0 touch)
+- **测试**: 17/17 pass (7 baseline CLI + 10 static env knob)
+- **后续**: §19 reviewer 3 parallel (code/security/critic) round-1 → user explicit-ask gate → admin-merge; Phase A 不 Closes #737 (留 Phase B/C 完成后 narrative comment, per memory `feedback_github_closes_sub_issue_parser.md`)
+
+### 数据变化
+- 新增 Python 文件: 5 (`scripts/ops/__init__.py` + `db_pool_baseline.py` + `tests/__init__.py` + `tests/test_db_pool_baseline.py` + `tests/test_pool_env_static.py`)
+- 新增 docs: 1 (`docs/governance/decisions/2026-05-19-db-pool-baseline-runbook.md`)
+- 修改 Python 源文件: 3 (3 个 pool 源 env knob 注入)
+- 修改 infra 文件: 3 (2 helm values + 1 compose base)
+- 新增测试: 17 (7 CLI + 10 static env knob)
+- alembic migration: 0 (Phase A 基础设施不动 schema)
+
+### 遗留问题
+- Phase B 真测量 W4 起手 (dev 跑 cron 1 周聚合 → 决策矩阵)
+- #738 dead engine line 14 独立 PR (Q3=A)
+
+### 明日计划
+- §19 reviewer 3 parallel 启动 (code/security/critic)
+- round-1 fix (如有) + push
+
+---
+
 ## 2026-05-19 W3 起手 — Prometheus 系统性审计 (#820) 4 Phase 单 PR 闭环
 
 ### 今日完成 (本 session, 1 PR + 4 Phase 收官 #820)

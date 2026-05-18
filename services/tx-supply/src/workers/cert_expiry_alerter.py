@@ -39,7 +39,11 @@ def _get_engine() -> AsyncEngine:
             "DATABASE_URL",
             "postgresql+asyncpg://postgres:postgres@localhost:5432/tunxiang",
         )
-        _engine = create_async_engine(db_url, pool_size=5, max_overflow=10)
+        _engine = create_async_engine(
+            db_url,
+            pool_size=int(os.getenv("CERT_ALERTER_POOL_SIZE", "5")),
+            max_overflow=int(os.getenv("CERT_ALERTER_POOL_OVERFLOW", "10")),
+        )
     return _engine
 
 

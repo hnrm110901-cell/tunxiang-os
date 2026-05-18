@@ -43,6 +43,12 @@ env:
   # 紧急停用走此 env="false" (优先级最高，绕过 SDK)。
   # dev/demo helm 环境如需翻 ON 用 `helm --set env.TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR=true`。
   TX_ANALYTICS_ENABLE_SPLIT_ATTRIBUTION_PROJECTOR: "false"
+  # #737 Phase A DB pool baseline env (W3 起手 G10 邻接) — Phase A 默认值与 ship 前等价
+  # tx-analytics 没有 cert_alerter daemon (tx-supply 独占), 故不暴露 CERT_ALERTER_*.
+  # 详 docs/governance/decisions/2026-05-19-db-pool-baseline-runbook.md
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_POOL_OVERFLOW: "30"
+  ASYNCPG_POOL_MAX: "3"
 
 # Secret中存放的敏感环境变量（由外部Secret Manager注入）
 secretRef:
