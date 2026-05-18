@@ -29,9 +29,8 @@ rule_files:
 # Prometheus pod 启动时挂 Secret tx-metrics-token 到 /etc/prometheus/secrets/
 # (Helm chart 部署改造 follow-up issue).
 #
-# 当前 ready (authorization 已加): gateway + tx-trade + tx-event-relay
-# follow-up: 其他服务渐进迁移 — 见 #825 round-2 立的 follow-up issue
-# (D2 决策矩阵分母覆盖率依赖此 follow-up)
+# 当前 ready (authorization 已加): 全部 emit_event 14 svc — 决策矩阵分母覆盖率 100% (issue #829 ship)
+# (gateway + tx-trade + tx-event-relay = PR #826; 其余 13 svc = PR #829)
 #
 # 本 yml 用 Prometheus 原生 `authorization: type: Bearer` 配置, 自动发 Authorization 头.
 # 实际生效需 Helm chart Secret 挂载 /etc/prometheus/secrets/tx-metrics-token (follow-up).
@@ -57,41 +56,65 @@ scrape_configs:
     static_configs:
       - targets: ['tx-menu:8002']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-member'
     static_configs:
       - targets: ['tx-member:8003']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-growth'
     static_configs:
       - targets: ['tx-growth:8004']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-ops'
     static_configs:
       - targets: ['tx-ops:8005']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-supply'
     static_configs:
       - targets: ['tx-supply:8006']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-finance'
     static_configs:
       - targets: ['tx-finance:8007']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-agent'
     static_configs:
       - targets: ['tx-agent:8008']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-analytics'
     static_configs:
       - targets: ['tx-analytics:8009']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-brain'
     static_configs:
@@ -107,6 +130,9 @@ scrape_configs:
     static_configs:
       - targets: ['tx-org:8012']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-forge'
     static_configs:
@@ -117,21 +143,33 @@ scrape_configs:
     static_configs:
       - targets: ['tx-civic:8014']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-expense'
     static_configs:
       - targets: ['tx-expense:8015']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-pay'
     static_configs:
       - targets: ['tx-pay:8016']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   - job_name: 'tunxiang-tx-devforge'
     static_configs:
       - targets: ['tx-devforge:8017']
     metrics_path: '/metrics'
+    authorization:
+      type: Bearer
+      credentials_file: /etc/prometheus/secrets/tx-metrics-token
 
   # tx-predict: CLAUDE.md §5 标的 8019 (Dockerfile EXPOSE 8013 bug 留 #820-P follow-up)
   - job_name: 'tunxiang-tx-predict'

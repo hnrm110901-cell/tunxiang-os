@@ -54,6 +54,11 @@ app = FastAPI(
 # Prometheus
 Instrumentator().instrument(app).expose(app)
 
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #829, parent #825 W3 D2 决策矩阵分母)
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
+
+app.add_middleware(MetricsAuthMiddleware)
+
 # 中间件注册顺序：starlette 中后注册的先执行（包装在最外层）。
 # 我们希望 CORS 处理 OPTIONS preflight 在 TenantMiddleware 之前完成，
 # 所以 TenantMiddleware 先 add（内层），CORSMiddleware 后 add（外层）。

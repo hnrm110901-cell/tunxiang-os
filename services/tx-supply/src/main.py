@@ -155,6 +155,11 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 Instrumentator().instrument(app).expose(app)
 
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #829, parent #825 W3 D2 决策矩阵分母)
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware  # noqa: E402
+
+app.add_middleware(MetricsAuthMiddleware)
+
 # ── Feature Flag 启动检查 ──────────────────────────────────────────
 # SupplyFlags.RECEIVING_INSPECTION: 收货验收功能（入库加权均价计算）
 if is_enabled(SupplyFlags.RECEIVING_INSPECTION):
