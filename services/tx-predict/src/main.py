@@ -1,4 +1,4 @@
-"""tx-predict — 预测引擎微服务 (port 8013)
+"""tx-predict — 预测引擎微服务 (port 8019)
 
 屯象OS V6.0 核心模块，对标 Toast IQ / Fourth iQ 需求预测能力。
 
@@ -25,7 +25,7 @@ from .api.weather_routes import router as weather_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("tx_predict_started", port=8013)
+    logger.info("tx_predict_started", port=8019)
     yield
     logger.info("tx_predict_stopped")
 
@@ -39,7 +39,13 @@ app = FastAPI(
 
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 Instrumentator().instrument(app).expose(app)
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #849);
+# tx-predict 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 信息泄漏.
+app.add_middleware(MetricsAuthMiddleware)
 
 app.include_router(traffic_router)
 app.include_router(demand_router)

@@ -4,13 +4,23 @@
 """
 
 import os
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+
 logger = structlog.get_logger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    logger.info("tx_forge_started", version="3.0.0", port=8013)
+    yield
 
 from .api.ai_ops_routes import router as ai_ops_router
 from .api.alliance_routes import router as alliance_router
@@ -39,9 +49,14 @@ app = FastAPI(
     title="TunxiangOS tx-forge",
     version="3.0.0",
     description="Forge开发者市场 · ISV管理 · AI OPS · 信任治理 · MCP · Ontology · 结果计价 · Token计量 · 智能发现 · 证据卡片 · 低代码构建 · AI审核 · 跨品牌联盟 · Agent编排 · 生态健康",
+    lifespan=lifespan,
 )
 
 Instrumentator().instrument(app).expose(app)
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #849);
+# tx-forge 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 信息泄漏.
+app.add_middleware(MetricsAuthMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,11 +87,6 @@ app.include_router(auto_review_router, tags=["AI审核"])
 app.include_router(alliance_router, tags=["跨品牌联盟"])
 app.include_router(workflow_router, tags=["Agent编排"])
 app.include_router(ecosystem_router, tags=["生态健康"])
-
-
-@app.on_event("startup")
-async def startup():
-    logger.info("tx_forge_started", version="3.0.0", port=8013)
 
 
 @app.get("/health")
