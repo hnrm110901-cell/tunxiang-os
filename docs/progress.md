@@ -1,3 +1,26 @@
+## 2026-05-18 08:30 · #776 P0 PR-B F#7 webhook secret fail-closed (Tier 1 邻接 explicit-ask 第 38 例)
+
+### 本 PR 状态
+
+- 本 PR (#814): G1 PR-B F#7 `fix/tx-trade-webhook-secret-fail-closed` rebase + tier1 test 通过 (14/14 = 6 新 tier1 + 8 regression) + §19 reviewer round-1 PASS, 走 explicit-ask admin-merge
+- [ ] G2 PR-C F#10 omni_channel — 串行下一 (#776 sub-2)
+- [ ] G3 PR-A F gateway whitelist — G1+G2 后 (#776 sub-3, blockedBy G1+G2)
+
+### 关键决策
+
+- 5/18 09:00 守门会 user cancel → 直接授权 #776 P0 ship
+- 串行 ship 顺序 G1 → G2 → G3: handler 层 fail-closed 必须先于 gateway 白名单 (#776 body 安全约束)
+- dev/test 兼容性: env-gate (仅 prod env 严格 raise)
+- #805 sediment race: 本 PR push 后 main 前进至 7e5f27ae, 二次 rebase 解决 + force-push-with-lease
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 37 → **38**
+- #776 sub-1 / 3 闭合
+- 距 W8 徐记海鲜 DEMO 验收: D-44 天
+
+---
+
 ## 2026-05-18 · Gateway 瘦身 抽 tx-sync-worker Phase 1 (W2 P1 #758, 4/4 explicit-ask A)
 
 ### 完成状态

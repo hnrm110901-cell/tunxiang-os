@@ -1,3 +1,31 @@
+## 2026-05-18 早段 ζ — #776 P0 复活 ship PR-B F#7 webhook secret fail-closed (Tier 1 邻接 explicit-ask 第 38 例)
+
+### 今日完成 (本 session ζ, 1 PR + #776 sub-1 闭合)
+
+- **5/11 残留 P0 复活**: `fix/tx-trade-webhook-secret-fail-closed` 分支休眠 7 天后 ship — 上游链路: 5/11 早创建 (5/11 reviewer 双轮审计 F#7) + 5/17 周末 worktree cleanup audit 揭露 (per `feedback_worktree_audit_three_step`) + 5/18 守门会取消 → user 直接授权 G1 串行启动
+- **F#7 修核心**: `services/tx-trade/src/api/booking_webhook_routes.py:87` 空 `WEBHOOK_SECRET` 改 raise 503 fail-closed (不再"dev/test env assumed" 静默放行); meituan/dianping/wechat 3 调用点 (line 470/501/532) 通过中心 helper `_verify_webhook_signature` 全受益
+- **rebase 模式**: 5/11 base 7 天演化后 ship; src 3 文件 clean 3-way merge apply ✅; DEVLOG/progress 走 `git checkout --ours` + 重 prepend; 中途遭 #805 sediment race (per `feedback_concurrent_session_devlog_sediment`) 二次 rebase 解决
+- **post-rebase caller audit** (per `feedback_post_rebase_caller_audit`): grep `_verify_webhook_signature` 3 caller 行为传播无回归
+- **§19 reviewer round-1 PASS**: 资金/认证安全触发器 0 P0/P1 (3 caller 无 try/except 包裹 / 503 在 DB session 前 raise 无 RLS 泄漏 / 200 桌并发 OK / 断网 4h 不触 Tier 1 数据丢失)
+
+### 安全收益
+
+- P0 攻击向量关闭: 攻击者发空 `X-Meituan-Signature` 即绕过的路径不再可达 (booking webhook 主入口 + 美团/点评/微信 3 channel)
+- prod fail-loud: 部署忘配 `WEBHOOK_SECRET` 不再默默 fail-open, 503 阻断让运维快速发现
+
+### 下一步
+
+- G2 PR-C F#10 omni_channel 4 处 fail-closed (#776 sub-2) — 串行 ship
+- G3 PR-A F gateway whitelist (#776 sub-3) — G1+G2 后 ship (handler 层 fail-closed 必须先于 gateway 白名单; §19 reviewer 重申顺序约束)
+
+### 累计
+
+- Tier 1 邻接 explicit-ask: 37 → **38**
+- #776 P0: sub-1 / 3 闭合
+- 5/18 早段 PR 数: 5 (ε 收官 4 + 本 PR-B)
+
+---
+
 ## 2026-05-18 — Gateway 瘦身 抽 tx-sync-worker Phase 1 (W2 P1 #758, 4/4 explicit-ask A)
 
 ### 今日完成
