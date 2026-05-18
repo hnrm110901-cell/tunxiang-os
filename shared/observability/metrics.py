@@ -19,6 +19,9 @@ from prometheus_fastapi_instrumentator import Instrumentator
 def setup_metrics(app: FastAPI, service_name: str) -> Instrumentator:
     """挂入 Prometheus instrumentator 到 FastAPI app。
 
+    注意: 每个 FastAPI app 实例只能调用一次, 否则 prometheus_client 抛
+    ValueError: Duplicated timeseries (适用于 21 service 渐进迁移)。
+
     Args:
         app: FastAPI 实例
         service_name: 当前服务名 (eg. "gateway", "tx-trade"), 当前未直接用,

@@ -95,3 +95,28 @@ def test_known_dockerfile_bugs_register_contains_tx_predict() -> None:
     assert expected_prom == 8019
     assert expected_docker == 8013
     assert "#820-P" in follow_up
+
+
+def test_main_returns_one_on_mismatch(tmp_path: Path) -> None:
+    """mismatch (prom_port ≠ dockerfile_port) → main() 返回 1."""
+    mod = _load_module()
+    yml = tmp_path / "p.yml"
+    yml.write_text(
+        """
+global:
+  scrape_interval: 15s
+scrape_configs:
+  - job_name: 'tunxiang-tx-trade'
+    static_configs:
+      - targets: ['tx-trade:9999']
+    metrics_path: '/metrics'
+"""
+    )
+    dockerfile = tmp_path / "services" / "tx-trade" / "Dockerfile"
+    dockerfile.parent.mkdir(parents=True)
+    dockerfile.write_text('CMD ["uvicorn", "--port", "8001"]\n')
+
+    with patch.object(mod, "PROMETHEUS_YML", yml), \
+         patch.object(mod, "SERVICES_DIR", tmp_path / "services"):
+        rc = mod.main()
+    assert rc == 1, "port mismatch 应 return 1"
