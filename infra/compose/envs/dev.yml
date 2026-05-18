@@ -344,6 +344,25 @@ services:
       - ../../services/tx-event-relay:/app/services/tx-event-relay
       - ../../shared:/app/shared
 
+  # ── tx-sync-worker 品智POS 同步 + 企微 daily SOP daemon (W2 issue #758) ──
+  tx-sync-worker:
+    image: python:3.11-slim
+    working_dir: /app
+    command: >
+      sh -c "pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple -r services/tx-sync-worker/requirements.txt &&
+             uvicorn services.tx_sync_worker.src.main:app --host 0.0.0.0 --port 8021 --reload"
+    ports:
+      - "8021:8021"
+    environment:
+      TX_AUTH_ENABLED: "false"
+      LOG_LEVEL: DEBUG
+      RUN_MODE: "dry_run"
+      SYNC_TIMEZONE: "Asia/Shanghai"
+    volumes:
+      - ../../services/tx-sync-worker:/app/services/tx-sync-worker
+      - ../../services/gateway:/app/services/gateway
+      - ../../shared:/app/shared
+
   # ── 边缘同步引擎（profile=edge 才启动）────────────────────
   sync-engine:
     build:
