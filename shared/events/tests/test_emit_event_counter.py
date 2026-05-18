@@ -16,7 +16,7 @@ from uuid import UUID
 
 import pytest
 
-from shared.events.src.emitter import _tenant_id_short, emit_event, tx_emit_event_total
+from shared.events.src.emitter import _tenant_id_short, emit_event
 
 TENANT_A = UUID("11111111-1111-1111-1111-111111111111")
 TENANT_B = UUID("22222222-2222-2222-2222-222222222222")
