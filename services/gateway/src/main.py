@@ -8,7 +8,8 @@ from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from prometheus_fastapi_instrumentator import Instrumentator
+
+from shared.observability import setup_metrics
 
 from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
 
@@ -50,7 +51,8 @@ app = FastAPI(
     description="AI-Native Restaurant Chain Operating System",
 )
 
-Instrumentator().instrument(app).expose(app)
+# Phase C.3 (#820) — 统一 metrics 入口, 22 service 渐进迁移 (follow-up #820-I)
+setup_metrics(app, service_name="gateway")
 
 # 中间件：先 add 的层更靠近路由；最后 add 的层最先收到请求。
 # 目标入站链：CORS → MetricsAuth → Audit → 日志 → ApiKey → Auth → DomainAuthz → Tenant → Personalization → 路由
