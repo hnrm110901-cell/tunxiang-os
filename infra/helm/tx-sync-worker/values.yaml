@@ -34,6 +34,9 @@ env:
   RUN_MODE: "dry_run"
   # 同步时区 (与 gateway sync_scheduler.py:595 一致, plan §7.2 timezone drift 缓解)
   SYNC_TIMEZONE: "Asia/Shanghai"
+  # 容器时区显式声明 (与 compose common-env / Dockerfile ENV TZ 一致, round-1 reviewer P2-3)
+  # ⚠️ 不可省 — 仅靠 Dockerfile 兜底, 若运维通过 envFrom secretRef 注入同名 TZ 会覆盖
+  TZ: "Asia/Shanghai"
 
 # Secret 注入 DATABASE_URL / REDIS_URL / CZYZ_TENANT_ID / ZQX_TENANT_ID / SGC_TENANT_ID
 # (与 gateway 模式一致)
