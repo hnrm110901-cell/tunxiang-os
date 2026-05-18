@@ -9,6 +9,7 @@
 旧接口（Redis Streams）保留兼容，新代码统一使用 emit_event。
 """
 
+from . import outbox_repo
 from .consumer import EventConsumer
 from .emitter import emit_event, emits
 from .event_base import TxEvent
@@ -44,6 +45,7 @@ from .middleware import (
     LoggingMiddleware,
     TenantIsolationMiddleware,
 )
+from .outbox_repo import OutboxInsertError
 from .pg_event_store import PgEventStore
 from .pg_notify import PgListener, PgNotifier
 from .projector import ProjectorBase
@@ -79,6 +81,9 @@ __all__ = [
     "emit_event",  # 平行事件发射器（Redis + PG）
     "emits",  # 装饰器版发射器
     "ProjectorBase",  # 投影器基类
+    # ── 真 Outbox helper (W3 D1 PR-1, 留 W4 #760 / W5 #768 真接入) ──
+    "outbox_repo",  # trade_event_outbox 同事务 INSERT helper 模块
+    "OutboxInsertError",  # outbox INSERT 失败异常
     # ── Redis Stream（保留兼容）──
     "EventPublisher",
     "EventConsumer",
