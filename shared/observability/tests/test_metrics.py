@@ -14,8 +14,8 @@ import pytest
 
 def _has_instrumentator() -> bool:
     try:
-        import prometheus_fastapi_instrumentator  # noqa: F401
         import fastapi  # noqa: F401
+        import prometheus_fastapi_instrumentator  # noqa: F401
     except ImportError:
         return False
     return True
