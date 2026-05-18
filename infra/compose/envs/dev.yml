@@ -270,6 +270,9 @@ services:
              uvicorn services.tx-pay.src.main:app --host 0.0.0.0 --port 8016 --reload"
     ports:
       - "8016:8016"
+    environment:
+      PROMETHEUS_AUTH_ENFORCE: "true"
+      PROMETHEUS_BEARER_TOKEN: "${PROMETHEUS_BEARER_TOKEN}"
     volumes:
       - ../../services/tx-pay:/app/services/tx-pay
       - ../../shared:/app/shared

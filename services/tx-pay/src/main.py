@@ -15,6 +15,9 @@ import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from shared.middleware.src.metrics_auth import MetricsAuthMiddleware
+from shared.observability import setup_metrics
+
 logger = structlog.get_logger(__name__)
 
 
@@ -80,7 +83,18 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
+# Phase C.3 (#820 / #847) — 统一 metrics 入口 (helper 已设 excluded_handlers=["/metrics"] +
+# include_in_schema=False, /metrics 不入 OpenAPI 公开 schema)。tx-pay 是 §17 Tier 1 资金路径,
+# 首次公开 /metrics 必须配 MetricsAuthMiddleware Bearer + IP allowlist (issue #825 / #847)。
+setup_metrics(app, service_name="tx-pay")
+
+# /metrics 端点 Bearer + IP allowlist 鉴权 (issue #825 / #847);
+# tx-pay 无 AuthMiddleware (gateway 反代后内网调用), /metrics 默认开放 → 严重信息泄漏.
+# 紧靠 CORS 内侧 (与 gateway 试点对齐); CORS OPTIONS preflight 在最外层
+# 直接 204 返回, 不进 metrics 鉴权链. Starlette LIFO: 最后 add = 最外层.
+app.add_middleware(MetricsAuthMiddleware)
+
+# CORS — 最后 add = 最外层 (preflight 不进 metrics 鉴权链)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:5173").split(","),
