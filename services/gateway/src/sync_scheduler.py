@@ -399,6 +399,7 @@ async def _with_retry(coro_factory: Any, sync_type: str, merchant_code: str) -> 
 # ── 调度任务入口 ─────────────────────────────────────────────────────────────
 
 
+# DO NOT CALL — see create_sync_scheduler banner above (#806 Step 1).
 async def _run_dishes_sync() -> None:
     """每日 02:00 — 全量拉取三商户菜品（并行）。"""
     log = logger.bind(job="daily_dishes_sync")
@@ -438,6 +439,7 @@ async def _run_dishes_sync() -> None:
     log.info("daily_dishes_sync_finished")
 
 
+# DO NOT CALL — see create_sync_scheduler banner above (#806 Step 1).
 async def _run_master_data_sync() -> None:
     """每日 03:00 — 全量拉取三商户员工 + 桌台基础资料（并行）。"""
     log = logger.bind(job="daily_master_data_sync")
@@ -496,6 +498,7 @@ async def _run_master_data_sync() -> None:
     log.info("daily_master_data_sync_finished")
 
 
+# DO NOT CALL — see create_sync_scheduler banner above (#806 Step 1).
 async def _run_orders_incremental_sync() -> None:
     """每小时 — 增量拉取三商户当日订单（并行）。"""
     log = logger.bind(job="hourly_orders_incremental_sync")
@@ -536,6 +539,7 @@ async def _run_orders_incremental_sync() -> None:
     log.info("hourly_orders_incremental_sync_finished")
 
 
+# DO NOT CALL — see create_sync_scheduler banner above (#806 Step 1).
 async def _run_members_incremental_sync() -> None:
     """每15分钟 — 增量拉取三商户会员变更（并行）。"""
     log = logger.bind(job="quarter_members_incremental_sync")
@@ -578,7 +582,13 @@ async def _run_members_incremental_sync() -> None:
 
 # ── 调度器工厂 ───────────────────────────────────────────────────────────────
 
-
+# DO NOT CALL — gateway scheduler removed per #806 Step 1 (2026-05-19).
+# This factory function is unreachable from main.py; calling it would
+# resurrect dual-fire P0 risk per
+# docs/governance/decisions/2026-05-18-tx-sync-worker-shadow-approval.md §6.
+# Step 2 PR (RUN_MODE=live flip + this file's cron half cleanup) — tracked in
+# parent issue #806. Until then, `sync_router` (alias `sync_health_router` in
+# main.py) is the only reachable symbol from this module.
 def create_sync_scheduler() -> AsyncIOScheduler:
     """
     创建并配置数据同步调度器。

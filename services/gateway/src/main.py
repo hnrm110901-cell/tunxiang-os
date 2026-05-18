@@ -1,9 +1,7 @@
 """TunxiangOS API Gateway — 统一入口，按域路由到各微服务"""
 
-import asyncio
 import os
 
-import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -38,8 +36,6 @@ from .wecom_jssdk import router as wecom_jssdk_router
 from .wecom_notify_routes import router as wecom_notify_router
 from .wecom_routes import router as wecom_router
 from .wecom_scrm_routes import router as wecom_scrm_router
-
-logger = structlog.get_logger(__name__)
 
 app = FastAPI(
     title="TunxiangOS Gateway",
