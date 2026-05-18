@@ -28,7 +28,6 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 import structlog
-from apscheduler.schedulers.asyncio import AsyncIOScheduler  # noqa: F401 — re-exported
 
 from ..metrics import (
     sync_duration_seconds,
