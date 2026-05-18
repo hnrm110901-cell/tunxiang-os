@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import hashlib
 from typing import Any, Callable, Optional
 from uuid import UUID
 
@@ -49,7 +50,52 @@ from .event_base import TxEvent
 from .pg_event_store import PgEventStore
 from .publisher import EventPublisher
 
+# W3 D2 PR-1 (战略 plan §6 真 Outbox 决策矩阵分母): tx_emit_event_total Counter
+# 当前 emit_event 是 fire-and-forget (PG 写入失败静默 swallow), 无任何观测点;
+# Phase 1 一周 shadow + 决策矩阵需要"发起总数"作分母与 outbox_relay_published_total
+# 比对失败率, 不加 Counter 则 W11 切换决策无数据基础 (#757 + #767 依赖).
+#
+# fail-open import 模式对齐 services/tx-trade/src/metrics.py (PR #227 round-2):
+# CI Tier 1 test runner 不装 prometheus_client transitive 依赖, 用 no-op stub 兜底
+# (feedback_tier1_ci_minimal_deps_trap.md). prod runtime 由 prometheus-fastapi-
+# instrumentator 在 main.py 启动时挂载真 Counter, /metrics 端点自动暴露.
+try:
+    from prometheus_client import Counter
+except ImportError:  # pragma: no cover — CI Tier 1 fallback
+    class Counter:  # type: ignore[no-redef]
+        """no-op stub for environments without prometheus_client."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            pass
+
+        def labels(self, *args: object, **kwargs: object) -> "Counter":
+            return self
+
+        def inc(self, *args: object, **kwargs: object) -> None:
+            pass
+
 logger = structlog.get_logger(__name__)
+
+# emit_event 发起计数 (Phase 1 决策矩阵分母).
+# 标签策略:
+#   - tenant_id_short: sha256(tenant_id)[:8] 防 cardinality 爆 (active tenant <100,
+#     hash space 2^32, 实际基数受 active tenant 数约束); 不暴露原 UUID 给 metrics
+#   - event_type:      点分字符串 (如 "order.paid"), 业务可控基数 (~50)
+#   - source_service:  来源服务名 (如 "tx-trade"), 基数 ≤ 20
+# 总 cardinality ≈ 100 * 50 * 20 = 100k 上限, Prometheus 单 metric 推荐 < 1M.
+tx_emit_event_total = Counter(
+    "tx_emit_event_total",
+    "Total business events emitted via emit_event() (Phase 1 真 Outbox shadow 决策矩阵分母).",
+    ["tenant_id_short", "event_type", "source_service"],
+)
+
+
+def _tenant_id_short(tenant_id: UUID | str) -> str:
+    """计算 tenant_id 的稳定短哈希 (sha256 前 8 hex).
+
+    同 tenant_id 多次调用结果一致, 防 Prometheus label cardinality 爆.
+    """
+    return hashlib.sha256(str(tenant_id).encode()).hexdigest()[:8]
 
 # 模块级 Redis 发布器单例（复用连接）
 _redis_publisher: Optional[EventPublisher] = None
@@ -97,6 +143,16 @@ async def emit_event(
         if hasattr(event_type, "value")
         else str(event_type)
     )
+
+    # ── 发起计数 (W3 D2 PR-1 决策矩阵分母, 算"发起"不算"成功") ──
+    # 在 Redis / PG 写入前 .inc(), 即使后续写入静默失败也计入分母,
+    # tx-event-relay shadow 用 outbox_relay_published_total 作分子算失败率.
+    # NoOp stub 路径不抛, 真 Counter 路径走 lock-free atomic add (Prometheus 内置).
+    tx_emit_event_total.labels(
+        tenant_id_short=_tenant_id_short(tenant_id),
+        event_type=event_type_str,
+        source_service=source_service,
+    ).inc()
 
     # ── Redis Stream 写入（实时推送，投影器实时触发）──
     redis_task = asyncio.create_task(
