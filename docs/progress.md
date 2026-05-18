@@ -1,3 +1,20 @@
+## 2026-05-19 · A5 #737 helm DSN pool baseline Phase A 基础设施 (W3 G10 邻接 / Tier 1 邻接 explicit-ask 第 NN 例)
+
+### 本 PR 状态
+
+- 本 PR: `feat/db-pool-baseline-737-2026-05-19` (Tier 1 邻接, 8 commit Phase A 基础设施)
+- 范围: 3 个 pool 源 env knob (`DATABASE_POOL_SIZE` + `DATABASE_POOL_OVERFLOW` + `ASYNCPG_POOL_MAX` + `CERT_ALERTER_POOL_SIZE`/`OVERFLOW`) + 测量 CLI (`scripts/ops/db_pool_baseline.py`) + helm/compose values + runbook (`docs/governance/decisions/2026-05-19-db-pool-baseline-runbook.md`)
+- 决策: 4 Q user gate (B/A/A/A) — env scope 3 拆 / default 不动 (Q2=A regression-safe) / dead engine #738 独立 PR / Prometheus 留 Phase B
+- 红线 0 touch: cashier_engine / order_service / payment_saga / wine_storage / invoice / emitter / pinzhi_pos / aoqiwei / meituan (`git diff --name-only origin/main..HEAD` 0 match)
+- 测试: 17/17 pass (7 CLI + 10 source-grep static — 后者绕开本机 Python 3.9 vs CI 3.11 版本不兼容)
+
+### 下一步
+
+- §19 reviewer 3 parallel (code/security/critic) round-1
+- round-1 fix (如有) + admin-merge gate
+
+---
+
 ## 2026-05-19 · #820 W3 起手 — Prometheus 系统性审计 4 Phase 单 PR 闭环 (Tier 1 邻接 explicit-ask 第 41 例)
 
 ### 本 PR 状态
