@@ -47,6 +47,60 @@
 
 ---
 
+## 2026-05-18 末段 ω session — W3 D2 P2 metrics auth 三 lane 收官 (Tier 1 邻接 explicit-ask 第 43→45 例) + 5/18 全天 closing summary
+
+> **注**: 5/19 W3 起手 entry 实为 5/18 14:14 CST PR #835 ship 时并发 session 标错日期, 内容已在该 entry 详写; 此处不重复. 本 entry 聚焦 5/18 末段 W3 D2 P2 三 lane 与 5/18 全天 closing summary, 不复述 5/18 早段 θ/η/ζ 散段 entry 已写过的 #776 P0 复活内容.
+
+### W3 D2 P2 metrics auth 三 lane (07:25-08:11Z = 15:25-16:11 CST) — 3 PR + 3 follow-up issue + 2 lesson 落盘
+
+- 07:25Z **#843** `[T2邻接][infra] feat(helm): backend svc Secret 挂载 PROMETHEUS_BEARER_TOKEN env (#830 Plan A)` — Lane B, Tier 1 邻接 explicit-ask 第 **43 例**, chart default `enabled: false` 向后兼容
+- 07:25Z **#840** `[T2邻接][ops] feat(infra/compose): dev compose Prometheus e2e scrape verify (#831)` — Lane C, Tier 1 邻接 explicit-ask 第 **44 例**, round-2 P0 docker compose v2 multi-file 相对路径解析陷阱 (feedback memory `feedback_docker_compose_v2_path_resolution` 落盘) + round-2 critic-only re-verify 节约 67% (feedback memory `feedback_round2_critic_only_pattern` 落盘)
+- 08:11Z **#845** `[T1邻接] feat(12 svc): MetricsAuthMiddleware mount + prometheus.yml 12 job authorization (#829, post-SPLIT)` — Lane A, Tier 1 邻接 explicit-ask 第 **45 例**. round-1 三 reviewer (code+security+critic opus 并行) REQUEST_CHANGES — critic 独立揭露 tx-pay scope creep (Tier 1 资金路径 first-time /metrics 暴露, feedback memory `feedback_scope_creep_via_preexisting_gap_fill` 落盘) → SPLIT 路径采纳 → round-2 fix 6 条 (tx-pay revert / dev.yml 12 svc env / prometheus.yml 注释 / PR body §0 真分母 7.14%→92.86%→100% / scope 收紧 / smoke test grep-verify 模式) → round-2 critic-only re-verify APPROVE → admin-merge carve-out
+
+立 3 follow-up issue (#845 round-1 整合):
+- **#847** `[T1邻接] tx-pay Instrumentator + MetricsAuth 单 PR — SPLIT from #845 / security 重审 label cardinality` (Tier 1 资金路径独立审)
+- **#848** `[T2邻接][deploy-blocking] 13 svc Helm chart 加 prometheus.metricsToken Secret mount block — #845 prod deploy pre-req` (prod 推前 MUST CLOSE)
+- **#849** `[T2邻接] 5 svc /metrics auth 覆盖 — tx-brain/tx-intel/tx-forge/tx-predict/tx-sync-worker 信息泄漏 follow-up #845`
+
+### 5/18 全天 closing summary (verified `gh pr list --search "merged:>=2026-05-18"` = 16 PR)
+
+- **早段 W2 收官 + #776 P0 复活** (01:31-02:35Z = 09:31-10:35 CST, 5 PR): #805 / #814 / #817 / #818 / #819 (详见早段 θ/η/ζ entry)
+- **中段 W3 D 阶段起手** (04:46-06:05Z = 12:46-14:05 CST, 5 PR + 立 #825): #823 第 41 例 (round-1 critic 揭露 2 CRITICAL P0, `feedback_critic_independent_third_perspective` 落盘) / #824 W3-Prep-1 rollback runbook / #826 第 42 例 MetricsAuthMiddleware fail-loud contract / #827 W3 D3 Prep-3 sync_logs 对账 / #828 outbox_repo helper
+- **中段后 #820 治理** (06:14-06:44Z = 14:14-14:44 CST, 3 PR): #835 (5/19 entry 详写 4 Phase) / #839 promtool credentials_file CI fix (`feedback_promtool_credentials_file_ci_fail` 落盘) / #842 rollback procedure docs
+- **末段 W3 D2 P2 三 lane** (07:25-08:11Z, 见上)
+
+### 量化指标
+
+- **PR ship**: 16 (5 早段 + 5 中段 W3 D + 3 中段后 #820 + 3 末段 W3 D2 P2 三 lane)
+- **新增 issue**: 4 (#825 + #847 + #848 + #849)
+- **新增 feedback memory**: 6 落盘 (`feedback_shadow_mode_reconciliation_design` / `feedback_critic_independent_third_perspective` 增补 / `feedback_promtool_credentials_file_ci_fail` / `feedback_docker_compose_v2_path_resolution` / `feedback_round2_critic_only_pattern` / `feedback_scope_creep_via_preexisting_gap_fill`)
+- **Tier 1 邻接 explicit-ask 累计**: 40 (5/17 ζ #784) → 41 (#823) → 42 (#826) → 43 (#843) → 44 (#840) → **45** (#845)
+- **OMC team 流程峰值**: 3 reviewer 并行 (PR #823 round-1+2+3 / PR #845 round-1) + executor opus round-2 fix + critic-only round-2 re-verify (节约 67%) + scope creep SPLIT 拆 3 follow-up issue 模式实战
+- **main HEAD**: `435d98eb` (5/17 W21 end) → `49837a14` (5/18 末段 #845 = 16 PR)
+
+### 关键学习沉淀 (本日 6 个 feedback memory 落盘)
+
+1. **`feedback_shadow_mode_reconciliation_design`** — dry_run/shadow 路径不写业务表时, Phase 1 一周对账必须 Prometheus query 比对 (非 sync_logs join)
+2. **`feedback_critic_independent_third_perspective`** (PR #823 + #845 双实战增补) — §19 critic opus 独立第三视角不可省, code+security 都 APPROVE 仍可漏设计层 P0/P1
+3. **`feedback_promtool_credentials_file_ci_fail`** — `authorization: Bearer + credentials_file` 让 CI runner promtool 强校验文件 → exit 1; 本地 PASS 不代表 CI PASS (双轨)
+4. **`feedback_docker_compose_v2_path_resolution`** — docker compose v2 multi-file 相对路径以第一个 -f 文件目录为 project dir; round-1 三 reviewer 全漏抓, e2e 真跑暴露
+5. **`feedback_round2_critic_only_pattern`** — round-1 code+security APPROVE / critic REQUEST_CHANGES 时 round-2 仅 spawn critic re-verify P0/P1 fix; 节约 67% reviewer 成本
+6. **`feedback_scope_creep_via_preexisting_gap_fill`** — Tier 1 邻接 PR 内 executor 顺补 Tier 1 本体 pre-existing gap (如 tx-pay 首次加 Instrumentator+/metrics) 实为 first-time 改动 Tier 1, code/security 单文件看不出, critic `git show origin/main` 才识别; 必须 SPLIT 单 PR
+
+### 遗留问题
+
+- **#847** tx-pay Instrumentator + MetricsAuth 单 PR (security 重审 label cardinality / 第三方 vendor 名称 / NetPol)
+- **#848** 13 chart Helm prometheus.metricsToken Secret block (deploy-blocking, prod 推前 MUST CLOSE 防 CrashLoopBackOff)
+- **#849** 5 svc /metrics auth 覆盖 (tx-brain/tx-intel/tx-forge/tx-predict/tx-sync-worker)
+
+### 明日计划 (5/19 周二)
+
+- **W3 D 阶段继续** — 接 D3 W3-Prep-2 Prometheus scrape 系统性 audit 2 chart 子集
+- **#847 tx-pay SPLIT PR** (独立 §19 security 重审)
+- **#848 deploy-blocking** (13 chart Helm Secret block ship 前 prod 推迟)
+
+---
+
 ## 2026-05-18 早段 θ — #776 P0 复活 ship PR-A F gateway 第三方回调白名单 + 收官 (Tier 1 邻接 explicit-ask 第 40 例)
 
 ### 今日完成 (本 session θ, 1 PR + #776 P0 全闭合)
