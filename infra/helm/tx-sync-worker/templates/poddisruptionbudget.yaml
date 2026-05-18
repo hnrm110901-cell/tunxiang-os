@@ -1,0 +1,24 @@
+{{/*
+PodDisruptionBudget — W2 P1 #758 创始人 Q4 决议: T2 maxU=1 enabled.
+Phase 1 dry_run 期间 PDB 不触发 (无 disruption); Phase 2 切单轨后 tx-sync-worker
+是唯一同步入口, K8s 蓝绿部署期间剪掉单 pod 致 cron miss (品智 POS 当日订单丢失).
+values.yaml 默认 pdb.enabled=true (Q4 决议). 启用时通过 .Values.pdb.minAvailable /
+.Values.pdb.maxUnavailable (互斥, 模板优先 minAvailable).
+*/}}
+{{- if .Values.pdb.enabled -}}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "tx-sync-worker.fullname" . }}
+  labels:
+    {{- include "tx-sync-worker.labels" . | nindent 4 }}
+spec:
+  {{- if .Values.pdb.minAvailable }}
+  minAvailable: {{ .Values.pdb.minAvailable }}
+  {{- else if .Values.pdb.maxUnavailable }}
+  maxUnavailable: {{ .Values.pdb.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tx-sync-worker.selectorLabels" . | nindent 6 }}
+{{- end }}
